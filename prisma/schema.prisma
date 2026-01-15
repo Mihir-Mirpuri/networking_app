@@ -1,0 +1,169 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Account {
+  id                       String  @id @default(cuid())
+  userId                   String
+  type                     String
+  provider                 String
+  providerAccountId        String
+  refresh_token            String?
+  access_token             String?
+  expires_at               Int?
+  token_type               String?
+  scope                    String?
+  id_token                 String?
+  session_state            String?
+  refresh_token_expires_in Int?
+  user                     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id             String     @id @default(cuid())
+  name           String?
+  email          String?    @unique
+  emailVerified  DateTime?
+  image          String?
+  dailySendCount Int        @default(0)
+  lastSendDate   DateTime?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  accounts       Account[]
+  campaigns      Campaign[]
+  sendLogs       SendLog[]
+  sessions       Session[]
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Campaign {
+  id                 String         @id @default(cuid())
+  userId             String
+  name               String
+  school             String
+  company            String
+  roleKeywords       String[]
+  templateSubject    String         @default("Reaching out from {school}")
+  templateBody       String         @default("Hi {first_name},\n\nI'm a student at {school} and I'm very interested in {company}. I'd love to learn more about your experience there.\n\nWould you be open to a brief chat?\n\nBest regards")
+  status             CampaignStatus @default(CREATED)
+  discoveryProgress  Int            @default(0)
+  enrichmentProgress Int            @default(0)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  user               User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  candidates         Candidate[]
+}
+
+model Candidate {
+  id                   String       @id @default(cuid())
+  campaignId           String
+  fullName             String
+  firstName            String?
+  lastName             String?
+  company              String
+  role                 String?
+  email                String?
+  emailStatus          EmailStatus  @default(MISSING)
+  emailConfidence      Float?
+  manualEmailConfirmed Boolean      @default(false)
+  sendStatus           SendStatus   @default(NOT_SENT)
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+  campaign             Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  emailDraft           EmailDraft?
+  sendLogs             SendLog[]
+  sourceLinks          SourceLink[]
+
+  @@unique([campaignId, fullName, company])
+}
+
+model SourceLink {
+  id          String         @id @default(cuid())
+  candidateId String
+  kind        SourceLinkKind
+  url         String
+  title       String
+  snippet     String?
+  domain      String?
+  createdAt   DateTime       @default(now())
+  candidate   Candidate      @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+}
+
+model EmailDraft {
+  id          String    @id @default(cuid())
+  candidateId String    @unique
+  subject     String
+  body        String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+}
+
+model SendLog {
+  id             String        @id @default(cuid())
+  userId         String
+  candidateId    String
+  toEmail        String
+  subject        String
+  body           String
+  status         SendLogStatus
+  errorMessage   String?
+  gmailMessageId String?
+  sentAt         DateTime      @default(now())
+  candidate      Candidate     @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum CampaignStatus {
+  CREATED
+  DISCOVERING
+  DISCOVERED
+  ENRICHING
+  READY
+  ERROR
+}
+
+enum EmailStatus {
+  MISSING
+  UNVERIFIED
+  VERIFIED
+  MANUAL
+}
+
+enum SendStatus {
+  NOT_SENT
+  SENT
+  FAILED
+}
+
+enum SourceLinkKind {
+  DISCOVERY
+  RESEARCH
+}
+
+enum SendLogStatus {
+  SUCCESS
+  FAILED
+}
