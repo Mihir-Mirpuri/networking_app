@@ -1,7 +1,4 @@
-import prisma from '@/lib/prisma';
-
 const APOLLO_API_KEY = process.env.APOLLO_API_KEY;
-console.log('Apollo API Key configured:', APOLLO_API_KEY ? 'Yes' : 'No');
 
 interface ApolloPersonMatch {
   email: string;
@@ -14,17 +11,23 @@ interface ApolloResponse {
   error?: string;
 }
 
-async function enrichWithApollo(
+export interface EmailResult {
+  email: string | null;
+  status: 'VERIFIED' | 'UNVERIFIED' | 'MISSING';
+  confidence: number;
+}
+
+export async function findEmail(
   firstName: string,
   lastName: string,
   company: string
-): Promise<{ email: string | null; status: 'VERIFIED' | 'UNVERIFIED'; confidence: number } | null> {
+): Promise<EmailResult> {
   if (!APOLLO_API_KEY) {
-    console.log('No Apollo API key - skipping enrichment');
-    return null;
+    console.log('No Apollo API key - skipping email lookup');
+    return { email: null, status: 'MISSING', confidence: 0 };
   }
 
-  console.log(`Enriching: ${firstName} ${lastName} at ${company}`);
+  console.log(`Looking up email for: ${firstName} ${lastName} at ${company}`);
 
   try {
     const response = await fetch('https://api.apollo.io/v1/people/match', {
@@ -44,11 +47,10 @@ async function enrichWithApollo(
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Apollo API error:', response.status, errorText);
-      return null;
+      return { email: null, status: 'MISSING', confidence: 0 };
     }
 
     const data: ApolloResponse = await response.json();
-    console.log(`Apollo response for ${firstName} ${lastName}:`, JSON.stringify(data, null, 2));
 
     if (data.person?.email) {
       const isVerified = data.person.email_status === 'verified';
@@ -61,85 +63,38 @@ async function enrichWithApollo(
     }
 
     console.log(`No email found for ${firstName} ${lastName}`);
-    return null;
+    return { email: null, status: 'MISSING', confidence: 0 };
   } catch (error) {
     console.error('Apollo enrichment error:', error);
-    return null;
+    return { email: null, status: 'MISSING', confidence: 0 };
   }
 }
 
-export async function runEnrichment(campaignId: string) {
-  const campaign = await prisma.campaign.findUnique({
-    where: { id: campaignId },
-    include: { candidates: true },
-  });
+export interface PersonToEnrich {
+  firstName: string | null;
+  lastName: string | null;
+  company: string;
+}
 
-  if (!campaign) {
-    throw new Error('Campaign not found');
-  }
+export async function enrichPeople(
+  people: PersonToEnrich[]
+): Promise<Map<string, EmailResult>> {
+  const results = new Map<string, EmailResult>();
 
-  const candidates = campaign.candidates;
-  let enrichedCount = 0;
-
-  for (let i = 0; i < candidates.length; i++) {
-    const candidate = candidates[i];
-
-    if (!candidate.firstName || !candidate.lastName) {
+  for (const person of people) {
+    if (!person.firstName || !person.lastName) {
+      const key = `${person.firstName || ''}_${person.lastName || ''}_${person.company}`;
+      results.set(key, { email: null, status: 'MISSING', confidence: 0 });
       continue;
     }
 
-    if (!APOLLO_API_KEY) {
-      // Mark as missing if no API key
-      await prisma.candidate.update({
-        where: { id: candidate.id },
-        data: { emailStatus: 'MISSING' },
-      });
-      continue;
-    }
+    const key = `${person.firstName}_${person.lastName}_${person.company}`;
+    const result = await findEmail(person.firstName, person.lastName, person.company);
+    results.set(key, result);
 
-    const result = await enrichWithApollo(
-      candidate.firstName,
-      candidate.lastName,
-      candidate.company
-    );
-
-    if (result) {
-      await prisma.candidate.update({
-        where: { id: candidate.id },
-        data: {
-          email: result.email,
-          emailStatus: result.status,
-          emailConfidence: result.confidence,
-        },
-      });
-      enrichedCount++;
-    } else {
-      await prisma.candidate.update({
-        where: { id: candidate.id },
-        data: { emailStatus: 'UNVERIFIED' },
-      });
-    }
-
-    // Update progress
-    await prisma.campaign.update({
-      where: { id: campaignId },
-      data: {
-        enrichmentProgress: Math.round(((i + 1) / candidates.length) * 100),
-      },
-    });
-
-    // Rate limiting
+    // Rate limiting between API calls
     await new Promise((r) => setTimeout(r, 300));
   }
 
-  // Update campaign status
-  await prisma.campaign.update({
-    where: { id: campaignId },
-    data: {
-      status: 'READY',
-      enrichmentProgress: 100,
-    },
-  });
-
-  return enrichedCount;
+  return results;
 }

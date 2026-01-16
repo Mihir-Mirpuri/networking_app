@@ -1,5 +1,3 @@
-import prisma from '@/lib/prisma';
-
 const CSE_API_KEY = process.env.GOOGLE_CSE_API_KEY;
 const CSE_CX = process.env.GOOGLE_CSE_CX || 'bf53ffdb484f145c5';
 
@@ -12,6 +10,25 @@ interface CSEResult {
 
 interface CSEResponse {
   items?: CSEResult[];
+}
+
+export interface SearchParams {
+  university: string;
+  company: string;
+  role: string;
+  limit: number;
+}
+
+export interface SearchResult {
+  fullName: string;
+  firstName: string | null;
+  lastName: string | null;
+  company: string;
+  role: string | null;
+  sourceUrl: string;
+  sourceTitle: string;
+  sourceSnippet: string;
+  sourceDomain: string;
 }
 
 async function searchCSE(query: string): Promise<CSEResult[]> {
@@ -99,47 +116,30 @@ function normalizeKey(name: string, company: string, url: string): string {
   return `${name.toLowerCase().replace(/\s+/g, '_')}_${company.toLowerCase().replace(/\s+/g, '_')}_${url}`;
 }
 
-export async function runDiscovery(campaignId: string) {
-  const campaign = await prisma.campaign.findUnique({
-    where: { id: campaignId },
-  });
+export async function searchPeople(params: SearchParams): Promise<SearchResult[]> {
+  const { university, company, role, limit } = params;
 
-  if (!campaign) {
-    throw new Error('Campaign not found');
-  }
-
-  const { school, company, roleKeywords } = campaign;
-
-  // Generate multiple queries to reach ~30 candidates
+  // Generate multiple queries to find candidates
   const queries = [
-    `${school} ${company} ${roleKeywords[0] || 'analyst'}`,
-    `"${school}" "${company}" alumni`,
-    `${company} "${school}" analyst`,
-    `site:linkedin.com "${school}" "${company}"`,
-    `"${school}" alumni ${company} ${roleKeywords[1] || 'associate'}`,
-    `${school} ${company} finance`,
+    `${university} ${company} ${role}`,
+    `"${university}" "${company}" alumni`,
+    `${company} "${university}" ${role}`,
+    `site:linkedin.com "${university}" "${company}"`,
+    `"${university}" alumni ${company}`,
+    `${university} ${company} finance`,
   ];
 
   const seenKeys = new Set<string>();
-  const candidates: Array<{
-    fullName: string;
-    firstName: string | null;
-    lastName: string | null;
-    company: string;
-    role: string | null;
-    sourceUrl: string;
-    sourceTitle: string;
-    sourceSnippet: string;
-    sourceDomain: string;
-  }> = [];
-
-  let progress = 0;
-  const totalQueries = queries.length;
+  const candidates: SearchResult[] = [];
 
   for (const query of queries) {
+    if (candidates.length >= limit) break;
+
     const results = await searchCSE(query);
 
     for (const result of results) {
+      if (candidates.length >= limit) break;
+
       const parsed = parseCandidate(result, company);
       if (!parsed) continue;
 
@@ -155,80 +155,11 @@ export async function runDiscovery(campaignId: string) {
         sourceSnippet: result.snippet,
         sourceDomain: result.displayLink,
       });
-
-      if (candidates.length >= 30) break;
     }
-
-    progress++;
-    await prisma.campaign.update({
-      where: { id: campaignId },
-      data: { discoveryProgress: Math.round((progress / totalQueries) * 100) },
-    });
-
-    if (candidates.length >= 30) break;
 
     // Rate limiting between queries
     await new Promise((r) => setTimeout(r, 200));
   }
 
-  // Store candidates and source links
-  for (const candidate of candidates) {
-    try {
-      const created = await prisma.candidate.create({
-        data: {
-          campaignId,
-          fullName: candidate.fullName,
-          firstName: candidate.firstName,
-          lastName: candidate.lastName,
-          company: candidate.company,
-          role: candidate.role,
-          emailStatus: 'MISSING',
-          sourceLinks: {
-            create: {
-              kind: 'DISCOVERY',
-              url: candidate.sourceUrl,
-              title: candidate.sourceTitle,
-              snippet: candidate.sourceSnippet,
-              domain: candidate.sourceDomain,
-            },
-          },
-        },
-      });
-
-      // Create initial email draft
-      const subject = campaign.templateSubject
-        .replace(/{first_name}/g, candidate.firstName || 'there')
-        .replace(/{company}/g, company)
-        .replace(/{school}/g, school);
-
-      const body = campaign.templateBody
-        .replace(/{first_name}/g, candidate.firstName || 'there')
-        .replace(/{company}/g, company)
-        .replace(/{school}/g, school);
-
-      await prisma.emailDraft.create({
-        data: {
-          candidateId: created.id,
-          subject,
-          body,
-        },
-      });
-    } catch (error) {
-      // Skip duplicates
-      if ((error as { code?: string }).code !== 'P2002') {
-        console.error('Error creating candidate:', error);
-      }
-    }
-  }
-
-  // Update campaign status
-  await prisma.campaign.update({
-    where: { id: campaignId },
-    data: {
-      status: 'DISCOVERED',
-      discoveryProgress: 100,
-    },
-  });
-
-  return candidates.length;
+  return candidates;
 }

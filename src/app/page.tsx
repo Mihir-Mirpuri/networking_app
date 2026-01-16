@@ -1,37 +1,45 @@
-import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
+import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import prisma from '@/lib/prisma';
 import { Header } from '@/components/Header';
-import { CampaignList } from '@/components/CampaignList';
-import { CreateCampaignButton } from '@/components/CreateCampaignButton';
+import { SearchPageClient } from '@/components/search/SearchPageClient';
+import prisma from '@/lib/prisma';
+
+const DAILY_LIMIT = 30;
+
+async function getRemainingDailyLimit(userId: string): Promise<number> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { dailySendCount: true, lastSendDate: true },
+  });
+
+  if (!user) return DAILY_LIMIT;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (!user.lastSendDate || new Date(user.lastSendDate) < today) {
+    return DAILY_LIMIT;
+  }
+
+  return Math.max(0, DAILY_LIMIT - user.dailySendCount);
+}
 
 export default async function HomePage() {
   const session = await getServerSession(authOptions);
 
-  if (!session?.user) {
+  if (!session?.user?.id) {
     redirect('/auth/signin');
   }
 
-  const campaigns = await prisma.campaign.findMany({
-    where: { userId: session.user.id },
-    orderBy: { createdAt: 'desc' },
-    include: {
-      _count: {
-        select: { candidates: true },
-      },
-    },
-  });
+  const remainingDaily = await getRemainingDailyLimit(session.user.id);
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">Your Campaigns</h1>
-          <CreateCampaignButton />
-        </div>
-        <CampaignList campaigns={campaigns} />
+      <main className="max-w-4xl mx-auto px-4 py-8">
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">Find Alumni</h1>
+        <SearchPageClient initialRemainingDaily={remainingDaily} />
       </main>
     </div>
   );
