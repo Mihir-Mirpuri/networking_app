@@ -13,6 +13,7 @@ interface ResultsListProps {
   sendingIndex?: number;
   sendStatuses: Map<string, 'success' | 'failed' | 'pending'>;
   remainingDaily: number;
+  generatingStatuses: Map<string, boolean>;
 }
 
 export function ResultsList({
@@ -24,6 +25,7 @@ export function ResultsList({
   sendingIndex,
   sendStatuses,
   remainingDaily,
+  generatingStatuses,
 }: ResultsListProps) {
   const [showConfirm, setShowConfirm] = useState(false);
 
@@ -101,6 +103,7 @@ export function ResultsList({
             onExpand={() => onExpand(index)}
             isSending={isSending && sendingIndex === index}
             sendStatus={sendStatuses.get(person.id)}
+            isGenerating={person.userCandidateId ? generatingStatuses.get(person.userCandidateId) || false : false}
           />
         ))}
       </div>

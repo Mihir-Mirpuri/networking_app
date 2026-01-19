@@ -8,6 +8,7 @@ interface PersonCardProps {
   onExpand: () => void;
   isSending: boolean;
   sendStatus?: 'success' | 'failed' | 'pending';
+  isGenerating?: boolean;
 }
 
 export function PersonCard({
@@ -16,6 +17,7 @@ export function PersonCard({
   onExpand,
   isSending,
   sendStatus,
+  isGenerating = false,
 }: PersonCardProps) {
   const getStatusBadge = () => {
     if (sendStatus === 'success') {
@@ -64,7 +66,18 @@ export function PersonCard({
     );
   };
 
-  const canSend = person.email && !sendStatus;
+  const getGeneratingBadge = () => {
+    if (isGenerating) {
+      return (
+        <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800 animate-pulse">
+          Generating email...
+        </span>
+      );
+    }
+    return null;
+  };
+
+  const canSend = person.email && !sendStatus && !isGenerating;
 
   return (
     <div className="bg-white rounded-lg shadow p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -72,6 +85,7 @@ export function PersonCard({
         <div className="flex items-center gap-2 mb-1">
           <h3 className="font-semibold text-gray-900">{person.fullName}</h3>
           {getEmailStatusBadge()}
+          {getGeneratingBadge()}
           {getStatusBadge()}
         </div>
         <p className="text-sm text-gray-600">
