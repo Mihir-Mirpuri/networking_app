@@ -17,19 +17,36 @@ export interface EmailResult {
   confidence: number;
 }
 
-export async function findEmail(
-  firstName: string,
-  lastName: string,
-  company: string
-): Promise<EmailResult> {
+export interface FindEmailParams {
+  firstName: string;
+  lastName: string;
+  company: string;
+  linkedinUrl?: string | null;
+}
+
+export async function findEmail(params: FindEmailParams): Promise<EmailResult> {
+  const { firstName, lastName, company, linkedinUrl } = params;
+
   if (!APOLLO_API_KEY) {
     console.log('No Apollo API key - skipping email lookup');
     return { email: null, status: 'MISSING', confidence: 0 };
   }
 
-  console.log(`Looking up email for: ${firstName} ${lastName} at ${company}`);
+  console.log(`Looking up email for: ${firstName} ${lastName} at ${company}${linkedinUrl ? ` (LinkedIn: ${linkedinUrl})` : ''}`);
 
   try {
+    // Build request body with optional LinkedIn URL
+    const requestBody: Record<string, string> = {
+      first_name: firstName,
+      last_name: lastName,
+      organization_name: company,
+    };
+
+    // Add LinkedIn URL if available - this provides much more accurate matching
+    if (linkedinUrl) {
+      requestBody.linkedin_url = linkedinUrl;
+    }
+
     const response = await fetch('https://api.apollo.io/v1/people/match', {
       method: 'POST',
       headers: {
@@ -37,11 +54,7 @@ export async function findEmail(
         'Cache-Control': 'no-cache',
         'X-Api-Key': APOLLO_API_KEY,
       },
-      body: JSON.stringify({
-        first_name: firstName,
-        last_name: lastName,
-        organization_name: company,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
@@ -74,6 +87,7 @@ export interface PersonToEnrich {
   firstName: string | null;
   lastName: string | null;
   company: string;
+  linkedinUrl?: string | null;
 }
 
 export async function enrichPeople(
@@ -89,7 +103,12 @@ export async function enrichPeople(
     }
 
     const key = `${person.firstName}_${person.lastName}_${person.company}`;
-    const result = await findEmail(person.firstName, person.lastName, person.company);
+    const result = await findEmail({
+      firstName: person.firstName,
+      lastName: person.lastName,
+      company: person.company,
+      linkedinUrl: person.linkedinUrl,
+    });
     results.set(key, result);
 
     // Rate limiting between API calls

@@ -151,11 +151,15 @@ export async function searchPeopleAction(
       let emailSource: 'cache' | 'apollo' | 'none' = 'none';
 
       if (person.firstName && person.lastName) {
+        // Extract LinkedIn URL if the source is from LinkedIn
+        const linkedinUrl = person.sourceDomain?.includes('linkedin.com') ? person.sourceUrl : null;
+
         const cachedResult = await getOrFindEmail({
           fullName: person.fullName,
           firstName: person.firstName,
           lastName: person.lastName,
           company: person.company,
+          linkedinUrl,
         });
         
         emailResult = {

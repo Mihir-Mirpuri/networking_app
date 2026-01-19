@@ -1,10 +1,18 @@
 'use client';
 
-import { signOut, useSession } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 export function Header() {
   const { data: session } = useSession();
+  const pathname = usePathname();
+
+  const tabs = [
+    { name: 'Send Emails', href: '/' },
+    { name: 'Email History', href: '/history' },
+    { name: 'Profile', href: '/profile' },
+  ];
 
   return (
     <header className="bg-white border-b border-gray-200">
@@ -14,15 +22,24 @@ export function Header() {
             AlumniReach
           </Link>
           {session?.user && (
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-gray-600">{session.user.email}</span>
-              <button
-                onClick={() => signOut()}
-                className="text-sm text-gray-500 hover:text-gray-700"
-              >
-                Sign out
-              </button>
-            </div>
+            <nav className="flex items-center gap-1">
+              {tabs.map((tab) => {
+                const isActive = pathname === tab.href;
+                return (
+                  <Link
+                    key={tab.href}
+                    href={tab.href}
+                    className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                      isActive
+                        ? 'bg-blue-600 text-white'
+                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                    }`}
+                  >
+                    {tab.name}
+                  </Link>
+                );
+              })}
+            </nav>
           )}
         </div>
       </div>

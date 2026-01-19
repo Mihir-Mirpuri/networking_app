@@ -10,6 +10,7 @@ export interface PersonEmailData {
   firstName: string | null;
   lastName: string | null;
   company: string;
+  linkedinUrl?: string | null;
 }
 
 export interface CachedEmailResult extends EmailResult {
@@ -30,7 +31,7 @@ export interface CachedEmailResult extends EmailResult {
 export async function getOrFindEmail(
   personData: PersonEmailData
 ): Promise<CachedEmailResult> {
-  const { fullName, firstName, lastName, company } = personData;
+  const { fullName, firstName, lastName, company, linkedinUrl } = personData;
 
   // Step 1: Check if Person exists for THIS company
   let existingPerson;
@@ -125,7 +126,7 @@ export async function getOrFindEmail(
   }
 
   console.log(`[EmailCache] 📞 Calling Apollo API for "${fullName}" at ${company}...`);
-  const emailResult = await findEmail(firstName, lastName, company);
+  const emailResult = await findEmail({ firstName, lastName, company, linkedinUrl });
 
   // Step 5: Update Person email if it already exists
   // Note: If Person doesn't exist yet, saveSearchResult will create it with email

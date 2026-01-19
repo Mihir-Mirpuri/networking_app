@@ -5,8 +5,7 @@ import { PersonCard } from './PersonCard';
 
 interface ResultsListProps {
   results: SearchResultWithDraft[];
-  onSendAll: () => void;
-  onSendSingle: (index: number) => void;
+  onReviewAndSend: () => void;
   onExpand: (index: number) => void;
   onHide?: (userCandidateId: string) => void;
   isSending: boolean;
@@ -17,8 +16,7 @@ interface ResultsListProps {
 
 export function ResultsList({
   results,
-  onSendAll,
-  onSendSingle,
+  onReviewAndSend,
   onExpand,
   onHide,
   isSending,
@@ -42,11 +40,11 @@ export function ResultsList({
           </p>
         </div>
         <button
-          onClick={onSendAll}
-          disabled={isSending || sendableCount === 0}
+          onClick={onReviewAndSend}
+          disabled={sendableCount === 0}
           className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isSending ? 'Sending...' : `Send All (${sendableCount})`}
+          Review and Send ({sendableCount})
         </button>
       </div>
 
@@ -55,7 +53,6 @@ export function ResultsList({
           <PersonCard
             key={person.id}
             person={person}
-            onSend={() => onSendSingle(index)}
             onExpand={() => onExpand(index)}
             onHide={person.userCandidateId && onHide ? () => onHide(person.userCandidateId!) : undefined}
             isSending={isSending && sendingIndex === index}

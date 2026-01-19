@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { SearchForm } from './SearchForm';
 import { ResultsList } from './ResultsList';
 import { ExpandedReview } from './ExpandedReview';
-import { PastEmailsSidebar } from '../sidebar/PastEmailsSidebar';
+import { BulkReview } from './BulkReview';
 import { searchPeopleAction, SearchResultWithDraft, hidePersonAction } from '@/app/actions/search';
 import { sendSingleEmailAction, sendEmailsAction, PersonToSend } from '@/app/actions/send';
 import { getDefaultTemplateAction, updateDefaultTemplateAction } from '@/app/actions/jobs';
@@ -18,13 +18,13 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
   const [results, setResults] = useState<SearchResultWithDraft[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isSending, setIsSending] = useState(false);
-  const [sendingIndex, setSendingIndex] = useState<number | undefined>();
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
   const [sendStatuses, setSendStatuses] = useState<Map<string, 'success' | 'failed' | 'pending'>>(
     new Map()
   );
   const [remainingDaily, setRemainingDaily] = useState(initialRemainingDaily);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showBulkReview, setShowBulkReview] = useState(false);
+  const [generatingStatuses, setGeneratingStatuses] = useState<Map<string, boolean>>(new Map());
   const [error, setError] = useState<string | null>(null);
   const [templateExpanded, setTemplateExpanded] = useState(false);
   const [templateSubject, setTemplateSubject] = useState('');
@@ -106,36 +106,6 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
     setIsSearching(false);
   };
 
-
-  const handleSendSingle = async (index: number) => {
-    const person = results[index];
-    if (!person.email || !person.userCandidateId) return;
-
-    setSendingIndex(index);
-    setIsSending(true);
-    setSendStatuses((prev) => new Map(prev).set(person.id, 'pending'));
-
-    const personToSend: PersonToSend = {
-      email: person.email,
-      subject: person.draftSubject,
-      body: person.draftBody,
-      userCandidateId: person.userCandidateId,
-    };
-
-    const result = await sendSingleEmailAction(personToSend);
-
-    setSendStatuses((prev) =>
-      new Map(prev).set(person.id, result.success ? 'success' : 'failed')
-    );
-
-    if (result.success) {
-      setRemainingDaily((prev) => Math.max(0, prev - 1));
-    }
-
-    setIsSending(false);
-    setSendingIndex(undefined);
-  };
-
   const handleSendFromReview = async (index: number, subject: string, body: string) => {
     const person = results[index];
     if (!person.email || !person.userCandidateId) return;
@@ -160,15 +130,19 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
     }
   };
 
-  const handleSendAll = async () => {
-    const peopleToSend = results
-      .filter((r) => r.email && r.userCandidateId && !sendStatuses.has(r.id))
-      .map((person) => ({
-        email: person.email!,
-        subject: person.draftSubject,
-        body: person.draftBody,
-        userCandidateId: person.userCandidateId!,
-      }));
+  const handleBulkSend = async (emails: { index: number; subject: string; body: string }[]) => {
+    const peopleToSend = emails
+      .map(({ index, subject, body }) => {
+        const person = results[index];
+        if (!person.email || !person.userCandidateId) return null;
+        return {
+          email: person.email,
+          subject,
+          body,
+          userCandidateId: person.userCandidateId,
+        };
+      })
+      .filter((p): p is NonNullable<typeof p> => p !== null);
 
     if (peopleToSend.length === 0) return;
 
@@ -176,9 +150,10 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
 
     // Mark all as pending
     const newStatuses = new Map(sendStatuses);
-    results.forEach((r) => {
-      if (r.email && r.userCandidateId && !sendStatuses.has(r.id)) {
-        newStatuses.set(r.id, 'pending');
+    emails.forEach(({ index }) => {
+      const person = results[index];
+      if (person.email && person.userCandidateId && !sendStatuses.has(person.id)) {
+        newStatuses.set(person.id, 'pending');
       }
     });
     setSendStatuses(newStatuses);
@@ -186,7 +161,6 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
     const result = await sendEmailsAction(peopleToSend);
 
     if (result.success) {
-      // Update statuses based on results
       const updatedStatuses = new Map(newStatuses);
       result.results.forEach((res) => {
         const person = results.find((r) => r.email === res.email);
@@ -225,7 +199,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
       )}
 
       {/* Template Editing Section - shown when results are displayed */}
-      {results.length > 0 && expandedIndex === null && (
+      {results.length > 0 && expandedIndex === null && !showBulkReview && (
         <div className="mb-6 bg-white rounded-lg shadow p-4">
           <button
             onClick={() => setTemplateExpanded(!templateExpanded)}
@@ -292,15 +266,14 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
         </div>
       )}
 
-      {results.length > 0 && expandedIndex === null && (
+      {results.length > 0 && expandedIndex === null && !showBulkReview && (
         <ResultsList
           results={results}
-          onSendAll={handleSendAll}
-          onSendSingle={handleSendSingle}
+          onReviewAndSend={() => setShowBulkReview(true)}
           onExpand={setExpandedIndex}
           onHide={handleHidePerson}
           isSending={isSending}
-          sendingIndex={sendingIndex}
+          sendingIndex={undefined}
           sendStatuses={sendStatuses}
           remainingDaily={remainingDaily}
         />
@@ -316,7 +289,15 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
         />
       )}
 
-      <PastEmailsSidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
+      {showBulkReview && (
+        <BulkReview
+          results={results}
+          onClose={() => setShowBulkReview(false)}
+          onSendAll={handleBulkSend}
+          sendStatuses={sendStatuses}
+          generatingStatuses={generatingStatuses}
+        />
+      )}
     </div>
   );
 }
