@@ -13,7 +13,6 @@ interface ResultsListProps {
   sendingIndex?: number;
   sendStatuses: Map<string, 'success' | 'failed' | 'pending'>;
   remainingDaily: number;
-  generatingStatuses: Map<string, boolean>;
 }
 
 export function ResultsList({
@@ -26,7 +25,6 @@ export function ResultsList({
   sendingIndex,
   sendStatuses,
   remainingDaily,
-  generatingStatuses,
 }: ResultsListProps) {
   const sendableCount = results.filter(
     (r) => r.email && !sendStatuses.has(r.id)
@@ -62,7 +60,6 @@ export function ResultsList({
             onHide={person.userCandidateId && onHide ? () => onHide(person.userCandidateId!) : undefined}
             isSending={isSending && sendingIndex === index}
             sendStatus={sendStatuses.get(person.id)}
-            isGenerating={person.userCandidateId ? generatingStatuses.get(person.userCandidateId) || false : false}
           />
         ))}
       </div>

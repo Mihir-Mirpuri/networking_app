@@ -3,8 +3,7 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
-import { emailGenerationQueue } from '@/lib/queue';
-import type { PersonData, TemplatePrompt } from '@/lib/services/groq-email';
+import type { TemplatePrompt } from '@/lib/types/email';
 import { EMAIL_TEMPLATES } from '@/lib/constants';
 
 export type DraftStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'SENT';
@@ -234,84 +233,3 @@ export async function updateDefaultTemplateAction(
   }
 }
 
-/**
- * Generate email for a specific candidate on-demand
- */
-export async function generateEmailForCandidateAction(
-  userCandidateId: string,
-  templatePrompt?: TemplatePrompt
-): Promise<
-  | { success: true; jobId: string }
-  | { success: false; error: string }
-> {
-  const session = await getServerSession(authOptions);
-
-  if (!session?.user?.id) {
-    return { success: false, error: 'Not authenticated' };
-  }
-
-  try {
-    // Fetch user candidate and person data
-    const userCandidate = await prisma.userCandidate.findUnique({
-      where: { id: userCandidateId },
-      include: {
-        person: true,
-        user: true,
-      },
-    });
-
-    if (!userCandidate) {
-      return { success: false, error: 'Candidate not found' };
-    }
-
-    // Ensure user owns this candidate
-    if (userCandidate.userId !== session.user.id) {
-      return { success: false, error: 'Unauthorized' };
-    }
-
-    // Get template (provided or default)
-    let template: TemplatePrompt;
-    if (templatePrompt) {
-      template = templatePrompt;
-    } else {
-      const templateResult = await getDefaultTemplateAction();
-      if (!templateResult.success) {
-        return { success: false, error: templateResult.error };
-      }
-      template = templateResult.template;
-    }
-
-    // Prepare person data
-    const personData: PersonData = {
-      fullName: userCandidate.person.fullName,
-      firstName: userCandidate.person.firstName,
-      lastName: userCandidate.person.lastName,
-      company: userCandidate.person.company,
-      role: userCandidate.person.role,
-      university: userCandidate.university || '',
-    };
-
-    // Queue the job
-    const job = await emailGenerationQueue.add(
-      'generate-email',
-      {
-        userCandidateId,
-        templatePrompt: template,
-        personData,
-      },
-      {
-        jobId: `email-${userCandidateId}`, // Unique job ID per userCandidate
-      }
-    );
-
-    console.log(`[Jobs] Queued email generation job ${job.id} for userCandidateId: ${userCandidateId}`);
-
-    return { success: true, jobId: job.id };
-  } catch (error) {
-    console.error('[Jobs] Error queueing email generation:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to queue generation',
-    };
-  }
-}

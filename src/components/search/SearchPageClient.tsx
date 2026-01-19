@@ -8,7 +8,7 @@ import { PastEmailsSidebar } from '../sidebar/PastEmailsSidebar';
 import { searchPeopleAction, SearchResultWithDraft, hidePersonAction } from '@/app/actions/search';
 import { sendSingleEmailAction, sendEmailsAction, PersonToSend } from '@/app/actions/send';
 import { getDefaultTemplateAction, updateDefaultTemplateAction } from '@/app/actions/jobs';
-import type { TemplatePrompt } from '@/lib/services/groq-email';
+import type { TemplatePrompt } from '@/lib/types/email';
 
 interface SearchPageClientProps {
   initialRemainingDaily: number;
@@ -26,7 +26,6 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
   const [remainingDaily, setRemainingDaily] = useState(initialRemainingDaily);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [generatingStatuses, setGeneratingStatuses] = useState<Map<string, boolean>>(new Map());
   const [templateExpanded, setTemplateExpanded] = useState(false);
   const [templateSubject, setTemplateSubject] = useState('');
   const [templateBody, setTemplateBody] = useState('');
@@ -94,7 +93,6 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
     setError(null);
     setResults([]);
     setSendStatuses(new Map());
-    setGeneratingStatuses(new Map());
 
 
     const result = await searchPeopleAction(params);
@@ -305,7 +303,6 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
           sendingIndex={sendingIndex}
           sendStatuses={sendStatuses}
           remainingDaily={remainingDaily}
-          generatingStatuses={generatingStatuses}
         />
       )}
 
@@ -316,7 +313,6 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
           onClose={() => setExpandedIndex(null)}
           onSend={handleSendFromReview}
           sendStatuses={sendStatuses}
-          generatingStatuses={generatingStatuses}
         />
       )}
 

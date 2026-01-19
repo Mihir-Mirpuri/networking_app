@@ -147,19 +147,19 @@ export async function createOrUpdateEmailDraft(
     where: {
       userCandidateId,
     },
-    create: {
+      create: {
       userCandidateId,
       templateId: draftData.templateId,
       subject: draftData.subject,
       body: draftData.body,
-      status: 'PENDING',
+      status: 'APPROVED', // Template replacement is immediate, no AI processing needed
     },
     update: {
       // Update draft if regenerated
       subject: draftData.subject,
       body: draftData.body,
       templateId: draftData.templateId || undefined,
-      status: 'PENDING', // Reset to pending if regenerated
+      status: 'APPROVED', // Template replacement is immediate
     },
   });
 
