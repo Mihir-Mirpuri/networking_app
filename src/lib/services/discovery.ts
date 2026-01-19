@@ -133,41 +133,61 @@ export async function searchPeople(params: SearchParams): Promise<SearchResult[]
   const seenKeys = new Set<string>();
   const candidates: SearchResult[] = [];
 
-  for (const query of queries) {
+  // Split queries into batches of 3 for controlled concurrency
+  const BATCH_SIZE = 3;
+  const batches: string[][] = [];
+  for (let i = 0; i < queries.length; i += BATCH_SIZE) {
+    batches.push(queries.slice(i, i + BATCH_SIZE));
+  }
+
+  // Process batches sequentially, queries within batch in parallel
+  for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
     if (candidates.length >= limit) break;
 
-    const results = await searchCSE(query);
+    const batch = batches[batchIndex];
 
-    for (const result of results) {
+    // Execute all queries in batch concurrently
+    const batchResults = await Promise.all(
+      batch.map(query => searchCSE(query))
+    );
+
+    // Process results from all queries in the batch
+    for (const results of batchResults) {
       if (candidates.length >= limit) break;
 
-      const parsed = parseCandidate(result, company);
-      if (!parsed) continue;
+      for (const result of results) {
+        if (candidates.length >= limit) break;
 
-      // Check if person is already discovered by this user
-      const personKey = `${parsed.fullName}_${company}`.toLowerCase();
-      if (excludePersonKeys.has(personKey)) {
-        console.log(`[Discovery] Skipping already discovered: ${parsed.fullName} at ${company}`);
-        continue;
+        const parsed = parseCandidate(result, company);
+        if (!parsed) continue;
+
+        // Check if person is already discovered by this user
+        const personKey = `${parsed.fullName}_${company}`.toLowerCase();
+        if (excludePersonKeys.has(personKey)) {
+          console.log(`[Discovery] Skipping already discovered: ${parsed.fullName} at ${company}`);
+          continue;
+        }
+
+        // Check for duplicate URLs (same person from different search queries)
+        const key = normalizeKey(parsed.fullName, company, result.link);
+        if (seenKeys.has(key)) continue;
+        seenKeys.add(key);
+
+        candidates.push({
+          ...parsed,
+          company,
+          sourceUrl: result.link,
+          sourceTitle: result.title,
+          sourceSnippet: result.snippet,
+          sourceDomain: result.displayLink,
+        });
       }
-
-      // Check for duplicate URLs (same person from different search queries)
-      const key = normalizeKey(parsed.fullName, company, result.link);
-      if (seenKeys.has(key)) continue;
-      seenKeys.add(key);
-
-      candidates.push({
-        ...parsed,
-        company,
-        sourceUrl: result.link,
-        sourceTitle: result.title,
-        sourceSnippet: result.snippet,
-        sourceDomain: result.displayLink,
-      });
     }
 
-    // Rate limiting between queries
-    await new Promise((r) => setTimeout(r, 200));
+    // Rate limiting between batches (not after last batch or if limit reached)
+    if (candidates.length < limit && batchIndex < batches.length - 1) {
+      await new Promise((r) => setTimeout(r, 200));
+    }
   }
 
   return candidates;
