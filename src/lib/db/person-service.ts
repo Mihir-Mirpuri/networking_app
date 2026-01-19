@@ -1,6 +1,7 @@
 import prisma from '@/lib/prisma';
 import { SearchResult } from '@/lib/services/discovery';
 import { EmailResult } from '@/lib/services/enrichment';
+import { EmailStatus } from '@prisma/client';
 
 export interface PersonData {
   fullName: string;
@@ -166,6 +167,70 @@ export async function createOrUpdateEmailDraft(
 }
 
 /**
+ * Updates Person email if new email is better than existing
+ * Only updates if:
+ * - Current email is null, OR
+ * - New email is VERIFIED and current is not, OR
+ * - New email has higher confidence than current
+ */
+export async function updatePersonEmailIfBetter(
+  personId: string,
+  newEmail: string | null,
+  newStatus: 'VERIFIED' | 'UNVERIFIED' | 'MISSING',
+  newConfidence: number
+): Promise<void> {
+  const person = await prisma.person.findUnique({
+    where: { id: personId },
+    select: {
+      email: true,
+      emailStatus: true,
+      emailConfidence: true,
+    },
+  });
+
+  if (!person) return;
+
+  // If no current email, always update
+  if (!person.email && newEmail) {
+    await prisma.person.update({
+      where: { id: personId },
+      data: {
+        email: newEmail,
+        emailStatus: newStatus as EmailStatus,
+        emailConfidence: newConfidence,
+        emailLastUpdated: new Date(),
+      },
+    });
+    return;
+  }
+
+  // If current email exists, only update if new is better
+  if (person.email && newEmail) {
+    const shouldUpdate =
+      // New is VERIFIED and current is not
+      (newStatus === 'VERIFIED' && person.emailStatus !== 'VERIFIED') ||
+      // New has higher confidence
+      (newConfidence > (person.emailConfidence || 0)) ||
+      // Both VERIFIED but new has higher confidence
+      (newStatus === 'VERIFIED' &&
+        person.emailStatus === 'VERIFIED' &&
+        newConfidence > (person.emailConfidence || 0));
+
+    if (shouldUpdate) {
+      await prisma.person.update({
+        where: { id: personId },
+        data: {
+          email: newEmail,
+          emailStatus: newStatus as EmailStatus,
+          emailConfidence: newConfidence,
+          emailLastUpdated: new Date(),
+        },
+      });
+    }
+  }
+}
+
+/**
  * Helper to extract LinkedIn URL from search result
  */
 export function extractLinkedInUrl(sourceUrl: string, sourceDomain: string): string | null {
@@ -203,7 +268,37 @@ export async function saveSearchResult(
     linkedinUrl,
   });
 
-  // 2. Create SourceLink
+  // 2. Update Person email if we have one (smart update logic)
+  // Check if email was already updated by getOrFindEmail to avoid duplicate work
+  if (emailResult.email) {
+    const currentPerson = await prisma.person.findUnique({
+      where: { id: person.id },
+      select: {
+        email: true,
+        emailStatus: true,
+        emailConfidence: true,
+        emailLastUpdated: true,
+      },
+    });
+
+    // Only update if email wasn't already set by getOrFindEmail
+    // Check if current email matches what we're trying to save, or if it's missing/null
+    const emailAlreadyUpdated = 
+      currentPerson?.email === emailResult.email &&
+      currentPerson?.emailStatus === emailResult.status &&
+      currentPerson?.emailConfidence === emailResult.confidence;
+
+    if (!emailAlreadyUpdated) {
+      await updatePersonEmailIfBetter(
+        person.id,
+        emailResult.email,
+        emailResult.status,
+        emailResult.confidence
+      );
+    }
+  }
+
+  // 3. Create SourceLink
   await createSourceLink(person.id, {
     url: searchResult.sourceUrl,
     title: searchResult.sourceTitle,
@@ -212,7 +307,7 @@ export async function saveSearchResult(
     kind: 'DISCOVERY',
   });
 
-  // 3. Create/update UserCandidate
+  // 4. Create/update UserCandidate
   const userCandidate = await createOrUpdateUserCandidate(userId, person.id, {
     email: emailResult.email,
     emailStatus: emailResult.status,
@@ -220,7 +315,7 @@ export async function saveSearchResult(
     university,
   });
 
-  // 4. Create/update EmailDraft
+  // 5. Create/update EmailDraft
   const emailDraft = await createOrUpdateEmailDraft(userCandidate.id, draftData);
 
   return {

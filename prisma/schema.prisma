@@ -68,6 +68,10 @@ model Person {
   company       String
   role          String?
   linkedinUrl   String?
+  email                String?
+  emailStatus          EmailStatus?
+  emailConfidence      Float?
+  emailLastUpdated     DateTime?
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
   userCandidates UserCandidate[]
@@ -75,6 +79,7 @@ model Person {
 
   @@unique([fullName, company])
   @@index([fullName, company])
+  @@index([emailStatus])
 }
 
 model UserCandidate {

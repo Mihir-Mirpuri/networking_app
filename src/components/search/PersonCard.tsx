@@ -77,6 +77,26 @@ export function PersonCard({
     return null;
   };
 
+  const getEmailSourceBadge = () => {
+    if (!person.email) return null;
+    
+    if (person.emailSource === 'cache') {
+      return (
+        <span className="px-2 py-0.5 text-xs rounded-full bg-purple-100 text-purple-700 border border-purple-300" title="Email from database cache">
+          📦 Cache
+        </span>
+      );
+    }
+    if (person.emailSource === 'apollo') {
+      return (
+        <span className="px-2 py-0.5 text-xs rounded-full bg-orange-100 text-orange-700 border border-orange-300" title="Email from Apollo API">
+          📞 Apollo
+        </span>
+      );
+    }
+    return null;
+  };
+
   const canSend = person.email && !sendStatus && !isGenerating;
 
   return (
@@ -93,7 +113,10 @@ export function PersonCard({
           {person.company}
         </p>
         {person.email ? (
-          <p className="text-sm text-blue-600">{person.email}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm text-blue-600">{person.email}</p>
+            {getEmailSourceBadge()}
+          </div>
         ) : (
           <p className="text-sm text-gray-400 italic">No email found</p>
         )}

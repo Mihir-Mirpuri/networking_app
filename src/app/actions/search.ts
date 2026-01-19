@@ -3,7 +3,7 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { searchPeople, SearchResult } from '@/lib/services/discovery';
-import { findEmail } from '@/lib/services/enrichment';
+import { getOrFindEmail } from '@/lib/services/email-cache';
 import { EMAIL_TEMPLATES } from '@/lib/constants';
 import prisma from '@/lib/prisma';
 import { saveSearchResult } from '@/lib/db/person-service';
@@ -27,6 +27,7 @@ export interface SearchResultWithDraft {
   email: string | null;
   emailStatus: 'VERIFIED' | 'UNVERIFIED' | 'MISSING';
   emailConfidence: number;
+  emailSource: 'cache' | 'apollo' | 'none'; // Debug field: where email came from
   draftSubject: string;
   draftBody: string;
   sourceUrl: string;
@@ -132,11 +133,37 @@ export async function searchPeopleAction(
     const results: SearchResultWithDraft[] = [];
 
     for (const person of people) {
-      // Find email for this person
+      // Smart email lookup with caching
       let emailResult = { email: null as string | null, status: 'MISSING' as const, confidence: 0 };
+      let emailSource: 'cache' | 'apollo' | 'none' = 'none';
 
       if (person.firstName && person.lastName) {
-        emailResult = await findEmail(person.firstName, person.lastName, person.company);
+        const cachedResult = await getOrFindEmail({
+          fullName: person.fullName,
+          firstName: person.firstName,
+          lastName: person.lastName,
+          company: person.company,
+        });
+        
+        emailResult = {
+          email: cachedResult.email,
+          status: cachedResult.status,
+          confidence: cachedResult.confidence,
+        };
+        
+        // Determine email source for debugging
+        if (cachedResult.fromCache) {
+          emailSource = 'cache';
+          console.log(`[Search] ✅ ${person.fullName} at ${person.company}: Email from CACHE (${cachedResult.email || 'none'}, ${cachedResult.status})`);
+        } else if (cachedResult.apolloCalled) {
+          emailSource = 'apollo';
+          console.log(`[Search] 📞 ${person.fullName} at ${person.company}: Email from APOLLO API (${cachedResult.email || 'none'}, ${cachedResult.status})`);
+        } else {
+          emailSource = 'none';
+          console.log(`[Search] ⚠️  ${person.fullName} at ${person.company}: No email found (missing firstName/lastName)`);
+        }
+      } else {
+        console.log(`[Search] ⚠️  ${person.fullName} at ${person.company}: Skipping email lookup (missing firstName or lastName)`);
       }
 
       // Generate placeholder draft (simple template replacement)
@@ -167,6 +194,7 @@ export async function searchPeopleAction(
           email: emailResult.email,
           emailStatus: emailResult.status,
           emailConfidence: emailResult.confidence,
+          emailSource,
           draftSubject: placeholderDraft.subject,
           draftBody: placeholderDraft.body,
           sourceUrl: person.sourceUrl,
@@ -187,6 +215,7 @@ export async function searchPeopleAction(
           email: emailResult.email,
           emailStatus: emailResult.status,
           emailConfidence: emailResult.confidence,
+          emailSource,
           draftSubject: placeholderDraft.subject,
           draftBody: placeholderDraft.body,
           sourceUrl: person.sourceUrl,
