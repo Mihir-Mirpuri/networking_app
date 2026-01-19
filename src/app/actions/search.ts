@@ -6,7 +6,7 @@ import { searchPeople, SearchResult } from '@/lib/services/discovery';
 import { getOrFindEmail } from '@/lib/services/email-cache';
 import { EMAIL_TEMPLATES } from '@/lib/constants';
 import prisma from '@/lib/prisma';
-import { saveSearchResult } from '@/lib/db/person-service';
+import { saveSearchResult, getExcludedPersonKeys } from '@/lib/db/person-service';
 
 export interface SearchInput {
   company: string;
@@ -121,13 +121,26 @@ export async function searchPeopleAction(
   }
 
   try {
-    // Search for people
+    // Get excluded Person keys (sent emails or marked "do not show again")
+    // Only these people should be excluded from future searches
+    const excludedKeys = await getExcludedPersonKeys(session.user.id);
+    console.log(`[Search] User has ${excludedKeys.size} excluded people (sent/hidden).`);
+
+    // Search for people, excluding only sent/hidden people
     const people = await searchPeople({
       university: input.university,
       company: input.company,
       role: input.role,
       limit: input.limit,
+      excludePersonKeys: excludedKeys,
     });
+
+    // Log if we got fewer results than requested
+    if (people.length < input.limit) {
+      console.log(
+        `[Search] Found ${people.length} new people (requested ${input.limit}). User may have already discovered many people for this search.`
+      );
+    }
 
     // Enrich with emails, generate drafts, and save to database
     const results: SearchResultWithDraft[] = [];
@@ -227,5 +240,47 @@ export async function searchPeopleAction(
   } catch (error) {
     console.error('Search error:', error);
     return { success: false, error: 'Search failed. Please try again.' };
+  }
+}
+
+/**
+ * Server action to mark a person as "do not show again"
+ * Updates UserCandidate.doNotShow = true for the given userCandidateId
+ */
+export async function hidePersonAction(
+  userCandidateId: string
+): Promise<{ success: true } | { success: false; error: string }> {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.id) {
+    return { success: false, error: 'Not authenticated' };
+  }
+
+  try {
+    // Verify user owns the UserCandidate
+    const userCandidate = await prisma.userCandidate.findUnique({
+      where: { id: userCandidateId },
+      select: { userId: true },
+    });
+
+    if (!userCandidate) {
+      return { success: false, error: 'Person not found' };
+    }
+
+    if (userCandidate.userId !== session.user.id) {
+      return { success: false, error: 'Unauthorized' };
+    }
+
+    // Update doNotShow flag
+    await prisma.userCandidate.update({
+      where: { id: userCandidateId },
+      data: { doNotShow: true },
+    });
+
+    console.log(`[Hide] User ${session.user.id} marked userCandidate ${userCandidateId} as doNotShow`);
+    return { success: true };
+  } catch (error) {
+    console.error('Error hiding person:', error);
+    return { success: false, error: 'Failed to hide person' };
   }
 }

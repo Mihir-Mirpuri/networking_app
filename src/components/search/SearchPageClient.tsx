@@ -5,7 +5,7 @@ import { SearchForm } from './SearchForm';
 import { ResultsList } from './ResultsList';
 import { ExpandedReview } from './ExpandedReview';
 import { PastEmailsSidebar } from '../sidebar/PastEmailsSidebar';
-import { searchPeopleAction, SearchResultWithDraft } from '@/app/actions/search';
+import { searchPeopleAction, SearchResultWithDraft, hidePersonAction } from '@/app/actions/search';
 import { sendSingleEmailAction, sendEmailsAction, PersonToSend } from '@/app/actions/send';
 import { getDefaultTemplateAction, updateDefaultTemplateAction } from '@/app/actions/jobs';
 import type { TemplatePrompt } from '@/lib/services/groq-email';
@@ -205,6 +205,17 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
     setIsSending(false);
   };
 
+  const handleHidePerson = async (userCandidateId: string) => {
+    const result = await hidePersonAction(userCandidateId);
+    
+    if (result.success) {
+      // Remove person from results immediately
+      setResults((prev) => prev.filter((r) => r.userCandidateId !== userCandidateId));
+    } else {
+      setError(result.error || 'Failed to hide person');
+    }
+  };
+
   return (
     <div className="relative">
       <SearchForm onSearch={handleSearch} isLoading={isSearching} />
@@ -289,6 +300,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
           onSendAll={handleSendAll}
           onSendSingle={handleSendSingle}
           onExpand={setExpandedIndex}
+          onHide={handleHidePerson}
           isSending={isSending}
           sendingIndex={sendingIndex}
           sendStatuses={sendStatuses}

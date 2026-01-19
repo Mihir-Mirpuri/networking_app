@@ -8,6 +8,7 @@ interface ResultsListProps {
   onSendAll: () => void;
   onSendSingle: (index: number) => void;
   onExpand: (index: number) => void;
+  onHide?: (userCandidateId: string) => void;
   isSending: boolean;
   sendingIndex?: number;
   sendStatuses: Map<string, 'success' | 'failed' | 'pending'>;
@@ -20,6 +21,7 @@ export function ResultsList({
   onSendAll,
   onSendSingle,
   onExpand,
+  onHide,
   isSending,
   sendingIndex,
   sendStatuses,
@@ -57,6 +59,7 @@ export function ResultsList({
             person={person}
             onSend={() => onSendSingle(index)}
             onExpand={() => onExpand(index)}
+            onHide={person.userCandidateId && onHide ? () => onHide(person.userCandidateId!) : undefined}
             isSending={isSending && sendingIndex === index}
             sendStatus={sendStatuses.get(person.id)}
             isGenerating={person.userCandidateId ? generatingStatuses.get(person.userCandidateId) || false : false}

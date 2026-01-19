@@ -324,3 +324,79 @@ export async function saveSearchResult(
     emailDraftId: emailDraft.id,
   };
 }
+
+/**
+ * Gets all Person keys that a user has already discovered
+ * Returns a Set of keys in format: "fullName_company" (lowercase) for fast lookup
+ * Used to filter out already-discovered people from search results
+ */
+export async function getDiscoveredPersonKeys(
+  userId: string
+): Promise<Set<string>> {
+  const userCandidates = await prisma.userCandidate.findMany({
+    where: { userId },
+    select: {
+      person: {
+        select: {
+          fullName: true,
+          company: true,
+        },
+      },
+    },
+  });
+
+  const keys = new Set<string>();
+  for (const uc of userCandidates) {
+    const key = `${uc.person.fullName}_${uc.person.company}`.toLowerCase();
+    keys.add(key);
+  }
+
+  return keys;
+}
+
+/**
+ * Gets Person keys that should be excluded from search results
+ * Excludes people who:
+ * - Have been successfully emailed (SendLog with status = SUCCESS)
+ * - Have been marked as "do not show again" (doNotShow = true)
+ * 
+ * Note: People discovered in prior searches but NOT sent emails and NOT marked
+ * "do not show again" will still appear in new searches.
+ * 
+ * Returns a Set of keys in format: "fullName_company" (lowercase) for fast lookup
+ */
+export async function getExcludedPersonKeys(
+  userId: string
+): Promise<Set<string>> {
+  const userCandidates = await prisma.userCandidate.findMany({
+    where: {
+      userId,
+      OR: [
+        { doNotShow: true },
+        {
+          sendLogs: {
+            some: {
+              status: 'SUCCESS',
+            },
+          },
+        },
+      ],
+    },
+    select: {
+      person: {
+        select: {
+          fullName: true,
+          company: true,
+        },
+      },
+    },
+  });
+
+  const keys = new Set<string>();
+  for (const uc of userCandidates) {
+    const key = `${uc.person.fullName}_${uc.person.company}`.toLowerCase();
+    keys.add(key);
+  }
+
+  return keys;
+}
