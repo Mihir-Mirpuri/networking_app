@@ -136,7 +136,15 @@ export async function searchPeopleAction(
       let emailResult = { email: null as string | null, status: 'MISSING' as const, confidence: 0 };
 
       if (person.firstName && person.lastName) {
-        emailResult = await findEmail(person.firstName, person.lastName, person.company);
+        // Extract LinkedIn URL if the source is from LinkedIn
+        const linkedinUrl = person.sourceDomain.includes('linkedin.com') ? person.sourceUrl : null;
+
+        emailResult = await findEmail({
+          firstName: person.firstName,
+          lastName: person.lastName,
+          company: person.company,
+          linkedinUrl,
+        });
       }
 
       // Generate placeholder draft (simple template replacement)
