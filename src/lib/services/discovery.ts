@@ -17,6 +17,7 @@ export interface SearchParams {
   company: string;
   role: string;
   limit: number;
+  excludePersonKeys?: Set<string>; // Set of "fullName_company" keys (lowercase) to exclude
 }
 
 export interface SearchResult {
@@ -117,7 +118,7 @@ function normalizeKey(name: string, company: string, url: string): string {
 }
 
 export async function searchPeople(params: SearchParams): Promise<SearchResult[]> {
-  const { university, company, role, limit } = params;
+  const { university, company, role, limit, excludePersonKeys = new Set() } = params;
 
   // Generate multiple queries to find candidates
   const queries = [
@@ -143,6 +144,14 @@ export async function searchPeople(params: SearchParams): Promise<SearchResult[]
       const parsed = parseCandidate(result, company);
       if (!parsed) continue;
 
+      // Check if person is already discovered by this user
+      const personKey = `${parsed.fullName}_${company}`.toLowerCase();
+      if (excludePersonKeys.has(personKey)) {
+        console.log(`[Discovery] Skipping already discovered: ${parsed.fullName} at ${company}`);
+        continue;
+      }
+
+      // Check for duplicate URLs (same person from different search queries)
       const key = normalizeKey(parsed.fullName, company, result.link);
       if (seenKeys.has(key)) continue;
       seenKeys.add(key);

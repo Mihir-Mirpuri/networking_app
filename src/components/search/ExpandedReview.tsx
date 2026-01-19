@@ -27,12 +27,14 @@ export function ExpandedReview({
   const currentPerson = results[internalIndex];
   const status = currentPerson ? sendStatuses.get(currentPerson.id) : undefined;
 
+  // Update subject/body when currentPerson changes
   useEffect(() => {
     if (currentPerson) {
       setSubject(currentPerson.draftSubject);
       setBody(currentPerson.draftBody);
     }
   }, [internalIndex, currentPerson]);
+
 
   const handleSend = async () => {
     if (!currentPerson?.email) return;
