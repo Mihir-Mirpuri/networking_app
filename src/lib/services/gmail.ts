@@ -30,6 +30,8 @@ export async function sendEmail(
   subject: string,
   body: string
 ): Promise<SendResult> {
+  console.log('[Gmail] sendEmail called:', { toEmail, fromEmail, hasAccessToken: !!accessToken, hasRefreshToken: !!refreshToken, TEST_MODE });
+  
   if (TEST_MODE) {
     console.log('=== TEST MODE: Email would be sent ===');
     console.log(`To: ${toEmail}`);
@@ -41,6 +43,15 @@ export async function sendEmail(
   }
 
   try {
+    if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+      console.error('[Gmail] Missing Google OAuth credentials');
+      return {
+        success: false,
+        error: 'Google OAuth credentials not configured',
+      };
+    }
+
+    console.log('[Gmail] Creating OAuth2 client...');
     const oauth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET
@@ -51,21 +62,31 @@ export async function sendEmail(
       refresh_token: refreshToken,
     });
 
+    console.log('[Gmail] Creating Gmail client...');
     const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
 
+    console.log('[Gmail] Creating MIME message...');
     const raw = createMimeMessage(toEmail, fromEmail, subject, body);
 
+    console.log('[Gmail] Sending email via Gmail API...');
     const response = await gmail.users.messages.send({
       userId: 'me',
       requestBody: { raw },
     });
 
+    console.log('[Gmail] Email sent successfully:', { messageId: response.data.id });
     return {
       success: true,
       messageId: response.data.id || undefined,
     };
   } catch (error) {
-    console.error('Gmail send error:', error);
+    console.error('[Gmail] Gmail send error:', error);
+    console.error('[Gmail] Error details:', {
+      message: error instanceof Error ? error.message : String(error),
+      code: (error as any)?.code,
+      status: (error as any)?.response?.status,
+      statusText: (error as any)?.response?.statusText,
+    });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',

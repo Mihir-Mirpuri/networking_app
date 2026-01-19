@@ -13,15 +13,11 @@ import {
 const BATCH_LIMIT = 10;
 
 export interface PersonToSend {
-  fullName: string;
-  firstName: string | null;
-  lastName: string | null;
   email: string;
-  company: string;
-  role: string | null;
-  university: string;
   subject: string;
   body: string;
+  userCandidateId?: string;
+  resumeId?: string;
 }
 
 export interface SendResult {
@@ -45,10 +41,22 @@ export async function sendEmailsAction(
   }
 
   // Get user tokens
-  const { accessToken, refreshToken } = await getUserTokens(session.user.id);
+  console.log('[Send] Getting user tokens for userId:', session.user.id);
+  let accessToken: string;
+  let refreshToken: string | undefined;
+  try {
+    const tokens = await getUserTokens(session.user.id);
+    accessToken = tokens.accessToken;
+    refreshToken = tokens.refreshToken;
+    console.log('[Send] Tokens retrieved:', { hasAccessToken: !!accessToken, hasRefreshToken: !!refreshToken });
+  } catch (error) {
+    console.error('[Send] Error getting user tokens:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Failed to get authentication tokens' };
+  }
 
   // Limit to batch size and remaining daily limit
   const toSend = people.slice(0, Math.min(BATCH_LIMIT, remaining));
+  console.log('[Send] Processing', toSend.length, 'emails (batch limit:', BATCH_LIMIT, ', remaining:', remaining, ')');
 
   const results: SendResult[] = [];
 
@@ -62,6 +70,16 @@ export async function sendEmailsAction(
       continue;
     }
 
+    if (!person.userCandidateId) {
+      results.push({
+        email: person.email,
+        success: false,
+        error: 'UserCandidate ID required',
+      });
+      continue;
+    }
+
+    console.log('[Send] Sending email to:', person.email, 'subject:', person.subject?.substring(0, 50));
     const sendResult = await sendEmail(
       accessToken,
       refreshToken,
@@ -70,55 +88,39 @@ export async function sendEmailsAction(
       person.subject,
       person.body
     );
-
-    // Create candidate record for history
-    let candidateId: string | null = null;
-    try {
-      const candidate = await prisma.candidate.upsert({
-        where: {
-          userId_fullName_company: {
-            userId: session.user.id,
-            fullName: person.fullName,
-            company: person.company,
-          },
-        },
-        update: {
-          email: person.email,
-          sendStatus: sendResult.success ? 'SENT' : 'FAILED',
-        },
-        create: {
-          userId: session.user.id,
-          fullName: person.fullName,
-          firstName: person.firstName,
-          lastName: person.lastName,
-          company: person.company,
-          role: person.role,
-          university: person.university,
-          email: person.email,
-          emailStatus: 'VERIFIED',
-          sendStatus: sendResult.success ? 'SENT' : 'FAILED',
-        },
-      });
-      candidateId = candidate.id;
-    } catch (error) {
-      console.error('Error creating candidate record:', error);
-    }
+    console.log('[Send] Send result:', { email: person.email, success: sendResult.success, error: sendResult.error });
 
     // Log the send attempt
     await prisma.sendLog.create({
       data: {
         userId: session.user.id,
-        candidateId,
+        userCandidateId: person.userCandidateId,
         toEmail: person.email,
-        toName: person.fullName,
-        company: person.company,
         subject: person.subject,
         body: person.body,
+        resumeAttached: !!person.resumeId,
+        resumeId: person.resumeId || null,
         status: sendResult.success ? 'SUCCESS' : 'FAILED',
         errorMessage: sendResult.error,
         gmailMessageId: sendResult.messageId,
       },
     });
+
+    // Update EmailDraft status to SENT if it exists
+    if (sendResult.success) {
+      try {
+        await prisma.emailDraft.updateMany({
+          where: {
+            userCandidateId: person.userCandidateId,
+          },
+          data: {
+            status: 'SENT',
+          },
+        });
+      } catch (error) {
+        console.error('Error updating email draft status:', error);
+      }
+    }
 
     // Increment daily count on success
     if (sendResult.success) {
