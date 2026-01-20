@@ -16,6 +16,7 @@ export interface SearchParams {
   university: string;
   company: string;
   role: string;
+  location: string;
   limit: number;
   excludePersonKeys?: Set<string>; // Set of "fullName_company" keys (lowercase) to exclude
 }
@@ -202,16 +203,19 @@ function normalizeKey(name: string, company: string, url: string): string {
 }
 
 export async function searchPeople(params: SearchParams): Promise<SearchResult[]> {
-  const { university, company, role, limit, excludePersonKeys = new Set() } = params;
+  const { university, company, role, location, limit, excludePersonKeys = new Set() } = params;
+
+  // Build location string for queries (only if location is specified)
+  const locationStr = location ? ` "${location}"` : '';
 
   // Generate multiple queries to find candidates
   const queries = [
-    `${university} ${company} ${role}`,
-    `"${university}" "${company}" alumni`,
-    `${company} "${university}" ${role}`,
-    `site:linkedin.com "${university}" "${company}"`,
-    `"${university}" alumni ${company}`,
-    `${university} ${company} finance`,
+    `${university} ${company} ${role}${locationStr}`,
+    `"${university}" "${company}" alumni${locationStr}`,
+    `${company} "${university}" ${role}${locationStr}`,
+    `site:linkedin.com "${university}" "${company}"${locationStr}`,
+    `"${university}" alumni ${company}${locationStr}`,
+    `${university} ${company} finance${locationStr}`,
   ];
 
   const seenKeys = new Set<string>();

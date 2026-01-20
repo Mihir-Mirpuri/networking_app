@@ -1,14 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { SearchForm } from './SearchForm';
 import { ResultsList } from './ResultsList';
 import { ExpandedReview } from './ExpandedReview';
 import { BulkReview } from './BulkReview';
 import { searchPeopleAction, SearchResultWithDraft, hidePersonAction } from '@/app/actions/search';
 import { sendSingleEmailAction, sendEmailsAction, PersonToSend } from '@/app/actions/send';
-import { getDefaultTemplateAction, updateDefaultTemplateAction } from '@/app/actions/jobs';
-import type { TemplatePrompt } from '@/lib/types/email';
 
 interface SearchPageClientProps {
   initialRemainingDaily: number;
@@ -26,66 +24,12 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
   const [showBulkReview, setShowBulkReview] = useState(false);
   const [generatingStatuses, setGeneratingStatuses] = useState<Map<string, boolean>>(new Map());
   const [error, setError] = useState<string | null>(null);
-  const [templateExpanded, setTemplateExpanded] = useState(false);
-  const [templateSubject, setTemplateSubject] = useState('');
-  const [templateBody, setTemplateBody] = useState('');
-  const [isLoadingTemplate, setIsLoadingTemplate] = useState(false);
-  const [isSavingTemplate, setIsSavingTemplate] = useState(false);
-  const [templateSaved, setTemplateSaved] = useState(false);
-
-  // Load template when component mounts
-  useEffect(() => {
-    const loadTemplate = async () => {
-      setIsLoadingTemplate(true);
-      try {
-        const templateResult = await getDefaultTemplateAction();
-        if (templateResult.success) {
-          setTemplateSubject(templateResult.template.subject);
-          setTemplateBody(templateResult.template.body);
-        }
-      } catch (error) {
-        console.error('Error loading template:', error);
-      } finally {
-        setIsLoadingTemplate(false);
-      }
-    };
-    loadTemplate();
-  }, []);
-
-  const handleSaveTemplate = async () => {
-    if (!templateSubject.trim() || !templateBody.trim()) {
-      setError('Template subject and body are required');
-      return;
-    }
-
-    setIsSavingTemplate(true);
-    setTemplateSaved(false);
-
-    try {
-      const template: TemplatePrompt = {
-        subject: templateSubject.trim(),
-        body: templateBody.trim(),
-      };
-
-      const result = await updateDefaultTemplateAction(template);
-      if (result.success) {
-        setTemplateSaved(true);
-        setTimeout(() => setTemplateSaved(false), 3000);
-      } else {
-        setError(result.error || 'Failed to save template');
-      }
-    } catch (error) {
-      console.error('Error saving template:', error);
-      setError(error instanceof Error ? error.message : 'Failed to save template');
-    } finally {
-      setIsSavingTemplate(false);
-    }
-  };
 
   const handleSearch = async (params: {
     company: string;
     role: string;
     university: string;
+    location: string;
     limit: number;
     templateId: string;
   }) => {
@@ -93,7 +37,6 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
     setError(null);
     setResults([]);
     setSendStatuses(new Map());
-
 
     const result = await searchPeopleAction(params);
 
@@ -179,7 +122,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
 
   const handleHidePerson = async (userCandidateId: string) => {
     const result = await hidePersonAction(userCandidateId);
-    
+
     if (result.success) {
       // Remove person from results immediately
       setResults((prev) => prev.filter((r) => r.userCandidateId !== userCandidateId));
@@ -195,74 +138,6 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
           {error}
-        </div>
-      )}
-
-      {/* Template Editing Section - shown when results are displayed */}
-      {results.length > 0 && expandedIndex === null && !showBulkReview && (
-        <div className="mb-6 bg-white rounded-lg shadow p-4">
-          <button
-            onClick={() => setTemplateExpanded(!templateExpanded)}
-            className="w-full flex items-center justify-between hover:bg-gray-50 p-2 rounded"
-          >
-            <span className="font-medium text-gray-700">Email Template</span>
-            <svg
-              className={`w-5 h-5 transition-transform ${templateExpanded ? 'rotate-180' : ''}`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-          {templateExpanded && (
-            <div className="mt-4 space-y-4">
-              {templateSaved && (
-                <div className="px-4 py-2 bg-green-100 text-green-800 rounded">
-                  Template saved successfully!
-                </div>
-              )}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Template Subject
-                  <span className="text-xs text-gray-500 ml-2">
-                    (Use placeholders: {'{first_name}'}, {'{company}'}, {'{university}'}, {'{role}'})
-                  </span>
-                </label>
-                <textarea
-                  value={templateSubject}
-                  onChange={(e) => setTemplateSubject(e.target.value)}
-                  rows={2}
-                  disabled={isLoadingTemplate || isSavingTemplate}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none disabled:opacity-50 disabled:cursor-not-allowed"
-                  placeholder="Reaching out from {university}"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Template Body
-                  <span className="text-xs text-gray-500 ml-2">
-                    (Use placeholders: {'{first_name}'}, {'{company}'}, {'{university}'}, {'{role}'})
-                  </span>
-                </label>
-                <textarea
-                  value={templateBody}
-                  onChange={(e) => setTemplateBody(e.target.value)}
-                  rows={6}
-                  disabled={isLoadingTemplate || isSavingTemplate}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none disabled:opacity-50 disabled:cursor-not-allowed"
-                  placeholder="Hi {first_name},&#10;&#10;I'm a student at {university}..."
-                />
-              </div>
-              <button
-                onClick={handleSaveTemplate}
-                disabled={isSavingTemplate || isLoadingTemplate}
-                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isSavingTemplate ? 'Saving...' : 'Save as Default Template'}
-              </button>
-            </div>
-          )}
         </div>
       )}
 

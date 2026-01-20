@@ -6,7 +6,7 @@ import { Providers } from '@/components/Providers';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'AlumniReach',
+  title: 'Lattice',
   description: 'Finance/consulting recruiting outreach tool',
 };
 

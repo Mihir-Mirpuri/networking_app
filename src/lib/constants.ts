@@ -57,50 +57,44 @@ export const UNIVERSITIES = [
   'Georgetown University',
 ] as const;
 
+export const LOCATIONS = [
+  '',
+  'New York',
+  'San Francisco',
+  'Los Angeles',
+  'Chicago',
+  'Boston',
+  'London',
+  'Hong Kong',
+  'Singapore',
+  'Dallas',
+  'Houston',
+  'Atlanta',
+  'Charlotte',
+  'Miami',
+  'Washington DC',
+  'Seattle',
+  'Denver',
+] as const;
+
 export const EMAIL_TEMPLATES = [
   {
-    id: 'networking',
-    name: 'Networking Request',
+    id: 'default',
+    name: 'Default',
     subject: 'Reaching out from {university}',
     body: `Hi {first_name},
 
-I'm a student at {university} and I'm very interested in {company}. I came across your profile and would love to learn more about your experience there.
+I hope you are doing well. My name is {user_name} and I am a {classification} pursuing my {major} at {university}. I am interested in {career} and would love to grab 10-15 minutes on the phone with you to hear about your experiences at {company}.
 
-Would you be open to a brief 15-minute call at your convenience?
+In case it's helpful to provide more context on my background, I have attached my resume below for your reference. I look forward to hearing from you.
 
-Best regards`,
-  },
-  {
-    id: 'coffee-chat',
-    name: 'Coffee Chat',
-    subject: 'Coffee Chat Request - {university} Student',
-    body: `Hi {first_name},
-
-I hope this message finds you well! I'm currently a student at {university} exploring opportunities in {role}.
-
-I noticed you work at {company} and would greatly appreciate the chance to hear about your journey and any advice you might have.
-
-Would you have 15-20 minutes for a virtual coffee chat?
-
-Thank you for your time!`,
-  },
-  {
-    id: 'informational',
-    name: 'Informational Interview',
-    subject: 'Informational Interview Request',
-    body: `Dear {first_name},
-
-I am a student at {university} with a strong interest in {role} at {company}.
-
-I am reaching out to request an informational interview to learn more about your career path and experience in the industry.
-
-I would be grateful for any time you could spare.
-
-Best regards`,
+Warm regards,
+{user_name}`,
   },
 ] as const;
 
 export type Company = (typeof COMPANIES)[number];
 export type Role = (typeof ROLES)[number];
 export type University = (typeof UNIVERSITIES)[number];
+export type Location = (typeof LOCATIONS)[number];
 export type EmailTemplate = (typeof EMAIL_TEMPLATES)[number];

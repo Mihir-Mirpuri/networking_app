@@ -12,6 +12,7 @@ export interface SearchInput {
   company: string;
   role: string;
   university: string;
+  location: string;
   limit: number;
   templateId: string;
 }
@@ -31,31 +32,55 @@ export interface SearchResultWithDraft {
   draftSubject: string;
   draftBody: string;
   sourceUrl: string;
+  linkedinUrl: string | null;
   userCandidateId?: string;
   emailDraftId?: string;
 }
 
+function extractLinkedInUrl(person: SearchResult): string | null {
+  if (person.sourceDomain?.includes('linkedin.com') || person.sourceUrl?.includes('linkedin.com')) {
+    return person.sourceUrl;
+  }
+  return null;
+}
+
+interface UserProfileData {
+  name: string | null;
+  classification: string | null;
+  major: string | null;
+  university: string | null;
+  career: string | null;
+}
+
 function generateDraft(
-  template: typeof EMAIL_TEMPLATES[number],
+  template: { subject: string; body: string },
   person: SearchResult,
-  university: string,
-  role: string
+  searchUniversity: string,
+  role: string,
+  userProfile: UserProfileData
 ): { subject: string; body: string } {
   const firstName = person.firstName || 'there';
+  const userName = userProfile.name || 'Your Name';
+  const classification = userProfile.classification || 'student';
+  const major = userProfile.major || 'degree';
+  const university = userProfile.university || searchUniversity;
+  const career = userProfile.career || role;
 
-  const subject = template.subject
-    .replace(/{first_name}/g, firstName)
-    .replace(/{company}/g, person.company)
-    .replace(/{university}/g, university)
-    .replace(/{role}/g, role);
+  const replacePlaceholders = (text: string) =>
+    text
+      .replace(/{first_name}/g, firstName)
+      .replace(/{user_name}/g, userName)
+      .replace(/{company}/g, person.company)
+      .replace(/{university}/g, university)
+      .replace(/{classification}/g, classification)
+      .replace(/{major}/g, major)
+      .replace(/{career}/g, career)
+      .replace(/{role}/g, role);
 
-  const body = template.body
-    .replace(/{first_name}/g, firstName)
-    .replace(/{company}/g, person.company)
-    .replace(/{university}/g, university)
-    .replace(/{role}/g, role);
-
-  return { subject, body };
+  return {
+    subject: replacePlaceholders(template.subject),
+    body: replacePlaceholders(template.body),
+  };
 }
 
 // Helper function for controlled concurrency
@@ -136,6 +161,18 @@ export async function searchPeopleAction(
   }
 
   try {
+    // Fetch user profile for template personalization
+    const userProfile = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: {
+        name: true,
+        classification: true,
+        major: true,
+        university: true,
+        career: true,
+      },
+    });
+
     // Get excluded Person keys (sent emails or marked "do not show again")
     // Only these people should be excluded from future searches
     const excludedKeys = await getExcludedPersonKeys(session.user.id);
@@ -146,6 +183,7 @@ export async function searchPeopleAction(
       university: input.university,
       company: input.company,
       role: input.role,
+      location: input.location,
       limit: input.limit,
       excludePersonKeys: excludedKeys,
     });
@@ -220,7 +258,7 @@ export async function searchPeopleAction(
       DB_SAVE_CONCURRENCY,
       async ({ person, emailResult, emailSource }): Promise<SearchResultWithDraft> => {
         // Generate placeholder draft (simple template replacement)
-        const placeholderDraft = generateDraft(template, person, input.university, input.role);
+        const placeholderDraft = generateDraft(template, person, input.university, input.role, userProfile || { name: null, classification: null, major: null, university: null, career: null });
 
         // Save to database with placeholder
         try {
@@ -251,6 +289,7 @@ export async function searchPeopleAction(
             draftSubject: placeholderDraft.subject,
             draftBody: placeholderDraft.body,
             sourceUrl: person.sourceUrl,
+            linkedinUrl: extractLinkedInUrl(person),
             userCandidateId: saved.userCandidateId,
             emailDraftId: saved.emailDraftId,
           };
@@ -272,6 +311,7 @@ export async function searchPeopleAction(
             draftSubject: placeholderDraft.subject,
             draftBody: placeholderDraft.body,
             sourceUrl: person.sourceUrl,
+            linkedinUrl: extractLinkedInUrl(person),
           };
         }
       }

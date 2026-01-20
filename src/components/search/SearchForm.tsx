@@ -1,13 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { COMPANIES, ROLES, UNIVERSITIES, EMAIL_TEMPLATES } from '@/lib/constants';
+import { COMPANIES, ROLES, UNIVERSITIES, LOCATIONS, EMAIL_TEMPLATES } from '@/lib/constants';
 
 interface SearchFormProps {
   onSearch: (params: {
     company: string;
     role: string;
     university: string;
+    location: string;
     limit: number;
     templateId: string;
   }) => void;
@@ -18,12 +19,13 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
   const [company, setCompany] = useState(COMPANIES[0]);
   const [role, setRole] = useState(ROLES[0]);
   const [university, setUniversity] = useState(UNIVERSITIES[0]);
+  const [location, setLocation] = useState(LOCATIONS[0]);
   const [limit, setLimit] = useState(10);
   const [templateId, setTemplateId] = useState(EMAIL_TEMPLATES[0].id);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSearch({ company, role, university, limit, templateId });
+    onSearch({ company, role, university, location, limit, templateId });
   };
 
   return (
@@ -81,6 +83,25 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
             {UNIVERSITIES.map((u) => (
               <option key={u} value={u}>
                 {u}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Office Location */}
+        <div>
+          <label htmlFor="location" className="block text-sm font-medium text-gray-700 mb-1">
+            Office Location
+          </label>
+          <select
+            id="location"
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {LOCATIONS.map((loc) => (
+              <option key={loc || 'any'} value={loc}>
+                {loc || 'Any Location'}
               </option>
             ))}
           </select>
