@@ -256,6 +256,7 @@ export async function saveSearchResult(
   personId: string;
   userCandidateId: string;
   emailDraftId: string;
+  linkedinUrl: string | null;
 }> {
   // Extract LinkedIn URL
   const linkedinUrl = extractLinkedInUrl(searchResult.sourceUrl, searchResult.sourceDomain);
@@ -269,6 +270,13 @@ export async function saveSearchResult(
     role: searchResult.role,
     linkedinUrl,
   });
+
+  // Get the person's LinkedIn URL (may have been updated or already existed)
+  const personWithLinkedIn = await prisma.person.findUnique({
+    where: { id: person.id },
+    select: { linkedinUrl: true },
+  });
+  const finalLinkedInUrl = personWithLinkedIn?.linkedinUrl || null;
 
   // 2. Update Person email if we have one (smart update logic)
   // Use existingPerson data if available to avoid redundant query
@@ -348,6 +356,7 @@ export async function saveSearchResult(
     personId: person.id,
     userCandidateId: userCandidate.id,
     emailDraftId: emailDraft.id,
+    linkedinUrl: finalLinkedInUrl,
   };
 }
 

@@ -91,7 +91,7 @@ export async function getOrFindEmail(
       existingPerson: {
         id: existingPerson.id,
         email: existingPerson.email,
-        emailStatus: existingPerson.emailStatus,
+        emailStatus: existingPerson.emailStatus || 'MISSING',
         emailConfidence: existingPerson.emailConfidence,
       },
     };
@@ -137,7 +137,7 @@ export async function getOrFindEmail(
       existingPerson: existingPerson ? {
         id: existingPerson.id,
         email: existingPerson.email,
-        emailStatus: existingPerson.emailStatus,
+        emailStatus: existingPerson.emailStatus || 'MISSING',
         emailConfidence: existingPerson.emailConfidence,
       } : undefined,
     };
@@ -178,7 +178,7 @@ export async function getOrFindEmail(
     existingPerson: existingPerson ? {
       id: existingPerson.id,
       email: existingPerson.email,
-      emailStatus: existingPerson.emailStatus,
+      emailStatus: existingPerson.emailStatus || 'MISSING',
       emailConfidence: existingPerson.emailConfidence,
     } : undefined,
   };

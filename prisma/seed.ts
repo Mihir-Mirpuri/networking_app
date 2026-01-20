@@ -22,28 +22,38 @@ async function main() {
   console.log('Creating email templates...');
   for (let i = 0; i < EMAIL_TEMPLATES.length; i++) {
     const template = EMAIL_TEMPLATES[i];
-    
+
     // Store template as JSON in prompt field
     const prompt = JSON.stringify({
       subject: template.subject,
       body: template.body,
     });
 
-    await prisma.emailTemplate.upsert({
+    // Check if template with this name already exists for the user
+    const existingTemplate = await prisma.emailTemplate.findFirst({
       where: {
-        userId_name: {
-          userId: user.id,
-          name: template.name,
-        },
-      },
-      update: {},
-      create: {
         userId: user.id,
         name: template.name,
-        prompt: prompt,
-        isDefault: i === 0, // First template is default
       },
     });
+
+    if (existingTemplate) {
+      // Update existing template
+      await prisma.emailTemplate.update({
+        where: { id: existingTemplate.id },
+        data: { prompt },
+      });
+    } else {
+      // Create new template
+      await prisma.emailTemplate.create({
+        data: {
+          userId: user.id,
+          name: template.name,
+          prompt: prompt,
+          isDefault: i === 0, // First template is default
+        },
+      });
+    }
 
     console.log(`Created template: ${template.name}`);
   }

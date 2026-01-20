@@ -1,15 +1,41 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { SearchForm } from './SearchForm';
 import { ResultsList } from './ResultsList';
 import { ExpandedReview } from './ExpandedReview';
 import { BulkReview } from './BulkReview';
+import { LoadingSpinner } from './LoadingSpinner';
 import { searchPeopleAction, SearchResultWithDraft, hidePersonAction } from '@/app/actions/search';
 import { sendSingleEmailAction, sendEmailsAction, PersonToSend } from '@/app/actions/send';
 
 interface SearchPageClientProps {
   initialRemainingDaily: number;
+}
+
+// Storage key for sessionStorage
+const STORAGE_KEY = 'lattice_searchState';
+const STORAGE_VERSION = 1;
+
+// State structure for persistence
+interface SearchPageState {
+  version: number;
+  results: SearchResultWithDraft[];
+  expandedIndex: number | null;
+  sendStatuses: Array<[string, 'success' | 'failed' | 'pending']>;
+  showBulkReview: boolean;
+  generatingStatuses: Array<[string, boolean]>;
+  remainingDaily?: number;
+  savedAt: number;
+}
+
+// Helper functions for Map serialization
+function mapToArray<T>(map: Map<string, T>): Array<[string, T]> {
+  return Array.from(map.entries());
+}
+
+function arrayToMap<T>(array: Array<[string, T]>): Map<string, T> {
+  return new Map(array);
 }
 
 export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProps) {
@@ -25,6 +51,80 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
   const [generatingStatuses, setGeneratingStatuses] = useState<Map<string, boolean>>(new Map());
   const [error, setError] = useState<string | null>(null);
 
+  // Restore state from sessionStorage on mount
+  useEffect(() => {
+    try {
+      const stored = sessionStorage.getItem(STORAGE_KEY);
+
+      if (stored) {
+        const state: SearchPageState = JSON.parse(stored);
+
+        // Check version compatibility
+        if (state.version === STORAGE_VERSION) {
+          if (state.results && state.results.length > 0) {
+            setResults(state.results);
+          }
+          if (state.expandedIndex !== undefined) {
+            setExpandedIndex(state.expandedIndex);
+          }
+          if (state.sendStatuses) {
+            setSendStatuses(arrayToMap(state.sendStatuses));
+          }
+          if (state.showBulkReview !== undefined) {
+            setShowBulkReview(state.showBulkReview);
+          }
+          if (state.generatingStatuses) {
+            setGeneratingStatuses(arrayToMap(state.generatingStatuses));
+          }
+        } else {
+          sessionStorage.removeItem(STORAGE_KEY);
+        }
+      }
+    } catch (error) {
+      console.error('Error restoring state from sessionStorage:', error);
+      try {
+        sessionStorage.removeItem(STORAGE_KEY);
+      } catch (e) {
+        // Ignore errors clearing
+      }
+    }
+  }, []);
+
+  // Debounced save to sessionStorage
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (results.length > 0) {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+
+      saveTimeoutRef.current = setTimeout(() => {
+        try {
+          const state: SearchPageState = {
+            version: STORAGE_VERSION,
+            results,
+            expandedIndex,
+            sendStatuses: mapToArray(sendStatuses),
+            showBulkReview,
+            generatingStatuses: mapToArray(generatingStatuses),
+            remainingDaily,
+            savedAt: Date.now(),
+          };
+          sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        } catch (error) {
+          console.error('Error saving state to sessionStorage:', error);
+        }
+      }, 300);
+    }
+
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [results, expandedIndex, sendStatuses, showBulkReview, generatingStatuses, remainingDaily]);
+
   const handleSearch = async (params: {
     company: string;
     role: string;
@@ -33,6 +133,12 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
     limit: number;
     templateId: string;
   }) => {
+    try {
+      sessionStorage.removeItem(STORAGE_KEY);
+    } catch (error) {
+      console.error('Error clearing sessionStorage:', error);
+    }
+
     setIsSearching(true);
     setError(null);
     setResults([]);
@@ -91,7 +197,6 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
 
     setIsSending(true);
 
-    // Mark all as pending
     const newStatuses = new Map(sendStatuses);
     emails.forEach(({ index }) => {
       const person = results[index];
@@ -124,7 +229,6 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
     const result = await hidePersonAction(userCandidateId);
 
     if (result.success) {
-      // Remove person from results immediately
       setResults((prev) => prev.filter((r) => r.userCandidateId !== userCandidateId));
     } else {
       setError(result.error || 'Failed to hide person');
@@ -138,6 +242,13 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
           {error}
+        </div>
+      )}
+
+      {isSearching && (
+        <div className="flex items-center gap-3 py-8 text-gray-600">
+          <LoadingSpinner size="md" />
+          <span className="text-base">Discovering people...</span>
         </div>
       )}
 
@@ -170,7 +281,6 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
           onClose={() => setShowBulkReview(false)}
           onSendAll={handleBulkSend}
           sendStatuses={sendStatuses}
-          generatingStatuses={generatingStatuses}
         />
       )}
     </div>

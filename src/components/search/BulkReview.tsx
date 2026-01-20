@@ -1,28 +1,18 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { SearchResultWithDraft } from '@/app/actions/search';
-import {
-  generateEmailForCandidateAction,
-  getDefaultTemplateAction,
-  checkDraftsStatus,
-} from '@/app/actions/jobs';
-import type { TemplatePrompt } from '@/lib/services/groq-email';
-import { EMAIL_TEMPLATES } from '@/lib/constants';
 
 interface BulkReviewProps {
   results: SearchResultWithDraft[];
   onClose: () => void;
   onSendAll: (emails: { index: number; subject: string; body: string }[]) => Promise<void>;
   sendStatuses: Map<string, 'success' | 'failed' | 'pending'>;
-  generatingStatuses: Map<string, boolean>;
 }
 
 interface EmailDraft {
   subject: string;
   body: string;
-  isGenerating: boolean;
-  error: string | null;
 }
 
 export function BulkReview({
@@ -30,11 +20,9 @@ export function BulkReview({
   onClose,
   onSendAll,
   sendStatuses,
-  generatingStatuses,
 }: BulkReviewProps) {
   const [drafts, setDrafts] = useState<Map<number, EmailDraft>>(new Map());
   const [isSending, setIsSending] = useState(false);
-  const pollingIntervalsRef = useRef<Map<number, NodeJS.Timeout>>(new Map());
 
   // Get only sendable results (have email and not already sent)
   const sendableResults = results
@@ -43,174 +31,25 @@ export function BulkReview({
 
   const sendableCount = sendableResults.filter(({ index }) => {
     const draft = drafts.get(index);
-    return draft && draft.subject && draft.body && !draft.isGenerating;
+    return draft && draft.subject && draft.body;
   }).length;
 
-  // Initialize drafts and trigger generation for each
+  // Initialize drafts from search results
   useEffect(() => {
-    const initializeDrafts = async () => {
-      // Load template first
-      let template: TemplatePrompt | null = null;
-      try {
-        const templateResult = await getDefaultTemplateAction();
-        if (templateResult.success) {
-          template = templateResult.template;
-        } else {
-          const fallback = EMAIL_TEMPLATES[0];
-          template = { subject: fallback.subject, body: fallback.body };
-        }
-      } catch (error) {
-        console.error('Error loading template:', error);
-        const fallback = EMAIL_TEMPLATES[0];
-        template = { subject: fallback.subject, body: fallback.body };
-      }
-
-      // Initialize drafts for each sendable result
-      for (const { result, index } of sendableResults) {
-        if (!result.userCandidateId) continue;
-
-        // Set initial state
-        setDrafts((prev) => {
-          const newDrafts = new Map(prev);
-          newDrafts.set(index, {
-            subject: result.draftSubject || '',
-            body: result.draftBody || '',
-            isGenerating: false,
-            error: null,
-          });
-          return newDrafts;
-        });
-
-        // Check if already generated
-        try {
-          const statusResult = await checkDraftsStatus([result.userCandidateId]);
-          if (statusResult.success) {
-            const draftStatus = statusResult.results[0];
-            if (draftStatus?.status === 'APPROVED' && draftStatus.subject && draftStatus.body) {
-              setDrafts((prev) => {
-                const newDrafts = new Map(prev);
-                newDrafts.set(index, {
-                  subject: draftStatus.subject!,
-                  body: draftStatus.body!,
-                  isGenerating: false,
-                  error: null,
-                });
-                return newDrafts;
-              });
-              continue; // Skip generation
-            }
-          }
-        } catch (error) {
-          console.error('Error checking draft status:', error);
-        }
-
-        // Trigger generation
-        if (template) {
-          triggerGeneration(index, result.userCandidateId, template);
-        }
-      }
-    };
-
-    initializeDrafts();
-
-    // Cleanup polling on unmount
-    return () => {
-      pollingIntervalsRef.current.forEach((interval) => clearInterval(interval));
-      pollingIntervalsRef.current.clear();
-    };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const triggerGeneration = async (index: number, userCandidateId: string, template: TemplatePrompt) => {
-    setDrafts((prev) => {
-      const newDrafts = new Map(prev);
-      const current = newDrafts.get(index) || { subject: '', body: '', isGenerating: false, error: null };
-      newDrafts.set(index, { ...current, isGenerating: true, error: null });
-      return newDrafts;
-    });
-
-    try {
-      const result = await generateEmailForCandidateAction(userCandidateId, template);
-      if (result.success) {
-        startPolling(index, userCandidateId);
-      } else {
-        setDrafts((prev) => {
-          const newDrafts = new Map(prev);
-          const current = newDrafts.get(index) || { subject: '', body: '', isGenerating: false, error: null };
-          newDrafts.set(index, { ...current, isGenerating: false, error: result.error || 'Failed to generate' });
-          return newDrafts;
-        });
-      }
-    } catch (error) {
-      setDrafts((prev) => {
-        const newDrafts = new Map(prev);
-        const current = newDrafts.get(index) || { subject: '', body: '', isGenerating: false, error: null };
-        newDrafts.set(index, { ...current, isGenerating: false, error: 'Failed to generate email' });
-        return newDrafts;
+    const newDrafts = new Map<number, EmailDraft>();
+    for (const { result, index } of sendableResults) {
+      newDrafts.set(index, {
+        subject: result.draftSubject || '',
+        body: result.draftBody || '',
       });
     }
-  };
-
-  const startPolling = (index: number, userCandidateId: string) => {
-    // Clear existing polling for this index
-    const existingInterval = pollingIntervalsRef.current.get(index);
-    if (existingInterval) {
-      clearInterval(existingInterval);
-    }
-
-    const startTime = Date.now();
-    const interval = setInterval(async () => {
-      if (Date.now() - startTime > 120000) {
-        clearInterval(interval);
-        pollingIntervalsRef.current.delete(index);
-        setDrafts((prev) => {
-          const newDrafts = new Map(prev);
-          const current = newDrafts.get(index) || { subject: '', body: '', isGenerating: false, error: null };
-          newDrafts.set(index, { ...current, isGenerating: false, error: 'Generation timed out' });
-          return newDrafts;
-        });
-        return;
-      }
-
-      try {
-        const statusResult = await checkDraftsStatus([userCandidateId]);
-        if (statusResult.success) {
-          const draftStatus = statusResult.results[0];
-          if (draftStatus?.status === 'APPROVED' && draftStatus.subject && draftStatus.body) {
-            clearInterval(interval);
-            pollingIntervalsRef.current.delete(index);
-            setDrafts((prev) => {
-              const newDrafts = new Map(prev);
-              newDrafts.set(index, {
-                subject: draftStatus.subject!,
-                body: draftStatus.body!,
-                isGenerating: false,
-                error: null,
-              });
-              return newDrafts;
-            });
-          } else if (draftStatus?.status === 'REJECTED') {
-            clearInterval(interval);
-            pollingIntervalsRef.current.delete(index);
-            setDrafts((prev) => {
-              const newDrafts = new Map(prev);
-              const current = newDrafts.get(index) || { subject: '', body: '', isGenerating: false, error: null };
-              newDrafts.set(index, { ...current, isGenerating: false, error: 'Generation was rejected' });
-              return newDrafts;
-            });
-          }
-        }
-      } catch (error) {
-        console.error('Error polling draft status:', error);
-      }
-    }, 2500);
-
-    pollingIntervalsRef.current.set(index, interval);
-  };
+    setDrafts(newDrafts);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSubjectChange = (index: number, value: string) => {
     setDrafts((prev) => {
       const newDrafts = new Map(prev);
-      const current = newDrafts.get(index) || { subject: '', body: '', isGenerating: false, error: null };
+      const current = newDrafts.get(index) || { subject: '', body: '' };
       newDrafts.set(index, { ...current, subject: value });
       return newDrafts;
     });
@@ -219,7 +58,7 @@ export function BulkReview({
   const handleBodyChange = (index: number, value: string) => {
     setDrafts((prev) => {
       const newDrafts = new Map(prev);
-      const current = newDrafts.get(index) || { subject: '', body: '', isGenerating: false, error: null };
+      const current = newDrafts.get(index) || { subject: '', body: '' };
       newDrafts.set(index, { ...current, body: value });
       return newDrafts;
     });
@@ -229,7 +68,7 @@ export function BulkReview({
     const emailsToSend = sendableResults
       .filter(({ index }) => {
         const draft = drafts.get(index);
-        return draft && draft.subject && draft.body && !draft.isGenerating;
+        return draft && draft.subject && draft.body;
       })
       .map(({ index }) => ({
         index,
@@ -278,8 +117,7 @@ export function BulkReview({
         {/* Scrollable Email List */}
         <div className="flex-1 overflow-y-auto p-4 space-y-6">
           {sendableResults.map(({ result, index }) => {
-            const draft = drafts.get(index) || { subject: '', body: '', isGenerating: false, error: null };
-            const isGenerating = draft.isGenerating || (result.userCandidateId ? generatingStatuses.get(result.userCandidateId) || false : false);
+            const draft = drafts.get(index) || { subject: '', body: '' };
 
             return (
               <div key={result.id} className="border rounded-lg p-4 bg-gray-50">
@@ -292,18 +130,6 @@ export function BulkReview({
                   <p className="text-sm text-blue-600">{result.email}</p>
                 </div>
 
-                {/* Status */}
-                {isGenerating && (
-                  <div className="mb-3 px-3 py-2 bg-blue-100 text-blue-800 rounded text-sm animate-pulse">
-                    Generating email...
-                  </div>
-                )}
-                {draft.error && (
-                  <div className="mb-3 px-3 py-2 bg-red-100 text-red-800 rounded text-sm">
-                    {draft.error}
-                  </div>
-                )}
-
                 {/* Subject */}
                 <div className="mb-3">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -313,8 +139,7 @@ export function BulkReview({
                     type="text"
                     value={draft.subject}
                     onChange={(e) => handleSubjectChange(index, e.target.value)}
-                    disabled={isGenerating}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                   />
                 </div>
 
@@ -327,8 +152,7 @@ export function BulkReview({
                     value={draft.body}
                     onChange={(e) => handleBodyChange(index, e.target.value)}
                     rows={6}
-                    disabled={isGenerating}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm"
                   />
                 </div>
               </div>

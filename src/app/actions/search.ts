@@ -33,6 +33,9 @@ export interface SearchResultWithDraft {
   draftBody: string;
   sourceUrl: string;
   linkedinUrl: string | null;
+  confidence?: number;
+  isLowConfidence?: boolean;
+  extractionMethod?: 'linkedin' | 'pipe' | 'snippet' | 'role-first' | 'fallback';
   userCandidateId?: string;
   emailDraftId?: string;
 }
@@ -178,20 +181,25 @@ export async function searchPeopleAction(
     const excludedKeys = await getExcludedPersonKeys(session.user.id);
     console.log(`[Search] User has ${excludedKeys.size} excluded people (sent/hidden).`);
 
+    // Request more candidates than user limit to account for unverified and missing emails
+    // Strategy: Request limit * 2 or limit + 10, whichever is higher
+    const discoveryLimit = Math.max(input.limit + 10, Math.ceil(input.limit * 2));
+    console.log(`[Search] Requesting ${discoveryLimit} candidates to ensure ${input.limit} results with emails (accounting for MISSING emails being filtered).`);
+
     // Search for people, excluding only sent/hidden people
     const people = await searchPeople({
       university: input.university,
       company: input.company,
       role: input.role,
       location: input.location,
-      limit: input.limit,
+      limit: discoveryLimit,
       excludePersonKeys: excludedKeys,
     });
 
-    // Log if we got fewer results than requested
-    if (people.length < input.limit) {
+    // Log if we got fewer results than requested for discovery
+    if (people.length < discoveryLimit) {
       console.log(
-        `[Search] Found ${people.length} new people (requested ${input.limit}). User may have already discovered many people for this search.`
+        `[Search] Found ${people.length} new people (requested ${discoveryLimit} for discovery). User may have already discovered many people for this search.`
       );
     }
 
@@ -211,7 +219,7 @@ export async function searchPeopleAction(
       EMAIL_LOOKUP_CONCURRENCY,
       async (person): Promise<EmailLookupResult> => {
         // Smart email lookup with caching
-        let emailResult = { email: null as string | null, status: 'MISSING' as const, confidence: 0 };
+        let emailResult: { email: string | null; status: 'VERIFIED' | 'UNVERIFIED' | 'MISSING'; confidence: number; existingPerson?: { id: string; email: string | null; emailStatus: string; emailConfidence: number | null } } = { email: null, status: 'MISSING', confidence: 0 };
         let emailSource: 'cache' | 'apollo' | 'none' = 'none';
 
         if (person.firstName && person.lastName) {
@@ -274,6 +282,9 @@ export async function searchPeopleAction(
             }
           );
 
+          // Extract LinkedIn URL from search result or use saved one
+          const linkedinUrl = saved.linkedinUrl || (person.sourceDomain?.includes('linkedin.com') ? person.sourceUrl : null);
+
           return {
             id: saved.userCandidateId,
             fullName: person.fullName,
@@ -289,13 +300,19 @@ export async function searchPeopleAction(
             draftSubject: placeholderDraft.subject,
             draftBody: placeholderDraft.body,
             sourceUrl: person.sourceUrl,
-            linkedinUrl: extractLinkedInUrl(person),
+            linkedinUrl: linkedinUrl || extractLinkedInUrl(person),
+            confidence: person.confidence,
+            isLowConfidence: person.isLowConfidence,
+            extractionMethod: person.extractionMethod,
             userCandidateId: saved.userCandidateId,
             emailDraftId: saved.emailDraftId,
           };
         } catch (error) {
           console.error('Error saving search result to database:', error);
           // Still return result even if save fails
+          // Extract LinkedIn URL from search result
+          const linkedinUrl = person.sourceDomain?.includes('linkedin.com') ? person.sourceUrl : null;
+
           return {
             id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             fullName: person.fullName,
@@ -311,13 +328,52 @@ export async function searchPeopleAction(
             draftSubject: placeholderDraft.subject,
             draftBody: placeholderDraft.body,
             sourceUrl: person.sourceUrl,
-            linkedinUrl: extractLinkedInUrl(person),
+            linkedinUrl: linkedinUrl || extractLinkedInUrl(person),
+            confidence: person.confidence,
+            isLowConfidence: person.isLowConfidence,
+            extractionMethod: person.extractionMethod,
           };
         }
       }
     );
 
-    return { success: true, results };
+    // Filter out results with MISSING email status (only show results with emails)
+    const resultsWithEmails = results.filter(
+      (result) => result.emailStatus !== 'MISSING'
+    );
+
+    // Sort results by verification status: VERIFIED → UNVERIFIED
+    const statusPriority: Record<'VERIFIED' | 'UNVERIFIED' | 'MISSING', number> = {
+      VERIFIED: 1,
+      UNVERIFIED: 2,
+      MISSING: 999,
+    };
+
+    const sortedResults = resultsWithEmails.sort((a, b) => {
+      const aPriority = statusPriority[a.emailStatus] || 999;
+      const bPriority = statusPriority[b.emailStatus] || 999;
+      return aPriority - bPriority;
+    });
+
+    // Apply limit after sorting
+    const finalResults = sortedResults.slice(0, input.limit);
+
+    // Count results by status for logging
+    const verifiedCount = finalResults.filter((r) => r.emailStatus === 'VERIFIED').length;
+    const unverifiedCount = finalResults.filter((r) => r.emailStatus === 'UNVERIFIED').length;
+
+    // Log results breakdown
+    if (finalResults.length < input.limit) {
+      console.log(
+        `[Search] Found ${finalResults.length} results (requested ${input.limit}): ${verifiedCount} verified, ${unverifiedCount} unverified. Not enough results with emails available.`
+      );
+    } else {
+      console.log(
+        `[Search] Successfully found ${finalResults.length} results: ${verifiedCount} verified, ${unverifiedCount} unverified.`
+      );
+    }
+
+    return { success: true, results: finalResults };
   } catch (error) {
     console.error('Search error:', error);
     return { success: false, error: 'Search failed. Please try again.' };
