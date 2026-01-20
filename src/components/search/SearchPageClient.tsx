@@ -166,6 +166,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
       subject,
       body,
       userCandidateId: person.userCandidateId,
+      resumeId: person.resumeId,
     };
 
     const result = await sendSingleEmailAction(personToSend);
@@ -189,6 +190,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
           subject,
           body,
           userCandidateId: person.userCandidateId,
+          resumeId: person.resumeId,
         };
       })
       .filter((p): p is NonNullable<typeof p> => p !== null);

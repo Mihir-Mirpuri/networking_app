@@ -38,6 +38,7 @@ export interface SearchResultWithDraft {
   extractionMethod?: 'linkedin' | 'pipe' | 'snippet' | 'role-first' | 'fallback';
   userCandidateId?: string;
   emailDraftId?: string;
+  resumeId?: string | null;
 }
 
 function extractLinkedInUrl(person: SearchResult): string | null {
@@ -111,7 +112,7 @@ export async function searchPeopleAction(
   }
 
   // Try to get template from database first, fallback to constants
-  let template: { subject: string; body: string; id: string } | null = null;
+  let template: { subject: string; body: string; id: string; attachResume: boolean; resumeId: string | null } | null = null;
   let templateId: string | null = null;
 
   try {
@@ -123,6 +124,12 @@ export async function searchPeopleAction(
           { isDefault: true },
         ],
       },
+      select: {
+        id: true,
+        prompt: true,
+        attachResume: true,
+        resumeId: true,
+      },
     });
 
     if (dbTemplate) {
@@ -133,6 +140,8 @@ export async function searchPeopleAction(
           id: dbTemplate.id,
           subject: parsed.subject || '',
           body: parsed.body || dbTemplate.prompt,
+          attachResume: dbTemplate.attachResume,
+          resumeId: dbTemplate.resumeId,
         };
         templateId = dbTemplate.id;
       } catch {
@@ -141,6 +150,8 @@ export async function searchPeopleAction(
           id: dbTemplate.id,
           subject: `Reaching out from ${input.university}`,
           body: dbTemplate.prompt,
+          attachResume: dbTemplate.attachResume,
+          resumeId: dbTemplate.resumeId,
         };
         templateId = dbTemplate.id;
       }
@@ -159,6 +170,8 @@ export async function searchPeopleAction(
       id: constTemplate.id,
       subject: constTemplate.subject,
       body: constTemplate.body,
+      attachResume: false,
+      resumeId: null,
     };
     templateId = null; // Will be created in seed script later
   }
@@ -260,6 +273,32 @@ export async function searchPeopleAction(
       }
     );
 
+    // Determine resume to attach based on template settings
+    let resumeIdToAttach: string | null = null;
+    let shouldAttachResume = false;
+
+    if (template.attachResume) {
+      shouldAttachResume = true;
+      // Use template's resumeId if specified, otherwise find user's active resume
+      if (template.resumeId) {
+        resumeIdToAttach = template.resumeId;
+      } else {
+        // Find user's active resume
+        const activeResume = await prisma.userResume.findFirst({
+          where: {
+            userId: session.user.id,
+            isActive: true,
+          },
+          select: { id: true },
+        });
+        if (activeResume) {
+          resumeIdToAttach = activeResume.id;
+        } else {
+          console.warn(`[Search] Template has attachResume=true but no resumeId specified and no active resume found for user ${session.user.id}`);
+        }
+      }
+    }
+
     // Step 2: Process database saves with controlled concurrency
     const results: SearchResultWithDraft[] = await processWithConcurrency(
       emailLookupResults,
@@ -279,6 +318,8 @@ export async function searchPeopleAction(
               subject: placeholderDraft.subject,
               body: placeholderDraft.body,
               templateId: templateId,
+              attachResume: shouldAttachResume,
+              resumeId: resumeIdToAttach,
             }
           );
 
@@ -306,6 +347,7 @@ export async function searchPeopleAction(
             extractionMethod: person.extractionMethod,
             userCandidateId: saved.userCandidateId,
             emailDraftId: saved.emailDraftId,
+            resumeId: shouldAttachResume ? resumeIdToAttach : null,
           };
         } catch (error) {
           console.error('Error saving search result to database:', error);
@@ -327,6 +369,7 @@ export async function searchPeopleAction(
             emailSource,
             draftSubject: placeholderDraft.subject,
             draftBody: placeholderDraft.body,
+            resumeId: shouldAttachResume ? resumeIdToAttach : null,
             sourceUrl: person.sourceUrl,
             linkedinUrl: linkedinUrl || extractLinkedInUrl(person),
             confidence: person.confidence,

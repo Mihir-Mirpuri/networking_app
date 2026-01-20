@@ -31,6 +31,8 @@ export interface EmailDraftData {
   subject: string;
   body: string;
   templateId: string | null;
+  attachResume?: boolean;
+  resumeId?: string | null;
 }
 
 /**
@@ -152,6 +154,8 @@ export async function createOrUpdateEmailDraft(
       templateId: draftData.templateId,
       subject: draftData.subject,
       body: draftData.body,
+      attachResume: draftData.attachResume || false,
+      resumeId: draftData.resumeId || null,
       status: 'APPROVED', // Template replacement is immediate, no AI processing needed
     },
     update: {
@@ -159,6 +163,8 @@ export async function createOrUpdateEmailDraft(
       subject: draftData.subject,
       body: draftData.body,
       templateId: draftData.templateId || undefined,
+      attachResume: draftData.attachResume !== undefined ? draftData.attachResume : undefined,
+      resumeId: draftData.resumeId !== undefined ? (draftData.resumeId || null) : undefined,
       status: 'APPROVED', // Template replacement is immediate
     },
   });

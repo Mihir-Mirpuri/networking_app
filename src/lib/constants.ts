@@ -116,6 +116,17 @@ export const ROLES = [
   'Wealth Management',
 ] as const;
 
+export const CLASSIFICATIONS = [
+  'Freshman',
+  'Sophomore',
+  'Junior',
+  'Senior',
+  'Graduate Student',
+  'Master\'s Student',
+  'PhD Student',
+  'Postgraduate',
+] as const;
+
 export const UNIVERSITIES = [
   // Ivy League
   'Harvard University',
@@ -244,6 +255,7 @@ Warm regards,
 
 export type Company = (typeof COMPANIES)[number];
 export type Role = (typeof ROLES)[number];
+export type Classification = (typeof CLASSIFICATIONS)[number];
 export type University = (typeof UNIVERSITIES)[number];
 export type Location = (typeof LOCATIONS)[number];
 export type EmailTemplate = (typeof EMAIL_TEMPLATES)[number];

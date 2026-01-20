@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import { COMPANIES, ROLES, UNIVERSITIES, LOCATIONS, EMAIL_TEMPLATES } from '@/lib/constants';
 import { LoadingSpinner } from './LoadingSpinner';
 import { SearchableCombobox } from './SearchableCombobox';
+import { getTemplatesAction, TemplateData } from '@/app/actions/profile';
 
 interface SearchFormProps {
   onSearch: (params: {
@@ -18,12 +20,84 @@ interface SearchFormProps {
 }
 
 export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
+  const { status } = useSession();
   const [company, setCompany] = useState<string>(COMPANIES[0]);
   const [role, setRole] = useState<string>(ROLES[0]);
   const [university, setUniversity] = useState<string>(UNIVERSITIES[0]);
   const [location, setLocation] = useState<string>(LOCATIONS[0]);
   const [limit, setLimit] = useState(10);
   const [templateId, setTemplateId] = useState<string>(EMAIL_TEMPLATES[0].id);
+  
+  // Template state
+  const [templates, setTemplates] = useState<TemplateData[]>([]);
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(true);
+  const [templateError, setTemplateError] = useState<string | null>(null);
+
+  // Fetch user templates on mount - but only when session is ready
+  useEffect(() => {
+    if (status === 'authenticated') {
+      const loadTemplates = async () => {
+        setIsLoadingTemplates(true);
+        setTemplateError(null);
+        
+        const result = await getTemplatesAction();
+        
+        if (result.success) {
+          // Combine user templates with hardcoded default
+          const hardcodedDefault = EMAIL_TEMPLATES[0];
+          const combinedTemplates = [
+            ...result.templates,
+            {
+              id: hardcodedDefault.id,
+              name: hardcodedDefault.name,
+              subject: hardcodedDefault.subject,
+              body: hardcodedDefault.body,
+              isDefault: false,
+              attachResume: false,
+              resumeId: null,
+              createdAt: new Date(),
+            },
+          ];
+          
+          setTemplates(combinedTemplates);
+          
+          // Set initial templateId to user's default template or fallback
+          if (result.templates.length > 0) {
+            const defaultTemplate = result.templates.find((t) => t.isDefault);
+            if (defaultTemplate) {
+              setTemplateId(defaultTemplate.id);
+            } else {
+              setTemplateId(result.templates[0].id);
+            }
+          } else {
+            // No user templates, use hardcoded default
+            setTemplateId(hardcodedDefault.id);
+          }
+        } else {
+          // Error fetching templates, fallback to hardcoded default only
+          setTemplateError(result.error || 'Failed to load templates');
+          const hardcodedDefault = EMAIL_TEMPLATES[0];
+          setTemplates([
+            {
+              id: hardcodedDefault.id,
+              name: hardcodedDefault.name,
+              subject: hardcodedDefault.subject,
+              body: hardcodedDefault.body,
+              isDefault: false,
+              attachResume: false,
+              resumeId: null,
+              createdAt: new Date(),
+            },
+          ]);
+          setTemplateId(hardcodedDefault.id);
+        }
+        
+        setIsLoadingTemplates(false);
+      };
+      
+      loadTemplates();
+    }
+  }, [status]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -119,14 +193,24 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
             id="template"
             value={templateId}
             onChange={(e) => setTemplateId(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            disabled={isLoadingTemplates}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {EMAIL_TEMPLATES.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
+            {isLoadingTemplates ? (
+              <option value="">Loading templates...</option>
+            ) : templates.length === 0 ? (
+              <option value={EMAIL_TEMPLATES[0].id}>{EMAIL_TEMPLATES[0].name}</option>
+            ) : (
+              templates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}{t.isDefault ? ' (Default)' : ''}
+                </option>
+              ))
+            )}
           </select>
+          {templateError && (
+            <p className="mt-1 text-sm text-amber-600">{templateError}</p>
+          )}
         </div>
       </div>
 

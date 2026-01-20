@@ -18,6 +18,8 @@ export interface TemplateData {
   subject: string;
   body: string;
   isDefault: boolean;
+  attachResume: boolean;
+  resumeId: string | null;
   createdAt: Date;
 }
 
@@ -122,6 +124,8 @@ export async function getTemplatesAction(): Promise<
         subject,
         body,
         isDefault: t.isDefault,
+        attachResume: t.attachResume,
+        resumeId: t.resumeId,
         createdAt: t.createdAt,
       };
     });
@@ -134,7 +138,7 @@ export async function getTemplatesAction(): Promise<
 }
 
 export async function createTemplateAction(
-  data: { name: string; subject: string; body: string }
+  data: { name: string; subject: string; body: string; attachResume?: boolean; resumeId?: string | null }
 ): Promise<{ success: true; template: TemplateData } | { success: false; error: string }> {
   const session = await getServerSession(authOptions);
 
@@ -143,6 +147,18 @@ export async function createTemplateAction(
   }
 
   try {
+    // Validate resumeId belongs to user if provided
+    if (data.attachResume && data.resumeId) {
+      const resume = await prisma.userResume.findUnique({
+        where: { id: data.resumeId },
+        select: { userId: true },
+      });
+
+      if (!resume || resume.userId !== session.user.id) {
+        return { success: false, error: 'Invalid resume selected' };
+      }
+    }
+
     const prompt = JSON.stringify({ subject: data.subject, body: data.body });
 
     const template = await prisma.emailTemplate.create({
@@ -151,6 +167,8 @@ export async function createTemplateAction(
         name: data.name,
         prompt,
         isDefault: false,
+        attachResume: data.attachResume || false,
+        resumeId: data.attachResume ? (data.resumeId || null) : null,
       },
     });
 
@@ -162,6 +180,8 @@ export async function createTemplateAction(
         subject: data.subject,
         body: data.body,
         isDefault: template.isDefault,
+        attachResume: template.attachResume,
+        resumeId: template.resumeId,
         createdAt: template.createdAt,
       },
     };
@@ -173,7 +193,7 @@ export async function createTemplateAction(
 
 export async function updateTemplateAction(
   id: string,
-  data: { name: string; subject: string; body: string }
+  data: { name: string; subject: string; body: string; attachResume?: boolean; resumeId?: string | null }
 ): Promise<{ success: true } | { success: false; error: string }> {
   const session = await getServerSession(authOptions);
 
@@ -192,6 +212,18 @@ export async function updateTemplateAction(
       return { success: false, error: 'Template not found' };
     }
 
+    // Validate resumeId belongs to user if provided
+    if (data.attachResume && data.resumeId) {
+      const resume = await prisma.userResume.findUnique({
+        where: { id: data.resumeId },
+        select: { userId: true },
+      });
+
+      if (!resume || resume.userId !== session.user.id) {
+        return { success: false, error: 'Invalid resume selected' };
+      }
+    }
+
     const prompt = JSON.stringify({ subject: data.subject, body: data.body });
 
     await prisma.emailTemplate.update({
@@ -199,6 +231,8 @@ export async function updateTemplateAction(
       data: {
         name: data.name,
         prompt,
+        attachResume: data.attachResume !== undefined ? data.attachResume : false,
+        resumeId: data.attachResume ? (data.resumeId || null) : null,
       },
     });
 

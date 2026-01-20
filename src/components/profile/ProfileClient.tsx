@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { signOut } from 'next-auth/react';
+import { signOut, useSession } from 'next-auth/react';
 import {
   getProfileAction,
   updateProfileAction,
@@ -13,6 +13,14 @@ import {
   UserProfile,
   TemplateData,
 } from '@/app/actions/profile';
+import {
+  getResumesAction,
+  setActiveResumeAction,
+  deleteResumeAction,
+  ResumeData,
+} from '@/app/actions/resume';
+import { SearchableCombobox } from '@/components/search/SearchableCombobox';
+import { UNIVERSITIES, CLASSIFICATIONS } from '@/lib/constants';
 
 interface ProfileClientProps {
   userEmail: string;
@@ -34,6 +42,8 @@ Warm regards,
 };
 
 export function ProfileClient({ userEmail, userName, userImage }: ProfileClientProps) {
+  const { status } = useSession();
+
   // Profile state
   const [profile, setProfile] = useState<UserProfile>({
     name: userName,
@@ -52,15 +62,31 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(true);
   const [editingTemplate, setEditingTemplate] = useState<TemplateData | null>(null);
   const [isCreating, setIsCreating] = useState(false);
-  const [newTemplate, setNewTemplate] = useState({ name: '', subject: '', body: '' });
+  const [newTemplate, setNewTemplate] = useState({ 
+    name: '', 
+    subject: '', 
+    body: '', 
+    attachResume: false, 
+    resumeId: null as string | null 
+  });
   const [templateError, setTemplateError] = useState<string | null>(null);
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
 
-  // Load profile and templates on mount
+  // Resume state
+  const [resumes, setResumes] = useState<ResumeData[]>([]);
+  const [isLoadingResumes, setIsLoadingResumes] = useState(true);
+  const [isUploadingResume, setIsUploadingResume] = useState(false);
+  const [resumeError, setResumeError] = useState<string | null>(null);
+  const [resumeSuccess, setResumeSuccess] = useState(false);
+
+  // Load profile, templates, and resumes on mount - but only when session is ready
   useEffect(() => {
-    loadProfile();
-    loadTemplates();
-  }, []);
+    if (status === 'authenticated') {
+      loadProfile();
+      loadTemplates();
+      loadResumes();
+    }
+  }, [status]);
 
   const loadProfile = async () => {
     setIsLoadingProfile(true);
@@ -79,6 +105,15 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
       setTemplates(result.templates);
     }
     setIsLoadingTemplates(false);
+  };
+
+  const loadResumes = async () => {
+    setIsLoadingResumes(true);
+    const result = await getResumesAction();
+    if (result.success) {
+      setResumes(result.resumes);
+    }
+    setIsLoadingResumes(false);
   };
 
   const handleSaveProfile = async () => {
@@ -105,10 +140,16 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
     setIsSavingTemplate(true);
     setTemplateError(null);
 
-    const result = await createTemplateAction(newTemplate);
+    const result = await createTemplateAction({
+      name: newTemplate.name,
+      subject: newTemplate.subject,
+      body: newTemplate.body,
+      attachResume: newTemplate.attachResume,
+      resumeId: newTemplate.resumeId,
+    });
     if (result.success) {
       setTemplates([...templates, result.template]);
-      setNewTemplate({ name: '', subject: '', body: '' });
+      setNewTemplate({ name: '', subject: '', body: '', attachResume: false, resumeId: null });
       setIsCreating(false);
     } else {
       setTemplateError(result.error);
@@ -126,6 +167,8 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
       name: editingTemplate.name,
       subject: editingTemplate.subject,
       body: editingTemplate.body,
+      attachResume: editingTemplate.attachResume,
+      resumeId: editingTemplate.resumeId,
     });
 
     if (result.success) {
@@ -166,6 +209,83 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
 
   const handleSignOut = () => {
     signOut({ callbackUrl: '/auth/signin' });
+  };
+
+  const handleUploadResume = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingResume(true);
+    setResumeError(null);
+    setResumeSuccess(false);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/resume/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to upload resume');
+      }
+
+      setResumeSuccess(true);
+      setTimeout(() => setResumeSuccess(false), 3000);
+      await loadResumes();
+      
+      // Reset file input
+      event.target.value = '';
+    } catch (error) {
+      setResumeError(error instanceof Error ? error.message : 'Failed to upload resume');
+    } finally {
+      setIsUploadingResume(false);
+    }
+  };
+
+  const handleSetActiveResume = async (resumeId: string) => {
+    const result = await setActiveResumeAction(resumeId);
+    if (result.success) {
+      await loadResumes();
+    } else {
+      setResumeError(result.error);
+    }
+  };
+
+  const handleDeleteResume = async (resumeId: string) => {
+    if (!confirm('Are you sure you want to delete this resume?')) return;
+
+    const result = await deleteResumeAction(resumeId);
+    if (result.success) {
+      await loadResumes();
+    } else {
+      setResumeError(result.error);
+    }
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
+  const formatDate = (date: Date): string => {
+    const now = new Date();
+    const diff = now.getTime() - new Date(date).getTime();
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    
+    if (days === 0) return 'Uploaded today';
+    if (days === 1) return 'Uploaded yesterday';
+    if (days < 7) return `Uploaded ${days} days ago`;
+    if (days < 30) {
+      const weeks = Math.floor(days / 7);
+      return `Uploaded ${weeks} ${weeks === 1 ? 'week' : 'weeks'} ago`;
+    }
+    return new Date(date).toLocaleDateString();
   };
 
   return (
@@ -224,17 +344,23 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="classification" className="block text-sm font-medium text-gray-700 mb-1">
               Classification
             </label>
-            <input
-              type="text"
+            <select
+              id="classification"
               value={profile.classification || ''}
               onChange={(e) => setProfile({ ...profile, classification: e.target.value })}
               disabled={isLoadingProfile}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-              placeholder="e.g., Junior, Senior"
-            />
+            >
+              <option value="">Select classification</option>
+              {CLASSIFICATIONS.map((classification) => (
+                <option key={classification} value={classification}>
+                  {classification}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>
@@ -251,19 +377,15 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              University
-            </label>
-            <input
-              type="text"
-              value={profile.university || ''}
-              onChange={(e) => setProfile({ ...profile, university: e.target.value })}
-              disabled={isLoadingProfile}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-              placeholder="e.g., Harvard University"
-            />
-          </div>
+          <SearchableCombobox
+            options={UNIVERSITIES}
+            value={profile.university || ''}
+            onChange={(value) => setProfile({ ...profile, university: value })}
+            label="University"
+            placeholder="Search universities..."
+            id="university"
+            disabled={isLoadingProfile}
+          />
 
           <div className="md:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -289,6 +411,123 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
             {isSavingProfile ? 'Saving...' : 'Save Profile'}
           </button>
         </div>
+      </div>
+
+      {/* Resume Section */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Resume</h2>
+
+        {resumeSuccess && (
+          <div className="mb-4 px-4 py-2 bg-green-100 text-green-800 rounded">
+            Resume uploaded successfully!
+          </div>
+        )}
+
+        {resumeError && (
+          <div className="mb-4 px-4 py-2 bg-red-100 text-red-800 rounded">
+            {resumeError}
+          </div>
+        )}
+
+        {/* Upload Section */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Upload Resume
+          </label>
+          <input
+            type="file"
+            accept=".pdf,.doc,.docx"
+            onChange={handleUploadResume}
+            disabled={isUploadingResume}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            Accepted formats: PDF, DOC, DOCX (Max 10MB)
+          </p>
+          {isUploadingResume && (
+            <p className="mt-2 text-sm text-blue-600">Uploading...</p>
+          )}
+        </div>
+
+        {/* Resumes List */}
+        {isLoadingResumes ? (
+          <div className="text-center py-4 text-gray-500">Loading resumes...</div>
+        ) : resumes.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            <p>No resumes uploaded yet.</p>
+            <p className="text-sm mt-1">Upload your first resume above.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {resumes.map((resume) => (
+              <div
+                key={resume.id}
+                className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
+              >
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <svg
+                      className="w-6 h-6 text-blue-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                      />
+                    </svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-gray-900 truncate">
+                        {resume.filename}
+                      </p>
+                      {resume.isActive && (
+                        <span className="flex-shrink-0 text-xs px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full">
+                          Active
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                      <span>{formatFileSize(resume.fileSize)}</span>
+                      <span>•</span>
+                      <span>{formatDate(resume.uploadedAt)}</span>
+                      <span>•</span>
+                      <span>Version {resume.version}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 ml-4">
+                  {!resume.isActive && (
+                    <button
+                      onClick={() => handleSetActiveResume(resume.id)}
+                      className="px-3 py-1.5 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-md"
+                    >
+                      Set Active
+                    </button>
+                  )}
+                  <a
+                    href={`/api/resume/view?id=${resume.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-md"
+                  >
+                    View
+                  </a>
+                  <button
+                    onClick={() => handleDeleteResume(resume.id)}
+                    className="px-3 py-1.5 text-sm text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* My Templates Section */}
@@ -341,6 +580,44 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Email body"
               />
+              {/* Resume Attachment Section */}
+              <div className="space-y-2 pt-2 border-t border-gray-200">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={newTemplate.attachResume}
+                    onChange={(e) => setNewTemplate({ ...newTemplate, attachResume: e.target.checked, resumeId: e.target.checked ? newTemplate.resumeId : null })}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700">
+                    Attach resume to emails using this template
+                  </span>
+                </label>
+                {newTemplate.attachResume && resumes.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Select Resume
+                    </label>
+                    <select
+                      value={newTemplate.resumeId || ''}
+                      onChange={(e) => setNewTemplate({ ...newTemplate, resumeId: e.target.value || null })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Use active resume</option>
+                      {resumes.map((resume) => (
+                        <option key={resume.id} value={resume.id}>
+                          {resume.filename} {resume.isActive ? '(Active)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {newTemplate.attachResume && resumes.length === 0 && (
+                  <p className="text-sm text-gray-500">
+                    No resumes uploaded. Upload a resume in the Resume section above.
+                  </p>
+                )}
+              </div>
               <div className="flex gap-2">
                 <button
                   onClick={handleCreateTemplate}
@@ -352,7 +629,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                 <button
                   onClick={() => {
                     setIsCreating(false);
-                    setNewTemplate({ name: '', subject: '', body: '' });
+                    setNewTemplate({ name: '', subject: '', body: '', attachResume: false, resumeId: null });
                   }}
                   className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
                 >
@@ -419,6 +696,44 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                       rows={6}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
+                    {/* Resume Attachment Section */}
+                    <div className="space-y-2 pt-2 border-t border-gray-200">
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={editingTemplate.attachResume}
+                          onChange={(e) => setEditingTemplate({ ...editingTemplate, attachResume: e.target.checked, resumeId: e.target.checked ? editingTemplate.resumeId : null })}
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                        <span className="text-sm font-medium text-gray-700">
+                          Attach resume to emails using this template
+                        </span>
+                      </label>
+                      {editingTemplate.attachResume && resumes.length > 0 && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Select Resume
+                          </label>
+                          <select
+                            value={editingTemplate.resumeId || ''}
+                            onChange={(e) => setEditingTemplate({ ...editingTemplate, resumeId: e.target.value || null })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="">Use active resume</option>
+                            {resumes.map((resume) => (
+                              <option key={resume.id} value={resume.id}>
+                                {resume.filename} {resume.isActive ? '(Active)' : ''}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                      {editingTemplate.attachResume && resumes.length === 0 && (
+                        <p className="text-sm text-gray-500">
+                          No resumes uploaded. Upload a resume in the Resume section above.
+                        </p>
+                      )}
+                    </div>
                     <div className="flex gap-2">
                       <button
                         onClick={handleUpdateTemplate}
@@ -444,6 +759,11 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                         {template.isDefault && (
                           <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full">
                             Default
+                          </span>
+                        )}
+                        {template.attachResume && (
+                          <span className="text-xs px-2 py-0.5 bg-green-100 text-green-800 rounded-full">
+                            Resume Attached
                           </span>
                         )}
                       </div>

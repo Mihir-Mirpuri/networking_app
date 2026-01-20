@@ -11,6 +11,7 @@ interface SearchableComboboxProps {
   label: string;
   placeholder?: string;
   id?: string;
+  disabled?: boolean;
 }
 
 export function SearchableCombobox({
@@ -20,6 +21,7 @@ export function SearchableCombobox({
   label,
   placeholder = 'Search...',
   id,
+  disabled = false,
 }: SearchableComboboxProps) {
   const [query, setQuery] = useState('');
 
@@ -41,14 +43,15 @@ export function SearchableCombobox({
       <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1">
         {label}
       </label>
-      <Combobox value={value} onChange={onChange}>
+      <Combobox value={value} onChange={onChange} disabled={disabled}>
         <div className="relative">
           <Combobox.Input
             id={id}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
             displayValue={() => displayValue}
             onChange={(event) => setQuery(event.target.value)}
             placeholder={placeholder}
+            disabled={disabled}
           />
           <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-2">
             <ChevronUpDownIcon

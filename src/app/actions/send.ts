@@ -79,14 +79,15 @@ export async function sendEmailsAction(
       continue;
     }
 
-    console.log('[Send] Sending email to:', person.email, 'subject:', person.subject?.substring(0, 50));
+    console.log('[Send] Sending email to:', person.email, 'subject:', person.subject?.substring(0, 50), 'resumeId:', person.resumeId);
     const sendResult = await sendEmail(
       accessToken,
       refreshToken,
       session.user.email,
       person.email,
       person.subject,
-      person.body
+      person.body,
+      person.resumeId
     );
     console.log('[Send] Send result:', { email: person.email, success: sendResult.success, error: sendResult.error });
 

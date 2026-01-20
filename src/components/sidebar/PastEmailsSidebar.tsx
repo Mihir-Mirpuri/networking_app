@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import { getSendLogs, SendLogEntry } from '@/app/actions/sendlog';
 
 interface PastEmailsSidebarProps {
@@ -9,16 +10,17 @@ interface PastEmailsSidebarProps {
 }
 
 export function PastEmailsSidebar({ isOpen, onToggle }: PastEmailsSidebarProps) {
+  const { status } = useSession();
   const [logs, setLogs] = useState<SendLogEntry[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && status === 'authenticated') {
       loadLogs();
     }
-  }, [isOpen]);
+  }, [isOpen, status]);
 
   const loadLogs = async (query?: string) => {
     setIsLoading(true);
