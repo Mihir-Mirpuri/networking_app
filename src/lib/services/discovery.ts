@@ -113,6 +113,90 @@ function parseCandidate(result: CSEResult, company: string): {
   return null;
 }
 
+// Validate that a parsed candidate name is actually a valid person name
+function isValidPersonName(
+  parsed: { fullName: string; firstName: string | null; lastName: string | null },
+  company: string
+): boolean {
+  const { fullName, firstName, lastName } = parsed;
+
+  // 1. Must have both first and last name
+  if (!firstName || !lastName || firstName.trim() === '' || lastName.trim() === '') {
+    return false;
+  }
+
+  // 2. Reject names that are too short (likely incomplete)
+  if (firstName.length < 2 || lastName.length < 2) {
+    return false;
+  }
+
+  // 3. Reject if name matches or contains company name (case-insensitive)
+  // This catches "Goldman Sachs" being parsed as a person name
+  // Normalize whitespace for better matching
+  const companyLower = company.toLowerCase().replace(/\s+/g, ' ').trim();
+  const fullNameLower = fullName.toLowerCase().replace(/\s+/g, ' ').trim();
+  
+  // Check for exact match or substring match
+  if (fullNameLower === companyLower || 
+      fullNameLower.includes(companyLower) || 
+      companyLower.includes(fullNameLower)) {
+    return false;
+  }
+
+  // 4. Reject if name contains email address pattern (like "10ksb_voices@gs.com")
+  const emailPattern = /@|\.(com|org|net|edu|gov|io|co)/i;
+  if (emailPattern.test(fullName)) {
+    return false;
+  }
+
+  // 5. Reject common non-person patterns (but NOT "no email" - that's just status info)
+  const invalidPatterns = [
+    /^n\/a$/i,
+    /^unknown$/i,
+    /^tbd$/i,
+    /^company$/i,
+    /^department$/i,
+    /^team$/i,
+    /^group$/i,
+    /^review$/i,
+    /^verified$/i,
+  ];
+  if (invalidPatterns.some(pattern => pattern.test(fullName))) {
+    return false;
+  }
+
+  // 6. Reject if name starts with common words (like "from", "the", etc.)
+  // This catches "From Goldman" where "From" is a common word
+  const commonWords = ['from', 'the', 'and', 'or', 'at', 'in', 'on', 'to', 'for'];
+  const nameWords = fullName.toLowerCase().split(/\s+/);
+  // Check if first word is a common word
+  if (nameWords.length > 0 && commonWords.includes(nameWords[0])) {
+    return false;
+  }
+  // Also check if it's a single common word
+  if (nameWords.length === 1 && commonWords.includes(nameWords[0])) {
+    return false;
+  }
+
+  // 7. Reject if name contains only numbers or special characters
+  if (!/[a-zA-Z]/.test(fullName)) {
+    return false;
+  }
+
+  // 8. Reject if name looks like it's just a fragment (starts with lowercase)
+  // This catches things like "rom Goldman" where "rom" is a fragment
+  const firstWord = fullName.split(/\s+/)[0];
+  if (firstWord && firstWord[0] && firstWord[0] === firstWord[0].toLowerCase()) {
+    // Exception: Allow if it's a valid name that happens to start lowercase in context
+    // But reject if it's clearly a fragment (very short)
+    if (firstWord.length < 3) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 function normalizeKey(name: string, company: string, url: string): string {
   return `${name.toLowerCase().replace(/\s+/g, '_')}_${company.toLowerCase().replace(/\s+/g, '_')}_${url}`;
 }
@@ -160,6 +244,12 @@ export async function searchPeople(params: SearchParams): Promise<SearchResult[]
 
         const parsed = parseCandidate(result, company);
         if (!parsed) continue;
+
+        // Validate that the parsed name is actually a valid person name
+        if (!isValidPersonName(parsed, company)) {
+          console.log(`[Discovery] Skipping invalid person name: ${parsed.fullName}`);
+          continue;
+        }
 
         // Check if person is already discovered by this user
         const personKey = `${parsed.fullName}_${company}`.toLowerCase();
