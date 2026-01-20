@@ -177,9 +177,11 @@ export async function updatePersonEmailIfBetter(
   personId: string,
   newEmail: string | null,
   newStatus: 'VERIFIED' | 'UNVERIFIED' | 'MISSING',
-  newConfidence: number
+  newConfidence: number,
+  existingPersonData?: { email: string | null; emailStatus: string; emailConfidence: number | null }
 ): Promise<void> {
-  const person = await prisma.person.findUnique({
+  // Use provided data if available, otherwise query
+  const person = existingPersonData || await prisma.person.findUnique({
     where: { id: personId },
     select: {
       email: true,
@@ -247,7 +249,7 @@ export function extractLinkedInUrl(sourceUrl: string, sourceDomain: string): str
 export async function saveSearchResult(
   userId: string,
   searchResult: SearchResult,
-  emailResult: EmailResult,
+  emailResult: EmailResult & { existingPerson?: { id: string; email: string | null; emailStatus: string; emailConfidence: number | null } },
   university: string,
   draftData: EmailDraftData
 ): Promise<{
@@ -269,32 +271,56 @@ export async function saveSearchResult(
   });
 
   // 2. Update Person email if we have one (smart update logic)
-  // Check if email was already updated by getOrFindEmail to avoid duplicate work
+  // Use existingPerson data if available to avoid redundant query
   if (emailResult.email) {
-    const currentPerson = await prisma.person.findUnique({
-      where: { id: person.id },
-      select: {
-        email: true,
-        emailStatus: true,
-        emailConfidence: true,
-        emailLastUpdated: true,
-      },
-    });
+    let emailAlreadyUpdated = false;
+    
+    if (emailResult.existingPerson) {
+      // Use existing person data - no need to query
+      emailAlreadyUpdated = 
+        emailResult.existingPerson.email === emailResult.email &&
+        emailResult.existingPerson.emailStatus === emailResult.status &&
+        emailResult.existingPerson.emailConfidence === emailResult.confidence;
+      
+      if (!emailAlreadyUpdated) {
+        // Use existing person ID and data
+        await updatePersonEmailIfBetter(
+          emailResult.existingPerson.id,
+          emailResult.email,
+          emailResult.status,
+          emailResult.confidence,
+          {
+            email: emailResult.existingPerson.email,
+            emailStatus: emailResult.existingPerson.emailStatus,
+            emailConfidence: emailResult.existingPerson.emailConfidence,
+          }
+        );
+      }
+    } else {
+      // Fallback: query if existingPerson not provided (shouldn't happen in normal flow)
+      const currentPerson = await prisma.person.findUnique({
+        where: { id: person.id },
+        select: {
+          email: true,
+          emailStatus: true,
+          emailConfidence: true,
+          emailLastUpdated: true,
+        },
+      });
 
-    // Only update if email wasn't already set by getOrFindEmail
-    // Check if current email matches what we're trying to save, or if it's missing/null
-    const emailAlreadyUpdated = 
-      currentPerson?.email === emailResult.email &&
-      currentPerson?.emailStatus === emailResult.status &&
-      currentPerson?.emailConfidence === emailResult.confidence;
+      emailAlreadyUpdated = 
+        currentPerson?.email === emailResult.email &&
+        currentPerson?.emailStatus === emailResult.status &&
+        currentPerson?.emailConfidence === emailResult.confidence;
 
-    if (!emailAlreadyUpdated) {
-      await updatePersonEmailIfBetter(
-        person.id,
-        emailResult.email,
-        emailResult.status,
-        emailResult.confidence
-      );
+      if (!emailAlreadyUpdated) {
+        await updatePersonEmailIfBetter(
+          person.id,
+          emailResult.email,
+          emailResult.status,
+          emailResult.confidence
+        );
+      }
     }
   }
 

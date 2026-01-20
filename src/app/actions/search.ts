@@ -58,6 +58,21 @@ function generateDraft(
   return { subject, body };
 }
 
+// Helper function for controlled concurrency
+async function processWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  processor: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = [];
+  for (let i = 0; i < items.length; i += concurrency) {
+    const batch = items.slice(i, i + concurrency);
+    const batchResults = await Promise.all(batch.map(processor));
+    results.push(...batchResults);
+  }
+  return results;
+}
+
 export async function searchPeopleAction(
   input: SearchInput
 ): Promise<{ success: true; results: SearchResultWithDraft[] } | { success: false; error: string }> {
@@ -143,102 +158,124 @@ export async function searchPeopleAction(
     }
 
     // Enrich with emails, generate drafts, and save to database
-    const results: SearchResultWithDraft[] = [];
+    const EMAIL_LOOKUP_CONCURRENCY = 3;
+    const DB_SAVE_CONCURRENCY = 3;
 
-    for (const person of people) {
-      // Smart email lookup with caching
-      let emailResult = { email: null as string | null, status: 'MISSING' as const, confidence: 0 };
-      let emailSource: 'cache' | 'apollo' | 'none' = 'none';
-
-      if (person.firstName && person.lastName) {
-        // Extract LinkedIn URL if the source is from LinkedIn
-        const linkedinUrl = person.sourceDomain?.includes('linkedin.com') ? person.sourceUrl : null;
-
-        const cachedResult = await getOrFindEmail({
-          fullName: person.fullName,
-          firstName: person.firstName,
-          lastName: person.lastName,
-          company: person.company,
-          linkedinUrl,
-        });
-        
-        emailResult = {
-          email: cachedResult.email,
-          status: cachedResult.status,
-          confidence: cachedResult.confidence,
-        };
-        
-        // Determine email source for debugging
-        if (cachedResult.fromCache) {
-          emailSource = 'cache';
-          console.log(`[Search] ✅ ${person.fullName} at ${person.company}: Email from CACHE (${cachedResult.email || 'none'}, ${cachedResult.status})`);
-        } else if (cachedResult.apolloCalled) {
-          emailSource = 'apollo';
-          console.log(`[Search] 📞 ${person.fullName} at ${person.company}: Email from APOLLO API (${cachedResult.email || 'none'}, ${cachedResult.status})`);
-        } else {
-          emailSource = 'none';
-          console.log(`[Search] ⚠️  ${person.fullName} at ${person.company}: No email found (missing firstName/lastName)`);
-        }
-      } else {
-        console.log(`[Search] ⚠️  ${person.fullName} at ${person.company}: Skipping email lookup (missing firstName or lastName)`);
-      }
-
-      // Generate placeholder draft (simple template replacement)
-      const placeholderDraft = generateDraft(template, person, input.university, input.role);
-
-      // Save to database with placeholder
-      try {
-        const saved = await saveSearchResult(
-          session.user.id,
-          person,
-          emailResult,
-          input.university,
-          {
-            subject: placeholderDraft.subject,
-            body: placeholderDraft.body,
-            templateId: templateId,
-          }
-        );
-
-        results.push({
-          id: saved.userCandidateId,
-          fullName: person.fullName,
-          firstName: person.firstName,
-          lastName: person.lastName,
-          company: person.company,
-          role: person.role,
-          university: input.university,
-          email: emailResult.email,
-          emailStatus: emailResult.status,
-          emailConfidence: emailResult.confidence,
-          emailSource,
-          draftSubject: placeholderDraft.subject,
-          draftBody: placeholderDraft.body,
-          sourceUrl: person.sourceUrl,
-          userCandidateId: saved.userCandidateId,
-          emailDraftId: saved.emailDraftId,
-        });
-      } catch (error) {
-        console.error('Error saving search result to database:', error);
-        // Still return result even if save fails
-        results.push({
-          id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          fullName: person.fullName,
-          firstName: person.firstName,
-          lastName: person.lastName,
-          company: person.company,
-          role: person.role,
-          university: input.university,
-          email: emailResult.email,
-          emailStatus: emailResult.status,
-          emailConfidence: emailResult.confidence,
-          emailSource,
-          draftSubject: placeholderDraft.subject,
-          draftBody: placeholderDraft.body,
-          sourceUrl: person.sourceUrl,
-        });
-      }
+    // Step 1: Process email lookups with controlled concurrency
+    interface EmailLookupResult {
+      person: SearchResult;
+      emailResult: { email: string | null; status: 'VERIFIED' | 'UNVERIFIED' | 'MISSING'; confidence: number; existingPerson?: { id: string; email: string | null; emailStatus: string; emailConfidence: number | null } };
+      emailSource: 'cache' | 'apollo' | 'none';
     }
+
+    const emailLookupResults = await processWithConcurrency(
+      people,
+      EMAIL_LOOKUP_CONCURRENCY,
+      async (person): Promise<EmailLookupResult> => {
+        // Smart email lookup with caching
+        let emailResult = { email: null as string | null, status: 'MISSING' as const, confidence: 0 };
+        let emailSource: 'cache' | 'apollo' | 'none' = 'none';
+
+        if (person.firstName && person.lastName) {
+          // Extract LinkedIn URL if the source is from LinkedIn
+          const linkedinUrl = person.sourceDomain?.includes('linkedin.com') ? person.sourceUrl : null;
+
+          const cachedResult = await getOrFindEmail({
+            fullName: person.fullName,
+            firstName: person.firstName,
+            lastName: person.lastName,
+            company: person.company,
+            linkedinUrl,
+          });
+          
+          emailResult = {
+            email: cachedResult.email,
+            status: cachedResult.status,
+            confidence: cachedResult.confidence,
+            existingPerson: cachedResult.existingPerson,
+          };
+          
+          // Determine email source for debugging
+          if (cachedResult.fromCache) {
+            emailSource = 'cache';
+            console.log(`[Search] ✅ ${person.fullName} at ${person.company}: Email from CACHE (${cachedResult.email || 'none'}, ${cachedResult.status})`);
+          } else if (cachedResult.apolloCalled) {
+            emailSource = 'apollo';
+            console.log(`[Search] 📞 ${person.fullName} at ${person.company}: Email from APOLLO API (${cachedResult.email || 'none'}, ${cachedResult.status})`);
+          } else {
+            emailSource = 'none';
+            console.log(`[Search] ⚠️  ${person.fullName} at ${person.company}: No email found (missing firstName/lastName)`);
+          }
+        } else {
+          console.log(`[Search] ⚠️  ${person.fullName} at ${person.company}: Skipping email lookup (missing firstName or lastName)`);
+        }
+
+        return { person, emailResult, emailSource };
+      }
+    );
+
+    // Step 2: Process database saves with controlled concurrency
+    const results: SearchResultWithDraft[] = await processWithConcurrency(
+      emailLookupResults,
+      DB_SAVE_CONCURRENCY,
+      async ({ person, emailResult, emailSource }): Promise<SearchResultWithDraft> => {
+        // Generate placeholder draft (simple template replacement)
+        const placeholderDraft = generateDraft(template, person, input.university, input.role);
+
+        // Save to database with placeholder
+        try {
+          const saved = await saveSearchResult(
+            session.user.id,
+            person,
+            emailResult,
+            input.university,
+            {
+              subject: placeholderDraft.subject,
+              body: placeholderDraft.body,
+              templateId: templateId,
+            }
+          );
+
+          return {
+            id: saved.userCandidateId,
+            fullName: person.fullName,
+            firstName: person.firstName,
+            lastName: person.lastName,
+            company: person.company,
+            role: person.role,
+            university: input.university,
+            email: emailResult.email,
+            emailStatus: emailResult.status,
+            emailConfidence: emailResult.confidence,
+            emailSource,
+            draftSubject: placeholderDraft.subject,
+            draftBody: placeholderDraft.body,
+            sourceUrl: person.sourceUrl,
+            userCandidateId: saved.userCandidateId,
+            emailDraftId: saved.emailDraftId,
+          };
+        } catch (error) {
+          console.error('Error saving search result to database:', error);
+          // Still return result even if save fails
+          return {
+            id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            fullName: person.fullName,
+            firstName: person.firstName,
+            lastName: person.lastName,
+            company: person.company,
+            role: person.role,
+            university: input.university,
+            email: emailResult.email,
+            emailStatus: emailResult.status,
+            emailConfidence: emailResult.confidence,
+            emailSource,
+            draftSubject: placeholderDraft.subject,
+            draftBody: placeholderDraft.body,
+            sourceUrl: person.sourceUrl,
+          };
+        }
+      }
+    );
 
     return { success: true, results };
   } catch (error) {

@@ -16,6 +16,12 @@ export interface PersonEmailData {
 export interface CachedEmailResult extends EmailResult {
   fromCache: boolean;
   apolloCalled: boolean;
+  existingPerson?: {
+    id: string;
+    email: string | null;
+    emailStatus: string;
+    emailConfidence: number | null;
+  };
 }
 
 /**
@@ -82,6 +88,12 @@ export async function getOrFindEmail(
       confidence: existingPerson.emailConfidence || 0,
       fromCache: true,
       apolloCalled: false,
+      existingPerson: {
+        id: existingPerson.id,
+        email: existingPerson.email,
+        emailStatus: existingPerson.emailStatus,
+        emailConfidence: existingPerson.emailConfidence,
+      },
     };
   }
 
@@ -122,6 +134,12 @@ export async function getOrFindEmail(
       confidence: 0,
       fromCache: false,
       apolloCalled: false,
+      existingPerson: existingPerson ? {
+        id: existingPerson.id,
+        email: existingPerson.email,
+        emailStatus: existingPerson.emailStatus,
+        emailConfidence: existingPerson.emailConfidence,
+      } : undefined,
     };
   }
 
@@ -157,5 +175,11 @@ export async function getOrFindEmail(
     ...emailResult,
     fromCache: false,
     apolloCalled: true,
+    existingPerson: existingPerson ? {
+      id: existingPerson.id,
+      email: existingPerson.email,
+      emailStatus: existingPerson.emailStatus,
+      emailConfidence: existingPerson.emailConfidence,
+    } : undefined,
   };
 }
