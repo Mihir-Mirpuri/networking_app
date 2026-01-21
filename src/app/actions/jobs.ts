@@ -233,3 +233,12 @@ export async function updateDefaultTemplateAction(
   }
 }
 
+/**
+ * TEMPORARY: Stub export to fix Vercel build cache issue
+ * This function was never actually implemented but is referenced in cached build artifacts.
+ * TODO: Remove after build cache clears and deployment succeeds.
+ */
+export async function generateEmailForCandidateAction() {
+  throw new Error('This function has been removed. Please use the updated API.');
+}
+
