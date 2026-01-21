@@ -51,7 +51,6 @@ export function SearchableCombobox({
             displayValue={() => displayValue}
             onChange={(event) => setQuery(event.target.value)}
             placeholder={placeholder}
-            disabled={disabled}
           />
           <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-2">
             <ChevronUpDownIcon
