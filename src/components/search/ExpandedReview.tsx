@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { SearchResultWithDraft } from '@/app/actions/search';
+import { scheduleEmailAction } from '@/app/actions/send';
 
 interface ExpandedReviewProps {
   results: SearchResultWithDraft[];
@@ -23,6 +24,10 @@ export function ExpandedReview({
   const [body, setBody] = useState(person?.draftBody || '');
   const [isSending, setIsSending] = useState(false);
   const [internalIndex, setInternalIndex] = useState(currentIndex);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [scheduledDateTime, setScheduledDateTime] = useState('');
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
+  const [isScheduling, setIsScheduling] = useState(false);
 
   const currentPerson = results[internalIndex];
   const status = currentPerson ? sendStatuses.get(currentPerson.id) : undefined;
@@ -82,6 +87,70 @@ export function ExpandedReview({
       onClose();
     }
   };
+
+  const handleSchedule = async () => {
+    if (!currentPerson?.email || !currentPerson.userCandidateId) return;
+
+    if (!scheduledDateTime) {
+      setScheduleError('Please select a date and time');
+      return;
+    }
+
+    const selectedDate = new Date(scheduledDateTime);
+    const now = new Date();
+    const minScheduledTime = new Date(now.getTime() + 5 * 60 * 1000); // 5 minutes from now
+
+    if (selectedDate < minScheduledTime) {
+      setScheduleError('Scheduled time must be at least 5 minutes in the future');
+      return;
+    }
+
+    setIsScheduling(true);
+    setScheduleError(null);
+
+    try {
+      const result = await scheduleEmailAction({
+        email: currentPerson.email,
+        subject,
+        body,
+        userCandidateId: currentPerson.userCandidateId,
+        resumeId: currentPerson.resumeId,
+        scheduledFor: selectedDate,
+      });
+
+      if (result.success) {
+        setShowScheduleModal(false);
+        setScheduledDateTime('');
+        // Auto-advance to next unsent person
+        const nextIndex = findNextUnsent(internalIndex + 1);
+        if (nextIndex !== -1) {
+          setInternalIndex(nextIndex);
+        } else {
+          onClose();
+        }
+      } else {
+        setScheduleError(result.error || 'Failed to schedule email');
+      }
+    } catch (error) {
+      setScheduleError(error instanceof Error ? error.message : 'Failed to schedule email');
+    } finally {
+      setIsScheduling(false);
+    }
+  };
+
+  // Set default scheduled time to 1 hour from now
+  useEffect(() => {
+    if (showScheduleModal && !scheduledDateTime) {
+      const defaultTime = new Date();
+      defaultTime.setHours(defaultTime.getHours() + 1);
+      defaultTime.setMinutes(0);
+      defaultTime.setSeconds(0);
+      const localDateTime = new Date(defaultTime.getTime() - defaultTime.getTimezoneOffset() * 60000)
+        .toISOString()
+        .slice(0, 16);
+      setScheduledDateTime(localDateTime);
+    }
+  }, [showScheduleModal, scheduledDateTime]);
 
   if (!currentPerson) {
     return null;
@@ -241,6 +310,13 @@ export function ExpandedReview({
               Skip
             </button>
             <button
+              onClick={() => setShowScheduleModal(true)}
+              disabled={!canSend || isSending}
+              className="px-4 py-2 text-sm border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Schedule
+            </button>
+            <button
               onClick={handleSend}
               disabled={!canSend || isSending}
               className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -250,6 +326,61 @@ export function ExpandedReview({
           </div>
         </div>
       </div>
+
+      {/* Schedule Modal */}
+      {showScheduleModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold mb-4">Schedule Email</h3>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Date & Time
+              </label>
+              <input
+                type="datetime-local"
+                value={scheduledDateTime}
+                onChange={(e) => {
+                  setScheduledDateTime(e.target.value);
+                  setScheduleError(null);
+                }}
+                min={new Date(new Date().getTime() + 5 * 60 * 1000).toISOString().slice(0, 16)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Minimum: 5 minutes from now
+              </p>
+            </div>
+
+            {scheduleError && (
+              <div className="mb-4 p-3 bg-red-100 text-red-800 rounded-md text-sm">
+                {scheduleError}
+              </div>
+            )}
+
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => {
+                  setShowScheduleModal(false);
+                  setScheduledDateTime('');
+                  setScheduleError(null);
+                }}
+                disabled={isScheduling}
+                className="px-4 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSchedule}
+                disabled={isScheduling || !scheduledDateTime}
+                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isScheduling ? 'Scheduling...' : 'Schedule'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

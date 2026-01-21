@@ -53,6 +53,7 @@ model User {
   userResumes    UserResume[]
   emailTemplates EmailTemplate[]
   sendLogs       SendLog[]
+  scheduledEmails ScheduledEmail[]
   sessions       Session[]
 }
 
@@ -102,6 +103,7 @@ model UserCandidate {
   person               Person        @relation(fields: [personId], references: [id], onDelete: Cascade)
   emailDraft           EmailDraft?
   sendLogs             SendLog[]
+  scheduledEmails      ScheduledEmail[]
 
   @@unique([userId, personId])
   @@index([userId])
@@ -142,6 +144,7 @@ model UserResume {
   user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   emailDrafts EmailDraft[]
   sendLogs   SendLog[]
+  scheduledEmails ScheduledEmail[]
   emailTemplates EmailTemplate[]
 
   @@index([userId])
@@ -215,6 +218,29 @@ model SendLog {
   @@index([gmailMessageId])
 }
 
+model ScheduledEmail {
+  id             String              @id @default(cuid())
+  userId         String
+  userCandidateId String
+  toEmail        String
+  subject        String
+  body           String
+  resumeId       String?
+  scheduledFor   DateTime
+  status         ScheduledEmailStatus @default(PENDING)
+  errorMessage   String?
+  sentAt         DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userCandidate  UserCandidate       @relation(fields: [userCandidateId], references: [id], onDelete: Cascade)
+  resume         UserResume?         @relation(fields: [resumeId], references: [id], onDelete: SetNull)
+
+  @@index([status, scheduledFor])
+  @@index([userId])
+  @@index([scheduledFor])
+}
+
 enum EmailStatus {
   MISSING
   UNVERIFIED
@@ -237,4 +263,11 @@ enum EmailDraftStatus {
   APPROVED
   REJECTED
   SENT
+}
+
+enum ScheduledEmailStatus {
+  PENDING
+  SENT
+  FAILED
+  CANCELLED
 }

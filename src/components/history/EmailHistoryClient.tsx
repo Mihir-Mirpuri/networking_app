@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { getSendLogs, SendLogEntry } from '@/app/actions/sendlog';
+import { updateScheduledEmailAction, cancelScheduledEmailAction } from '@/app/actions/send';
 
 interface GroupedLogs {
   [date: string]: SendLogEntry[];
@@ -26,6 +27,11 @@ export function EmailHistoryClient({
   const [cursor, setCursor] = useState<string | null>(initialCursor);
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [isSearchMode, setIsSearchMode] = useState(false);
+  const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
+  const [editScheduledDateTime, setEditScheduledDateTime] = useState('');
+  const [editScheduleError, setEditScheduleError] = useState<string | null>(null);
+  const [isUpdatingSchedule, setIsUpdatingSchedule] = useState(false);
+  const [isCanceling, setIsCanceling] = useState<string | null>(null);
 
   const handleSearch = async () => {
     setIsLoading(true);
@@ -103,6 +109,87 @@ export function EmailHistoryClient({
     }, {});
   };
 
+  const formatCountdown = (scheduledFor: Date): string => {
+    const now = new Date();
+    const diff = scheduledFor.getTime() - now.getTime();
+    
+    if (diff <= 0) return 'Sending soon...';
+    
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    
+    if (days > 0) return `${days}d ${hours}h`;
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    return `${minutes}m`;
+  };
+
+  const handleEditSchedule = async (scheduledEmailId: string, currentScheduledFor: Date) => {
+    if (!editScheduledDateTime) {
+      setEditScheduleError('Please select a date and time');
+      return;
+    }
+
+    const selectedDate = new Date(editScheduledDateTime);
+    const now = new Date();
+    const minScheduledTime = new Date(now.getTime() + 5 * 60 * 1000);
+
+    if (selectedDate < minScheduledTime) {
+      setEditScheduleError('Scheduled time must be at least 5 minutes in the future');
+      return;
+    }
+
+    setIsUpdatingSchedule(true);
+    setEditScheduleError(null);
+
+    try {
+      const result = await updateScheduledEmailAction(scheduledEmailId, selectedDate);
+      if (result.success) {
+        setEditingScheduleId(null);
+        setEditScheduledDateTime('');
+        // Refresh logs
+        const refreshResult = await getSendLogs(isSearchMode ? searchQuery : undefined, undefined);
+        if (refreshResult.success) {
+          setLogs(refreshResult.logs);
+          setCursor(refreshResult.nextCursor);
+          setHasMore(refreshResult.hasMore);
+        }
+      } else {
+        setEditScheduleError(result.error || 'Failed to update scheduled time');
+      }
+    } catch (error) {
+      setEditScheduleError(error instanceof Error ? error.message : 'Failed to update scheduled time');
+    } finally {
+      setIsUpdatingSchedule(false);
+    }
+  };
+
+  const handleCancelSchedule = async (scheduledEmailId: string) => {
+    if (!confirm('Are you sure you want to cancel this scheduled email?')) {
+      return;
+    }
+
+    setIsCanceling(scheduledEmailId);
+    try {
+      const result = await cancelScheduledEmailAction(scheduledEmailId);
+      if (result.success) {
+        // Refresh logs
+        const refreshResult = await getSendLogs(isSearchMode ? searchQuery : undefined, undefined);
+        if (refreshResult.success) {
+          setLogs(refreshResult.logs);
+          setCursor(refreshResult.nextCursor);
+          setHasMore(refreshResult.hasMore);
+        }
+      } else {
+        alert(result.error || 'Failed to cancel scheduled email');
+      }
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to cancel scheduled email');
+    } finally {
+      setIsCanceling(null);
+    }
+  };
+
   const groupedLogs = groupLogsByDay(logs);
   const sortedDates = Object.keys(groupedLogs).sort((a, b) => b.localeCompare(a));
 
@@ -171,18 +258,31 @@ export function EmailHistoryClient({
                             <span className="font-medium text-gray-900">
                               {log.toName || log.toEmail}
                             </span>
-                            <span
-                              className={`text-xs px-2 py-0.5 rounded-full ${
-                                log.status === 'SUCCESS'
-                                  ? 'bg-green-100 text-green-800'
-                                  : 'bg-red-100 text-red-800'
-                              }`}
-                            >
-                              {log.status === 'SUCCESS' ? 'Sent' : 'Failed'}
-                            </span>
+                            {log.isScheduled ? (
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
+                                Scheduled
+                              </span>
+                            ) : (
+                              <span
+                                className={`text-xs px-2 py-0.5 rounded-full ${
+                                  log.status === 'SUCCESS'
+                                    ? 'bg-green-100 text-green-800'
+                                    : 'bg-red-100 text-red-800'
+                                }`}
+                              >
+                                {log.status === 'SUCCESS' ? 'Sent' : 'Failed'}
+                              </span>
+                            )}
+                            {log.isScheduled && log.scheduledFor && (
+                              <span className="text-xs text-gray-500">
+                                {formatCountdown(log.scheduledFor)}
+                              </span>
+                            )}
                           </div>
                           <span className="text-sm text-gray-500">
-                            {formatTime(log.sentAt)}
+                            {log.isScheduled && log.scheduledFor
+                              ? formatTime(log.scheduledFor)
+                              : formatTime(log.sentAt)}
                           </span>
                         </div>
                         <p className="text-sm text-gray-600">{log.company}</p>
@@ -201,12 +301,38 @@ export function EmailHistoryClient({
                             <p className="text-xs font-medium text-gray-500 mb-1">Subject:</p>
                             <p className="text-sm text-gray-900">{log.subject}</p>
                           </div>
-                          <div>
+                          <div className="mb-3">
                             <p className="text-xs font-medium text-gray-500 mb-1">Body:</p>
                             <p className="text-sm text-gray-900 whitespace-pre-wrap bg-gray-50 p-3 rounded">
                               {log.body}
                             </p>
                           </div>
+                          {log.isScheduled && log.scheduledEmailId && log.status === 'PENDING' && (
+                            <div className="mt-4 pt-4 border-t border-gray-200 flex gap-2">
+                              <button
+                                onClick={() => {
+                                  if (log.scheduledFor) {
+                                    const localDateTime = new Date(log.scheduledFor.getTime() - log.scheduledFor.getTimezoneOffset() * 60000)
+                                      .toISOString()
+                                      .slice(0, 16);
+                                    setEditScheduledDateTime(localDateTime);
+                                    setEditingScheduleId(log.scheduledEmailId!);
+                                    setEditScheduleError(null);
+                                  }
+                                }}
+                                className="px-3 py-1.5 text-sm border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50"
+                              >
+                                Edit Time
+                              </button>
+                              <button
+                                onClick={() => log.scheduledEmailId && handleCancelSchedule(log.scheduledEmailId)}
+                                disabled={isCanceling === log.scheduledEmailId}
+                                className="px-3 py-1.5 text-sm border border-red-600 text-red-600 rounded-md hover:bg-red-50 disabled:opacity-50"
+                              >
+                                {isCanceling === log.scheduledEmailId ? 'Canceling...' : 'Cancel'}
+                              </button>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -228,6 +354,61 @@ export function EmailHistoryClient({
             </div>
           )}
         </>
+      )}
+
+      {/* Edit Schedule Modal */}
+      {editingScheduleId && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold mb-4">Edit Scheduled Time</h3>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                New Date & Time
+              </label>
+              <input
+                type="datetime-local"
+                value={editScheduledDateTime}
+                onChange={(e) => {
+                  setEditScheduledDateTime(e.target.value);
+                  setEditScheduleError(null);
+                }}
+                min={new Date(new Date().getTime() + 5 * 60 * 1000).toISOString().slice(0, 16)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Minimum: 5 minutes from now
+              </p>
+            </div>
+
+            {editScheduleError && (
+              <div className="mb-4 p-3 bg-red-100 text-red-800 rounded-md text-sm">
+                {editScheduleError}
+              </div>
+            )}
+
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => {
+                  setEditingScheduleId(null);
+                  setEditScheduledDateTime('');
+                  setEditScheduleError(null);
+                }}
+                disabled={isUpdatingSchedule}
+                className="px-4 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => editingScheduleId && handleEditSchedule(editingScheduleId, new Date(editScheduledDateTime))}
+                disabled={isUpdatingSchedule || !editScheduledDateTime}
+                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isUpdatingSchedule ? 'Updating...' : 'Update'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

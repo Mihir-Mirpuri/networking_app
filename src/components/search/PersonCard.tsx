@@ -8,6 +8,7 @@ interface PersonCardProps {
   onHide?: () => void;
   isSending: boolean;
   sendStatus?: 'success' | 'failed' | 'pending';
+  scheduledFor?: Date | null;
 }
 
 export function PersonCard({
@@ -16,6 +17,7 @@ export function PersonCard({
   onHide,
   isSending,
   sendStatus,
+  scheduledFor,
 }: PersonCardProps) {
   const getStatusBadge = () => {
     if (sendStatus === 'success') {
@@ -64,6 +66,29 @@ export function PersonCard({
     );
   };
 
+  const getScheduledBadge = () => {
+    if (!scheduledFor) return null;
+    const scheduledDate = new Date(scheduledFor);
+    const now = new Date();
+    if (scheduledDate <= now) return null; // Already sent or past
+    
+    const formattedDate = scheduledDate.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    
+    return (
+      <span 
+        className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800"
+        title={`Scheduled for ${scheduledDate.toLocaleString()}`}
+      >
+        Scheduled: {formattedDate}
+      </span>
+    );
+  };
+
   const canSend = person.email && !sendStatus;
 
   return (
@@ -103,6 +128,7 @@ export function PersonCard({
           )}
           {getEmailStatusBadge()}
           {getStatusBadge()}
+          {getScheduledBadge()}
         </div>
         <p className="text-sm text-gray-600">
           {person.role ? `${person.role} at ` : ''}
