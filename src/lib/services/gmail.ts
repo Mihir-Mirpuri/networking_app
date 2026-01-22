@@ -64,6 +64,80 @@ function createMimeMessage(
   return Buffer.from(message).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
+async function refreshAccessToken(
+  refreshToken: string,
+  clientId: string,
+  clientSecret: string
+): Promise<{ access_token: string; expires_in: number } | null> {
+  try {
+    const response = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: refreshToken,
+        grant_type: 'refresh_token',
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('[Gmail] Token refresh failed:', error);
+      return null;
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('[Gmail] Token refresh error:', error);
+    return null;
+  }
+}
+
+async function getValidAccessToken(
+  account: { access_token: string; refresh_token: string | null; expires_at: number | null },
+  userId: string,
+  clientId: string,
+  clientSecret: string
+): Promise<string | null> {
+  const now = Math.floor(Date.now() / 1000);
+  const expiresAt = account.expires_at || 0;
+  
+  // Check if token expires in next 5 minutes (proactive refresh)
+  if (expiresAt && expiresAt > now + 300) {
+    // Token is still valid for more than 5 minutes
+    return account.access_token;
+  }
+
+  // Token expired or expiring soon, refresh it
+  if (!account.refresh_token) {
+    console.error('[Gmail] No refresh token available');
+    return null;
+  }
+
+  console.log('[Gmail] Refreshing access token...');
+  const newTokens = await refreshAccessToken(account.refresh_token, clientId, clientSecret);
+  
+  if (!newTokens) {
+    return null;
+  }
+
+  // Update database with new token
+  const newExpiresAt = now + newTokens.expires_in;
+  await prisma.account.updateMany({
+    where: {
+      userId: userId,
+      provider: 'google',
+    },
+    data: {
+      access_token: newTokens.access_token,
+      expires_at: newExpiresAt,
+    },
+  });
+
+  return newTokens.access_token;
+}
+
 async function downloadResumeFromStorage(resumeId: string): Promise<{ filename: string; content: Buffer; mimeType: string } | null> {
   try {
     const resume = await prisma.userResume.findUnique({
@@ -128,7 +202,8 @@ export async function sendEmail(
   toEmail: string,
   subject: string,
   body: string,
-  resumeId?: string | null
+  resumeId?: string | null,
+  userId?: string
 ): Promise<SendResult> {
   console.log('[Gmail] sendEmail called:', { toEmail, fromEmail, hasAccessToken: !!accessToken, hasRefreshToken: !!refreshToken, resumeId, TEST_MODE });
   
@@ -166,6 +241,32 @@ export async function sendEmail(
       };
     }
 
+    // Get valid access token (proactive refresh if needed)
+    let validToken = accessToken;
+    if (userId) {
+      const account = await prisma.account.findFirst({
+        where: { userId, provider: 'google' },
+        select: { access_token: true, refresh_token: true, expires_at: true },
+      });
+
+      if (account) {
+        const refreshedToken = await getValidAccessToken(
+          account,
+          userId,
+          process.env.GOOGLE_CLIENT_ID,
+          process.env.GOOGLE_CLIENT_SECRET
+        );
+        if (refreshedToken) {
+          validToken = refreshedToken;
+        } else {
+          return {
+            success: false,
+            error: 'Failed to refresh access token',
+          };
+        }
+      }
+    }
+
     console.log('[Gmail] Creating OAuth2 client...');
     const oauth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
@@ -173,7 +274,7 @@ export async function sendEmail(
     );
 
     oauth2Client.setCredentials({
-      access_token: accessToken,
+      access_token: validToken,
       refresh_token: refreshToken,
     });
 
@@ -184,15 +285,77 @@ export async function sendEmail(
     const raw = createMimeMessage(toEmail, fromEmail, subject, body, attachment);
 
     console.log('[Gmail] Sending email via Gmail API...');
-    const response = await gmail.users.messages.send({
-      userId: 'me',
-      requestBody: { raw },
-    });
+    
+    // Try sending with retry logic for token refresh
+    let lastError: Error | null = null;
+    let retryCount = 0;
+    const maxRetries = 1; // Only retry once for token refresh
+    
+    while (retryCount <= maxRetries) {
+      try {
+        const response = await gmail.users.messages.send({
+          userId: 'me',
+          requestBody: { raw },
+        });
 
-    console.log('[Gmail] Email sent successfully:', { messageId: response.data.id });
+        console.log('[Gmail] Email sent successfully:', { messageId: response.data.id });
+        return {
+          success: true,
+          messageId: response.data.id || undefined,
+        };
+      } catch (error: any) {
+        lastError = error;
+        
+        // Token expired - try refreshing once
+        if (error?.code === 401 && userId && refreshToken && retryCount === 0) {
+          console.log('[Gmail] Token expired (401), refreshing...');
+          const refreshedToken = await refreshAccessToken(
+            refreshToken,
+            process.env.GOOGLE_CLIENT_ID!,
+            process.env.GOOGLE_CLIENT_SECRET!
+          );
+          
+          if (refreshedToken) {
+            // Update database
+            const now = Math.floor(Date.now() / 1000);
+            await prisma.account.updateMany({
+              where: {
+                userId: userId,
+                provider: 'google',
+              },
+              data: {
+                access_token: refreshedToken.access_token,
+                expires_at: now + refreshedToken.expires_in,
+              },
+            });
+            
+            // Update OAuth client with new token
+            oauth2Client.setCredentials({
+              access_token: refreshedToken.access_token,
+              refresh_token: refreshToken,
+            });
+            
+            retryCount++;
+            continue;
+          }
+        }
+        
+        // If not a token error or refresh failed, break
+        break;
+      }
+    }
+
+    // If we get here, sending failed
+    console.error('[Gmail] Gmail send error:', lastError);
+    console.error('[Gmail] Error details:', {
+      message: lastError instanceof Error ? lastError.message : String(lastError),
+      code: (lastError as any)?.code,
+      status: (lastError as any)?.response?.status,
+      statusText: (lastError as any)?.response?.statusText,
+    });
     return {
-      success: true,
-      messageId: response.data.id || undefined,
+      success: false,
+      error: lastError instanceof Error ? lastError.message : 'Unknown error',
     };
   } catch (error) {
     console.error('[Gmail] Gmail send error:', error);

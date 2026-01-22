@@ -1,38 +1,16 @@
--- pg_cron setup for scheduled email sending
--- Run this in Supabase SQL Editor after deploying the edge function
+-- pg_cron cleanup for scheduled email sending
+-- This file is no longer needed as we've migrated to Vercel Cron Jobs
+-- 
+-- If you previously set up pg_cron to call the Supabase Edge Function,
+-- run the following to unschedule the old job:
 
--- First, ensure pg_cron extension is enabled (should already be done)
--- CREATE EXTENSION IF NOT EXISTS pg_cron;
+-- Unschedule the old edge function cron job
+SELECT cron.unschedule('send-scheduled-emails');
 
--- Get your project details:
--- 1. SUPABASE_URL: From Settings -> API -> Project URL (e.g., https://xxxxx.supabase.co)
--- 2. SUPABASE_ANON_KEY: From Settings -> API -> anon public key
--- 3. Replace the placeholders below with your actual values
-
--- Schedule the edge function to run every minute
--- Note: Replace YOUR_PROJECT_REF with your Supabase project reference ID
--- You can find this in your Supabase dashboard URL or project settings
-
-SELECT cron.schedule(
-  'send-scheduled-emails',
-  '* * * * *', -- Every minute (cron syntax: minute hour day month weekday)
-  $$
-  SELECT
-    net.http_post(
-      url := 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/send-scheduled-emails',
-      headers := jsonb_build_object(
-        'Content-Type', 'application/json',
-        'Authorization', 'Bearer YOUR_SUPABASE_ANON_KEY'
-      )
-    ) AS request_id;
-  $$
-);
-
--- To verify the job was created:
+-- To verify the job was removed:
 -- SELECT * FROM cron.job WHERE jobname = 'send-scheduled-emails';
+-- (Should return no rows)
 
--- To unschedule the job (if needed):
--- SELECT cron.unschedule('send-scheduled-emails');
-
--- To view job execution history:
--- SELECT * FROM cron.job_run_details WHERE jobid = (SELECT jobid FROM cron.job WHERE jobname = 'send-scheduled-emails') ORDER BY start_time DESC LIMIT 10;
+-- Note: Scheduled emails are now processed by Vercel Cron Jobs
+-- See vercel.json for the cron job configuration
+-- The API route is at: /api/cron/send-scheduled-emails
