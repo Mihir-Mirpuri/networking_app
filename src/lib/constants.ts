@@ -242,7 +242,7 @@ export const EMAIL_TEMPLATES = [
     id: 'default',
     name: 'Default',
     subject: 'Reaching out from {university}',
-    body: `Hi {first_name},
+    body: `Hello {first_name},
 
 I hope you are doing well. My name is {user_name} and I am a {classification} pursuing my {major} at {university}. I am interested in {career} and would love to grab 10-15 minutes on the phone with you to hear about your experiences at {company}.
 

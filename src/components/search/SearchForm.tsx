@@ -17,16 +17,38 @@ interface SearchFormProps {
     templateId: string;
   }) => void;
   isLoading: boolean;
+  initialParams?: {
+    company: string;
+    role: string;
+    university: string;
+    location: string;
+    limit: number;
+    templateId: string;
+  } | null;
 }
 
-export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
+export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormProps) {
   const { status } = useSession();
-  const [company, setCompany] = useState<string>(COMPANIES[0]);
-  const [role, setRole] = useState<string>(ROLES[0]);
-  const [university, setUniversity] = useState<string>(UNIVERSITIES[0]);
-  const [location, setLocation] = useState<string>(LOCATIONS[0]);
-  const [limit, setLimit] = useState(10);
-  const [templateId, setTemplateId] = useState<string>(EMAIL_TEMPLATES[0].id);
+  
+  // Initialize with initialParams if available, otherwise use defaults
+  const [company, setCompany] = useState<string>(
+    initialParams?.company || COMPANIES[0]
+  );
+  const [role, setRole] = useState<string>(
+    initialParams?.role || ROLES[0]
+  );
+  const [university, setUniversity] = useState<string>(
+    initialParams?.university || UNIVERSITIES[0]
+  );
+  const [location, setLocation] = useState<string>(
+    initialParams?.location || LOCATIONS[0]
+  );
+  const [limit, setLimit] = useState(
+    initialParams?.limit || 10
+  );
+  const [templateId, setTemplateId] = useState<string>(
+    initialParams?.templateId || EMAIL_TEMPLATES[0].id
+  );
   
   // Template state
   const [templates, setTemplates] = useState<TemplateData[]>([]);
@@ -62,16 +84,19 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
           setTemplates(combinedTemplates);
           
           // Set initial templateId to user's default template or fallback
-          if (result.templates.length > 0) {
-            const defaultTemplate = result.templates.find((t) => t.isDefault);
-            if (defaultTemplate) {
-              setTemplateId(defaultTemplate.id);
+          // But only if we don't have initialParams with a templateId
+          if (!initialParams?.templateId) {
+            if (result.templates.length > 0) {
+              const defaultTemplate = result.templates.find((t) => t.isDefault);
+              if (defaultTemplate) {
+                setTemplateId(defaultTemplate.id);
+              } else {
+                setTemplateId(result.templates[0].id);
+              }
             } else {
-              setTemplateId(result.templates[0].id);
+              // No user templates, use hardcoded default
+              setTemplateId(hardcodedDefault.id);
             }
-          } else {
-            // No user templates, use hardcoded default
-            setTemplateId(hardcodedDefault.id);
           }
         } else {
           // Error fetching templates, fallback to hardcoded default only
@@ -89,7 +114,9 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
               createdAt: new Date(),
             },
           ]);
-          setTemplateId(hardcodedDefault.id);
+          if (!initialParams?.templateId) {
+            setTemplateId(hardcodedDefault.id);
+          }
         }
         
         setIsLoadingTemplates(false);
@@ -97,7 +124,27 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
       
       loadTemplates();
     }
-  }, [status]);
+  }, [status, initialParams?.templateId]);
+
+  // Update form fields when initialParams are restored from sessionStorage
+  useEffect(() => {
+    if (initialParams) {
+      setCompany(initialParams.company);
+      setRole(initialParams.role);
+      setUniversity(initialParams.university);
+      setLocation(initialParams.location);
+      setLimit(initialParams.limit);
+      // Only set templateId if templates are loaded
+      if (templates.length > 0 || !isLoadingTemplates) {
+        // Verify templateId exists in available templates
+        const templateExists = templates.some(t => t.id === initialParams.templateId) || 
+                              initialParams.templateId === EMAIL_TEMPLATES[0].id;
+        if (templateExists) {
+          setTemplateId(initialParams.templateId);
+        }
+      }
+    }
+  }, [initialParams, templates, isLoadingTemplates]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

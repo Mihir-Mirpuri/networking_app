@@ -26,6 +26,15 @@ interface SearchPageState {
   showBulkReview: boolean;
   generatingStatuses: Array<[string, boolean]>;
   remainingDaily?: number;
+  // NEW: Add search parameters
+  searchParams?: {
+    company: string;
+    role: string;
+    university: string;
+    location: string;
+    limit: number;
+    templateId: string;
+  };
   savedAt: number;
 }
 
@@ -50,6 +59,14 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
   const [showBulkReview, setShowBulkReview] = useState(false);
   const [generatingStatuses, setGeneratingStatuses] = useState<Map<string, boolean>>(new Map());
   const [error, setError] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useState<{
+    company: string;
+    role: string;
+    university: string;
+    location: string;
+    limit: number;
+    templateId: string;
+  } | null>(null);
 
   // Restore state from sessionStorage on mount
   useEffect(() => {
@@ -76,6 +93,10 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
           if (state.generatingStatuses) {
             setGeneratingStatuses(arrayToMap(state.generatingStatuses));
           }
+          // NEW: Restore search parameters
+          if (state.searchParams) {
+            setSearchParams(state.searchParams);
+          }
         } else {
           sessionStorage.removeItem(STORAGE_KEY);
         }
@@ -101,6 +122,20 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
 
       saveTimeoutRef.current = setTimeout(() => {
         try {
+          // Retrieve existing searchParams from sessionStorage to preserve them
+          const existing = sessionStorage.getItem(STORAGE_KEY);
+          let existingSearchParams = undefined;
+          if (existing) {
+            try {
+              const existingState: SearchPageState = JSON.parse(existing);
+              existingSearchParams = existingState.searchParams;
+            } catch (e) {
+              // Ignore parse errors
+            }
+          }
+          // Use current searchParams state if available, otherwise use existing from storage
+          const paramsToSave = searchParams || existingSearchParams;
+
           const state: SearchPageState = {
             version: STORAGE_VERSION,
             results,
@@ -109,6 +144,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
             showBulkReview,
             generatingStatuses: mapToArray(generatingStatuses),
             remainingDaily,
+            searchParams: paramsToSave, // Preserve search params
             savedAt: Date.now(),
           };
           sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -123,7 +159,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [results, expandedIndex, sendStatuses, showBulkReview, generatingStatuses, remainingDaily]);
+  }, [results, expandedIndex, sendStatuses, showBulkReview, generatingStatuses, remainingDaily, searchParams]);
 
   const handleSearch = async (params: {
     company: string;
@@ -148,6 +184,24 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
 
     if (result.success) {
       setResults(result.results);
+      // Save search parameters immediately after successful search
+      try {
+        const state: SearchPageState = {
+          version: STORAGE_VERSION,
+          results: result.results,
+          expandedIndex: null,
+          sendStatuses: [],
+          showBulkReview: false,
+          generatingStatuses: [],
+          remainingDaily,
+          searchParams: params, // Save search parameters
+          savedAt: Date.now(),
+        };
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        setSearchParams(params); // Also update state
+      } catch (error) {
+        console.error('Error saving search params to sessionStorage:', error);
+      }
     } else {
       setError(result.error);
     }
@@ -239,7 +293,11 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
 
   return (
     <div className="relative">
-      <SearchForm onSearch={handleSearch} isLoading={isSearching} />
+      <SearchForm 
+        onSearch={handleSearch} 
+        isLoading={isSearching}
+        initialParams={searchParams}
+      />
 
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
