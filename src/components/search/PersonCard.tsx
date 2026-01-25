@@ -139,6 +139,22 @@ export function PersonCard({
         ) : (
           <p className="text-sm text-gray-400 italic">No email found</p>
         )}
+        {/* Education info */}
+        {person.education?.schoolName && (
+          <p className="text-sm text-gray-500 mt-1">
+            <span className="font-medium">Education:</span>{' '}
+            {person.education.degree && `${person.education.degree}, `}
+            {person.education.schoolName}
+            {person.education.graduationYear && ` (${person.education.graduationYear})`}
+          </p>
+        )}
+        {/* Location info */}
+        {(person.city || person.state) && (
+          <p className="text-sm text-gray-500">
+            <span className="font-medium">Location:</span>{' '}
+            {[person.city, person.state].filter(Boolean).join(', ')}
+          </p>
+        )}
         {person.linkedinUrl && (
           <a
             href={person.linkedinUrl}

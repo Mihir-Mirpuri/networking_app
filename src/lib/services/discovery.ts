@@ -500,16 +500,94 @@ function isValidPersonName(
     /^group$/i,
     /^review$/i,
     /^verified$/i,
+    // Temporal phrases from LinkedIn snippets (e.g., "3 days ago", "Posted 2 weeks ago")
+    /\d+\s*(days?|weeks?|months?|years?|hours?|minutes?)\s*ago/i,
+    /^days?\s+ago$/i,
+    /^weeks?\s+ago$/i,
+    /^months?\s+ago$/i,
+    /^years?\s+ago$/i,
+    // Industry/department names that look like names
+    /^investment\s+banking$/i,
+    /^private\s+equity$/i,
+    /^venture\s+capital$/i,
+    /^asset\s+management$/i,
+    /^wealth\s+management$/i,
+    /^corporate\s+finance$/i,
+    /^mergers?\s*(and|&)?\s*acquisitions?$/i,
+    /^human\s+resources$/i,
+    /^public\s+relations$/i,
+    /^business\s+development$/i,
+    /^customer\s+success$/i,
+    /^customer\s+service$/i,
+    /^information\s+technology$/i,
+    /^data\s+science$/i,
+    /^machine\s+learning$/i,
+    /^artificial\s+intelligence$/i,
+    /^software\s+engineering$/i,
+    /^product\s+management$/i,
+    /^project\s+management$/i,
+    /^supply\s+chain$/i,
+    /^real\s+estate$/i,
+    /^capital\s+markets$/i,
+    /^equity\s+research$/i,
+    /^fixed\s+income$/i,
+    /^sales\s+(and|&)?\s*trading$/i,
+    // Common LinkedIn post phrases
+    /^im\s+thrilled$/i,
+    /^excited\s+to$/i,
+    /^happy\s+to$/i,
+    /^proud\s+to$/i,
+    /^pleased\s+to$/i,
+    /^delighted\s+to$/i,
+    /^honored\s+to$/i,
+    /^grateful\s+to$/i,
+    /^whats\s+up$/i,
+    /^check\s+out$/i,
+    /^looking\s+for$/i,
+    /^hiring\s+now$/i,
+    /^join\s+us$/i,
+    /^open\s+to$/i,
+    /^new\s+post$/i,
+    /^new\s+job$/i,
+    /^new\s+role$/i,
+    // LinkedIn activity fragments
+    /^posted\s+/i,
+    /^shared\s+/i,
+    /^liked\s+/i,
+    /^commented\s+/i,
+    /^reacted\s+/i,
+    /^following\s+/i,
+    /^celebrating\s+/i,
   ];
   if (invalidPatterns.some(pattern => pattern.test(fullName))) {
     return false;
   }
 
-  // 6. Reject if name starts with common words (like "from", "the", etc.)
+  // 6. Reject if name starts with or contains common non-name words
   // This catches "From Goldman" where "From" is a common word
-  const commonWords = ['from', 'the', 'and', 'or', 'at', 'in', 'on', 'to', 'for'];
+  const commonWords = [
+    // Prepositions and articles
+    'from', 'the', 'and', 'or', 'at', 'in', 'on', 'to', 'for', 'of', 'by', 'with',
+    // Temporal words (from LinkedIn snippets)
+    'days', 'day', 'weeks', 'week', 'months', 'month', 'years', 'year', 'ago', 'today', 'yesterday',
+    'hours', 'hour', 'minutes', 'minute', 'just', 'now', 'recently', 'posted', 'updated',
+    // Common verbs from LinkedIn
+    'im', 'ive', 'excited', 'thrilled', 'happy', 'proud', 'pleased', 'honored', 'grateful',
+    'hiring', 'looking', 'seeking', 'join', 'joining', 'joined', 'started', 'starting',
+    'announcing', 'announced', 'sharing', 'shared', 'celebrating', 'celebrated',
+    // Industry words that might be capitalized
+    'investment', 'banking', 'private', 'equity', 'venture', 'capital', 'corporate',
+    'finance', 'consulting', 'technology', 'healthcare', 'retail', 'energy',
+    // Other common non-name words
+    'new', 'open', 'available', 'remote', 'hybrid', 'full', 'part', 'time',
+  ];
   // Check if first word is a common word
   if (nameWords.length > 0 && commonWords.includes(nameWords[0])) {
+    return false;
+  }
+  // Check if last word is a temporal word (catches "3 days ago" parsed as "Days Ago")
+  const temporalWords = ['ago', 'days', 'day', 'weeks', 'week', 'months', 'month', 'years', 'year', 'hours', 'hour'];
+  if (nameWords.length > 0 && temporalWords.includes(nameWords[nameWords.length - 1])) {
     return false;
   }
   // Also check if it's a single common word

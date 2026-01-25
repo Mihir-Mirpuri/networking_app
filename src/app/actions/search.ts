@@ -3,7 +3,7 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { searchPeople, SearchResult } from '@/lib/services/discovery';
-import { getOrFindEmail } from '@/lib/services/email-cache';
+import { getOrFindEmail, CachedEmailResult } from '@/lib/services/email-cache';
 import { EMAIL_TEMPLATES } from '@/lib/constants';
 import prisma from '@/lib/prisma';
 import { saveSearchResult, getExcludedPersonKeys } from '@/lib/db/person-service';
@@ -15,6 +15,13 @@ export interface SearchInput {
   location: string;
   limit: number;
   templateId: string;
+}
+
+export interface EducationInfo {
+  schoolName: string | null;
+  degree: string | null;
+  fieldOfStudy: string | null;
+  graduationYear: string | null;
 }
 
 export interface SearchResultWithDraft {
@@ -39,6 +46,12 @@ export interface SearchResultWithDraft {
   userCandidateId?: string;
   emailDraftId?: string;
   resumeId?: string | null;
+  // Location fields from Apollo
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
+  // Education from Apollo
+  education?: EducationInfo | null;
 }
 
 function extractLinkedInUrl(person: SearchResult): string | null {
@@ -223,23 +236,35 @@ export async function searchPeopleAction(
     // Step 1: Process email lookups with controlled concurrency
     interface EmailLookupResult {
       person: SearchResult;
-      emailResult: { email: string | null; status: 'VERIFIED' | 'UNVERIFIED' | 'MISSING'; confidence: number; existingPerson?: { id: string; email: string | null; emailStatus: string; emailConfidence: number | null } };
+      emailResult: CachedEmailResult;
       emailSource: 'cache' | 'apollo' | 'none';
     }
+
+    const emptyEmailResult: CachedEmailResult = {
+      email: null,
+      status: 'MISSING',
+      confidence: 0,
+      city: null,
+      state: null,
+      country: null,
+      education: null,
+      fromCache: false,
+      apolloCalled: false,
+    };
 
     const emailLookupResults = await processWithConcurrency(
       people,
       EMAIL_LOOKUP_CONCURRENCY,
       async (person): Promise<EmailLookupResult> => {
         // Smart email lookup with caching
-        let emailResult: { email: string | null; status: 'VERIFIED' | 'UNVERIFIED' | 'MISSING'; confidence: number; existingPerson?: { id: string; email: string | null; emailStatus: string; emailConfidence: number | null } } = { email: null, status: 'MISSING', confidence: 0 };
+        let emailResult: CachedEmailResult = emptyEmailResult;
         let emailSource: 'cache' | 'apollo' | 'none' = 'none';
 
         if (person.firstName && person.lastName) {
           // Extract LinkedIn URL if the source is from LinkedIn
           const linkedinUrl = person.sourceDomain?.includes('linkedin.com') ? person.sourceUrl : null;
 
-          const cachedResult = await getOrFindEmail({
+          emailResult = await getOrFindEmail({
             fullName: person.fullName,
             firstName: person.firstName,
             lastName: person.lastName,
@@ -247,20 +272,13 @@ export async function searchPeopleAction(
             linkedinUrl,
           });
           
-          emailResult = {
-            email: cachedResult.email,
-            status: cachedResult.status,
-            confidence: cachedResult.confidence,
-            existingPerson: cachedResult.existingPerson,
-          };
-          
           // Determine email source for debugging
-          if (cachedResult.fromCache) {
+          if (emailResult.fromCache) {
             emailSource = 'cache';
-            console.log(`[Search] ✅ ${person.fullName} at ${person.company}: Email from CACHE (${cachedResult.email || 'none'}, ${cachedResult.status})`);
-          } else if (cachedResult.apolloCalled) {
+            console.log(`[Search] ✅ ${person.fullName} at ${person.company}: Email from CACHE (${emailResult.email || 'none'}, ${emailResult.status})`);
+          } else if (emailResult.apolloCalled) {
             emailSource = 'apollo';
-            console.log(`[Search] 📞 ${person.fullName} at ${person.company}: Email from APOLLO API (${cachedResult.email || 'none'}, ${cachedResult.status})`);
+            console.log(`[Search] 📞 ${person.fullName} at ${person.company}: Email from APOLLO API (${emailResult.email || 'none'}, ${emailResult.status})`);
           } else {
             emailSource = 'none';
             console.log(`[Search] ⚠️  ${person.fullName} at ${person.company}: No email found (missing firstName/lastName)`);
@@ -348,6 +366,11 @@ export async function searchPeopleAction(
             userCandidateId: saved.userCandidateId,
             emailDraftId: saved.emailDraftId,
             resumeId: shouldAttachResume ? resumeIdToAttach : null,
+            // Location and education from Apollo
+            city: emailResult.city,
+            state: emailResult.state,
+            country: emailResult.country,
+            education: emailResult.education,
           };
         } catch (error) {
           console.error('Error saving search result to database:', error);
@@ -375,6 +398,11 @@ export async function searchPeopleAction(
             confidence: person.confidence,
             isLowConfidence: person.isLowConfidence,
             extractionMethod: person.extractionMethod,
+            // Location and education from Apollo
+            city: emailResult.city,
+            state: emailResult.state,
+            country: emailResult.country,
+            education: emailResult.education,
           };
         }
       }

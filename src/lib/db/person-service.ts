@@ -1,6 +1,6 @@
 import prisma from '@/lib/prisma';
 import { SearchResult } from '@/lib/services/discovery';
-import { EmailResult } from '@/lib/services/enrichment';
+import { EmailResult, EducationInfo } from '@/lib/services/enrichment';
 import { EmailStatus } from '@prisma/client';
 
 export interface PersonData {
@@ -10,6 +10,12 @@ export interface PersonData {
   company: string;
   role: string | null;
   linkedinUrl?: string | null;
+  // Location fields
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
+  // Education fields
+  education?: EducationInfo | null;
 }
 
 export interface UserCandidateData {
@@ -41,6 +47,41 @@ export interface EmailDraftData {
 export async function createOrUpdatePerson(
   personData: PersonData
 ): Promise<{ id: string }> {
+  // Build create data with optional fields
+  const createData: Record<string, unknown> = {
+    fullName: personData.fullName,
+    firstName: personData.firstName,
+    lastName: personData.lastName,
+    company: personData.company,
+    role: personData.role,
+    linkedinUrl: personData.linkedinUrl || null,
+  };
+
+  // Add location if available
+  if (personData.city) createData.city = personData.city;
+  if (personData.state) createData.state = personData.state;
+  if (personData.country) createData.country = personData.country;
+
+  // Add education if available
+  if (personData.education) {
+    if (personData.education.schoolName) createData.educationSchool = personData.education.schoolName;
+    if (personData.education.degree) createData.educationDegree = personData.education.degree;
+    if (personData.education.fieldOfStudy) createData.educationField = personData.education.fieldOfStudy;
+    if (personData.education.graduationYear) createData.educationYear = personData.education.graduationYear;
+  }
+
+  // Build update data - only update if we have new info
+  const updateData: Record<string, unknown> = {};
+  if (personData.role) updateData.role = personData.role;
+  if (personData.linkedinUrl) updateData.linkedinUrl = personData.linkedinUrl;
+  if (personData.city) updateData.city = personData.city;
+  if (personData.state) updateData.state = personData.state;
+  if (personData.country) updateData.country = personData.country;
+  if (personData.education?.schoolName) updateData.educationSchool = personData.education.schoolName;
+  if (personData.education?.degree) updateData.educationDegree = personData.education.degree;
+  if (personData.education?.fieldOfStudy) updateData.educationField = personData.education.fieldOfStudy;
+  if (personData.education?.graduationYear) updateData.educationYear = personData.education.graduationYear;
+
   const person = await prisma.person.upsert({
     where: {
       fullName_company: {
@@ -48,20 +89,8 @@ export async function createOrUpdatePerson(
         company: personData.company,
       },
     },
-    create: {
-      fullName: personData.fullName,
-      firstName: personData.firstName,
-      lastName: personData.lastName,
-      company: personData.company,
-      role: personData.role,
-      linkedinUrl: personData.linkedinUrl || null,
-    },
-    update: {
-      // Update role if we have new info
-      role: personData.role || undefined,
-      // Update LinkedIn URL if we found one and don't have one
-      linkedinUrl: personData.linkedinUrl || undefined,
-    },
+    create: createData as any,
+    update: updateData,
   });
 
   return { id: person.id };
@@ -267,7 +296,7 @@ export async function saveSearchResult(
   // Extract LinkedIn URL
   const linkedinUrl = extractLinkedInUrl(searchResult.sourceUrl, searchResult.sourceDomain);
 
-  // 1. Create/update Person
+  // 1. Create/update Person (including location and education from Apollo)
   const person = await createOrUpdatePerson({
     fullName: searchResult.fullName,
     firstName: searchResult.firstName,
@@ -275,6 +304,11 @@ export async function saveSearchResult(
     company: searchResult.company,
     role: searchResult.role,
     linkedinUrl,
+    // Pass through location and education data from Apollo
+    city: emailResult.city,
+    state: emailResult.state,
+    country: emailResult.country,
+    education: emailResult.education,
   });
 
   // Get the person's LinkedIn URL (may have been updated or already existed)

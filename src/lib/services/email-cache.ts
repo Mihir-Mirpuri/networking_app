@@ -1,5 +1,5 @@
 import prisma from '@/lib/prisma';
-import { findEmail, EmailResult } from './enrichment';
+import { findEmail, EmailResult, EducationInfo } from './enrichment';
 import { EmailStatus } from '@prisma/client';
 
 // Type matching Prisma EmailStatus enum
@@ -23,6 +23,8 @@ export interface CachedEmailResult extends EmailResult {
     emailConfidence: number | null;
   };
 }
+
+export type { EducationInfo };
 
 /**
  * Smart email lookup with caching and company change detection
@@ -55,6 +57,13 @@ export async function getOrFindEmail(
         emailStatus: true,
         emailConfidence: true,
         emailLastUpdated: true,
+        city: true,
+        state: true,
+        country: true,
+        educationSchool: true,
+        educationDegree: true,
+        educationField: true,
+        educationYear: true,
       },
     });
   } catch (error: any) {
@@ -77,8 +86,17 @@ export async function getOrFindEmail(
     existingPerson?.email &&
     (existingPerson.emailStatus === 'VERIFIED' || existingPerson.emailStatus === 'UNVERIFIED')
   ) {
-    const status = existingPerson.emailStatus === 'VERIFIED' ? 'VERIFIED' : 
+    const status = existingPerson.emailStatus === 'VERIFIED' ? 'VERIFIED' :
                    existingPerson.emailStatus === 'UNVERIFIED' ? 'UNVERIFIED' : 'MISSING';
+
+    // Build education info from cached data
+    const education: EducationInfo | null = existingPerson.educationSchool ? {
+      schoolName: existingPerson.educationSchool,
+      degree: existingPerson.educationDegree,
+      fieldOfStudy: existingPerson.educationField,
+      graduationYear: existingPerson.educationYear,
+    } : null;
+
     console.log(
       `[EmailCache] ✅ CACHE HIT for "${fullName}" at ${company} - Email: ${existingPerson.email} (${status}, confidence: ${existingPerson.emailConfidence || 0}) - NO Apollo call`
     );
@@ -86,6 +104,10 @@ export async function getOrFindEmail(
       email: existingPerson.email,
       status,
       confidence: existingPerson.emailConfidence || 0,
+      city: existingPerson.city,
+      state: existingPerson.state,
+      country: existingPerson.country,
+      education,
       fromCache: true,
       apolloCalled: false,
       existingPerson: {
@@ -132,6 +154,10 @@ export async function getOrFindEmail(
       email: null,
       status: 'MISSING',
       confidence: 0,
+      city: null,
+      state: null,
+      country: null,
+      education: null,
       fromCache: false,
       apolloCalled: false,
       existingPerson: existingPerson ? {
@@ -146,20 +172,40 @@ export async function getOrFindEmail(
   console.log(`[EmailCache] 📞 Calling Apollo API for "${fullName}" at ${company}...`);
   const emailResult = await findEmail({ firstName, lastName, company, linkedinUrl });
 
-  // Step 5: Update Person email if it already exists
-  // Note: If Person doesn't exist yet, saveSearchResult will create it with email
-  if (existingPerson && emailResult.email) {
+  // Step 5: Update Person if it already exists (email + location + education)
+  // Note: If Person doesn't exist yet, saveSearchResult will create it with all data
+  if (existingPerson) {
+    const updateData: Record<string, unknown> = {
+      emailLastUpdated: new Date(),
+    };
+
+    // Update email if found
+    if (emailResult.email) {
+      updateData.email = emailResult.email;
+      updateData.emailStatus = emailResult.status as EmailStatus;
+      updateData.emailConfidence = emailResult.confidence;
+    }
+
+    // Update location if found
+    if (emailResult.city) updateData.city = emailResult.city;
+    if (emailResult.state) updateData.state = emailResult.state;
+    if (emailResult.country) updateData.country = emailResult.country;
+
+    // Update education if found
+    if (emailResult.education) {
+      if (emailResult.education.schoolName) updateData.educationSchool = emailResult.education.schoolName;
+      if (emailResult.education.degree) updateData.educationDegree = emailResult.education.degree;
+      if (emailResult.education.fieldOfStudy) updateData.educationField = emailResult.education.fieldOfStudy;
+      if (emailResult.education.graduationYear) updateData.educationYear = emailResult.education.graduationYear;
+    }
+
     await prisma.person.update({
       where: { id: existingPerson.id },
-      data: {
-        email: emailResult.email,
-        emailStatus: emailResult.status as EmailStatus,
-        emailConfidence: emailResult.confidence,
-        emailLastUpdated: new Date(),
-      },
+      data: updateData,
     });
+
     console.log(
-      `[EmailCache] 💾 Updated Person email in cache for "${fullName}" at ${company} - Email: ${emailResult.email} (${emailResult.status}, confidence: ${emailResult.confidence})`
+      `[EmailCache] 💾 Updated Person in cache for "${fullName}" at ${company} - Email: ${emailResult.email || 'none'} (${emailResult.status}, confidence: ${emailResult.confidence}), Location: ${emailResult.city || 'unknown'}, School: ${emailResult.education?.schoolName || 'unknown'}`
     );
   } else if (emailResult.email) {
     console.log(

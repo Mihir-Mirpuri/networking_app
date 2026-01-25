@@ -77,6 +77,15 @@ model Person {
   emailStatus          EmailStatus?
   emailConfidence      Float?
   emailLastUpdated     DateTime?
+  // Location fields from Apollo
+  city                 String?
+  state                String?
+  country              String?
+  // Education fields from Apollo
+  educationSchool      String?
+  educationDegree      String?
+  educationField       String?
+  educationYear        String?
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
   userCandidates UserCandidate[]
