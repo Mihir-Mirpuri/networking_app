@@ -181,14 +181,15 @@ export function BulkReview({
           })}
         </div>
 
-        {/* Footer with Send All Button */}
-        <div className="p-4 border-t bg-gray-50 flex justify-between items-center">
+        {/* Footer */}
+        <div className="p-4 border-t bg-gray-50 flex justify-end items-center">
           <button
             onClick={onClose}
             className="px-4 py-2 text-sm text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500"
           >
-            Cancel
+            Close
           </button>
+          {/* Send All button hidden for now
           <button
             onClick={handleSendAll}
             disabled={isSending || sendableCount === 0}
@@ -196,6 +197,7 @@ export function BulkReview({
           >
             {isSending ? 'Sending...' : `Send All (${sendableCount})`}
           </button>
+          */}
         </div>
       </div>
     </div>

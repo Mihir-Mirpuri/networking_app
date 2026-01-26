@@ -119,6 +119,7 @@ export function ResultsList({
             {remainingDaily} emails remaining today
           </p>
         </div>
+        {/* Send All button hidden for now
         <div className="flex gap-2">
           <button
             onClick={onReviewAndSend}
@@ -128,6 +129,7 @@ export function ResultsList({
             Send All ({sendableCount})
           </button>
         </div>
+        */}
       </div>
 
       <div className="space-y-3">

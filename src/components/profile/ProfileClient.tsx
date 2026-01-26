@@ -41,6 +41,29 @@ Warm regards,
 {user_name}`,
 };
 
+// Default placeholders that are always available
+const DEFAULT_PLACEHOLDERS = [
+  '{first_name}',
+  '{user_name}',
+  '{company}',
+  '{university}',
+  '{classification}',
+  '{major}',
+  '{career}',
+  '{role}',
+];
+
+// Helper function to extract placeholders from template text
+function extractPlaceholders(text: string): string[] {
+  const regex = /\{([^}]+)\}/g;
+  const matches = new Set<string>();
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    matches.add(`{${match[1]}}`);
+  }
+  return Array.from(matches);
+}
+
 export function ProfileClient({ userEmail, userName, userImage }: ProfileClientProps) {
   const { status } = useSession();
 
@@ -61,13 +84,15 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
   const [templates, setTemplates] = useState<TemplateData[]>([]);
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(true);
   const [editingTemplate, setEditingTemplate] = useState<TemplateData | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<TemplateData | null>(null);
+  const [showDefaultTemplate, setShowDefaultTemplate] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-  const [newTemplate, setNewTemplate] = useState({ 
-    name: '', 
-    subject: '', 
-    body: '', 
-    attachResume: false, 
-    resumeId: null as string | null 
+  const [newTemplate, setNewTemplate] = useState({
+    name: '',
+    subject: '',
+    body: '',
+    attachResume: false,
+    resumeId: null as string | null
   });
   const [templateError, setTemplateError] = useState<string | null>(null);
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
@@ -532,21 +557,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
 
       {/* My Templates Section */}
       <div className="bg-white rounded-lg shadow p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">My Templates</h2>
-          {!isCreating && (
-            <button
-              onClick={() => setIsCreating(true)}
-              className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
-            >
-              + Add Template
-            </button>
-          )}
-        </div>
-
-        <p className="text-sm text-gray-500 mb-4">
-          Available placeholders: {'{first_name}'}, {'{user_name}'}, {'{company}'}, {'{university}'}, {'{classification}'}, {'{major}'}, {'{career}'}, {'{role}'}
-        </p>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">My Templates</h2>
 
         {templateError && (
           <div className="mb-4 px-4 py-2 bg-red-100 text-red-800 rounded">
@@ -554,9 +565,73 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
           </div>
         )}
 
+        {/* Templates List - Just Names */}
+        {isLoadingTemplates ? (
+          <div className="text-center py-8 text-gray-500">Loading templates...</div>
+        ) : (
+          <div className="space-y-2">
+            {/* Default Template (shown when no templates exist or as first option) */}
+            {templates.length === 0 && (
+              <button
+                onClick={() => setShowDefaultTemplate(true)}
+                className="w-full text-left px-4 py-3 border rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-between"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-gray-900">Default Template</span>
+                  <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full">
+                    Default
+                  </span>
+                </div>
+                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            )}
+
+            {/* User Templates */}
+            {templates.map((template) => (
+              <button
+                key={template.id}
+                onClick={() => setSelectedTemplate(template)}
+                className="w-full text-left px-4 py-3 border rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-between"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-gray-900">{template.name}</span>
+                  {template.isDefault && (
+                    <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full">
+                      Default
+                    </span>
+                  )}
+                  {template.attachResume && (
+                    <span className="text-xs px-2 py-0.5 bg-green-100 text-green-800 rounded-full">
+                      Resume
+                    </span>
+                  )}
+                </div>
+                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            ))}
+
+            {/* Add Template Button - Below all templates */}
+            {!isCreating && (
+              <button
+                onClick={() => setIsCreating(true)}
+                className="w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-blue-500 hover:text-blue-600 transition-colors flex items-center justify-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Add Template
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Create New Template Form */}
         {isCreating && (
-          <div className="mb-6 p-4 border border-blue-200 rounded-lg bg-blue-50">
+          <div className="mt-4 p-4 border border-blue-200 rounded-lg bg-blue-50">
             <h3 className="font-medium text-gray-900 mb-3">New Template</h3>
             <div className="space-y-3">
               <input
@@ -571,15 +646,45 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                 value={newTemplate.subject}
                 onChange={(e) => setNewTemplate({ ...newTemplate, subject: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Email subject"
+                placeholder="Email subject (use {placeholder} syntax)"
               />
               <textarea
                 value={newTemplate.body}
                 onChange={(e) => setNewTemplate({ ...newTemplate, body: e.target.value })}
                 rows={6}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Email body"
+                placeholder="Email body (use {placeholder} syntax for dynamic content)"
               />
+              {/* Detected Placeholders */}
+              {(newTemplate.subject || newTemplate.body) && (
+                <div className="p-3 bg-gray-100 rounded-md">
+                  <p className="text-xs font-medium text-gray-700 mb-2">Detected Placeholders:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {extractPlaceholders(newTemplate.subject + ' ' + newTemplate.body).length > 0 ? (
+                      extractPlaceholders(newTemplate.subject + ' ' + newTemplate.body).map((placeholder) => (
+                        <span
+                          key={placeholder}
+                          className={`text-xs px-2 py-1 rounded ${
+                            DEFAULT_PLACEHOLDERS.includes(placeholder)
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-purple-100 text-purple-800'
+                          }`}
+                        >
+                          {placeholder}
+                          {!DEFAULT_PLACEHOLDERS.includes(placeholder) && (
+                            <span className="ml-1 text-purple-600">(custom)</span>
+                          )}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-xs text-gray-500">No placeholders detected</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Default placeholders (auto-filled): {DEFAULT_PLACEHOLDERS.join(', ')}
+                  </p>
+                </div>
+              )}
               {/* Resume Attachment Section */}
               <div className="space-y-2 pt-2 border-t border-gray-200">
                 <label className="flex items-center gap-2">
@@ -639,172 +744,251 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
             </div>
           </div>
         )}
+      </div>
 
-        {/* Templates List */}
-        {isLoadingTemplates ? (
-          <div className="text-center py-8 text-gray-500">Loading templates...</div>
-        ) : templates.length === 0 ? (
-          <div className="border rounded-lg p-4">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <span className="font-medium text-gray-900">Default Template</span>
-                <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full">
-                  Default
-                </span>
+      {/* Template Modal/Popup */}
+      {(selectedTemplate || showDefaultTemplate) && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  {showDefaultTemplate ? 'Default Template' : selectedTemplate?.name}
+                </h3>
+                <button
+                  onClick={() => {
+                    setSelectedTemplate(null);
+                    setShowDefaultTemplate(false);
+                    setEditingTemplate(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
-            </div>
-            <p className="text-sm text-gray-600 mb-1">
-              <strong>Subject:</strong> {DEFAULT_TEMPLATE.subject}
-            </p>
-            <p className="text-sm text-gray-500 whitespace-pre-wrap line-clamp-3">
-              {DEFAULT_TEMPLATE.body}
-            </p>
-            <p className="text-xs text-gray-400 mt-2">
-              Create your first template to customize your outreach emails.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {templates.map((template) => (
-              <div key={template.id} className="border rounded-lg p-4">
-                {editingTemplate?.id === template.id ? (
-                  // Edit Mode
-                  <div className="space-y-3">
+
+              {showDefaultTemplate ? (
+                /* Default Template View (read-only) */
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+                    <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                      {DEFAULT_TEMPLATE.subject}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Body</label>
+                    <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-gray-700 whitespace-pre-wrap">
+                      {DEFAULT_TEMPLATE.body}
+                    </div>
+                  </div>
+                  <div className="p-3 bg-gray-100 rounded-md">
+                    <p className="text-xs font-medium text-gray-700 mb-2">Available Placeholders:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {DEFAULT_PLACEHOLDERS.map((placeholder) => (
+                        <span key={placeholder} className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded">
+                          {placeholder}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    This is the default template. Create a new template to customize your outreach emails.
+                  </p>
+                </div>
+              ) : selectedTemplate && editingTemplate?.id === selectedTemplate.id ? (
+                /* Edit Mode */
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Template Name</label>
                     <input
                       type="text"
                       value={editingTemplate.name}
-                      onChange={(e) =>
-                        setEditingTemplate({ ...editingTemplate, name: e.target.value })
-                      }
+                      onChange={(e) => setEditingTemplate({ ...editingTemplate, name: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Template name"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
                     <input
                       type="text"
                       value={editingTemplate.subject}
-                      onChange={(e) =>
-                        setEditingTemplate({ ...editingTemplate, subject: e.target.value })
-                      }
+                      onChange={(e) => setEditingTemplate({ ...editingTemplate, subject: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Email subject"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Body</label>
                     <textarea
                       value={editingTemplate.body}
-                      onChange={(e) =>
-                        setEditingTemplate({ ...editingTemplate, body: e.target.value })
-                      }
-                      rows={6}
+                      onChange={(e) => setEditingTemplate({ ...editingTemplate, body: e.target.value })}
+                      rows={8}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
-                    {/* Resume Attachment Section */}
-                    <div className="space-y-2 pt-2 border-t border-gray-200">
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={editingTemplate.attachResume}
-                          onChange={(e) => setEditingTemplate({ ...editingTemplate, attachResume: e.target.checked, resumeId: e.target.checked ? editingTemplate.resumeId : null })}
-                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                        />
-                        <span className="text-sm font-medium text-gray-700">
-                          Attach resume to emails using this template
+                  </div>
+                  {/* Detected Placeholders */}
+                  <div className="p-3 bg-gray-100 rounded-md">
+                    <p className="text-xs font-medium text-gray-700 mb-2">Detected Placeholders:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {extractPlaceholders(editingTemplate.subject + ' ' + editingTemplate.body).map((placeholder) => (
+                        <span
+                          key={placeholder}
+                          className={`text-xs px-2 py-1 rounded ${
+                            DEFAULT_PLACEHOLDERS.includes(placeholder)
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-purple-100 text-purple-800'
+                          }`}
+                        >
+                          {placeholder}
+                          {!DEFAULT_PLACEHOLDERS.includes(placeholder) && (
+                            <span className="ml-1 text-purple-600">(custom)</span>
+                          )}
                         </span>
-                      </label>
-                      {editingTemplate.attachResume && resumes.length > 0 && (
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Select Resume
-                          </label>
-                          <select
-                            value={editingTemplate.resumeId || ''}
-                            onChange={(e) => setEditingTemplate({ ...editingTemplate, resumeId: e.target.value || null })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          >
-                            <option value="">Use active resume</option>
-                            {resumes.map((resume) => (
-                              <option key={resume.id} value={resume.id}>
-                                {resume.filename} {resume.isActive ? '(Active)' : ''}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
-                      {editingTemplate.attachResume && resumes.length === 0 && (
-                        <p className="text-sm text-gray-500">
-                          No resumes uploaded. Upload a resume in the Resume section above.
-                        </p>
-                      )}
+                      ))}
                     </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={handleUpdateTemplate}
-                        disabled={isSavingTemplate}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                    <p className="text-xs text-gray-500 mt-2">
+                      Default placeholders are auto-filled from your profile. Custom placeholders need manual input when sending.
+                    </p>
+                  </div>
+                  {/* Resume Attachment */}
+                  <div className="space-y-2 pt-2 border-t border-gray-200">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={editingTemplate.attachResume}
+                        onChange={(e) => setEditingTemplate({ ...editingTemplate, attachResume: e.target.checked, resumeId: e.target.checked ? editingTemplate.resumeId : null })}
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <span className="text-sm font-medium text-gray-700">
+                        Attach resume to emails using this template
+                      </span>
+                    </label>
+                    {editingTemplate.attachResume && resumes.length > 0 && (
+                      <select
+                        value={editingTemplate.resumeId || ''}
+                        onChange={(e) => setEditingTemplate({ ...editingTemplate, resumeId: e.target.value || null })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
-                        {isSavingTemplate ? 'Saving...' : 'Save'}
-                      </button>
-                      <button
-                        onClick={() => setEditingTemplate(null)}
-                        className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
-                      >
-                        Cancel
-                      </button>
+                        <option value="">Use active resume</option>
+                        {resumes.map((resume) => (
+                          <option key={resume.id} value={resume.id}>
+                            {resume.filename} {resume.isActive ? '(Active)' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                  {/* Action Buttons */}
+                  <div className="flex gap-2 pt-4 border-t border-gray-200">
+                    <button
+                      onClick={async () => {
+                        await handleUpdateTemplate();
+                        if (!templateError) {
+                          setSelectedTemplate({ ...editingTemplate });
+                        }
+                      }}
+                      disabled={isSavingTemplate}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {isSavingTemplate ? 'Saving...' : 'Save Changes'}
+                    </button>
+                    <button
+                      onClick={() => setEditingTemplate(null)}
+                      className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : selectedTemplate ? (
+                /* View Mode */
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    {selectedTemplate.isDefault && (
+                      <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full">
+                        Default
+                      </span>
+                    )}
+                    {selectedTemplate.attachResume && (
+                      <span className="text-xs px-2 py-0.5 bg-green-100 text-green-800 rounded-full">
+                        Resume Attached
+                      </span>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+                    <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-gray-700">
+                      {selectedTemplate.subject || '(No subject)'}
                     </div>
                   </div>
-                ) : (
-                  // View Mode
-                  <>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-gray-900">{template.name}</span>
-                        {template.isDefault && (
-                          <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full">
-                            Default
-                          </span>
-                        )}
-                        {template.attachResume && (
-                          <span className="text-xs px-2 py-0.5 bg-green-100 text-green-800 rounded-full">
-                            Resume Attached
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {!template.isDefault && (
-                          <button
-                            onClick={() => handleSetDefault(template.id)}
-                            className="text-xs text-blue-600 hover:text-blue-800"
-                          >
-                            Set as Default
-                          </button>
-                        )}
-                        <button
-                          onClick={() => setEditingTemplate(template)}
-                          className="text-sm text-gray-600 hover:text-gray-800"
-                        >
-                          Edit
-                        </button>
-                        {!template.isDefault && (
-                          <button
-                            onClick={() => handleDeleteTemplate(template.id)}
-                            className="text-sm text-red-600 hover:text-red-800"
-                          >
-                            Delete
-                          </button>
-                        )}
-                      </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Body</label>
+                    <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-gray-700 whitespace-pre-wrap max-h-64 overflow-y-auto">
+                      {selectedTemplate.body}
                     </div>
-                    <p className="text-sm text-gray-600 mb-1">
-                      <strong>Subject:</strong> {template.subject}
-                    </p>
-                    <p className="text-sm text-gray-500 whitespace-pre-wrap line-clamp-3">
-                      {template.body}
-                    </p>
-                  </>
-                )}
-              </div>
-            ))}
+                  </div>
+                  {/* Detected Placeholders */}
+                  <div className="p-3 bg-gray-100 rounded-md">
+                    <p className="text-xs font-medium text-gray-700 mb-2">Placeholders in this template:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {extractPlaceholders(selectedTemplate.subject + ' ' + selectedTemplate.body).length > 0 ? (
+                        extractPlaceholders(selectedTemplate.subject + ' ' + selectedTemplate.body).map((placeholder) => (
+                          <span
+                            key={placeholder}
+                            className={`text-xs px-2 py-1 rounded ${
+                              DEFAULT_PLACEHOLDERS.includes(placeholder)
+                                ? 'bg-blue-100 text-blue-800'
+                                : 'bg-purple-100 text-purple-800'
+                            }`}
+                          >
+                            {placeholder}
+                            {!DEFAULT_PLACEHOLDERS.includes(placeholder) && (
+                              <span className="ml-1 text-purple-600">(custom)</span>
+                            )}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-xs text-gray-500">No placeholders</span>
+                      )}
+                    </div>
+                  </div>
+                  {/* Action Buttons */}
+                  <div className="flex gap-2 pt-4 border-t border-gray-200">
+                    <button
+                      onClick={() => setEditingTemplate(selectedTemplate)}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                    >
+                      Edit Template
+                    </button>
+                    {!selectedTemplate.isDefault && (
+                      <>
+                        <button
+                          onClick={() => handleSetDefault(selectedTemplate.id)}
+                          className="px-4 py-2 border border-blue-300 text-blue-600 rounded-md hover:bg-blue-50"
+                        >
+                          Set as Default
+                        </button>
+                        <button
+                          onClick={() => {
+                            handleDeleteTemplate(selectedTemplate.id);
+                            setSelectedTemplate(null);
+                          }}
+                          className="px-4 py-2 border border-red-300 text-red-600 rounded-md hover:bg-red-50"
+                        >
+                          Delete
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Sign Out Section */}
       <div className="bg-white rounded-lg shadow p-6">

@@ -126,7 +126,6 @@ export function PersonCard({
               ⚠️ Verify
             </span>
           )}
-          {getEmailStatusBadge()}
           {getStatusBadge()}
           {getScheduledBadge()}
         </div>
@@ -135,9 +134,15 @@ export function PersonCard({
           {person.company}
         </p>
         {person.email ? (
-          <p className="text-sm text-blue-600">{person.email}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm text-blue-600">{person.email}</p>
+            {getEmailStatusBadge()}
+          </div>
         ) : (
-          <p className="text-sm text-gray-400 italic">No email found</p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm text-gray-400 italic">No email found</p>
+            {getEmailStatusBadge()}
+          </div>
         )}
         {/* Education info */}
         {person.education?.schoolName && (
