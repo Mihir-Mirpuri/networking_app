@@ -27,12 +27,30 @@ interface FollowUpData {
   userCandidateId: string;
 }
 
+type TabType = 'all' | 'ongoing' | 'no-response';
+
+type TimeFilter = 'all' | 'custom' | number; // number represents days
+
+const TIME_FILTER_PRESETS: { value: TimeFilter; label: string }[] = [
+  { value: 'all', label: 'All time' },
+  { value: 1, label: 'Last 24 hours' },
+  { value: 3, label: 'Last 3 days' },
+  { value: 7, label: 'Last 7 days' },
+  { value: 14, label: 'Last 14 days' },
+  { value: 30, label: 'Last 30 days' },
+  { value: 'custom', label: 'Custom...' },
+];
+
 export function EmailHistoryClient({
   initialLogs,
   initialCursor,
   initialHasMore,
 }: EmailHistoryClientProps) {
   const [logs, setLogs] = useState<SendLogEntry[]>(initialLogs);
+  const [activeTab, setActiveTab] = useState<TabType>('all');
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
+  const [customDays, setCustomDays] = useState<string>('');
+  const [showCustomInput, setShowCustomInput] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -126,6 +144,49 @@ export function EmailHistoryClient({
       groups[dateKey].push(log);
       return groups;
     }, {});
+  };
+
+  // Filter logs by time range
+  const filterByTime = (logs: SendLogEntry[]): SendLogEntry[] => {
+    if (timeFilter === 'all') return logs;
+    if (timeFilter === 'custom') return logs; // Custom without valid input shows all
+
+    const days = typeof timeFilter === 'number' ? timeFilter : 0;
+    if (days <= 0) return logs;
+
+    const now = new Date();
+    const cutoffDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+
+    return logs.filter((log) => {
+      const sentDate = new Date(log.sentAt);
+      return sentDate >= cutoffDate;
+    });
+  };
+
+  // Get display label for current time filter
+  const getTimeFilterLabel = (): string => {
+    if (timeFilter === 'all') return 'All time';
+    if (timeFilter === 'custom') return 'Custom';
+    const preset = TIME_FILTER_PRESETS.find((p) => p.value === timeFilter);
+    if (preset) return preset.label;
+    return `Last ${timeFilter} days`;
+  };
+
+  // Filter logs based on active tab
+  const getFilteredLogs = (logs: SendLogEntry[]): SendLogEntry[] => {
+    switch (activeTab) {
+      case 'ongoing':
+        // Show only emails with responses (ongoing conversations)
+        return logs.filter((log) => log.hasResponse === true);
+      case 'no-response':
+        // Show sent emails without responses (excluding scheduled/failed)
+        return logs.filter(
+          (log) => log.status === 'SUCCESS' && !log.isScheduled && log.hasResponse === false
+        );
+      case 'all':
+      default:
+        return logs;
+    }
   };
 
   const formatCountdown = (scheduledFor: Date): string => {
@@ -272,22 +333,158 @@ export function EmailHistoryClient({
     }
   };
 
-  const groupedLogs = groupLogsByDay(logs);
+  // Apply time filter first, then tab filter
+  const timeFilteredLogs = filterByTime(logs);
+  const filteredLogs = getFilteredLogs(timeFilteredLogs);
+  const groupedLogs = groupLogsByDay(filteredLogs);
   const sortedDates = Object.keys(groupedLogs).sort((a, b) => b.localeCompare(a));
+
+  // Count for tab badges (based on time-filtered logs)
+  const ongoingCount = timeFilteredLogs.filter((log) => log.hasResponse === true).length;
+  const noResponseCount = timeFilteredLogs.filter(
+    (log) => log.status === 'SUCCESS' && !log.isScheduled && log.hasResponse === false
+  ).length;
 
   return (
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900 mb-4">Email History</h1>
-        <div className="flex gap-2">
+
+        {/* Tabs */}
+        <div className="flex border-b border-gray-200 mb-4">
+          <button
+            onClick={() => setActiveTab('all')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'all'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Sent
+            <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600">
+              {timeFilteredLogs.length}
+            </span>
+          </button>
+          <button
+            onClick={() => setActiveTab('ongoing')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'ongoing'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Ongoing Conversations
+            {ongoingCount > 0 && (
+              <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-700">
+                {ongoingCount}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('no-response')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'no-response'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            No Response
+            {noResponseCount > 0 && (
+              <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-orange-100 text-orange-700">
+                {noResponseCount}
+              </span>
+            )}
+          </button>
+        </div>
+
+        <div className="flex gap-2 flex-wrap">
           <input
             type="text"
             placeholder="Search by name, email, company, or subject..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 min-w-[200px] px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
+          <div className="flex gap-2">
+            {showCustomInput ? (
+              <div className="flex items-center gap-1">
+                <span className="text-sm text-gray-600">Last</span>
+                <input
+                  type="number"
+                  min="1"
+                  max="365"
+                  value={customDays}
+                  onChange={(e) => setCustomDays(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && customDays) {
+                      const days = parseInt(customDays, 10);
+                      if (days > 0) {
+                        setTimeFilter(days);
+                        setShowCustomInput(false);
+                      }
+                    }
+                    if (e.key === 'Escape') {
+                      setShowCustomInput(false);
+                      setCustomDays('');
+                    }
+                  }}
+                  placeholder="days"
+                  className="w-20 px-2 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  autoFocus
+                />
+                <span className="text-sm text-gray-600">days</span>
+                <button
+                  onClick={() => {
+                    const days = parseInt(customDays, 10);
+                    if (days > 0) {
+                      setTimeFilter(days);
+                      setShowCustomInput(false);
+                    }
+                  }}
+                  disabled={!customDays || parseInt(customDays, 10) <= 0}
+                  className="px-2 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                >
+                  Apply
+                </button>
+                <button
+                  onClick={() => {
+                    setShowCustomInput(false);
+                    setCustomDays('');
+                  }}
+                  className="px-2 py-2 text-sm text-gray-600 hover:text-gray-800"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <select
+                value={typeof timeFilter === 'number' && !TIME_FILTER_PRESETS.some(p => p.value === timeFilter) ? 'custom' : timeFilter}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === 'custom') {
+                    setShowCustomInput(true);
+                    setCustomDays('');
+                  } else if (val === 'all') {
+                    setTimeFilter('all');
+                  } else {
+                    setTimeFilter(parseInt(val, 10));
+                  }
+                }}
+                className="px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              >
+                {TIME_FILTER_PRESETS.map((option) => (
+                  <option key={String(option.value)} value={String(option.value)}>
+                    {option.label}
+                  </option>
+                ))}
+                {/* Show custom value if it's not a preset */}
+                {typeof timeFilter === 'number' && !TIME_FILTER_PRESETS.some(p => p.value === timeFilter) && (
+                  <option value={timeFilter}>Last {timeFilter} days</option>
+                )}
+              </select>
+            )}
+          </div>
           <button
             onClick={handleSearch}
             disabled={isLoading}
@@ -311,9 +508,19 @@ export function EmailHistoryClient({
         <div className="flex items-center justify-center h-64">
           <p className="text-gray-500">Loading...</p>
         </div>
-      ) : logs.length === 0 ? (
+      ) : filteredLogs.length === 0 ? (
         <div className="flex items-center justify-center h-64">
-          <p className="text-gray-500">{isSearchMode ? 'No emails found' : 'No emails sent yet'}</p>
+          <p className="text-gray-500">
+            {isSearchMode
+              ? 'No emails found'
+              : timeFilter !== 'all'
+              ? `No emails in the ${getTimeFilterLabel().toLowerCase()}`
+              : activeTab === 'ongoing'
+              ? 'No ongoing conversations yet'
+              : activeTab === 'no-response'
+              ? 'No emails awaiting response'
+              : 'No emails sent yet'}
+          </p>
         </div>
       ) : (
         <>
@@ -363,6 +570,18 @@ export function EmailHistoryClient({
                             {log.isScheduled && log.scheduledFor && (
                               <span className="text-xs text-gray-500">
                                 {formatCountdown(log.scheduledFor)}
+                              </span>
+                            )}
+                            {/* Response status indicator */}
+                            {!log.isScheduled && log.status === 'SUCCESS' && (
+                              <span
+                                className={`text-xs px-2 py-0.5 rounded-full ${
+                                  log.hasResponse
+                                    ? 'bg-green-100 text-green-800'
+                                    : 'bg-orange-100 text-orange-800'
+                                }`}
+                              >
+                                {log.hasResponse ? 'Replied' : 'Awaiting'}
                               </span>
                             )}
                           </div>
