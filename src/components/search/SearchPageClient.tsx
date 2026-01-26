@@ -29,10 +29,10 @@ interface SearchPageState {
   // NEW: Add search parameters
   searchParams?: {
     name?: string;
-    company: string;
-    role: string;
-    university: string;
-    location: string;
+    company?: string;
+    role?: string;
+    university?: string;
+    location?: string;
     limit: number;
     templateId: string;
   };
@@ -62,10 +62,10 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
   const [error, setError] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useState<{
     name?: string;
-    company: string;
-    role: string;
-    university: string;
-    location: string;
+    company?: string;
+    role?: string;
+    university?: string;
+    location?: string;
     limit: number;
     templateId: string;
   } | null>(null);
@@ -165,10 +165,10 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
 
   const handleSearch = async (params: {
     name?: string;
-    company: string;
-    role: string;
-    university: string;
-    location: string;
+    company?: string;
+    role?: string;
+    university?: string;
+    location?: string;
     limit: number;
     templateId: string;
   }) => {

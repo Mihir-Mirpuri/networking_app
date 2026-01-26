@@ -204,22 +204,24 @@ model EmailDraft {
 }
 
 model SendLog {
-  id              String        @id @default(cuid())
-  userId          String
-  userCandidateId String
-  toEmail         String
-  subject         String
-  body            String
-  resumeAttached  Boolean       @default(false)
-  resumeId        String?
-  status          SendLogStatus
-  errorMessage    String?
-  gmailMessageId  String?       @unique
-  gmailThreadId   String?
-  sentAt          DateTime      @default(now())
-  resume          UserResume?   @relation(fields: [resumeId], references: [id])
-  userCandidate   UserCandidate @relation(fields: [userCandidateId], references: [id], onDelete: Cascade)
-  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                   String         @id @default(cuid())
+  userId               String
+  userCandidateId      String?
+  toEmail              String
+  subject              String
+  body                 String
+  resumeAttached       Boolean        @default(false)
+  resumeId             String?
+  status               SendLogStatus
+  errorMessage         String?
+  gmailMessageId       String?        @unique
+  gmailThreadId        String?
+  sentAt               DateTime       @default(now())
+  directRecipientEmail String?
+  directRecipientName  String?
+  resume               UserResume?    @relation(fields: [resumeId], references: [id])
+  userCandidate        UserCandidate? @relation(fields: [userCandidateId], references: [id], onDelete: Cascade)
+  user                 User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([userCandidateId])

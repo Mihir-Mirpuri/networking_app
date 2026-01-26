@@ -16,6 +16,7 @@ export interface SendLogEntry {
   scheduledFor?: Date | null;
   isScheduled?: boolean;
   scheduledEmailId?: string; // For editing/canceling scheduled emails
+  isDirectSend?: boolean; // True when sent via compose (no UserCandidate)
 }
 
 export interface GetSendLogsResult {
@@ -52,6 +53,8 @@ export async function getSendLogs(
               OR: [
                 { toEmail: { contains: searchQuery, mode: 'insensitive' } },
                 { subject: { contains: searchQuery, mode: 'insensitive' } },
+                { directRecipientName: { contains: searchQuery, mode: 'insensitive' } },
+                { directRecipientEmail: { contains: searchQuery, mode: 'insensitive' } },
                 {
                   userCandidate: {
                     person: {
@@ -114,13 +117,14 @@ export async function getSendLogs(
     const transformedLogs: SendLogEntry[] = logs.map((log) => ({
       id: log.id,
       toEmail: log.toEmail,
-      toName: log.userCandidate.person.fullName,
-      company: log.userCandidate.person.company,
+      toName: log.userCandidate?.person.fullName || log.directRecipientName || null,
+      company: log.userCandidate?.person.company || null,
       subject: log.subject,
       body: log.body,
       status: log.status,
       sentAt: log.sentAt,
       isScheduled: false,
+      isDirectSend: !log.userCandidateId,
     }));
 
     // Transform scheduled emails
@@ -196,13 +200,14 @@ export async function getInitialSendLogs(userId: string): Promise<GetSendLogsRes
     const transformedLogs: SendLogEntry[] = logs.map((log) => ({
       id: log.id,
       toEmail: log.toEmail,
-      toName: log.userCandidate.person.fullName,
-      company: log.userCandidate.person.company,
+      toName: log.userCandidate?.person.fullName || log.directRecipientName || null,
+      company: log.userCandidate?.person.company || null,
       subject: log.subject,
       body: log.body,
       status: log.status,
       sentAt: log.sentAt,
       isScheduled: false,
+      isDirectSend: !log.userCandidateId,
     }));
 
     // Transform scheduled emails

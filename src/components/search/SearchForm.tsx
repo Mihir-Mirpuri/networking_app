@@ -10,20 +10,20 @@ import { getTemplatesAction, TemplateData } from '@/app/actions/profile';
 interface SearchFormProps {
   onSearch: (params: {
     name?: string;
-    company: string;
-    role: string;
-    university: string;
-    location: string;
+    company?: string;
+    role?: string;
+    university?: string;
+    location?: string;
     limit: number;
     templateId: string;
   }) => void;
   isLoading: boolean;
   initialParams?: {
     name?: string;
-    company: string;
-    role: string;
-    university: string;
-    location: string;
+    company?: string;
+    role?: string;
+    university?: string;
+    location?: string;
     limit: number;
     templateId: string;
   } | null;
@@ -32,29 +32,17 @@ interface SearchFormProps {
 export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormProps) {
   const { status } = useSession();
 
-  // Initialize with initialParams if available, otherwise use defaults
-  const [name, setName] = useState<string>(
-    initialParams?.name || ''
-  );
-  const [company, setCompany] = useState<string>(
-    initialParams?.company || COMPANIES[0]
-  );
-  const [role, setRole] = useState<string>(
-    initialParams?.role || ROLES[0]
-  );
-  const [university, setUniversity] = useState<string>(
-    initialParams?.university || UNIVERSITIES[0]
-  );
-  const [location, setLocation] = useState<string>(
-    initialParams?.location || LOCATIONS[0]
-  );
-  const [limit, setLimit] = useState(
-    initialParams?.limit || 10
-  );
+  // Initialize with initialParams if available, otherwise empty (user must select)
+  const [name, setName] = useState<string>(initialParams?.name || '');
+  const [company, setCompany] = useState<string>(initialParams?.company || '');
+  const [role, setRole] = useState<string>(initialParams?.role || '');
+  const [university, setUniversity] = useState<string>(initialParams?.university || '');
+  const [location, setLocation] = useState<string>(initialParams?.location || '');
+  const [limit, setLimit] = useState(initialParams?.limit || 10);
   const [templateId, setTemplateId] = useState<string>(
     initialParams?.templateId || EMAIL_TEMPLATES[0].id
   );
-  
+
   // Template state
   const [templates, setTemplates] = useState<TemplateData[]>([]);
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(true);
@@ -66,9 +54,9 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
       const loadTemplates = async () => {
         setIsLoadingTemplates(true);
         setTemplateError(null);
-        
+
         const result = await getTemplatesAction();
-        
+
         if (result.success) {
           // Combine user templates with hardcoded default
           const hardcodedDefault = EMAIL_TEMPLATES[0];
@@ -85,9 +73,9 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
               createdAt: new Date(),
             },
           ];
-          
+
           setTemplates(combinedTemplates);
-          
+
           // Set initial templateId to user's default template or fallback
           // But only if we don't have initialParams with a templateId
           if (!initialParams?.templateId) {
@@ -123,10 +111,10 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
             setTemplateId(hardcodedDefault.id);
           }
         }
-        
+
         setIsLoadingTemplates(false);
       };
-      
+
       loadTemplates();
     }
   }, [status, initialParams?.templateId]);
@@ -135,16 +123,17 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
   useEffect(() => {
     if (initialParams) {
       setName(initialParams.name || '');
-      setCompany(initialParams.company);
-      setRole(initialParams.role);
-      setUniversity(initialParams.university);
-      setLocation(initialParams.location);
+      setCompany(initialParams.company || '');
+      setRole(initialParams.role || '');
+      setUniversity(initialParams.university || '');
+      setLocation(initialParams.location || '');
       setLimit(initialParams.limit);
       // Only set templateId if templates are loaded
       if (templates.length > 0 || !isLoadingTemplates) {
         // Verify templateId exists in available templates
-        const templateExists = templates.some(t => t.id === initialParams.templateId) ||
-                              initialParams.templateId === EMAIL_TEMPLATES[0].id;
+        const templateExists =
+          templates.some((t) => t.id === initialParams.templateId) ||
+          initialParams.templateId === EMAIL_TEMPLATES[0].id;
         if (templateExists) {
           setTemplateId(initialParams.templateId);
         }
@@ -154,8 +143,19 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSearch({ name: name || undefined, company, role, university, location, limit, templateId });
+    onSearch({
+      name: name || undefined,
+      company: company || undefined,
+      role: role || undefined,
+      university: university || undefined,
+      location: location || undefined,
+      limit,
+      templateId,
+    });
   };
+
+  // Check if at least one search parameter is filled
+  const hasSearchParams = name || company || role || university || location;
 
   return (
     <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow p-6 mb-6">
@@ -177,11 +177,11 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
 
         {/* Company */}
         <SearchableCombobox
-          options={COMPANIES}
+          options={['', ...COMPANIES]}
           value={company}
           onChange={setCompany}
           label="Company"
-          placeholder="Search companies..."
+          placeholder="Select a company..."
           id="company"
         />
 
@@ -196,6 +196,7 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
             onChange={(e) => setRole(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
+            <option value="">Select a role...</option>
             {ROLES.map((r) => (
               <option key={r} value={r}>
                 {r}
@@ -206,11 +207,11 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
 
         {/* University */}
         <SearchableCombobox
-          options={UNIVERSITIES}
+          options={['', ...UNIVERSITIES]}
           value={university}
           onChange={setUniversity}
           label="University"
-          placeholder="Search universities..."
+          placeholder="Select a university..."
           id="university"
         />
 
@@ -225,9 +226,10 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
             onChange={(e) => setLocation(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            {LOCATIONS.map((loc) => (
-              <option key={loc || 'any'} value={loc}>
-                {loc || 'Any Location'}
+            <option value="">Any Location</option>
+            {LOCATIONS.filter((loc) => loc !== '').map((loc) => (
+              <option key={loc} value={loc}>
+                {loc}
               </option>
             ))}
           </select>
@@ -271,25 +273,29 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
             ) : (
               templates.map((t) => (
                 <option key={t.id} value={t.id}>
-                  {t.name}{t.isDefault ? ' (Default)' : ''}
+                  {t.name}
+                  {t.isDefault ? ' (Default)' : ''}
                 </option>
               ))
             )}
           </select>
-          {templateError && (
-            <p className="mt-1 text-sm text-amber-600">{templateError}</p>
-          )}
+          {templateError && <p className="mt-1 text-sm text-amber-600">{templateError}</p>}
         </div>
       </div>
 
       <button
         type="submit"
-        disabled={isLoading}
+        disabled={isLoading || !hasSearchParams}
         className="w-full md:w-auto px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
         {isLoading && <LoadingSpinner size="sm" />}
         {isLoading ? 'Searching...' : 'Search'}
       </button>
+      {!hasSearchParams && (
+        <p className="mt-2 text-sm text-gray-500">
+          Please fill in at least one search field (name, company, role, university, or location)
+        </p>
+      )}
     </form>
   );
 }

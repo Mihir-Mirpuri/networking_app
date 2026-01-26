@@ -10,10 +10,10 @@ import { saveSearchResult, getExcludedPersonKeys } from '@/lib/db/person-service
 
 export interface SearchInput {
   name?: string;
-  company: string;
-  role: string;
-  university: string;
-  location: string;
+  company?: string;
+  role?: string;
+  university?: string;
+  location?: string;
   limit: number;
   templateId: string;
 }

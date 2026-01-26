@@ -148,10 +148,10 @@ interface CSEResponse {
 
 export interface SearchParams {
   name?: string;
-  university: string;
-  company: string;
-  role: string;
-  location: string;
+  university?: string;
+  company?: string;
+  role?: string;
+  location?: string;
   limit: number;
   excludePersonKeys?: Set<string>; // Set of "fullName_company" keys (lowercase) to exclude
 }
@@ -622,19 +622,20 @@ function normalizeKey(name: string, company: string, url: string): string {
 export async function searchPeople(params: SearchParams): Promise<SearchResult[]> {
   const { name, university, company, role, location, limit, excludePersonKeys = new Set() } = params;
 
-  // Build location string for queries (only if location is specified)
-  const locationStr = location ? ` "${location}"` : '';
+  // Build query from all non-empty parameters
+  const queryParts: string[] = [];
 
-  // Build query based on whether name is provided
-  let query: string;
-  if (name) {
-    // If name is provided, use it as primary search term
-    // Combine with other filters if they have meaningful values
-    const otherFilters = [university, company, role].filter(f => f && f.trim() !== '').join(' ');
-    query = otherFilters ? `${name} ${otherFilters}${locationStr}` : `${name}${locationStr}`;
-  } else {
-    // Original query construction
-    query = `${university} ${company} ${role}${locationStr}`;
+  if (name && name.trim()) queryParts.push(name.trim());
+  if (university && university.trim()) queryParts.push(university.trim());
+  if (company && company.trim()) queryParts.push(company.trim());
+  if (role && role.trim()) queryParts.push(role.trim());
+  if (location && location.trim()) queryParts.push(`"${location.trim()}"`);
+
+  const query = queryParts.join(' ');
+
+  if (!query) {
+    console.log('[Discovery] No search parameters provided, returning empty results');
+    return [];
   }
 
   console.log(`[Discovery] Search query: ${query}`);
