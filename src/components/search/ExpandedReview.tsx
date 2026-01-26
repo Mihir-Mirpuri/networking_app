@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { SearchResultWithDraft } from '@/app/actions/search';
 import { scheduleEmailAction } from '@/app/actions/send';
-import { personalizeEmailAction, useFoundInfoAction } from '@/app/actions/personalize';
+import { personalizeEmailAction, applyFoundInfoAction } from '@/app/actions/personalize';
 
 // Extension ID - set via environment variable after publishing to Chrome Web Store
 const EXTENSION_ID = process.env.NEXT_PUBLIC_EXTENSION_ID || '';
@@ -311,7 +311,7 @@ export function ExpandedReview({
     setPersonalizeError(null);
 
     try {
-      const result = await useFoundInfoAction({
+      const result = await applyFoundInfoAction({
         foundInfo: personalizeResult.foundInfo,
         originalSubject: subject,
         originalBody: body,

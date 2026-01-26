@@ -67,7 +67,7 @@ export interface UseFoundInfoInput {
   personRole?: string;
 }
 
-export async function useFoundInfoAction(
+export async function applyFoundInfoAction(
   input: UseFoundInfoInput
 ): Promise<PersonalizeEmailResult> {
   try {
@@ -144,6 +144,10 @@ export async function generateFollowUpAction(
       return { success: false, error: 'No thread ID found for this email' };
     }
 
+    if (!sendLog.userCandidate) {
+      return { success: false, error: 'No candidate associated with this email' };
+    }
+
     const person = sendLog.userCandidate.person;
     const senderName = session.user.name || 'there';
 
@@ -166,7 +170,7 @@ export async function generateFollowUpAction(
       company: person.company,
       gmailThreadId: sendLog.gmailThreadId,
       gmailMessageId: sendLog.gmailMessageId || undefined,
-      userCandidateId: sendLog.userCandidateId,
+      userCandidateId: sendLog.userCandidateId || undefined,
     };
   } catch (error) {
     console.error('GenerateFollowUp error:', error);

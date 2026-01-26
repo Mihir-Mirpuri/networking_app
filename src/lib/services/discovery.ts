@@ -669,17 +669,17 @@ export async function searchPeople(params: SearchParams): Promise<SearchResult[]
       for (const result of results) {
         if (candidates.length >= limit) break;
 
-        const parsed = parseCandidate(result, company);
+        const parsed = parseCandidate(result, company || '');
         if (!parsed) continue;
 
         // Validate that the parsed name is actually a valid person name
-        if (!isValidPersonName(parsed, company)) {
+        if (!isValidPersonName(parsed, company || '')) {
           console.log(`[Discovery] Skipping invalid person name: ${parsed.fullName}`);
           continue;
         }
 
         // Calculate confidence score
-        const confidence = calculateConfidence(parsed, result, company);
+        const confidence = calculateConfidence(parsed, result, company || '');
         const isLowConfidence = confidence < 0.6;
 
         // Log low-confidence matches for monitoring
@@ -695,7 +695,7 @@ export async function searchPeople(params: SearchParams): Promise<SearchResult[]
         }
 
         // Check for duplicate URLs (same person from different pages)
-        const key = normalizeKey(parsed.fullName, company, result.link);
+        const key = normalizeKey(parsed.fullName, company || '', result.link);
         if (seenKeys.has(key)) continue;
         seenKeys.add(key);
 
@@ -703,7 +703,7 @@ export async function searchPeople(params: SearchParams): Promise<SearchResult[]
           fullName: parsed.fullName,
           firstName: parsed.firstName,
           lastName: parsed.lastName,
-          company,
+          company: company || '',
           role: parsed.role,
           sourceUrl: result.link,
           sourceTitle: result.title,

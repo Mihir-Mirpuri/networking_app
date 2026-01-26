@@ -95,10 +95,9 @@ export async function getGmailClient(userId: string) {
   // Listen to 'tokens' event to update database when tokens are refreshed
   oauth2Client.on('tokens', async (tokens) => {
     if (tokens.access_token) {
-      const now = Math.floor(Date.now() / 1000);
-      const expiresAt = tokens.expiry_date 
-        ? Math.floor(tokens.expiry_date / 1000) 
-        : (tokens.expires_in ? now + tokens.expires_in : null);
+      const expiresAt = tokens.expiry_date
+        ? Math.floor(tokens.expiry_date / 1000)
+        : null;
 
       try {
         await prisma.account.updateMany({
