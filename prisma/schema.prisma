@@ -35,26 +35,26 @@ model Session {
 }
 
 model User {
-  id             String          @id @default(cuid())
-  name           String?
-  email          String?         @unique
-  emailVerified  DateTime?
-  image          String?
-  classification String?
-  major          String?
-  university     String?
-  career         String?
-  dailySendCount Int             @default(0)
-  lastSendDate   DateTime?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  accounts       Account[]
-  userCandidates UserCandidate[]
-  userResumes    UserResume[]
-  emailTemplates EmailTemplate[]
-  sendLogs       SendLog[]
+  id              String           @id @default(cuid())
+  name            String?
+  email           String?          @unique
+  emailVerified   DateTime?
+  image           String?
+  classification  String?
+  major           String?
+  university      String?
+  career          String?
+  dailySendCount  Int              @default(0)
+  lastSendDate    DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  accounts        Account[]
+  emailTemplates  EmailTemplate[]
   scheduledEmails ScheduledEmail[]
-  sessions       Session[]
+  sendLogs        SendLog[]
+  sessions        Session[]
+  userCandidates  UserCandidate[]
+  userResumes     UserResume[]
 }
 
 model VerificationToken {
@@ -66,30 +66,28 @@ model VerificationToken {
 }
 
 model Person {
-  id            String          @id @default(cuid())
-  fullName      String
-  firstName     String?
-  lastName      String?
-  company       String
-  role          String?
-  linkedinUrl   String?
-  email                String?
-  emailStatus          EmailStatus?
-  emailConfidence      Float?
-  emailLastUpdated     DateTime?
-  // Location fields from Apollo
-  city                 String?
-  state                String?
-  country              String?
-  // Education fields from Apollo
-  educationSchool      String?
-  educationDegree      String?
-  educationField       String?
-  educationYear        String?
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-  userCandidates UserCandidate[]
-  sourceLinks   SourceLink[]
+  id               String          @id @default(cuid())
+  fullName         String
+  firstName        String?
+  lastName         String?
+  company          String
+  role             String?
+  linkedinUrl      String?
+  email            String?
+  emailStatus      EmailStatus?
+  emailConfidence  Float?
+  emailLastUpdated DateTime?
+  city             String?
+  state            String?
+  country          String?
+  educationSchool  String?
+  educationDegree  String?
+  educationField   String?
+  educationYear    String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  sourceLinks      SourceLink[]
+  userCandidates   UserCandidate[]
 
   @@unique([fullName, company])
   @@index([fullName, company])
@@ -97,22 +95,22 @@ model Person {
 }
 
 model UserCandidate {
-  id                   String       @id @default(cuid())
+  id                   String           @id @default(cuid())
   userId               String
   personId             String
   email                String?
-  emailStatus          EmailStatus   @default(MISSING)
+  emailStatus          EmailStatus      @default(MISSING)
   emailConfidence      Float?
-  manualEmailConfirmed Boolean       @default(false)
-  doNotShow            Boolean       @default(false)
+  manualEmailConfirmed Boolean          @default(false)
+  doNotShow            Boolean          @default(false)
   university           String?
-  createdAt            DateTime      @default(now())
-  updatedAt            DateTime      @updatedAt
-  user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  person               Person        @relation(fields: [personId], references: [id], onDelete: Cascade)
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
   emailDraft           EmailDraft?
-  sendLogs             SendLog[]
   scheduledEmails      ScheduledEmail[]
+  sendLogs             SendLog[]
+  person               Person           @relation(fields: [personId], references: [id], onDelete: Cascade)
+  user                 User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, personId])
   @@index([userId])
@@ -139,43 +137,42 @@ model SourceLink {
 }
 
 model UserResume {
-  id         String       @id @default(cuid())
-  userId     String
-  filename   String
-  fileUrl    String
-  fileSize   Int
-  mimeType   String
-  version    Int          @default(1)
-  isActive   Boolean      @default(false)
-  // AI-extracted summary for personalization (orgs, activities, interests)
-  summary    String?
+  id                 String           @id @default(cuid())
+  userId             String
+  filename           String
+  fileUrl            String
+  fileSize           Int
+  mimeType           String
+  version            Int              @default(1)
+  isActive           Boolean          @default(false)
+  summary            String?
   summaryGeneratedAt DateTime?
-  uploadedAt DateTime     @default(now())
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
-  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  emailDrafts EmailDraft[]
-  sendLogs   SendLog[]
-  scheduledEmails ScheduledEmail[]
-  emailTemplates EmailTemplate[]
+  uploadedAt         DateTime         @default(now())
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  emailDrafts        EmailDraft[]
+  emailTemplates     EmailTemplate[]
+  scheduledEmails    ScheduledEmail[]
+  sendLogs           SendLog[]
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([userId, isActive])
 }
 
 model EmailTemplate {
-  id         String       @id @default(cuid())
-  userId     String
-  name       String
-  prompt     String
-  isDefault  Boolean      @default(false)
-  attachResume Boolean   @default(false)
-  resumeId   String?
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
-  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  resume     UserResume?  @relation(fields: [resumeId], references: [id], onDelete: SetNull)
-  emailDrafts EmailDraft[]
+  id           String       @id @default(cuid())
+  userId       String
+  name         String
+  prompt       String
+  isDefault    Boolean      @default(false)
+  attachResume Boolean      @default(false)
+  resumeId     String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  emailDrafts  EmailDraft[]
+  resume       UserResume?  @relation(fields: [resumeId], references: [id])
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([userId, isDefault])
@@ -183,22 +180,22 @@ model EmailTemplate {
 }
 
 model EmailDraft {
-  id             String            @id @default(cuid())
+  id              String           @id @default(cuid())
   userCandidateId String           @unique
-  templateId     String?
-  subject        String
-  body           String
-  status         EmailDraftStatus  @default(PENDING)
-  userEdited     Boolean           @default(false)
-  editedSubject  String?
-  editedBody     String?
-  attachResume   Boolean           @default(false)
-  resumeId       String?
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
-  userCandidate  UserCandidate     @relation(fields: [userCandidateId], references: [id], onDelete: Cascade)
-  template       EmailTemplate?    @relation(fields: [templateId], references: [id], onDelete: SetNull)
-  resume         UserResume?       @relation(fields: [resumeId], references: [id], onDelete: SetNull)
+  templateId      String?
+  subject         String
+  body            String
+  status          EmailDraftStatus @default(PENDING)
+  userEdited      Boolean          @default(false)
+  editedSubject   String?
+  editedBody      String?
+  attachResume    Boolean          @default(false)
+  resumeId        String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  resume          UserResume?      @relation(fields: [resumeId], references: [id])
+  template        EmailTemplate?   @relation(fields: [templateId], references: [id])
+  userCandidate   UserCandidate    @relation(fields: [userCandidateId], references: [id], onDelete: Cascade)
 
   @@index([userCandidateId])
   @@index([templateId])
@@ -207,46 +204,48 @@ model EmailDraft {
 }
 
 model SendLog {
-  id             String        @id @default(cuid())
-  userId         String
+  id              String        @id @default(cuid())
+  userId          String
   userCandidateId String
-  toEmail        String
-  subject        String
-  body           String
-  resumeAttached Boolean       @default(false)
-  resumeId       String?
-  status         SendLogStatus
-  errorMessage   String?
-  gmailMessageId String?       @unique
-  sentAt         DateTime      @default(now())
-  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userCandidate  UserCandidate @relation(fields: [userCandidateId], references: [id], onDelete: Cascade)
-  resume         UserResume?   @relation(fields: [resumeId], references: [id], onDelete: SetNull)
+  toEmail         String
+  subject         String
+  body            String
+  resumeAttached  Boolean       @default(false)
+  resumeId        String?
+  status          SendLogStatus
+  errorMessage    String?
+  gmailMessageId  String?       @unique
+  gmailThreadId   String?
+  sentAt          DateTime      @default(now())
+  resume          UserResume?   @relation(fields: [resumeId], references: [id])
+  userCandidate   UserCandidate @relation(fields: [userCandidateId], references: [id], onDelete: Cascade)
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([userCandidateId])
   @@index([status])
   @@index([sentAt])
   @@index([gmailMessageId])
+  @@index([gmailThreadId])
 }
 
 model ScheduledEmail {
-  id             String              @id @default(cuid())
-  userId         String
+  id              String               @id @default(cuid())
+  userId          String
   userCandidateId String
-  toEmail        String
-  subject        String
-  body           String
-  resumeId       String?
-  scheduledFor   DateTime
-  status         ScheduledEmailStatus @default(PENDING)
-  errorMessage   String?
-  sentAt         DateTime?
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
-  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userCandidate  UserCandidate       @relation(fields: [userCandidateId], references: [id], onDelete: Cascade)
-  resume         UserResume?         @relation(fields: [resumeId], references: [id], onDelete: SetNull)
+  toEmail         String
+  subject         String
+  body            String
+  resumeId        String?
+  scheduledFor    DateTime
+  status          ScheduledEmailStatus @default(PENDING)
+  errorMessage    String?
+  sentAt          DateTime?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  resume          UserResume?          @relation(fields: [resumeId], references: [id])
+  userCandidate   UserCandidate        @relation(fields: [userCandidateId], references: [id], onDelete: Cascade)
+  user            User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([status, scheduledFor])
   @@index([userId])

@@ -32,6 +32,23 @@ export default async function HomePage() {
     redirect('/auth/signin');
   }
 
+  // For testing: Force re-authentication if Account record doesn't exist
+  // This ensures users get new OAuth tokens with updated scopes
+  const account = await prisma.account.findFirst({
+    where: {
+      userId: session.user.id,
+      provider: 'google',
+    },
+  });
+
+  if (!account) {
+    // Clear session and force re-authentication
+    await prisma.session.deleteMany({
+      where: { userId: session.user.id },
+    });
+    redirect('/auth/signin');
+  }
+
   const remainingDaily = await getRemainingDailyLimit(session.user.id);
 
   return (

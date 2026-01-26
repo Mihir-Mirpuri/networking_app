@@ -138,6 +138,7 @@ async function handleCronRequest(request: NextRequest) {
               resumeId: email.resumeId || null,
               status: 'SUCCESS',
               gmailMessageId: sendResult.messageId || null,
+              gmailThreadId: sendResult.threadId || null,
             },
           });
 
