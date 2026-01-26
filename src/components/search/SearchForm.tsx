@@ -2,10 +2,19 @@
 
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { COMPANIES, ROLES, UNIVERSITIES, LOCATIONS, EMAIL_TEMPLATES } from '@/lib/constants';
+import { COMPANIES, UNIVERSITIES, LOCATIONS, EMAIL_TEMPLATES } from '@/lib/constants';
 import { LoadingSpinner } from './LoadingSpinner';
 import { SearchableCombobox } from './SearchableCombobox';
 import { getTemplatesAction, TemplateData } from '@/app/actions/profile';
+
+// Role options with display name and CSE search value
+const ROLE_OPTIONS = [
+  { id: 'ib-analyst', label: 'Investment Banking Analyst', searchValue: 'Investment Banking Analyst' },
+  { id: 'consulting-associate', label: 'Consulting Associate', searchValue: 'Associate' },
+  { id: 'custom', label: 'Custom Role', searchValue: '' },
+] as const;
+
+type RoleOptionId = typeof ROLE_OPTIONS[number]['id'];
 
 interface SearchFormProps {
   onSearch: (params: {
@@ -35,13 +44,36 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
   // Initialize with initialParams if available, otherwise empty (user must select)
   const [name, setName] = useState<string>(initialParams?.name || '');
   const [company, setCompany] = useState<string>(initialParams?.company || '');
-  const [role, setRole] = useState<string>(initialParams?.role || '');
   const [university, setUniversity] = useState<string>(initialParams?.university || '');
   const [location, setLocation] = useState<string>(initialParams?.location || '');
   const [limit, setLimit] = useState(initialParams?.limit || 10);
   const [templateId, setTemplateId] = useState<string>(
     initialParams?.templateId || EMAIL_TEMPLATES[0].id
   );
+
+  // Role state - determine initial role option from initialParams
+  const getInitialRoleOption = (): RoleOptionId => {
+    if (!initialParams?.role) return 'ib-analyst'; // Default to IB Analyst
+    const matchingOption = ROLE_OPTIONS.find(opt => opt.searchValue === initialParams.role);
+    if (matchingOption && matchingOption.id !== 'custom') return matchingOption.id;
+    return 'custom';
+  };
+
+  const [selectedRoleOption, setSelectedRoleOption] = useState<RoleOptionId>(getInitialRoleOption());
+  const [customRole, setCustomRole] = useState<string>(() => {
+    if (!initialParams?.role) return '';
+    const matchingOption = ROLE_OPTIONS.find(opt => opt.searchValue === initialParams.role);
+    return matchingOption && matchingOption.id !== 'custom' ? '' : initialParams.role;
+  });
+
+  // Get the actual role value to send to search
+  const getEffectiveRole = (): string => {
+    if (selectedRoleOption === 'custom') {
+      return customRole;
+    }
+    const option = ROLE_OPTIONS.find(opt => opt.id === selectedRoleOption);
+    return option?.searchValue || '';
+  };
 
   // Template state
   const [templates, setTemplates] = useState<TemplateData[]>([]);
@@ -124,10 +156,22 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
     if (initialParams) {
       setName(initialParams.name || '');
       setCompany(initialParams.company || '');
-      setRole(initialParams.role || '');
       setUniversity(initialParams.university || '');
       setLocation(initialParams.location || '');
       setLimit(initialParams.limit);
+
+      // Handle role restoration
+      if (initialParams.role) {
+        const matchingOption = ROLE_OPTIONS.find(opt => opt.searchValue === initialParams.role);
+        if (matchingOption && matchingOption.id !== 'custom') {
+          setSelectedRoleOption(matchingOption.id);
+          setCustomRole('');
+        } else {
+          setSelectedRoleOption('custom');
+          setCustomRole(initialParams.role);
+        }
+      }
+
       // Only set templateId if templates are loaded
       if (templates.length > 0 || !isLoadingTemplates) {
         // Verify templateId exists in available templates
@@ -143,10 +187,11 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const effectiveRole = getEffectiveRole();
     onSearch({
       name: name || undefined,
       company: company || undefined,
-      role: role || undefined,
+      role: effectiveRole || undefined,
       university: university || undefined,
       location: location || undefined,
       limit,
@@ -155,7 +200,8 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
   };
 
   // Check if at least one search parameter is filled
-  const hasSearchParams = name || company || role || university || location;
+  const effectiveRole = getEffectiveRole();
+  const hasSearchParams = name || company || effectiveRole || university || location;
 
   return (
     <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow p-6 mb-6">
@@ -186,23 +232,35 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
         />
 
         {/* Role */}
-        <div>
-          <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-1">
+        <div className="lg:col-span-2">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
             Role
           </label>
-          <select
-            id="role"
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Select a role...</option>
-            {ROLES.map((r) => (
-              <option key={r} value={r}>
-                {r}
-              </option>
+          <div className="flex flex-wrap gap-2 mb-2">
+            {ROLE_OPTIONS.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => setSelectedRoleOption(option.id)}
+                className={`px-3 py-1.5 text-sm rounded-md border transition-colors ${
+                  selectedRoleOption === option.id
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-white text-gray-700 border-gray-300 hover:border-blue-400'
+                }`}
+              >
+                {option.label}
+              </button>
             ))}
-          </select>
+          </div>
+          {selectedRoleOption === 'custom' && (
+            <input
+              type="text"
+              value={customRole}
+              onChange={(e) => setCustomRole(e.target.value)}
+              placeholder="Enter custom role..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          )}
         </div>
 
         {/* University */}

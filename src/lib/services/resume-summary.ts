@@ -1,6 +1,5 @@
 import Groq from 'groq-sdk';
 import { createClient } from '@supabase/supabase-js';
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const pdf = require('pdf-parse');
 
 const groq = new Groq({

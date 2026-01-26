@@ -325,7 +325,7 @@ export async function searchPeopleAction(
       DB_SAVE_CONCURRENCY,
       async ({ person, emailResult, emailSource }): Promise<SearchResultWithDraft> => {
         // Generate placeholder draft (simple template replacement)
-        const placeholderDraft = generateDraft(template, person, input.university, input.role, userProfile || { name: null, classification: null, major: null, university: null, career: null });
+        const placeholderDraft = generateDraft(template, person, input.university || '', input.role || '', userProfile || { name: null, classification: null, major: null, university: null, career: null });
 
         // Save to database with placeholder
         try {
@@ -333,7 +333,7 @@ export async function searchPeopleAction(
             session.user.id,
             person,
             emailResult,
-            input.university,
+            input.university || '',
             {
               subject: placeholderDraft.subject,
               body: placeholderDraft.body,
@@ -353,7 +353,7 @@ export async function searchPeopleAction(
             lastName: person.lastName,
             company: person.company,
             role: person.role,
-            university: input.university,
+            university: input.university || '',
             email: emailResult.email,
             emailStatus: emailResult.status,
             emailConfidence: emailResult.confidence,
@@ -387,7 +387,7 @@ export async function searchPeopleAction(
             lastName: person.lastName,
             company: person.company,
             role: person.role,
-            university: input.university,
+            university: input.university || '',
             email: emailResult.email,
             emailStatus: emailResult.status,
             emailConfidence: emailResult.confidence,

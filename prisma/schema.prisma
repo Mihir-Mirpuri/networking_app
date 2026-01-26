@@ -55,6 +55,9 @@ model User {
   sessions        Session[]
   userCandidates  UserCandidate[]
   userResumes     UserResume[]
+  gmailSyncState  gmail_sync_state?
+  conversations   conversations[]
+  messages        messages[]
 }
 
 model VerificationToken {
@@ -222,6 +225,7 @@ model SendLog {
   resume               UserResume?    @relation(fields: [resumeId], references: [id])
   userCandidate        UserCandidate? @relation(fields: [userCandidateId], references: [id], onDelete: Cascade)
   user                 User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages             messages[]
 
   @@index([userId])
   @@index([userCandidateId])
@@ -283,4 +287,64 @@ enum ScheduledEmailStatus {
   SENT
   FAILED
   CANCELLED
+}
+
+model gmail_sync_state {
+  id               String    @id @default(cuid())
+  userId           String    @unique
+  email_address    String
+  historyId        String?
+  watch_expiration DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([email_address])
+}
+
+model conversations {
+  threadId      String     @id
+  userId        String
+  subject       String?
+  lastMessageAt DateTime?
+  messageCount  Int        @default(0)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages      messages[]
+
+  @@unique([userId, threadId])
+  @@index([userId])
+  @@index([userId, lastMessageAt])
+}
+
+enum MessageDirection {
+  SENT
+  RECEIVED
+}
+
+model messages {
+  messageId      String           @id
+  threadId       String
+  userId         String
+  direction      MessageDirection
+  sender         String
+  recipient_list Json
+  subject        String?
+  body_html      String?
+  body_text      String?
+  received_at    DateTime
+  sendLogId      String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  conversation   conversations    @relation(fields: [threadId], references: [threadId], onDelete: Cascade)
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sendLog        SendLog?         @relation(fields: [sendLogId], references: [id], onDelete: SetNull)
+
+  @@index([threadId])
+  @@index([userId])
+  @@index([userId, threadId])
+  @@index([userId, received_at])
+  @@index([sender])
+  @@index([sendLogId])
 }
