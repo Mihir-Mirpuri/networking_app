@@ -17,6 +17,8 @@ export interface SendLogEntry {
   isScheduled?: boolean;
   scheduledEmailId?: string; // For editing/canceling scheduled emails
   isDirectSend?: boolean; // True when sent via compose (no UserCandidate)
+  gmailThreadId?: string | null; // For thread tracking
+  hasResponse?: boolean; // True if recipient has responded in this thread
 }
 
 export interface GetSendLogsResult {
@@ -113,6 +115,23 @@ export async function getSendLogs(
       orderBy: { scheduledFor: 'asc' },
     });
 
+    // Get all unique thread IDs to check for responses
+    const threadIds = logs
+      .map((log) => log.gmailThreadId)
+      .filter((id): id is string => id !== null);
+
+    // Query messages table to find threads with RECEIVED messages
+    const threadsWithResponses = await prisma.messages.groupBy({
+      by: ['threadId'],
+      where: {
+        threadId: { in: threadIds },
+        userId: session.user.id,
+        direction: 'RECEIVED',
+      },
+    });
+
+    const threadIdsWithResponses = new Set(threadsWithResponses.map((t) => t.threadId));
+
     // Transform send logs
     const transformedLogs: SendLogEntry[] = logs.map((log) => ({
       id: log.id,
@@ -125,6 +144,8 @@ export async function getSendLogs(
       sentAt: log.sentAt,
       isScheduled: false,
       isDirectSend: !log.userCandidateId,
+      gmailThreadId: log.gmailThreadId,
+      hasResponse: log.gmailThreadId ? threadIdsWithResponses.has(log.gmailThreadId) : false,
     }));
 
     // Transform scheduled emails
@@ -140,6 +161,7 @@ export async function getSendLogs(
       scheduledFor: email.scheduledFor,
       isScheduled: true,
       scheduledEmailId: email.id,
+      hasResponse: false, // Scheduled emails haven't been sent yet
     }));
 
     // Combine and sort by date (most recent first, then future scheduled)
@@ -196,6 +218,23 @@ export async function getInitialSendLogs(userId: string): Promise<GetSendLogsRes
       orderBy: { scheduledFor: 'asc' },
     });
 
+    // Get all unique thread IDs to check for responses
+    const threadIds = logs
+      .map((log) => log.gmailThreadId)
+      .filter((id): id is string => id !== null);
+
+    // Query messages table to find threads with RECEIVED messages
+    const threadsWithResponses = await prisma.messages.groupBy({
+      by: ['threadId'],
+      where: {
+        threadId: { in: threadIds },
+        userId: userId,
+        direction: 'RECEIVED',
+      },
+    });
+
+    const threadIdsWithResponses = new Set(threadsWithResponses.map((t) => t.threadId));
+
     // Transform send logs
     const transformedLogs: SendLogEntry[] = logs.map((log) => ({
       id: log.id,
@@ -208,6 +247,8 @@ export async function getInitialSendLogs(userId: string): Promise<GetSendLogsRes
       sentAt: log.sentAt,
       isScheduled: false,
       isDirectSend: !log.userCandidateId,
+      gmailThreadId: log.gmailThreadId,
+      hasResponse: log.gmailThreadId ? threadIdsWithResponses.has(log.gmailThreadId) : false,
     }));
 
     // Transform scheduled emails
@@ -223,6 +264,7 @@ export async function getInitialSendLogs(userId: string): Promise<GetSendLogsRes
       scheduledFor: email.scheduledFor,
       isScheduled: true,
       scheduledEmailId: email.id,
+      hasResponse: false, // Scheduled emails haven't been sent yet
     }));
 
     // Combine and sort by date
