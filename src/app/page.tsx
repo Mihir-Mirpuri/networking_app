@@ -55,7 +55,7 @@ export default async function HomePage() {
     <div className="min-h-screen bg-gray-50">
       <Header />
       <main className="max-w-4xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">Find Alumni</h1>
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">Find Connections</h1>
         <SearchPageClient initialRemainingDaily={remainingDaily} />
       </main>
     </div>
