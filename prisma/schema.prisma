@@ -35,29 +35,26 @@ model Session {
 }
 
 model User {
-  id               String            @id @default(cuid())
-  name             String?
-  email            String?           @unique
-  emailVerified    DateTime?
-  image            String?
-  dailySendCount   Int               @default(0)
-  lastSendDate     DateTime?
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  classification   String?
-  major            String?
-  university       String?
-  career           String?
-  accounts         Account[]
-  emailTemplates   EmailTemplate[]
-  scheduledEmails  ScheduledEmail[]
-  sendLogs         SendLog[]
-  sessions         Session[]
-  userCandidates   UserCandidate[]
-  userResumes      UserResume[]
-  conversations    conversations[]
-  gmail_sync_state gmail_sync_state?
-  messages         messages[]
+  id              String           @id @default(cuid())
+  name            String?
+  email           String?          @unique
+  emailVerified   DateTime?
+  image           String?
+  classification  String?
+  major           String?
+  university      String?
+  career          String?
+  dailySendCount  Int              @default(0)
+  lastSendDate    DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  accounts        Account[]
+  emailTemplates  EmailTemplate[]
+  scheduledEmails ScheduledEmail[]
+  sendLogs        SendLog[]
+  sessions        Session[]
+  userCandidates  UserCandidate[]
+  userResumes     UserResume[]
 }
 
 model VerificationToken {
@@ -76,19 +73,19 @@ model Person {
   company          String
   role             String?
   linkedinUrl      String?
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
   email            String?
+  emailStatus      EmailStatus?
   emailConfidence  Float?
   emailLastUpdated DateTime?
-  emailStatus      EmailStatus?
   city             String?
+  state            String?
   country          String?
+  educationSchool  String?
   educationDegree  String?
   educationField   String?
-  educationSchool  String?
   educationYear    String?
-  state            String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
   sourceLinks      SourceLink[]
   userCandidates   UserCandidate[]
 
@@ -105,10 +102,10 @@ model UserCandidate {
   emailStatus          EmailStatus      @default(MISSING)
   emailConfidence      Float?
   manualEmailConfirmed Boolean          @default(false)
+  doNotShow            Boolean          @default(false)
+  university           String?
   createdAt            DateTime         @default(now())
   updatedAt            DateTime         @updatedAt
-  university           String?
-  doNotShow            Boolean          @default(false)
   emailDraft           EmailDraft?
   scheduledEmails      ScheduledEmail[]
   sendLogs             SendLog[]
@@ -140,22 +137,24 @@ model SourceLink {
 }
 
 model UserResume {
-  id              String           @id @default(cuid())
-  userId          String
-  filename        String
-  fileUrl         String
-  fileSize        Int
-  mimeType        String
-  version         Int              @default(1)
-  isActive        Boolean          @default(false)
-  uploadedAt      DateTime         @default(now())
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  emailDrafts     EmailDraft[]
-  emailTemplates  EmailTemplate[]
-  scheduledEmails ScheduledEmail[]
-  sendLogs        SendLog[]
-  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                 String           @id @default(cuid())
+  userId             String
+  filename           String
+  fileUrl            String
+  fileSize           Int
+  mimeType           String
+  version            Int              @default(1)
+  isActive           Boolean          @default(false)
+  summary            String?
+  summaryGeneratedAt DateTime?
+  uploadedAt         DateTime         @default(now())
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  emailDrafts        EmailDraft[]
+  emailTemplates     EmailTemplate[]
+  scheduledEmails    ScheduledEmail[]
+  sendLogs           SendLog[]
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([userId, isActive])
@@ -167,10 +166,10 @@ model EmailTemplate {
   name         String
   prompt       String
   isDefault    Boolean      @default(false)
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
   attachResume Boolean      @default(false)
   resumeId     String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
   emailDrafts  EmailDraft[]
   resume       UserResume?  @relation(fields: [resumeId], references: [id])
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -221,7 +220,6 @@ model SendLog {
   resume          UserResume?   @relation(fields: [resumeId], references: [id])
   userCandidate   UserCandidate @relation(fields: [userCandidateId], references: [id], onDelete: Cascade)
   user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messages        messages[]
 
   @@index([userId])
   @@index([userCandidateId])
@@ -252,65 +250,6 @@ model ScheduledEmail {
   @@index([status, scheduledFor])
   @@index([userId])
   @@index([scheduledFor])
-}
-
-model conversations {
-  threadId      String     @id
-  userId        String
-  subject       String?
-  lastMessageAt DateTime?  @db.Timestamptz(6)
-  messageCount  Int        @default(0)
-  createdAt     DateTime   @default(now()) @db.Timestamptz(6)
-  updatedAt     DateTime   @default(now()) @db.Timestamptz(6)
-  User          User       @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  messages      messages[]
-
-  @@unique([userId, threadId])
-  @@index([userId])
-  @@index([userId, lastMessageAt])
-}
-
-model gmail_sync_state {
-  id               String    @id
-  userId           String    @unique
-  email_address    String
-  historyId        String?
-  watch_expiration DateTime? @db.Timestamptz(6)
-  createdAt        DateTime  @default(now()) @db.Timestamptz(6)
-  updatedAt        DateTime  @default(now()) @db.Timestamptz(6)
-  User             User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-
-  @@index([email_address])
-  @@index([userId])
-  @@index([watch_expiration])
-}
-
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-model messages {
-  messageId      String        @id
-  threadId       String
-  userId         String
-  direction      String
-  sender         String
-  recipient_list Json
-  subject        String?
-  body_html      String?
-  body_text      String?
-  received_at    DateTime      @db.Timestamptz(6)
-  sendLogId      String?
-  createdAt      DateTime      @default(now()) @db.Timestamptz(6)
-  updatedAt      DateTime      @default(now()) @db.Timestamptz(6)
-  SendLog        SendLog?      @relation(fields: [sendLogId], references: [id], onUpdate: NoAction)
-  conversations  conversations @relation(fields: [threadId], references: [threadId], onDelete: Cascade, onUpdate: NoAction)
-  User           User          @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-
-  @@index([recipient_list], type: Gin)
-  @@index([sendLogId])
-  @@index([sender])
-  @@index([threadId])
-  @@index([userId])
-  @@index([userId, received_at])
-  @@index([userId, threadId])
 }
 
 enum EmailStatus {
