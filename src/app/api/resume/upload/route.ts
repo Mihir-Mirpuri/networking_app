@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { createClient } from '@supabase/supabase-js';
+import { summarizeResume } from '@/lib/services/resume-summary';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_MIME_TYPES = [
@@ -141,6 +142,22 @@ export async function POST(request: NextRequest) {
         isActive,
       },
     });
+
+    // Summarize resume in background (don't block upload response)
+    summarizeResume(fileUrl, file.type)
+      .then(async (summary) => {
+        await prisma.userResume.update({
+          where: { id: resume.id },
+          data: {
+            summary: JSON.stringify(summary),
+            summaryGeneratedAt: new Date(),
+          },
+        });
+        console.log('Resume summary generated for:', resume.id);
+      })
+      .catch((error) => {
+        console.error('Failed to generate resume summary:', error);
+      });
 
     return NextResponse.json({
       success: true,

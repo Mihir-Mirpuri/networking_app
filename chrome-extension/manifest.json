@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "Lattice LinkedIn Helper",
+  "version": "1.0.0",
+  "description": "Helps personalize outreach emails by reading LinkedIn profile data",
+  "permissions": [
+    "activeTab",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://www.linkedin.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.linkedin.com/in/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "externally_connectable": {
+    "matches": [
+      "http://localhost:3000/*",
+      "https://*.vercel.app/*"
+    ]
+  },
+  "action": {
+    "default_title": "Lattice LinkedIn Helper"
+  }
+}

@@ -249,12 +249,12 @@ export async function sendEmail(
         select: { access_token: true, refresh_token: true, expires_at: true },
       });
 
-      if (account) {
+      if (account && account.access_token) {
         const refreshedToken = await getValidAccessToken(
-          account,
+          { ...account, access_token: account.access_token },
           userId,
-          process.env.GOOGLE_CLIENT_ID,
-          process.env.GOOGLE_CLIENT_SECRET
+          process.env.GOOGLE_CLIENT_ID!,
+          process.env.GOOGLE_CLIENT_SECRET!
         );
         if (refreshedToken) {
           validToken = refreshedToken;

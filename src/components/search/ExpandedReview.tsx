@@ -1,8 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { SearchResultWithDraft } from '@/app/actions/search';
 import { scheduleEmailAction } from '@/app/actions/send';
+import { personalizeEmailAction, useFoundInfoAction } from '@/app/actions/personalize';
+
+// Extension ID - set via environment variable after publishing to Chrome Web Store
+const EXTENSION_ID = process.env.NEXT_PUBLIC_EXTENSION_ID || '';
 
 interface ExpandedReviewProps {
   results: SearchResultWithDraft[];
@@ -29,6 +33,18 @@ export function ExpandedReview({
   const [scheduleError, setScheduleError] = useState<string | null>(null);
   const [isScheduling, setIsScheduling] = useState(false);
 
+  // Personalization state
+  const [isPersonalizing, setIsPersonalizing] = useState(false);
+  const [personalizeError, setPersonalizeError] = useState<string | null>(null);
+  const [showExtensionModal, setShowExtensionModal] = useState(false);
+  const [extensionInstalled, setExtensionInstalled] = useState<boolean | null>(null);
+  const [personalizeResult, setPersonalizeResult] = useState<{
+    similarityFound: boolean;
+    changes?: string[];
+    foundInfo?: string[];
+  } | null>(null);
+  const [lastLinkedInData, setLastLinkedInData] = useState<unknown>(null);
+
   const currentPerson = results[internalIndex];
   const status = currentPerson ? sendStatuses.get(currentPerson.id) : undefined;
 
@@ -37,6 +53,9 @@ export function ExpandedReview({
     if (currentPerson) {
       setSubject(currentPerson.draftSubject);
       setBody(currentPerson.draftBody);
+      setPersonalizeResult(null);
+      setPersonalizeError(null);
+      setLastLinkedInData(null);
     }
   }, [internalIndex, currentPerson]);
 
@@ -114,7 +133,7 @@ export function ExpandedReview({
         subject,
         body,
         userCandidateId: currentPerson.userCandidateId,
-        resumeId: currentPerson.resumeId,
+        resumeId: currentPerson.resumeId ?? undefined,
         scheduledFor: selectedDate,
       });
 
@@ -151,6 +170,178 @@ export function ExpandedReview({
       setScheduledDateTime(localDateTime);
     }
   }, [showScheduleModal, scheduledDateTime]);
+
+  // Check if Chrome extension is installed
+  const checkExtension = useCallback(async (): Promise<boolean> => {
+    if (!EXTENSION_ID) {
+      console.warn('Extension ID not configured');
+      return false;
+    }
+
+    return new Promise((resolve) => {
+      try {
+        // @ts-expect-error - Chrome extension API
+        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+          // @ts-expect-error - Chrome extension API
+          chrome.runtime.sendMessage(
+            EXTENSION_ID,
+            { action: 'ping' },
+            (response: { success: boolean } | undefined) => {
+              // @ts-expect-error - Chrome extension API
+              if (chrome.runtime.lastError) {
+                resolve(false);
+              } else {
+                resolve(response?.success === true);
+              }
+            }
+          );
+          // Timeout if no response
+          setTimeout(() => resolve(false), 1000);
+        } else {
+          resolve(false);
+        }
+      } catch {
+        resolve(false);
+      }
+    });
+  }, []);
+
+  // Handle personalize button click
+  const handlePersonalize = async () => {
+    if (!currentPerson?.linkedinUrl) {
+      setPersonalizeError('No LinkedIn URL available for this person');
+      return;
+    }
+
+    setPersonalizeError(null);
+
+    // Check if extension is installed
+    const installed = await checkExtension();
+    setExtensionInstalled(installed);
+
+    if (!installed) {
+      setShowExtensionModal(true);
+      return;
+    }
+
+    // Extension is installed, start personalization
+    await runPersonalization();
+  };
+
+  // Run the actual personalization flow
+  const runPersonalization = async () => {
+    if (!currentPerson?.linkedinUrl) return;
+
+    setIsPersonalizing(true);
+    setPersonalizeError(null);
+
+    try {
+      // Send message to extension to scrape LinkedIn
+      const scrapeResult = await new Promise<{ success: boolean; data?: unknown; error?: string }>((resolve) => {
+        // @ts-expect-error - Chrome extension API
+        chrome.runtime.sendMessage(
+          EXTENSION_ID,
+          {
+            action: 'scrapeLinkedIn',
+            linkedinUrl: currentPerson.linkedinUrl
+          },
+          (response: { success: boolean; data?: unknown; error?: string } | undefined) => {
+            // @ts-expect-error - Chrome extension API
+            if (chrome.runtime.lastError) {
+              resolve({ success: false, error: 'Extension communication failed' });
+            } else if (response) {
+              resolve(response);
+            } else {
+              resolve({ success: false, error: 'No response from extension' });
+            }
+          }
+        );
+
+        // Timeout after 30 seconds
+        setTimeout(() => {
+          resolve({ success: false, error: 'Request timed out' });
+        }, 30000);
+      });
+
+      if (!scrapeResult.success) {
+        throw new Error(scrapeResult.error || 'Failed to scrape LinkedIn profile');
+      }
+
+      // Save LinkedIn data for potential "Use this" action
+      setLastLinkedInData(scrapeResult.data);
+
+      // Call server action to personalize with Groq
+      const result = await personalizeEmailAction({
+        linkedinData: scrapeResult.data as Parameters<typeof personalizeEmailAction>[0]['linkedinData'],
+        originalSubject: subject,
+        originalBody: body,
+        personName: currentPerson.fullName,
+        personCompany: currentPerson.company,
+        personRole: currentPerson.role || undefined,
+      });
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to personalize email');
+      }
+
+      // Update the email fields
+      if (result.subject) setSubject(result.subject);
+      if (result.body) setBody(result.body);
+
+      // Save the result for displaying changes/found info
+      setPersonalizeResult({
+        similarityFound: result.similarityFound || false,
+        changes: result.changes,
+        foundInfo: result.foundInfo,
+      });
+
+    } catch (error) {
+      console.error('Personalization error:', error);
+      setPersonalizeError(error instanceof Error ? error.message : 'Personalization failed');
+    } finally {
+      setIsPersonalizing(false);
+    }
+  };
+
+  // Handle "Use this info" button click
+  const handleUseFoundInfo = async () => {
+    if (!personalizeResult?.foundInfo || !currentPerson) return;
+
+    setIsPersonalizing(true);
+    setPersonalizeError(null);
+
+    try {
+      const result = await useFoundInfoAction({
+        foundInfo: personalizeResult.foundInfo,
+        originalSubject: subject,
+        originalBody: body,
+        personName: currentPerson.fullName,
+        personCompany: currentPerson.company,
+        personRole: currentPerson.role || undefined,
+      });
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to personalize email');
+      }
+
+      // Update the email fields
+      if (result.subject) setSubject(result.subject);
+      if (result.body) setBody(result.body);
+
+      // Update result to show changes
+      setPersonalizeResult({
+        similarityFound: true,
+        changes: result.changes,
+        foundInfo: undefined,
+      });
+
+    } catch (error) {
+      console.error('UseFoundInfo error:', error);
+      setPersonalizeError(error instanceof Error ? error.message : 'Failed to personalize');
+    } finally {
+      setIsPersonalizing(false);
+    }
+  };
 
   if (!currentPerson) {
     return null;
@@ -237,6 +428,76 @@ export function ExpandedReview({
 
         {/* Email Form */}
         <div className="flex-1 overflow-y-auto p-4">
+          {/* Personalize Button */}
+          {currentPerson.linkedinUrl && (
+            <div className="mb-4">
+              <button
+                onClick={handlePersonalize}
+                disabled={isPersonalizing || !currentPerson.linkedinUrl}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-purple-700 bg-purple-50 border border-purple-200 rounded-md hover:bg-purple-100 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isPersonalizing ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Personalizing...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                    </svg>
+                    Personalize with AI
+                  </>
+                )}
+              </button>
+              {personalizeError && (
+                <p className="mt-2 text-sm text-red-600">{personalizeError}</p>
+              )}
+
+              {/* Personalization Result */}
+              {personalizeResult && (
+                <div className="mt-3">
+                  {personalizeResult.similarityFound ? (
+                    // Similarity found - show what was changed
+                    <div className="p-3 bg-green-50 border border-green-200 rounded-md">
+                      <p className="text-sm font-medium text-green-800">Changes made:</p>
+                      <ul className="mt-1 text-sm text-green-700 list-disc list-inside">
+                        {personalizeResult.changes?.map((change, i) => (
+                          <li key={i}>{change}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : (
+                    // No similarity found - show found info with "Use this" option
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-md">
+                      <p className="text-sm font-medium text-amber-800">No similarities found.</p>
+                      {personalizeResult.foundInfo && personalizeResult.foundInfo.length > 0 && (
+                        <>
+                          <p className="mt-2 text-sm text-amber-700">Found this about them:</p>
+                          <ul className="mt-1 text-sm text-amber-700 list-disc list-inside">
+                            {personalizeResult.foundInfo.map((info, i) => (
+                              <li key={i}>{info}</li>
+                            ))}
+                          </ul>
+                          <button
+                            onClick={handleUseFoundInfo}
+                            disabled={isPersonalizing}
+                            className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-amber-800 bg-amber-100 border border-amber-300 rounded-md hover:bg-amber-200 disabled:opacity-50"
+                          >
+                            {isPersonalizing ? 'Applying...' : 'Use this info'}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Subject
@@ -332,7 +593,7 @@ export function ExpandedReview({
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
             <h3 className="text-lg font-semibold mb-4">Schedule Email</h3>
-            
+
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Date & Time
@@ -378,6 +639,59 @@ export function ExpandedReview({
                 {isScheduling ? 'Scheduling...' : 'Schedule'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Extension Install Modal */}
+      {showExtensionModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex-shrink-0 w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">Install LinkedIn Helper</h3>
+                <p className="text-sm text-gray-500">One-time setup (10 seconds)</p>
+              </div>
+            </div>
+
+            <p className="text-gray-600 mb-6">
+              To personalize emails, install our Chrome extension. It reads LinkedIn profiles to help craft better outreach messages.
+            </p>
+
+            <div className="bg-amber-50 border border-amber-200 rounded-md p-3 mb-6">
+              <p className="text-sm text-amber-800">
+                <strong>Note:</strong> You need to be logged into LinkedIn for this to work. The extension only reads public profile data.
+              </p>
+            </div>
+
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setShowExtensionModal(false)}
+                className="px-4 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <a
+                href="https://chrome.google.com/webstore/detail/lattice-linkedin-helper/YOUR_EXTENSION_ID"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-purple-600 text-white rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 0C8.21 0 4.831 1.757 2.632 4.501l3.953 6.848A5.454 5.454 0 0 1 12 6.545h10.691A12 12 0 0 0 12 0zM1.931 5.47A11.943 11.943 0 0 0 0 12c0 6.012 4.42 10.991 10.189 11.864l3.953-6.847a5.45 5.45 0 0 1-6.865-2.29zm13.342 2.166a5.446 5.446 0 0 1 1.45 7.09l.002.001h-.002l-3.952 6.848a12.014 12.014 0 0 0 9.193-5.101A11.94 11.94 0 0 0 24 12c0-1.537-.29-3.009-.818-4.364zM12 8.91a3.091 3.091 0 1 0 0 6.181 3.091 3.091 0 0 0 0-6.181z"/>
+                </svg>
+                Add to Chrome
+              </a>
+            </div>
+
+            <p className="mt-4 text-xs text-gray-500 text-center">
+              After installing, click &quot;Personalize with AI&quot; again
+            </p>
           </div>
         </div>
       )}
