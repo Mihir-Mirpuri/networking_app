@@ -122,6 +122,7 @@ export async function sendEmailsAction(
         status: sendResult.success ? 'SUCCESS' : 'FAILED',
         errorMessage: sendResult.error,
         gmailMessageId: sendResult.messageId,
+        gmailThreadId: sendResult.threadId,
       },
     });
 

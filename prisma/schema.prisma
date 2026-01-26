@@ -35,26 +35,29 @@ model Session {
 }
 
 model User {
-  id             String          @id @default(cuid())
-  name           String?
-  email          String?         @unique
-  emailVerified  DateTime?
-  image          String?
-  classification String?
-  major          String?
-  university     String?
-  career         String?
-  dailySendCount Int             @default(0)
-  lastSendDate   DateTime?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  accounts       Account[]
-  userCandidates UserCandidate[]
-  userResumes    UserResume[]
-  emailTemplates EmailTemplate[]
-  sendLogs       SendLog[]
-  scheduledEmails ScheduledEmail[]
-  sessions       Session[]
+  id               String            @id @default(cuid())
+  name             String?
+  email            String?           @unique
+  emailVerified    DateTime?
+  image            String?
+  dailySendCount   Int               @default(0)
+  lastSendDate     DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  classification   String?
+  major            String?
+  university       String?
+  career           String?
+  accounts         Account[]
+  emailTemplates   EmailTemplate[]
+  scheduledEmails  ScheduledEmail[]
+  sendLogs         SendLog[]
+  sessions         Session[]
+  userCandidates   UserCandidate[]
+  userResumes      UserResume[]
+  conversations    conversations[]
+  gmail_sync_state gmail_sync_state?
+  messages         messages[]
 }
 
 model VerificationToken {
@@ -66,30 +69,28 @@ model VerificationToken {
 }
 
 model Person {
-  id            String          @id @default(cuid())
-  fullName      String
-  firstName     String?
-  lastName      String?
-  company       String
-  role          String?
-  linkedinUrl   String?
-  email                String?
-  emailStatus          EmailStatus?
-  emailConfidence      Float?
-  emailLastUpdated     DateTime?
-  // Location fields from Apollo
-  city                 String?
-  state                String?
-  country              String?
-  // Education fields from Apollo
-  educationSchool      String?
-  educationDegree      String?
-  educationField       String?
-  educationYear        String?
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-  userCandidates UserCandidate[]
-  sourceLinks   SourceLink[]
+  id               String          @id @default(cuid())
+  fullName         String
+  firstName        String?
+  lastName         String?
+  company          String
+  role             String?
+  linkedinUrl      String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  email            String?
+  emailConfidence  Float?
+  emailLastUpdated DateTime?
+  emailStatus      EmailStatus?
+  city             String?
+  country          String?
+  educationDegree  String?
+  educationField   String?
+  educationSchool  String?
+  educationYear    String?
+  state            String?
+  sourceLinks      SourceLink[]
+  userCandidates   UserCandidate[]
 
   @@unique([fullName, company])
   @@index([fullName, company])
@@ -97,22 +98,22 @@ model Person {
 }
 
 model UserCandidate {
-  id                   String       @id @default(cuid())
+  id                   String           @id @default(cuid())
   userId               String
   personId             String
   email                String?
-  emailStatus          EmailStatus   @default(MISSING)
+  emailStatus          EmailStatus      @default(MISSING)
   emailConfidence      Float?
-  manualEmailConfirmed Boolean       @default(false)
-  doNotShow            Boolean       @default(false)
+  manualEmailConfirmed Boolean          @default(false)
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
   university           String?
-  createdAt            DateTime      @default(now())
-  updatedAt            DateTime      @updatedAt
-  user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  person               Person        @relation(fields: [personId], references: [id], onDelete: Cascade)
+  doNotShow            Boolean          @default(false)
   emailDraft           EmailDraft?
-  sendLogs             SendLog[]
   scheduledEmails      ScheduledEmail[]
+  sendLogs             SendLog[]
+  person               Person           @relation(fields: [personId], references: [id], onDelete: Cascade)
+  user                 User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, personId])
   @@index([userId])
@@ -139,40 +140,40 @@ model SourceLink {
 }
 
 model UserResume {
-  id         String       @id @default(cuid())
-  userId     String
-  filename   String
-  fileUrl    String
-  fileSize   Int
-  mimeType   String
-  version    Int          @default(1)
-  isActive   Boolean      @default(false)
-  uploadedAt DateTime     @default(now())
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
-  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  emailDrafts EmailDraft[]
-  sendLogs   SendLog[]
+  id              String           @id @default(cuid())
+  userId          String
+  filename        String
+  fileUrl         String
+  fileSize        Int
+  mimeType        String
+  version         Int              @default(1)
+  isActive        Boolean          @default(false)
+  uploadedAt      DateTime         @default(now())
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  emailDrafts     EmailDraft[]
+  emailTemplates  EmailTemplate[]
   scheduledEmails ScheduledEmail[]
-  emailTemplates EmailTemplate[]
+  sendLogs        SendLog[]
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([userId, isActive])
 }
 
 model EmailTemplate {
-  id         String       @id @default(cuid())
-  userId     String
-  name       String
-  prompt     String
-  isDefault  Boolean      @default(false)
-  attachResume Boolean   @default(false)
-  resumeId   String?
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
-  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  resume     UserResume?  @relation(fields: [resumeId], references: [id], onDelete: SetNull)
-  emailDrafts EmailDraft[]
+  id           String       @id @default(cuid())
+  userId       String
+  name         String
+  prompt       String
+  isDefault    Boolean      @default(false)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  attachResume Boolean      @default(false)
+  resumeId     String?
+  emailDrafts  EmailDraft[]
+  resume       UserResume?  @relation(fields: [resumeId], references: [id])
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([userId, isDefault])
@@ -180,22 +181,22 @@ model EmailTemplate {
 }
 
 model EmailDraft {
-  id             String            @id @default(cuid())
+  id              String           @id @default(cuid())
   userCandidateId String           @unique
-  templateId     String?
-  subject        String
-  body           String
-  status         EmailDraftStatus  @default(PENDING)
-  userEdited     Boolean           @default(false)
-  editedSubject  String?
-  editedBody     String?
-  attachResume   Boolean           @default(false)
-  resumeId       String?
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
-  userCandidate  UserCandidate     @relation(fields: [userCandidateId], references: [id], onDelete: Cascade)
-  template       EmailTemplate?    @relation(fields: [templateId], references: [id], onDelete: SetNull)
-  resume         UserResume?       @relation(fields: [resumeId], references: [id], onDelete: SetNull)
+  templateId      String?
+  subject         String
+  body            String
+  status          EmailDraftStatus @default(PENDING)
+  userEdited      Boolean          @default(false)
+  editedSubject   String?
+  editedBody      String?
+  attachResume    Boolean          @default(false)
+  resumeId        String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  resume          UserResume?      @relation(fields: [resumeId], references: [id])
+  template        EmailTemplate?   @relation(fields: [templateId], references: [id])
+  userCandidate   UserCandidate    @relation(fields: [userCandidateId], references: [id], onDelete: Cascade)
 
   @@index([userCandidateId])
   @@index([templateId])
@@ -204,50 +205,111 @@ model EmailDraft {
 }
 
 model SendLog {
-  id             String        @id @default(cuid())
-  userId         String
+  id              String        @id @default(cuid())
+  userId          String
   userCandidateId String
-  toEmail        String
-  subject        String
-  body           String
-  resumeAttached Boolean       @default(false)
-  resumeId       String?
-  status         SendLogStatus
-  errorMessage   String?
-  gmailMessageId String?       @unique
-  sentAt         DateTime      @default(now())
-  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userCandidate  UserCandidate @relation(fields: [userCandidateId], references: [id], onDelete: Cascade)
-  resume         UserResume?   @relation(fields: [resumeId], references: [id], onDelete: SetNull)
+  toEmail         String
+  subject         String
+  body            String
+  resumeAttached  Boolean       @default(false)
+  resumeId        String?
+  status          SendLogStatus
+  errorMessage    String?
+  gmailMessageId  String?       @unique
+  gmailThreadId   String?
+  sentAt          DateTime      @default(now())
+  resume          UserResume?   @relation(fields: [resumeId], references: [id])
+  userCandidate   UserCandidate @relation(fields: [userCandidateId], references: [id], onDelete: Cascade)
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages        messages[]
 
   @@index([userId])
   @@index([userCandidateId])
   @@index([status])
   @@index([sentAt])
   @@index([gmailMessageId])
+  @@index([gmailThreadId])
 }
 
 model ScheduledEmail {
-  id             String              @id @default(cuid())
-  userId         String
+  id              String               @id @default(cuid())
+  userId          String
   userCandidateId String
-  toEmail        String
-  subject        String
-  body           String
-  resumeId       String?
-  scheduledFor   DateTime
-  status         ScheduledEmailStatus @default(PENDING)
-  errorMessage   String?
-  sentAt         DateTime?
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
-  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userCandidate  UserCandidate       @relation(fields: [userCandidateId], references: [id], onDelete: Cascade)
-  resume         UserResume?         @relation(fields: [resumeId], references: [id], onDelete: SetNull)
+  toEmail         String
+  subject         String
+  body            String
+  resumeId        String?
+  scheduledFor    DateTime
+  status          ScheduledEmailStatus @default(PENDING)
+  errorMessage    String?
+  sentAt          DateTime?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  resume          UserResume?          @relation(fields: [resumeId], references: [id])
+  userCandidate   UserCandidate        @relation(fields: [userCandidateId], references: [id], onDelete: Cascade)
+  user            User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([status, scheduledFor])
   @@index([userId])
   @@index([scheduledFor])
+}
+
+model conversations {
+  threadId      String     @id
+  userId        String
+  subject       String?
+  lastMessageAt DateTime?  @db.Timestamptz(6)
+  messageCount  Int        @default(0)
+  createdAt     DateTime   @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime   @default(now()) @db.Timestamptz(6)
+  User          User       @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  messages      messages[]
+
+  @@unique([userId, threadId])
+  @@index([userId])
+  @@index([userId, lastMessageAt])
+}
+
+model gmail_sync_state {
+  id               String    @id
+  userId           String    @unique
+  email_address    String
+  historyId        String?
+  watch_expiration DateTime? @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime  @default(now()) @db.Timestamptz(6)
+  User             User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([email_address])
+  @@index([userId])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model messages {
+  messageId      String        @id
+  threadId       String
+  userId         String
+  direction      String
+  sender         String
+  recipient_list Json
+  subject        String?
+  body_html      String?
+  body_text      String?
+  received_at    DateTime      @db.Timestamptz(6)
+  sendLogId      String?
+  createdAt      DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime      @default(now()) @db.Timestamptz(6)
+  SendLog        SendLog?      @relation(fields: [sendLogId], references: [id], onUpdate: NoAction)
+  conversations  conversations @relation(fields: [threadId], references: [threadId], onDelete: Cascade, onUpdate: NoAction)
+  User           User          @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([recipient_list], type: Gin)
+  @@index([sendLogId])
+  @@index([sender])
+  @@index([threadId])
+  @@index([userId])
+  @@index([userId, received_at])
+  @@index([userId, threadId])
 }
 
 enum EmailStatus {

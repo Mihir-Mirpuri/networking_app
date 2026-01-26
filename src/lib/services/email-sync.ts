@@ -304,7 +304,8 @@ async function performFullSync(
 
 /**
  * Fetch single message, check idempotency, parse, and store
- * Returns processed message data if successful, null if already exists
+ * Only processes messages from threads initiated via the app (tracked in SendLog)
+ * Returns processed message data if successful, null if skipped
  */
 async function fetchAndProcessMessage(
   gmail: gmail_v1.Gmail,
@@ -335,6 +336,17 @@ async function fetchAndProcessMessage(
 
   if (!threadId) {
     console.warn(`[Email Sync] Message ${messageId} has no threadId, skipping`);
+    return null;
+  }
+
+  // 3. Check if this thread is app-related (has a SendLog with this threadId)
+  const appThread = await prisma.sendLog.findFirst({
+    where: { gmailThreadId: threadId },
+    select: { id: true },
+  });
+
+  if (!appThread) {
+    // Not an app-initiated thread, skip
     return null;
   }
 

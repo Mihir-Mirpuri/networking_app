@@ -7,6 +7,7 @@ const TEST_MODE = process.env.TEST_MODE === 'true';
 interface SendResult {
   success: boolean;
   messageId?: string;
+  threadId?: string;
   error?: string;
 }
 
@@ -229,7 +230,7 @@ export async function sendEmail(
       console.log(`Attachment: ${attachment.filename} (${attachment.content.length} bytes, ${attachment.mimeType})`);
     }
     console.log('=====================================');
-    return { success: true, messageId: 'test-mode-' + Date.now() };
+    return { success: true, messageId: 'test-mode-' + Date.now(), threadId: 'test-thread-' + Date.now() };
   }
 
   try {
@@ -298,10 +299,11 @@ export async function sendEmail(
           requestBody: { raw },
         });
 
-        console.log('[Gmail] Email sent successfully:', { messageId: response.data.id });
+        console.log('[Gmail] Email sent successfully:', { messageId: response.data.id, threadId: response.data.threadId });
         return {
           success: true,
           messageId: response.data.id || undefined,
+          threadId: response.data.threadId || undefined,
         };
       } catch (error: any) {
         lastError = error;
