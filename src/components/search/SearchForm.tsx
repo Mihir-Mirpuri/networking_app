@@ -9,6 +9,7 @@ import { getTemplatesAction, TemplateData } from '@/app/actions/profile';
 
 interface SearchFormProps {
   onSearch: (params: {
+    name?: string;
     company: string;
     role: string;
     university: string;
@@ -18,6 +19,7 @@ interface SearchFormProps {
   }) => void;
   isLoading: boolean;
   initialParams?: {
+    name?: string;
     company: string;
     role: string;
     university: string;
@@ -29,8 +31,11 @@ interface SearchFormProps {
 
 export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormProps) {
   const { status } = useSession();
-  
+
   // Initialize with initialParams if available, otherwise use defaults
+  const [name, setName] = useState<string>(
+    initialParams?.name || ''
+  );
   const [company, setCompany] = useState<string>(
     initialParams?.company || COMPANIES[0]
   );
@@ -129,6 +134,7 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
   // Update form fields when initialParams are restored from sessionStorage
   useEffect(() => {
     if (initialParams) {
+      setName(initialParams.name || '');
       setCompany(initialParams.company);
       setRole(initialParams.role);
       setUniversity(initialParams.university);
@@ -137,7 +143,7 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
       // Only set templateId if templates are loaded
       if (templates.length > 0 || !isLoadingTemplates) {
         // Verify templateId exists in available templates
-        const templateExists = templates.some(t => t.id === initialParams.templateId) || 
+        const templateExists = templates.some(t => t.id === initialParams.templateId) ||
                               initialParams.templateId === EMAIL_TEMPLATES[0].id;
         if (templateExists) {
           setTemplateId(initialParams.templateId);
@@ -148,12 +154,27 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSearch({ company, role, university, location, limit, templateId });
+    onSearch({ name: name || undefined, company, role, university, location, limit, templateId });
   };
 
   return (
     <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow p-6 mb-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+        {/* Name (Optional) */}
+        <div>
+          <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+            Name <span className="text-gray-400 font-normal">(optional)</span>
+          </label>
+          <input
+            type="text"
+            id="name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Search by name..."
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
         {/* Company */}
         <SearchableCombobox
           options={COMPANIES}

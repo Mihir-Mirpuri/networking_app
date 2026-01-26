@@ -28,6 +28,7 @@ interface SearchPageState {
   remainingDaily?: number;
   // NEW: Add search parameters
   searchParams?: {
+    name?: string;
     company: string;
     role: string;
     university: string;
@@ -60,6 +61,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
   const [generatingStatuses, setGeneratingStatuses] = useState<Map<string, boolean>>(new Map());
   const [error, setError] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useState<{
+    name?: string;
     company: string;
     role: string;
     university: string;
@@ -162,6 +164,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
   }, [results, expandedIndex, sendStatuses, showBulkReview, generatingStatuses, remainingDaily, searchParams]);
 
   const handleSearch = async (params: {
+    name?: string;
     company: string;
     role: string;
     university: string;

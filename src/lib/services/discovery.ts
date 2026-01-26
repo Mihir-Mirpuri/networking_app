@@ -147,6 +147,7 @@ interface CSEResponse {
 }
 
 export interface SearchParams {
+  name?: string;
   university: string;
   company: string;
   role: string;
@@ -619,13 +620,24 @@ function normalizeKey(name: string, company: string, url: string): string {
 }
 
 export async function searchPeople(params: SearchParams): Promise<SearchResult[]> {
-  const { university, company, role, location, limit, excludePersonKeys = new Set() } = params;
+  const { name, university, company, role, location, limit, excludePersonKeys = new Set() } = params;
 
   // Build location string for queries (only if location is specified)
   const locationStr = location ? ` "${location}"` : '';
 
-  // Use single optimized query with pagination (include location if specified)
-  const query = `${university} ${company} ${role}${locationStr}`;
+  // Build query based on whether name is provided
+  let query: string;
+  if (name) {
+    // If name is provided, use it as primary search term
+    // Combine with other filters if they have meaningful values
+    const otherFilters = [university, company, role].filter(f => f && f.trim() !== '').join(' ');
+    query = otherFilters ? `${name} ${otherFilters}${locationStr}` : `${name}${locationStr}`;
+  } else {
+    // Original query construction
+    query = `${university} ${company} ${role}${locationStr}`;
+  }
+
+  console.log(`[Discovery] Search query: ${query}`);
   const pages = [1, 11, 21, 31, 41, 51]; // 6 pages = 60 results max
 
   const seenKeys = new Set<string>();

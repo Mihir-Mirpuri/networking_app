@@ -9,6 +9,7 @@ import prisma from '@/lib/prisma';
 import { saveSearchResult, getExcludedPersonKeys } from '@/lib/db/person-service';
 
 export interface SearchInput {
+  name?: string;
   company: string;
   role: string;
   university: string;
@@ -214,6 +215,7 @@ export async function searchPeopleAction(
 
     // Search for people, excluding only sent/hidden people
     const people = await searchPeople({
+      name: input.name,
       university: input.university,
       company: input.company,
       role: input.role,
