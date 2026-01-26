@@ -1,14 +1,25 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { sendComposedEmailAction } from '@/app/actions/compose';
+import { useState, useEffect, useRef } from 'react';
+import { sendComposedEmailAction, FileAttachmentInput } from '@/app/actions/compose';
 import { getTemplatesAction, TemplateData } from '@/app/actions/profile';
 import { getResumesAction, ResumeData } from '@/app/actions/resume';
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_ATTACHMENTS = 5;
 
 interface ComposeEmailModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: (messageId: string, threadId: string) => void;
+}
+
+interface FileAttachment {
+  id: string;
+  file: File;
+  name: string;
+  size: number;
+  type: string;
 }
 
 export function ComposeEmailModal({ isOpen, onClose, onSuccess }: ComposeEmailModalProps) {
@@ -19,6 +30,7 @@ export function ComposeEmailModal({ isOpen, onClose, onSuccess }: ComposeEmailMo
   const [attachResume, setAttachResume] = useState(false);
   const [selectedResumeId, setSelectedResumeId] = useState<string>('');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+  const [fileAttachments, setFileAttachments] = useState<FileAttachment[]>([]);
 
   const [templates, setTemplates] = useState<TemplateData[]>([]);
   const [resumes, setResumes] = useState<ResumeData[]>([]);
@@ -26,6 +38,8 @@ export function ComposeEmailModal({ isOpen, onClose, onSuccess }: ComposeEmailMo
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load templates and resumes on mount
   useEffect(() => {
@@ -92,6 +106,85 @@ export function ComposeEmailModal({ isOpen, onClose, onSuccess }: ComposeEmailMo
     }
   };
 
+  // Handle file selection
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    const newAttachments: FileAttachment[] = [];
+    const errors: string[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+
+      // Check total count
+      if (fileAttachments.length + newAttachments.length >= MAX_ATTACHMENTS) {
+        errors.push(`Maximum ${MAX_ATTACHMENTS} attachments allowed`);
+        break;
+      }
+
+      // Check file size
+      if (file.size > MAX_FILE_SIZE) {
+        errors.push(`"${file.name}" exceeds 10MB limit`);
+        continue;
+      }
+
+      // Check for duplicates
+      if (fileAttachments.some((a) => a.name === file.name)) {
+        errors.push(`"${file.name}" is already attached`);
+        continue;
+      }
+
+      newAttachments.push({
+        id: `${Date.now()}-${i}`,
+        file,
+        name: file.name,
+        size: file.size,
+        type: file.type || 'application/octet-stream',
+      });
+    }
+
+    if (errors.length > 0) {
+      setError(errors.join('. '));
+    }
+
+    if (newAttachments.length > 0) {
+      setFileAttachments((prev) => [...prev, ...newAttachments]);
+    }
+
+    // Reset input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  // Remove file attachment
+  const handleRemoveFile = (id: string) => {
+    setFileAttachments((prev) => prev.filter((a) => a.id !== id));
+  };
+
+  // Format file size
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  // Convert file to base64
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        const result = reader.result as string;
+        // Remove data URL prefix (e.g., "data:application/pdf;base64,")
+        const base64 = result.split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
   const handleSend = async () => {
     setError(null);
 
@@ -119,6 +212,18 @@ export function ComposeEmailModal({ isOpen, onClose, onSuccess }: ComposeEmailMo
     setIsSending(true);
 
     try {
+      // Convert file attachments to base64
+      const attachments: FileAttachmentInput[] = [];
+      for (const attachment of fileAttachments) {
+        const content = await fileToBase64(attachment.file);
+        attachments.push({
+          filename: attachment.name,
+          content,
+          mimeType: attachment.type,
+          size: attachment.size,
+        });
+      }
+
       const result = await sendComposedEmailAction({
         recipientEmail,
         recipientName: recipientName || undefined,
@@ -126,6 +231,7 @@ export function ComposeEmailModal({ isOpen, onClose, onSuccess }: ComposeEmailMo
         body,
         attachResume,
         resumeId: attachResume ? selectedResumeId : undefined,
+        attachments: attachments.length > 0 ? attachments : undefined,
       });
 
       if (result.success) {
@@ -149,6 +255,7 @@ export function ComposeEmailModal({ isOpen, onClose, onSuccess }: ComposeEmailMo
     setBody('');
     setAttachResume(false);
     setSelectedTemplateId('');
+    setFileAttachments([]);
     setError(null);
     setEmailError(null);
     onClose();
@@ -308,6 +415,94 @@ export function ComposeEmailModal({ isOpen, onClose, onSuccess }: ComposeEmailMo
                   )}
                 </div>
               )}
+
+              {/* File Attachments */}
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Attachments
+                </label>
+
+                {/* File list */}
+                {fileAttachments.length > 0 && (
+                  <div className="space-y-2">
+                    {fileAttachments.map((attachment) => (
+                      <div
+                        key={attachment.id}
+                        className="flex items-center justify-between px-3 py-2 bg-gray-50 border border-gray-200 rounded-md"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <svg
+                            className="w-4 h-4 text-gray-500 flex-shrink-0"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
+                            />
+                          </svg>
+                          <span className="text-sm text-gray-700 truncate">
+                            {attachment.name}
+                          </span>
+                          <span className="text-xs text-gray-500 flex-shrink-0">
+                            ({formatFileSize(attachment.size)})
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveFile(attachment.id)}
+                          className="p-1 text-gray-400 hover:text-red-500"
+                          aria-label={`Remove ${attachment.name}`}
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M6 18L18 6M6 6l12 12"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add file button */}
+                {fileAttachments.length < MAX_ATTACHMENTS && (
+                  <>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      onChange={handleFileSelect}
+                      className="hidden"
+                      id="file-attachment-input"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 4v16m8-8H4"
+                        />
+                      </svg>
+                      Add File
+                    </button>
+                    <p className="text-xs text-gray-500">
+                      Max {MAX_ATTACHMENTS} files, 10MB each
+                    </p>
+                  </>
+                )}
+              </div>
             </>
           )}
 

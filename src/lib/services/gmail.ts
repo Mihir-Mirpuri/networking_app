@@ -21,12 +21,18 @@ interface MimeMessageOptions {
   references?: string; // Message-ID for threading
 }
 
+export interface EmailAttachment {
+  filename: string;
+  content: Buffer;
+  mimeType: string;
+}
+
 function createMimeMessage(
   to: string,
   from: string,
   subject: string,
   body: string,
-  attachment?: { filename: string; content: Buffer; mimeType: string },
+  attachments?: EmailAttachment[],
   inReplyTo?: string,
   references?: string
 ): string {
@@ -47,7 +53,7 @@ function createMimeMessage(
     headers.push(`References: ${references}`);
   }
 
-  if (!attachment) {
+  if (!attachments || attachments.length === 0) {
     // Simple text message
     const message = [
       ...headers,
@@ -59,12 +65,8 @@ function createMimeMessage(
     return Buffer.from(message).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   }
 
-  // Multipart message with attachment
-  const attachmentBase64 = attachment.content.toString('base64');
-  const attachmentLines = attachmentBase64.match(/.{1,76}/g) || [];
-  const attachmentBody = attachmentLines.join('\r\n');
-
-  const message = [
+  // Multipart message with attachments
+  const messageParts = [
     ...headers,
     `MIME-Version: 1.0`,
     `Content-Type: multipart/mixed; boundary="${boundary}"`,
@@ -75,16 +77,28 @@ function createMimeMessage(
     '',
     body,
     '',
-    `--${boundary}`,
-    `Content-Type: ${attachment.mimeType}`,
-    'Content-Transfer-Encoding: base64',
-    `Content-Disposition: attachment; filename="${attachment.filename}"`,
-    '',
-    attachmentBody,
-    '',
-    `--${boundary}--`,
-  ].join('\r\n');
+  ];
 
+  // Add each attachment
+  for (const attachment of attachments) {
+    const attachmentBase64 = attachment.content.toString('base64');
+    const attachmentLines = attachmentBase64.match(/.{1,76}/g) || [];
+    const attachmentBody = attachmentLines.join('\r\n');
+
+    messageParts.push(
+      `--${boundary}`,
+      `Content-Type: ${attachment.mimeType}`,
+      'Content-Transfer-Encoding: base64',
+      `Content-Disposition: attachment; filename="${attachment.filename}"`,
+      '',
+      attachmentBody,
+      ''
+    );
+  }
+
+  messageParts.push(`--${boundary}--`);
+
+  const message = messageParts.join('\r\n');
   return Buffer.from(message).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
@@ -227,30 +241,42 @@ export async function sendEmail(
   subject: string,
   body: string,
   resumeId?: string | null,
-  userId?: string
+  userId?: string,
+  additionalAttachments?: EmailAttachment[]
 ): Promise<SendResult> {
-  console.log('[Gmail] sendEmail called:', { toEmail, fromEmail, hasAccessToken: !!accessToken, hasRefreshToken: !!refreshToken, resumeId, TEST_MODE });
-  
-  // Download attachment if resumeId is provided
-  let attachment: { filename: string; content: Buffer; mimeType: string } | undefined;
+  console.log('[Gmail] sendEmail called:', { toEmail, fromEmail, hasAccessToken: !!accessToken, hasRefreshToken: !!refreshToken, resumeId, additionalAttachments: additionalAttachments?.length || 0, TEST_MODE });
+
+  // Collect all attachments
+  const attachments: EmailAttachment[] = [];
+
+  // Download resume attachment if resumeId is provided
   if (resumeId) {
     const resumeData = await downloadResumeFromStorage(resumeId);
     if (resumeData) {
-      attachment = resumeData;
+      attachments.push(resumeData);
       console.log(`[Gmail] Resume attachment loaded: ${resumeData.filename} (${resumeData.content.length} bytes, ${resumeData.mimeType})`);
     } else {
-      console.warn(`[Gmail] Failed to load resume ${resumeId}, sending email without attachment`);
+      console.warn(`[Gmail] Failed to load resume ${resumeId}, sending email without resume attachment`);
     }
   }
-  
+
+  // Add any additional attachments
+  if (additionalAttachments && additionalAttachments.length > 0) {
+    attachments.push(...additionalAttachments);
+    console.log(`[Gmail] Added ${additionalAttachments.length} additional attachment(s)`);
+  }
+
   if (TEST_MODE) {
     console.log('=== TEST MODE: Email would be sent ===');
     console.log(`To: ${toEmail}`);
     console.log(`From: ${fromEmail}`);
     console.log(`Subject: ${subject}`);
     console.log(`Body: ${body}`);
-    if (attachment) {
-      console.log(`Attachment: ${attachment.filename} (${attachment.content.length} bytes, ${attachment.mimeType})`);
+    if (attachments.length > 0) {
+      console.log('Attachments:');
+      attachments.forEach((att, i) => {
+        console.log(`  ${i + 1}. ${att.filename} (${att.content.length} bytes, ${att.mimeType})`);
+      });
     }
     console.log('=====================================');
     return { success: true, messageId: 'test-mode-' + Date.now(), threadId: 'test-thread-' + Date.now() };
@@ -306,7 +332,7 @@ export async function sendEmail(
     const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
 
     console.log('[Gmail] Creating MIME message...');
-    const raw = createMimeMessage(toEmail, fromEmail, subject, body, attachment);
+    const raw = createMimeMessage(toEmail, fromEmail, subject, body, attachments.length > 0 ? attachments : undefined);
 
     console.log('[Gmail] Sending email via Gmail API...');
     
@@ -429,12 +455,14 @@ export async function sendReplyEmail(
 ): Promise<SendResult> {
   console.log('[Gmail] sendReplyEmail called:', { toEmail, fromEmail, threadId, originalMessageId, hasAccessToken: !!accessToken, hasRefreshToken: !!refreshToken, resumeId, TEST_MODE });
 
-  // Download attachment if resumeId is provided
-  let attachment: { filename: string; content: Buffer; mimeType: string } | undefined;
+  // Collect attachments
+  const attachments: EmailAttachment[] = [];
+
+  // Download resume attachment if resumeId is provided
   if (resumeId) {
     const resumeData = await downloadResumeFromStorage(resumeId);
     if (resumeData) {
-      attachment = resumeData;
+      attachments.push(resumeData);
       console.log(`[Gmail] Resume attachment loaded: ${resumeData.filename} (${resumeData.content.length} bytes, ${resumeData.mimeType})`);
     } else {
       console.warn(`[Gmail] Failed to load resume ${resumeId}, sending email without attachment`);
@@ -449,8 +477,11 @@ export async function sendReplyEmail(
     console.log(`ThreadId: ${threadId}`);
     console.log(`In-Reply-To: ${originalMessageId}`);
     console.log(`Body: ${body}`);
-    if (attachment) {
-      console.log(`Attachment: ${attachment.filename} (${attachment.content.length} bytes, ${attachment.mimeType})`);
+    if (attachments.length > 0) {
+      console.log('Attachments:');
+      attachments.forEach((att, i) => {
+        console.log(`  ${i + 1}. ${att.filename} (${att.content.length} bytes, ${att.mimeType})`);
+      });
     }
     console.log('=====================================');
     return { success: true, messageId: 'test-mode-' + Date.now(), threadId: threadId };
@@ -510,7 +541,7 @@ export async function sendReplyEmail(
     const references = originalMessageId ? `<${originalMessageId}>` : undefined;
 
     console.log('[Gmail] Creating MIME message for reply...');
-    const raw = createMimeMessage(toEmail, fromEmail, subject, body, attachment, inReplyTo, references);
+    const raw = createMimeMessage(toEmail, fromEmail, subject, body, attachments.length > 0 ? attachments : undefined, inReplyTo, references);
 
     console.log('[Gmail] Sending reply email via Gmail API...');
 

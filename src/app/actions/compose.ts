@@ -8,7 +8,19 @@ import {
   getUserTokens,
   checkDailyLimit,
   incrementDailyCount,
+  EmailAttachment,
 } from '@/lib/services/gmail';
+
+// Max file size: 10MB (Gmail limit is 25MB but we'll be conservative)
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const MAX_ATTACHMENTS = 5;
+
+export interface FileAttachmentInput {
+  filename: string;
+  content: string; // base64 encoded
+  mimeType: string;
+  size: number;
+}
 
 export interface SendComposedEmailInput {
   recipientEmail: string;
@@ -17,6 +29,7 @@ export interface SendComposedEmailInput {
   body: string;
   attachResume?: boolean;
   resumeId?: string;
+  attachments?: FileAttachmentInput[];
 }
 
 export interface SendComposedEmailResult {
@@ -76,6 +89,31 @@ export async function sendComposedEmailAction(
     }
   }
 
+  // Validate file attachments
+  const additionalAttachments: EmailAttachment[] = [];
+  if (input.attachments && input.attachments.length > 0) {
+    if (input.attachments.length > MAX_ATTACHMENTS) {
+      return { success: false, error: `Maximum ${MAX_ATTACHMENTS} attachments allowed` };
+    }
+
+    for (const file of input.attachments) {
+      if (file.size > MAX_FILE_SIZE) {
+        return { success: false, error: `File "${file.filename}" exceeds 10MB limit` };
+      }
+
+      try {
+        const content = Buffer.from(file.content, 'base64');
+        additionalAttachments.push({
+          filename: file.filename,
+          content,
+          mimeType: file.mimeType,
+        });
+      } catch {
+        return { success: false, error: `Invalid file data for "${file.filename}"` };
+      }
+    }
+  }
+
   // Get user tokens
   let accessToken: string;
   let refreshToken: string | undefined;
@@ -101,7 +139,8 @@ export async function sendComposedEmailAction(
     input.subject,
     input.body,
     input.attachResume ? input.resumeId : undefined,
-    session.user.id
+    session.user.id,
+    additionalAttachments.length > 0 ? additionalAttachments : undefined
   );
 
   // Log the send attempt (with direct recipient fields since no UserCandidate)
