@@ -1,0 +1,12 @@
+{
+  "_comment": "Replace this file with a real Gmail API response from Gmail API Explorer",
+  "_instructions": [
+    "1. Go to https://developers.google.com/gmail/api/reference/rest/v1/users.messages/get",
+    "2. Click 'Try this API' and authorize with your Google account",
+    "3. Enter 'me' as userId and a message ID from your inbox",
+    "4. Execute the request",
+    "5. Copy the entire JSON response",
+    "6. Replace the contents of this file with the response"
+  ],
+  "_note": "This is a placeholder file. Replace it with actual Gmail API response JSON."
+}
