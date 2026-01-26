@@ -284,3 +284,82 @@ BODY:
     changes,
   };
 }
+
+export interface FollowUpInput {
+  originalSubject: string;
+  originalBody: string;
+  personName: string;
+  personCompany: string;
+  personRole?: string;
+  senderName: string;
+}
+
+export interface FollowUpResult {
+  subject: string;
+  body: string;
+}
+
+/**
+ * Generate a follow-up email based on the original email sent
+ */
+export async function generateFollowUpEmail(
+  input: FollowUpInput
+): Promise<FollowUpResult> {
+  const {
+    originalSubject,
+    originalBody,
+    personName,
+    personCompany,
+    personRole,
+    senderName,
+  } = input;
+
+  const prompt = `You are a college student writing a follow-up email. You previously sent an email to someone and haven't heard back. Write a brief, polite follow-up.
+
+RECIPIENT:
+${personName} at ${personCompany}${personRole ? ` (${personRole})` : ''}
+
+YOUR ORIGINAL EMAIL:
+Subject: ${originalSubject}
+Body:
+${originalBody}
+
+RULES:
+1. Keep it SHORT - 2-4 sentences max
+2. Reference that you reached out before without being pushy
+3. Restate your interest briefly
+4. Include a clear call to action (e.g., "Would you have 15 minutes for a quick chat?")
+5. Sound like a real college student - casual but respectful
+6. NO guilt-tripping, no "just checking in", no "bumping this up"
+7. NO corporate speak or excessive enthusiasm
+8. The subject should be "Re: [original subject]" to maintain the thread
+
+TONE: Genuine, direct, slightly informal. Like a college student who's following up without being annoying.
+
+Return in this EXACT format:
+
+SUBJECT: [subject line - should be "Re: original subject"]
+BODY:
+[email body - just the follow-up text, no greeting repetition needed]`;
+
+  const completion = await groq.chat.completions.create({
+    messages: [{ role: 'user', content: prompt }],
+    model: 'llama-3.3-70b-versatile',
+    temperature: 0.7,
+    max_tokens: 300,
+  });
+
+  const response = completion.choices[0]?.message?.content || '';
+
+  // Parse the response
+  const subjectMatch = response.match(/SUBJECT:\s*([^\n]+)/);
+  const bodyMatch = response.match(/BODY:\s*([\s\S]+)$/);
+
+  const followUpSubject = subjectMatch?.[1]?.trim() || `Re: ${originalSubject}`;
+  const followUpBody = bodyMatch?.[1]?.trim() || '';
+
+  return {
+    subject: followUpSubject,
+    body: followUpBody,
+  };
+}

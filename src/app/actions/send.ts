@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import {
   sendEmail,
+  sendReplyEmail,
   getUserTokens,
   checkDailyLimit,
   incrementDailyCount,
@@ -353,9 +354,9 @@ export async function updateScheduledEmailAction(
   const now = new Date();
   const minScheduledTime = new Date(now.getTime() + 5 * 60 * 1000); // 5 minutes from now
   if (newScheduledFor < minScheduledTime) {
-    return { 
-      success: false, 
-      error: 'Scheduled time must be at least 5 minutes in the future' 
+    return {
+      success: false,
+      error: 'Scheduled time must be at least 5 minutes in the future'
     };
   }
 
@@ -383,9 +384,96 @@ export async function updateScheduledEmailAction(
     return { success: true };
   } catch (error) {
     console.error('[Schedule] Error updating scheduled email:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Failed to update scheduled email' 
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to update scheduled email'
     };
   }
+}
+
+export interface SendFollowUpInput {
+  toEmail: string;
+  subject: string;
+  body: string;
+  threadId: string;
+  originalMessageId?: string;
+  userCandidateId: string;
+  resumeId?: string;
+}
+
+export async function sendFollowUpAction(
+  input: SendFollowUpInput
+): Promise<SendResult> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.email || !session.user.id) {
+    return { email: input.toEmail, success: false, error: 'Not authenticated' };
+  }
+
+  // Check daily limit
+  const { canSend, remaining } = await checkDailyLimit(session.user.id);
+  if (!canSend) {
+    return {
+      email: input.toEmail,
+      success: false,
+      error: 'Daily send limit reached (30 emails per day)'
+    };
+  }
+
+  // Get user tokens
+  let accessToken: string;
+  let refreshToken: string | undefined;
+  try {
+    const tokens = await getUserTokens(session.user.id);
+    accessToken = tokens.accessToken;
+    refreshToken = tokens.refreshToken;
+  } catch (error) {
+    return {
+      email: input.toEmail,
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to get authentication tokens'
+    };
+  }
+
+  console.log('[Send] Sending follow-up email to:', input.toEmail, 'in thread:', input.threadId);
+
+  const sendResult = await sendReplyEmail(
+    accessToken,
+    refreshToken,
+    session.user.email,
+    input.toEmail,
+    input.subject,
+    input.body,
+    input.threadId,
+    input.originalMessageId,
+    input.resumeId,
+    session.user.id
+  );
+
+  // Log the follow-up send
+  await prisma.sendLog.create({
+    data: {
+      userId: session.user.id,
+      userCandidateId: input.userCandidateId,
+      toEmail: input.toEmail,
+      subject: input.subject,
+      body: input.body,
+      resumeAttached: !!input.resumeId,
+      resumeId: input.resumeId || null,
+      status: sendResult.success ? 'SUCCESS' : 'FAILED',
+      errorMessage: sendResult.error,
+      gmailMessageId: sendResult.messageId,
+      gmailThreadId: sendResult.threadId,
+    },
+  });
+
+  // Increment daily count on success
+  if (sendResult.success) {
+    await incrementDailyCount(session.user.id);
+  }
+
+  return {
+    email: input.toEmail,
+    success: sendResult.success,
+    error: sendResult.error,
+  };
 }

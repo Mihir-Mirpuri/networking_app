@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { getSendLogs, SendLogEntry } from '@/app/actions/sendlog';
-import { updateScheduledEmailAction, cancelScheduledEmailAction } from '@/app/actions/send';
+import { updateScheduledEmailAction, cancelScheduledEmailAction, sendFollowUpAction } from '@/app/actions/send';
+import { generateFollowUpAction } from '@/app/actions/personalize';
 
 interface GroupedLogs {
   [date: string]: SendLogEntry[];
@@ -12,6 +13,18 @@ interface EmailHistoryClientProps {
   initialLogs: SendLogEntry[];
   initialCursor: string | null;
   initialHasMore: boolean;
+}
+
+interface FollowUpData {
+  sendLogId: string;
+  subject: string;
+  body: string;
+  toEmail: string;
+  toName: string | null;
+  company: string | null;
+  gmailThreadId: string;
+  gmailMessageId?: string;
+  userCandidateId: string;
 }
 
 export function EmailHistoryClient({
@@ -32,6 +45,12 @@ export function EmailHistoryClient({
   const [editScheduleError, setEditScheduleError] = useState<string | null>(null);
   const [isUpdatingSchedule, setIsUpdatingSchedule] = useState(false);
   const [isCanceling, setIsCanceling] = useState<string | null>(null);
+
+  // Follow-up state
+  const [followUpData, setFollowUpData] = useState<FollowUpData | null>(null);
+  const [isGeneratingFollowUp, setIsGeneratingFollowUp] = useState<string | null>(null);
+  const [isSendingFollowUp, setIsSendingFollowUp] = useState(false);
+  const [followUpError, setFollowUpError] = useState<string | null>(null);
 
   const handleSearch = async () => {
     setIsLoading(true);
@@ -112,13 +131,13 @@ export function EmailHistoryClient({
   const formatCountdown = (scheduledFor: Date): string => {
     const now = new Date();
     const diff = scheduledFor.getTime() - now.getTime();
-    
+
     if (diff <= 0) return 'Sending soon...';
-    
+
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
     const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    
+
     if (days > 0) return `${days}d ${hours}h`;
     if (hours > 0) return `${hours}h ${minutes}m`;
     return `${minutes}m`;
@@ -187,6 +206,69 @@ export function EmailHistoryClient({
       alert(error instanceof Error ? error.message : 'Failed to cancel scheduled email');
     } finally {
       setIsCanceling(null);
+    }
+  };
+
+  const handleGenerateFollowUp = async (sendLogId: string) => {
+    setIsGeneratingFollowUp(sendLogId);
+    setFollowUpError(null);
+
+    try {
+      const result = await generateFollowUpAction(sendLogId);
+      if (result.success && result.subject && result.body && result.gmailThreadId && result.userCandidateId) {
+        setFollowUpData({
+          sendLogId,
+          subject: result.subject,
+          body: result.body,
+          toEmail: result.toEmail || '',
+          toName: result.toName || null,
+          company: result.company || null,
+          gmailThreadId: result.gmailThreadId,
+          gmailMessageId: result.gmailMessageId,
+          userCandidateId: result.userCandidateId,
+        });
+      } else {
+        setFollowUpError(result.error || 'Failed to generate follow-up');
+      }
+    } catch (error) {
+      setFollowUpError(error instanceof Error ? error.message : 'Failed to generate follow-up');
+    } finally {
+      setIsGeneratingFollowUp(null);
+    }
+  };
+
+  const handleSendFollowUp = async () => {
+    if (!followUpData) return;
+
+    setIsSendingFollowUp(true);
+    setFollowUpError(null);
+
+    try {
+      const result = await sendFollowUpAction({
+        toEmail: followUpData.toEmail,
+        subject: followUpData.subject,
+        body: followUpData.body,
+        threadId: followUpData.gmailThreadId,
+        originalMessageId: followUpData.gmailMessageId,
+        userCandidateId: followUpData.userCandidateId,
+      });
+
+      if (result.success) {
+        setFollowUpData(null);
+        // Refresh logs to show the new follow-up
+        const refreshResult = await getSendLogs(isSearchMode ? searchQuery : undefined, undefined);
+        if (refreshResult.success) {
+          setLogs(refreshResult.logs);
+          setCursor(refreshResult.nextCursor);
+          setHasMore(refreshResult.hasMore);
+        }
+      } else {
+        setFollowUpError(result.error || 'Failed to send follow-up');
+      }
+    } catch (error) {
+      setFollowUpError(error instanceof Error ? error.message : 'Failed to send follow-up');
+    } finally {
+      setIsSendingFollowUp(false);
     }
   };
 
@@ -279,11 +361,26 @@ export function EmailHistoryClient({
                               </span>
                             )}
                           </div>
-                          <span className="text-sm text-gray-500">
-                            {log.isScheduled && log.scheduledFor
-                              ? formatTime(log.scheduledFor)
-                              : formatTime(log.sentAt)}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            {/* Follow Up button - only show for successfully sent emails (not scheduled) */}
+                            {!log.isScheduled && log.status === 'SUCCESS' && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleGenerateFollowUp(log.id);
+                                }}
+                                disabled={isGeneratingFollowUp === log.id}
+                                className="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200 disabled:opacity-50"
+                              >
+                                {isGeneratingFollowUp === log.id ? 'Generating...' : 'Follow Up'}
+                              </button>
+                            )}
+                            <span className="text-sm text-gray-500">
+                              {log.isScheduled && log.scheduledFor
+                                ? formatTime(log.scheduledFor)
+                                : formatTime(log.sentAt)}
+                            </span>
+                          </div>
                         </div>
                         <p className="text-sm text-gray-600">{log.company}</p>
                         <p className="text-sm text-gray-500 truncate mt-1">
@@ -361,7 +458,7 @@ export function EmailHistoryClient({
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
             <h3 className="text-lg font-semibold mb-4">Edit Scheduled Time</h3>
-            
+
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 New Date & Time
@@ -405,6 +502,72 @@ export function EmailHistoryClient({
                 className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isUpdatingSchedule ? 'Updating...' : 'Update'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Follow Up Modal */}
+      {followUpData && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold mb-4">Follow Up Email</h3>
+
+            <div className="mb-4">
+              <p className="text-sm text-gray-600 mb-2">
+                To: <span className="font-medium text-gray-900">{followUpData.toName || followUpData.toEmail}</span>
+                {followUpData.company && <span className="text-gray-500"> at {followUpData.company}</span>}
+              </p>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Subject
+              </label>
+              <input
+                type="text"
+                value={followUpData.subject}
+                onChange={(e) => setFollowUpData({ ...followUpData, subject: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Message
+              </label>
+              <textarea
+                value={followUpData.body}
+                onChange={(e) => setFollowUpData({ ...followUpData, body: e.target.value })}
+                rows={8}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
+              />
+            </div>
+
+            {followUpError && (
+              <div className="mb-4 p-3 bg-red-100 text-red-800 rounded-md text-sm">
+                {followUpError}
+              </div>
+            )}
+
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => {
+                  setFollowUpData(null);
+                  setFollowUpError(null);
+                }}
+                disabled={isSendingFollowUp}
+                className="px-4 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSendFollowUp}
+                disabled={isSendingFollowUp || !followUpData.body.trim()}
+                className="px-4 py-2 text-sm bg-purple-600 text-white rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSendingFollowUp ? 'Sending...' : 'Send Follow Up'}
               </button>
             </div>
           </div>

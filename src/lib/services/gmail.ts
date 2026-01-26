@@ -11,21 +11,46 @@ interface SendResult {
   error?: string;
 }
 
+interface MimeMessageOptions {
+  to: string;
+  from: string;
+  subject: string;
+  body: string;
+  attachment?: { filename: string; content: Buffer; mimeType: string };
+  inReplyTo?: string; // Message-ID for threading
+  references?: string; // Message-ID for threading
+}
+
 function createMimeMessage(
   to: string,
   from: string,
   subject: string,
   body: string,
-  attachment?: { filename: string; content: Buffer; mimeType: string }
+  attachment?: { filename: string; content: Buffer; mimeType: string },
+  inReplyTo?: string,
+  references?: string
 ): string {
   const boundary = `----=_Part_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+  // Build headers array
+  const headers = [
+    `To: ${to}`,
+    `From: ${from}`,
+    `Subject: ${subject}`,
+  ];
+
+  // Add threading headers if replying
+  if (inReplyTo) {
+    headers.push(`In-Reply-To: ${inReplyTo}`);
+  }
+  if (references) {
+    headers.push(`References: ${references}`);
+  }
 
   if (!attachment) {
     // Simple text message
     const message = [
-      `To: ${to}`,
-      `From: ${from}`,
-      `Subject: ${subject}`,
+      ...headers,
       'Content-Type: text/plain; charset=utf-8',
       '',
       body,
@@ -40,9 +65,7 @@ function createMimeMessage(
   const attachmentBody = attachmentLines.join('\r\n');
 
   const message = [
-    `To: ${to}`,
-    `From: ${from}`,
-    `Subject: ${subject}`,
+    ...headers,
     `MIME-Version: 1.0`,
     `Content-Type: multipart/mixed; boundary="${boundary}"`,
     '',
@@ -387,6 +410,182 @@ export async function getUserTokens(userId: string) {
     accessToken: account.access_token,
     refreshToken: account.refresh_token || undefined,
   };
+}
+
+/**
+ * Send a reply email in an existing thread
+ */
+export async function sendReplyEmail(
+  accessToken: string,
+  refreshToken: string | undefined,
+  fromEmail: string,
+  toEmail: string,
+  subject: string,
+  body: string,
+  threadId: string,
+  originalMessageId?: string,
+  resumeId?: string | null,
+  userId?: string
+): Promise<SendResult> {
+  console.log('[Gmail] sendReplyEmail called:', { toEmail, fromEmail, threadId, originalMessageId, hasAccessToken: !!accessToken, hasRefreshToken: !!refreshToken, resumeId, TEST_MODE });
+
+  // Download attachment if resumeId is provided
+  let attachment: { filename: string; content: Buffer; mimeType: string } | undefined;
+  if (resumeId) {
+    const resumeData = await downloadResumeFromStorage(resumeId);
+    if (resumeData) {
+      attachment = resumeData;
+      console.log(`[Gmail] Resume attachment loaded: ${resumeData.filename} (${resumeData.content.length} bytes, ${resumeData.mimeType})`);
+    } else {
+      console.warn(`[Gmail] Failed to load resume ${resumeId}, sending email without attachment`);
+    }
+  }
+
+  if (TEST_MODE) {
+    console.log('=== TEST MODE: Reply Email would be sent ===');
+    console.log(`To: ${toEmail}`);
+    console.log(`From: ${fromEmail}`);
+    console.log(`Subject: ${subject}`);
+    console.log(`ThreadId: ${threadId}`);
+    console.log(`In-Reply-To: ${originalMessageId}`);
+    console.log(`Body: ${body}`);
+    if (attachment) {
+      console.log(`Attachment: ${attachment.filename} (${attachment.content.length} bytes, ${attachment.mimeType})`);
+    }
+    console.log('=====================================');
+    return { success: true, messageId: 'test-mode-' + Date.now(), threadId: threadId };
+  }
+
+  try {
+    if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+      console.error('[Gmail] Missing Google OAuth credentials');
+      return {
+        success: false,
+        error: 'Google OAuth credentials not configured',
+      };
+    }
+
+    // Get valid access token (proactive refresh if needed)
+    let validToken = accessToken;
+    if (userId) {
+      const account = await prisma.account.findFirst({
+        where: { userId, provider: 'google' },
+        select: { access_token: true, refresh_token: true, expires_at: true },
+      });
+
+      if (account && account.access_token) {
+        const refreshedToken = await getValidAccessToken(
+          { ...account, access_token: account.access_token },
+          userId,
+          process.env.GOOGLE_CLIENT_ID!,
+          process.env.GOOGLE_CLIENT_SECRET!
+        );
+        if (refreshedToken) {
+          validToken = refreshedToken;
+        } else {
+          return {
+            success: false,
+            error: 'Failed to refresh access token',
+          };
+        }
+      }
+    }
+
+    console.log('[Gmail] Creating OAuth2 client for reply...');
+    const oauth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET
+    );
+
+    oauth2Client.setCredentials({
+      access_token: validToken,
+      refresh_token: refreshToken,
+    });
+
+    console.log('[Gmail] Creating Gmail client for reply...');
+    const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+
+    // Format the In-Reply-To and References headers
+    const inReplyTo = originalMessageId ? `<${originalMessageId}>` : undefined;
+    const references = originalMessageId ? `<${originalMessageId}>` : undefined;
+
+    console.log('[Gmail] Creating MIME message for reply...');
+    const raw = createMimeMessage(toEmail, fromEmail, subject, body, attachment, inReplyTo, references);
+
+    console.log('[Gmail] Sending reply email via Gmail API...');
+
+    // Try sending with retry logic for token refresh
+    let lastError: Error | null = null;
+    let retryCount = 0;
+    const maxRetries = 1;
+
+    while (retryCount <= maxRetries) {
+      try {
+        const response = await gmail.users.messages.send({
+          userId: 'me',
+          requestBody: {
+            raw,
+            threadId, // Include threadId to reply in the same thread
+          },
+        });
+
+        console.log('[Gmail] Reply email sent successfully:', { messageId: response.data.id, threadId: response.data.threadId });
+        return {
+          success: true,
+          messageId: response.data.id || undefined,
+          threadId: response.data.threadId || undefined,
+        };
+      } catch (error: any) {
+        lastError = error;
+
+        // Token expired - try refreshing once
+        if (error?.code === 401 && userId && refreshToken && retryCount === 0) {
+          console.log('[Gmail] Token expired (401), refreshing...');
+          const refreshedToken = await refreshAccessToken(
+            refreshToken,
+            process.env.GOOGLE_CLIENT_ID!,
+            process.env.GOOGLE_CLIENT_SECRET!
+          );
+
+          if (refreshedToken) {
+            const now = Math.floor(Date.now() / 1000);
+            await prisma.account.updateMany({
+              where: {
+                userId: userId,
+                provider: 'google',
+              },
+              data: {
+                access_token: refreshedToken.access_token,
+                expires_at: now + refreshedToken.expires_in,
+              },
+            });
+
+            oauth2Client.setCredentials({
+              access_token: refreshedToken.access_token,
+              refresh_token: refreshToken,
+            });
+
+            retryCount++;
+            continue;
+          }
+        }
+
+        break;
+      }
+    }
+
+    console.error('[Gmail] Gmail reply send error:', lastError);
+    return {
+      success: false,
+      error: lastError instanceof Error ? lastError.message : 'Unknown error',
+    };
+  } catch (error) {
+    console.error('[Gmail] Gmail reply send error:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
 }
 
 export async function checkDailyLimit(userId: string): Promise<{ canSend: boolean; remaining: number }> {
