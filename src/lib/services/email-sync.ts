@@ -1,7 +1,18 @@
 import { gmail_v1 } from 'googleapis';
 import prisma from '@/lib/prisma';
 import { getGmailClient, NoGoogleAccountError, NoRefreshTokenError } from '@/lib/gmail/client';
-import { parseGmailResponse, ParsedGmailMessage } from '@/lib/gmail/parser';
+import { parseGmailResponse } from '@/lib/gmail/parser';
+
+/**
+ * Maximum duration for sync operations (25 seconds)
+ * Leaves buffer before Vercel's 30s timeout
+ */
+const MAX_SYNC_DURATION_MS = 25_000;
+
+/**
+ * Maximum body size to store (10MB)
+ */
+const MAX_BODY_SIZE = 10_000_000;
 
 /**
  * Payload for syncUserMailbox function
@@ -127,6 +138,7 @@ export async function syncUserMailbox(payload: SyncUserMailboxPayload): Promise<
 /**
  * Incremental sync via history.list API
  * Returns messages added since the stored historyId
+ * Includes timeout guard to prevent Vercel function timeout
  */
 async function processHistoryChanges(
   gmail: gmail_v1.Gmail,
@@ -136,13 +148,24 @@ async function processHistoryChanges(
 ): Promise<SyncResult> {
   console.log(`[Email Sync] Processing history changes from historyId: ${startHistoryId}`);
 
+  const startTime = Date.now();
+
   try {
     let messagesProcessed = 0;
     let conversationsUpdated = new Set<string>();
     let latestHistoryId = startHistoryId;
+    let lastProcessedHistoryId = startHistoryId;
     let pageToken: string | undefined;
+    let timedOut = false;
 
     do {
+      // Timeout guard - stop if we're running too long
+      if (Date.now() - startTime > MAX_SYNC_DURATION_MS) {
+        console.warn(`[Email Sync] Timeout reached after ${messagesProcessed} messages, will resume on next sync`);
+        timedOut = true;
+        break;
+      }
+
       // Fetch history changes
       const historyResponse = await gmail.users.history.list({
         userId: 'me',
@@ -156,6 +179,12 @@ async function processHistoryChanges(
 
       // Process each history record
       for (const record of historyRecords) {
+        // Timeout check inside inner loop too
+        if (Date.now() - startTime > MAX_SYNC_DURATION_MS) {
+          timedOut = true;
+          break;
+        }
+
         const messagesAdded = record.messagesAdded || [];
 
         for (const messageAdded of messagesAdded) {
@@ -167,25 +196,33 @@ async function processHistoryChanges(
             if (processed) {
               messagesProcessed++;
               conversationsUpdated.add(processed.threadId);
+              // Track progress for resumption
+              lastProcessedHistoryId = latestHistoryId;
             }
           } catch (error) {
             console.error(`[Email Sync] Error processing message ${messageId}:`, error);
             // Continue with other messages
           }
         }
+
+        if (timedOut) break;
       }
 
+      if (timedOut) break;
       pageToken = historyResponse.data.nextPageToken || undefined;
     } while (pageToken);
 
-    // Update sync state with latest historyId
-    await updateSyncState(userId, latestHistoryId);
+    // Update sync state with the historyId we actually processed up to
+    // This ensures we don't skip messages if we timed out
+    const finalHistoryId = timedOut ? lastProcessedHistoryId : latestHistoryId;
+    await updateSyncState(userId, finalHistoryId);
 
     return {
       success: true,
       messagesProcessed,
       conversationsUpdated: conversationsUpdated.size,
       syncType: 'incremental',
+      ...(timedOut && { error: 'Partial sync due to timeout, will continue on next notification' }),
     };
 
   } catch (error) {
@@ -221,6 +258,7 @@ async function processHistoryChanges(
 /**
  * Full sync fallback - fetches messages from last 7 days
  * Used when historyId is stale or not available
+ * Includes timeout guard to prevent Vercel function timeout
  */
 async function performFullSync(
   gmail: gmail_v1.Gmail,
@@ -229,9 +267,12 @@ async function performFullSync(
 ): Promise<SyncResult> {
   console.log(`[Email Sync] Performing full sync for userId: ${userId}`);
 
+  const startTime = Date.now();
+
   try {
     let messagesProcessed = 0;
     let conversationsUpdated = new Set<string>();
+    let timedOut = false;
 
     // Calculate 7 days ago in Gmail query format
     const sevenDaysAgo = new Date();
@@ -242,6 +283,13 @@ async function performFullSync(
     let pageToken: string | undefined;
 
     do {
+      // Timeout guard
+      if (Date.now() - startTime > MAX_SYNC_DURATION_MS) {
+        console.warn(`[Email Sync] Timeout reached during full sync after ${messagesProcessed} messages`);
+        timedOut = true;
+        break;
+      }
+
       const listResponse = await gmail.users.messages.list({
         userId: 'me',
         q: `after:${afterDate}`,
@@ -252,6 +300,12 @@ async function performFullSync(
       const messageRefs = listResponse.data.messages || [];
 
       for (const messageRef of messageRefs) {
+        // Timeout check inside loop
+        if (Date.now() - startTime > MAX_SYNC_DURATION_MS) {
+          timedOut = true;
+          break;
+        }
+
         const messageId = messageRef.id;
         if (!messageId) continue;
 
@@ -267,6 +321,7 @@ async function performFullSync(
         }
       }
 
+      if (timedOut) break;
       pageToken = listResponse.data.nextPageToken || undefined;
     } while (pageToken);
 
@@ -283,6 +338,7 @@ async function performFullSync(
       messagesProcessed,
       conversationsUpdated: conversationsUpdated.size,
       syncType: 'full',
+      ...(timedOut && { error: 'Partial sync due to timeout, will continue on next notification' }),
     };
 
   } catch (error) {
@@ -404,8 +460,17 @@ async function findSendLogId(gmailMessageId: string): Promise<string | null> {
 
 /**
  * Upsert conversation and message in a transaction
+ * Uses upsert for messages to handle race conditions gracefully
  */
 async function upsertEmailData(userId: string, message: ProcessedMessage): Promise<void> {
+  // Truncate body content if too large
+  const bodyHtml = message.body_html && message.body_html.length > MAX_BODY_SIZE
+    ? message.body_html.substring(0, MAX_BODY_SIZE) + '\n[truncated]'
+    : message.body_html;
+  const bodyText = message.body_text && message.body_text.length > MAX_BODY_SIZE
+    ? message.body_text.substring(0, MAX_BODY_SIZE) + '\n[truncated]'
+    : message.body_text;
+
   await prisma.$transaction(async (tx) => {
     // 1. Upsert conversation
     await tx.conversations.upsert({
@@ -429,9 +494,12 @@ async function upsertEmailData(userId: string, message: ProcessedMessage): Promi
       },
     });
 
-    // 2. Create message (using create since we already checked for existence)
-    await tx.messages.create({
-      data: {
+    // 2. Upsert message (handles race conditions where same message processed twice)
+    await tx.messages.upsert({
+      where: {
+        messageId: message.messageId,
+      },
+      create: {
         messageId: message.messageId,
         threadId: message.threadId,
         userId,
@@ -439,10 +507,13 @@ async function upsertEmailData(userId: string, message: ProcessedMessage): Promi
         sender: message.sender,
         recipient_list: message.recipient_list,
         subject: message.subject,
-        body_html: message.body_html,
-        body_text: message.body_text,
+        body_html: bodyHtml,
+        body_text: bodyText,
         received_at: message.received_at,
         sendLogId: message.sendLogId,
+      },
+      update: {
+        // No-op if already exists - we don't want to overwrite
       },
     });
   });

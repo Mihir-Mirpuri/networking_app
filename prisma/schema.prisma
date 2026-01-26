@@ -282,6 +282,7 @@ model gmail_sync_state {
 
   @@index([email_address])
   @@index([userId])
+  @@index([watch_expiration])
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
