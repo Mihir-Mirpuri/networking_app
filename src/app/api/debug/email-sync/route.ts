@@ -43,7 +43,7 @@ export async function GET() {
     // Get recent SendLogs with threadIds
     const recentSendLogs = await prisma.sendLog.findMany({
       where: { userId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { sentAt: 'desc' },
       take: 5,
       select: {
         id: true,
@@ -51,7 +51,7 @@ export async function GET() {
         gmailMessageId: true,
         gmailThreadId: true,
         status: true,
-        createdAt: true,
+        sentAt: true,
       },
     });
 
