@@ -77,6 +77,11 @@ export default function SignInPage() {
         <p className="mt-4 text-center text-sm text-gray-500">
           Gmail access is required to send outreach emails on your behalf.
         </p>
+        <div className="mt-6 text-center text-xs text-gray-400">
+          <a href="/privacy" className="hover:text-gray-600 underline">Privacy Policy</a>
+          <span className="mx-2">·</span>
+          <a href="/terms" className="hover:text-gray-600 underline">Terms of Service</a>
+        </div>
       </div>
     </div>
   );

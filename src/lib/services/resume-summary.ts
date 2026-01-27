@@ -2,10 +2,6 @@ import Groq from 'groq-sdk';
 import { createClient } from '@supabase/supabase-js';
 const pdf = require('pdf-parse');
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-});
-
 export interface ResumeSummary {
   organizations: string[];
   activities: string[];
@@ -97,6 +93,10 @@ Return a JSON object with these exact keys:
 }
 
 Be concise. Only include notable items, not generic ones. Return ONLY valid JSON, no other text.`;
+
+  const groq = new Groq({
+    apiKey: process.env.GROQ_API_KEY,
+  });
 
   const completion = await groq.chat.completions.create({
     messages: [{ role: 'user', content: prompt }],

@@ -114,7 +114,7 @@ export function FeedbackButton() {
                     </svg>
                   </div>
                   <h4 className="text-lg font-semibold text-gray-900 mb-1">Thanks for the honesty!</h4>
-                  <p className="text-gray-600">We'll use this to make things better.</p>
+                  <p className="text-gray-600">We&apos;ll use this to make things better.</p>
                 </div>
               ) : (
                 <>
