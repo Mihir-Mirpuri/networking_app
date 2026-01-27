@@ -4,8 +4,10 @@ import { useState, useMemo } from 'react';
 import { Combobox } from '@headlessui/react';
 import { CheckIcon, ChevronUpDownIcon } from '@heroicons/react/20/solid';
 
+type ComboboxOption = string | { label: string; value: string };
+
 interface SearchableComboboxProps {
-  options: readonly string[];
+  options: readonly ComboboxOption[];
   value: string;
   onChange: (value: string) => void;
   label: string;
@@ -25,31 +27,48 @@ export function SearchableCombobox({
 }: SearchableComboboxProps) {
   const [query, setQuery] = useState('');
 
+  const normalizedOptions = useMemo(() => {
+    return options.map((option) =>
+      typeof option === 'string' ? { label: option, value: option } : option
+    );
+  }, [options]);
+
   const filteredOptions = useMemo(() => {
     if (query === '') {
-      return options;
+      return normalizedOptions;
     }
 
     const lowerQuery = query.toLowerCase();
-    return options.filter((option) =>
-      option.toLowerCase().includes(lowerQuery)
+    return normalizedOptions.filter((option) =>
+      option.label.toLowerCase().includes(lowerQuery)
     );
-  }, [query, options]);
+  }, [query, normalizedOptions]);
 
-  const displayValue = value || '';
+  const displayValue = normalizedOptions.find((option) => option.value === value)?.label || value || '';
 
   return (
     <div>
       <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1">
         {label}
       </label>
-      <Combobox value={value} onChange={onChange} disabled={disabled}>
+      <Combobox
+        value={value}
+        onChange={(nextValue) => {
+          onChange(nextValue);
+          setQuery('');
+        }}
+        disabled={disabled}
+      >
         <div className="relative">
           <Combobox.Input
             id={id}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
             displayValue={() => displayValue}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => {
+              const nextValue = event.target.value;
+              setQuery(nextValue);
+              onChange(nextValue);
+            }}
             placeholder={placeholder}
           />
           <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-2">
@@ -67,8 +86,8 @@ export function SearchableCombobox({
             ) : (
               filteredOptions.map((option) => (
                 <Combobox.Option
-                  key={option}
-                  value={option}
+                  key={`${option.value}-${option.label}`}
+                  value={option.value}
                   className={({ active }) =>
                     `relative cursor-default select-none py-2 pl-10 pr-4 ${
                       active ? 'bg-blue-600 text-white' : 'text-gray-900'
@@ -82,7 +101,7 @@ export function SearchableCombobox({
                           selected ? 'font-medium' : 'font-normal'
                         }`}
                       >
-                        {option}
+                        {option.label}
                       </span>
                       {selected ? (
                         <span

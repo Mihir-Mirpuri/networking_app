@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { Header } from '@/components/Header';
-import { SearchPageClient } from '@/components/search/SearchPageClient';
+import { HomeTabs } from '@/components/home/HomeTabs';
 import prisma from '@/lib/prisma';
 
 const DAILY_LIMIT = 30;
@@ -55,8 +55,7 @@ export default async function HomePage() {
     <div className="min-h-screen bg-gray-50">
       <Header />
       <main className="max-w-4xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">Find Connections</h1>
-        <SearchPageClient initialRemainingDaily={remainingDaily} />
+        <HomeTabs initialRemainingDaily={remainingDaily} />
       </main>
     </div>
   );

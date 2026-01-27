@@ -7,18 +7,14 @@ import { LoadingSpinner } from './LoadingSpinner';
 import { SearchableCombobox } from './SearchableCombobox';
 import { getTemplatesAction, TemplateData } from '@/app/actions/profile';
 
-// Role options with display name and CSE search value
+// Role options with display label and search value
 const ROLE_OPTIONS = [
-  { id: 'ib-analyst', label: 'Investment Banking Analyst', searchValue: 'Investment Banking Analyst' },
-  { id: 'consulting-associate', label: 'Consulting Associate', searchValue: 'Associate' },
-  { id: 'custom', label: 'Custom Role', searchValue: '' },
+  { label: 'Investment Banking Analyst', value: 'Investment Banking Analyst' },
+  { label: 'Consulting Associate', value: 'Associate' },
 ] as const;
-
-type RoleOptionId = typeof ROLE_OPTIONS[number]['id'];
 
 interface SearchFormProps {
   onSearch: (params: {
-    name?: string;
     company?: string;
     role?: string;
     university?: string;
@@ -28,7 +24,6 @@ interface SearchFormProps {
   }) => void;
   isLoading: boolean;
   initialParams?: {
-    name?: string;
     company?: string;
     role?: string;
     university?: string;
@@ -42,38 +37,14 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
   const { status } = useSession();
 
   // Initialize with initialParams if available, otherwise empty (user must select)
-  const [name, setName] = useState<string>(initialParams?.name || '');
   const [company, setCompany] = useState<string>(initialParams?.company || '');
+  const [role, setRole] = useState<string>(initialParams?.role || '');
   const [university, setUniversity] = useState<string>(initialParams?.university || '');
   const [location, setLocation] = useState<string>(initialParams?.location || '');
   const [limit, setLimit] = useState(initialParams?.limit || 10);
   const [templateId, setTemplateId] = useState<string>(
     initialParams?.templateId || EMAIL_TEMPLATES[0].id
   );
-
-  // Role state - determine initial role option from initialParams
-  const getInitialRoleOption = (): RoleOptionId => {
-    if (!initialParams?.role) return 'ib-analyst'; // Default to IB Analyst
-    const matchingOption = ROLE_OPTIONS.find(opt => opt.searchValue === initialParams.role);
-    if (matchingOption && matchingOption.id !== 'custom') return matchingOption.id;
-    return 'custom';
-  };
-
-  const [selectedRoleOption, setSelectedRoleOption] = useState<RoleOptionId>(getInitialRoleOption());
-  const [customRole, setCustomRole] = useState<string>(() => {
-    if (!initialParams?.role) return '';
-    const matchingOption = ROLE_OPTIONS.find(opt => opt.searchValue === initialParams.role);
-    return matchingOption && matchingOption.id !== 'custom' ? '' : initialParams.role;
-  });
-
-  // Get the actual role value to send to search
-  const getEffectiveRole = (): string => {
-    if (selectedRoleOption === 'custom') {
-      return customRole;
-    }
-    const option = ROLE_OPTIONS.find(opt => opt.id === selectedRoleOption);
-    return option?.searchValue || '';
-  };
 
   // Template state
   const [templates, setTemplates] = useState<TemplateData[]>([]);
@@ -154,23 +125,11 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
   // Update form fields when initialParams are restored from sessionStorage
   useEffect(() => {
     if (initialParams) {
-      setName(initialParams.name || '');
       setCompany(initialParams.company || '');
+      setRole(initialParams.role || '');
       setUniversity(initialParams.university || '');
       setLocation(initialParams.location || '');
       setLimit(initialParams.limit);
-
-      // Handle role restoration
-      if (initialParams.role) {
-        const matchingOption = ROLE_OPTIONS.find(opt => opt.searchValue === initialParams.role);
-        if (matchingOption && matchingOption.id !== 'custom') {
-          setSelectedRoleOption(matchingOption.id);
-          setCustomRole('');
-        } else {
-          setSelectedRoleOption('custom');
-          setCustomRole(initialParams.role);
-        }
-      }
 
       // Only set templateId if templates are loaded
       if (templates.length > 0 || !isLoadingTemplates) {
@@ -187,11 +146,9 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const effectiveRole = getEffectiveRole();
     onSearch({
-      name: name || undefined,
       company: company || undefined,
-      role: effectiveRole || undefined,
+      role: role || undefined,
       university: university || undefined,
       location: location || undefined,
       limit,
@@ -200,27 +157,11 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
   };
 
   // Check if at least one search parameter is filled
-  const effectiveRole = getEffectiveRole();
-  const hasSearchParams = name || company || effectiveRole || university || location;
+  const hasSearchParams = company || role || university || location;
 
   return (
     <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow p-6 mb-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-        {/* Name (Optional) */}
-        <div>
-          <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-            Name <span className="text-gray-400 font-normal">(optional)</span>
-          </label>
-          <input
-            type="text"
-            id="name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Search by name..."
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
         {/* Company */}
         <SearchableCombobox
           options={['', ...COMPANIES]}
@@ -232,36 +173,14 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
         />
 
         {/* Role */}
-        <div className="lg:col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Role
-          </label>
-          <div className="flex flex-wrap gap-2 mb-2">
-            {ROLE_OPTIONS.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                onClick={() => setSelectedRoleOption(option.id)}
-                className={`px-3 py-1.5 text-sm rounded-md border transition-colors ${
-                  selectedRoleOption === option.id
-                    ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-white text-gray-700 border-gray-300 hover:border-blue-400'
-                }`}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-          {selectedRoleOption === 'custom' && (
-            <input
-              type="text"
-              value={customRole}
-              onChange={(e) => setCustomRole(e.target.value)}
-              placeholder="Enter custom role..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          )}
-        </div>
+        <SearchableCombobox
+          options={ROLE_OPTIONS}
+          value={role}
+          onChange={setRole}
+          label="Role"
+          placeholder="Select a role..."
+          id="role"
+        />
 
         {/* University */}
         <SearchableCombobox
@@ -274,24 +193,20 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
         />
 
         {/* Office Location */}
-        <div>
-          <label htmlFor="location" className="block text-sm font-medium text-gray-700 mb-1">
-            Office Location
-          </label>
-          <select
-            id="location"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Any Location</option>
-            {LOCATIONS.filter((loc) => loc !== '').map((loc) => (
-              <option key={loc} value={loc}>
-                {loc}
-              </option>
-            ))}
-          </select>
-        </div>
+        <SearchableCombobox
+          options={[
+            { label: 'Any Location', value: '' },
+            ...LOCATIONS.filter((loc) => loc !== '').map((loc) => ({
+              label: loc,
+              value: loc,
+            })),
+          ]}
+          value={location}
+          onChange={setLocation}
+          label="Office Location"
+          placeholder="Select a location..."
+          id="location"
+        />
 
         {/* Number of Results */}
         <div>
@@ -351,7 +266,7 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
       </button>
       {!hasSearchParams && (
         <p className="mt-2 text-sm text-gray-500">
-          Please fill in at least one search field (name, company, role, university, or location)
+          Please fill in at least one search field (company, role, university, or location)
         </p>
       )}
     </form>
