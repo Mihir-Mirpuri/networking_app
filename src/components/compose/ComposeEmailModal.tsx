@@ -63,6 +63,41 @@ export function ComposeEmailModal({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Check if Chrome extension is installed
+  const checkExtension = useCallback(async (): Promise<boolean> => {
+    if (!EXTENSION_ID) {
+      console.warn('Extension ID not configured');
+      return false;
+    }
+
+    return new Promise((resolve) => {
+      try {
+        // @ts-expect-error - Chrome extension API
+        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+          // @ts-expect-error - Chrome extension API
+          chrome.runtime.sendMessage(
+            EXTENSION_ID,
+            { action: 'ping' },
+            (response: { success: boolean } | undefined) => {
+              // @ts-expect-error - Chrome extension API
+              if (chrome.runtime.lastError) {
+                resolve(false);
+              } else {
+                resolve(response?.success === true);
+              }
+            }
+          );
+          // Timeout if no response
+          setTimeout(() => resolve(false), 1000);
+        } else {
+          resolve(false);
+        }
+      } catch {
+        resolve(false);
+      }
+    });
+  }, []);
+
   // Load templates and resumes on mount
   useEffect(() => {
     if (isOpen) {
@@ -352,41 +387,6 @@ export function ComposeEmailModal({
       .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
       .join(' ');
   };
-
-  // Check if Chrome extension is installed
-  const checkExtension = useCallback(async (): Promise<boolean> => {
-    if (!EXTENSION_ID) {
-      console.warn('Extension ID not configured');
-      return false;
-    }
-
-    return new Promise((resolve) => {
-      try {
-        // @ts-expect-error - Chrome extension API
-        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
-          // @ts-expect-error - Chrome extension API
-          chrome.runtime.sendMessage(
-            EXTENSION_ID,
-            { action: 'ping' },
-            (response: { success: boolean } | undefined) => {
-              // @ts-expect-error - Chrome extension API
-              if (chrome.runtime.lastError) {
-                resolve(false);
-              } else {
-                resolve(response?.success === true);
-              }
-            }
-          );
-          // Timeout if no response
-          setTimeout(() => resolve(false), 1000);
-        } else {
-          resolve(false);
-        }
-      } catch {
-        resolve(false);
-      }
-    });
-  }, []);
 
   const runPersonalization = async () => {
     if (!linkedinUrl) return;
