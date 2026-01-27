@@ -33,7 +33,6 @@ interface SearchPageState {
     role?: string;
     university?: string;
     location?: string;
-    limit: number;
     templateId: string;
   };
   savedAt: number;
@@ -66,7 +65,6 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
     role?: string;
     university?: string;
     location?: string;
-    limit: number;
     templateId: string;
   } | null>(null);
 
