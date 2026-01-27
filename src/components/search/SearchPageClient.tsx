@@ -6,6 +6,7 @@ import { ResultsList } from './ResultsList';
 import { ExpandedReview } from './ExpandedReview';
 import { BulkReview } from './BulkReview';
 import { LoadingSpinner } from './LoadingSpinner';
+import { Toast } from '@/components/ui/Toast';
 import { searchPeopleAction, SearchResultWithDraft, hidePersonAction } from '@/app/actions/search';
 import { sendSingleEmailAction, sendEmailsAction, PersonToSend } from '@/app/actions/send';
 
@@ -59,6 +60,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
   const [showBulkReview, setShowBulkReview] = useState(false);
   const [generatingStatuses, setGeneratingStatuses] = useState<Map<string, boolean>>(new Map());
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [searchParams, setSearchParams] = useState<{
     company?: string;
     role?: string;
@@ -231,6 +233,9 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
 
     if (result.success) {
       setRemainingDaily((prev) => Math.max(0, prev - 1));
+      setToast({ message: 'Email sent successfully!', type: 'success' });
+    } else {
+      setToast({ message: 'Failed to send email', type: 'error' });
     }
   };
 
@@ -341,6 +346,14 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
           onClose={() => setShowBulkReview(false)}
           onSendAll={handleBulkSend}
           sendStatuses={sendStatuses}
+        />
+      )}
+
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
         />
       )}
     </div>
