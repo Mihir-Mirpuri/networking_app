@@ -2,25 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { syncUserMailbox } from '@/lib/services/email-sync';
 
-/**
- * Validates Bearer token authentication for Pub/Sub webhook
- */
-function validateAuth(request: NextRequest): boolean {
-  const authHeader = request.headers.get('authorization');
-  const webhookSecret = process.env.PUBSUB_WEBHOOK_SECRET;
-
-  if (!webhookSecret) {
-    console.error('[Gmail Webhook] PUBSUB_WEBHOOK_SECRET not configured');
-    return false;
-  }
-
-  if (authHeader !== `Bearer ${webhookSecret}`) {
-    console.error('[Gmail Webhook] Invalid or missing authorization header');
-    return false;
-  }
-
-  return true;
-}
 
 /**
  * Parses Pub/Sub message and extracts Gmail notification data
@@ -138,17 +119,7 @@ export async function POST(request: NextRequest) {
   try {
     console.log('[Gmail Webhook] Received webhook request');
 
-    // 1. Validate authentication
-    if (!validateAuth(request)) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    console.log('[Gmail Webhook] Authentication successful');
-
-    // 2. Parse request body
+    // 1. Parse request body
     let body: any;
     try {
       body = await request.json();
