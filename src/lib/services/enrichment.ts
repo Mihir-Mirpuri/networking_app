@@ -38,6 +38,11 @@ export interface EducationInfo {
   graduationYear: string | null;
 }
 
+export interface EmploymentInfo {
+  company: string | null;
+  title: string | null;
+}
+
 export interface EmailResult {
   email: string | null;
   status: 'VERIFIED' | 'UNVERIFIED' | 'MISSING';
@@ -46,6 +51,7 @@ export interface EmailResult {
   state: string | null;
   country: string | null;
   education: EducationInfo | null;
+  employment: EmploymentInfo | null;
 }
 
 export interface FindEmailParams {
@@ -78,6 +84,44 @@ function parseEducation(education?: ApolloEducation[]): EducationInfo | null {
   };
 }
 
+function parseEmployment(employmentHistory?: ApolloPersonMatch['employment_history']): EmploymentInfo | null {
+  if (!employmentHistory || employmentHistory.length === 0) {
+    return null;
+  }
+
+  // First, try to find a current position (current === true)
+  const currentJob = employmentHistory.find(job => job.current === true);
+  if (currentJob) {
+    return {
+      company: currentJob.organization_name || null,
+      title: currentJob.title || null,
+    };
+  }
+
+  // If no current position, get the most recent one (no end_date or latest end_date)
+  const sortedJobs = [...employmentHistory].sort((a, b) => {
+    // Jobs without end_date are more recent (still employed)
+    if (!a.end_date && b.end_date) return -1;
+    if (a.end_date && !b.end_date) return 1;
+    if (!a.end_date && !b.end_date) {
+      // Both have no end date, sort by start date descending
+      const aStart = a.start_date ? new Date(a.start_date).getTime() : 0;
+      const bStart = b.start_date ? new Date(b.start_date).getTime() : 0;
+      return bStart - aStart;
+    }
+    // Both have end dates, sort descending
+    const aEnd = new Date(a.end_date!).getTime();
+    const bEnd = new Date(b.end_date!).getTime();
+    return bEnd - aEnd;
+  });
+
+  const mostRecentJob = sortedJobs[0];
+  return {
+    company: mostRecentJob.organization_name || null,
+    title: mostRecentJob.title || null,
+  };
+}
+
 export async function findEmail(params: FindEmailParams): Promise<EmailResult> {
   const { firstName, lastName, company, linkedinUrl } = params;
 
@@ -89,6 +133,7 @@ export async function findEmail(params: FindEmailParams): Promise<EmailResult> {
     state: null,
     country: null,
     education: null,
+    employment: null,
   };
 
   if (!APOLLO_API_KEY) {
@@ -133,12 +178,13 @@ export async function findEmail(params: FindEmailParams): Promise<EmailResult> {
       const person = data.person;
       const isVerified = person.email_status === 'verified';
       const education = parseEducation(person.education);
+      const employment = parseEmployment(person.employment_history);
 
       // Build location string for logging
       const locationParts = [person.city, person.state, person.country].filter(Boolean);
       const locationStr = locationParts.length > 0 ? locationParts.join(', ') : 'unknown';
 
-      console.log(`Found: ${person.email || 'no email'} (${isVerified ? 'verified' : 'unverified'}), location: ${locationStr}, education: ${education?.schoolName || 'unknown'}`);
+      console.log(`Found: ${person.email || 'no email'} (${isVerified ? 'verified' : 'unverified'}), location: ${locationStr}, education: ${education?.schoolName || 'unknown'}, employment: ${employment?.company || 'unknown'} - ${employment?.title || 'unknown'}`);
 
       return {
         email: person.email || null,
@@ -148,6 +194,7 @@ export async function findEmail(params: FindEmailParams): Promise<EmailResult> {
         state: person.state || null,
         country: person.country || null,
         education,
+        employment,
       };
     }
 
@@ -182,6 +229,7 @@ export async function enrichPeople(
         state: null,
         country: null,
         education: null,
+        employment: null,
       });
       continue;
     }

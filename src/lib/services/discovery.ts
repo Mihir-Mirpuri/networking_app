@@ -569,6 +569,9 @@ function isValidPersonName(
   const commonWords = [
     // Prepositions and articles
     'from', 'the', 'and', 'or', 'at', 'in', 'on', 'to', 'for', 'of', 'by', 'with',
+    // Generic business words that appear in titles but aren't names
+    'company', 'companies', 'team', 'group', 'department', 'division', 'office',
+    'about', 'contact', 'careers', 'jobs', 'page', 'profile', 'linkedin',
     // Temporal words (from LinkedIn snippets)
     'days', 'day', 'weeks', 'week', 'months', 'month', 'years', 'year', 'ago', 'today', 'yesterday',
     'hours', 'hour', 'minutes', 'minute', 'just', 'now', 'recently', 'posted', 'updated',

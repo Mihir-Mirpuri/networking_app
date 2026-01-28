@@ -1,6 +1,6 @@
 import prisma from '@/lib/prisma';
 import { SearchResult } from '@/lib/services/discovery';
-import { EmailResult, EducationInfo } from '@/lib/services/enrichment';
+import { EmailResult, EducationInfo, EmploymentInfo } from '@/lib/services/enrichment';
 import { EmailStatus } from '@prisma/client';
 
 export interface PersonData {
@@ -296,13 +296,18 @@ export async function saveSearchResult(
   // Extract LinkedIn URL
   const linkedinUrl = extractLinkedInUrl(searchResult.sourceUrl, searchResult.sourceDomain);
 
-  // 1. Create/update Person (including location and education from Apollo)
+  // Use Apollo's employment data for company and role
+  // If Apollo doesn't provide employment data, this should have been filtered out earlier
+  const company = emailResult.employment?.company || searchResult.company;
+  const role = emailResult.employment?.title || searchResult.role;
+
+  // 1. Create/update Person (including location, education, company and role from Apollo)
   const person = await createOrUpdatePerson({
     fullName: searchResult.fullName,
     firstName: searchResult.firstName,
     lastName: searchResult.lastName,
-    company: searchResult.company,
-    role: searchResult.role,
+    company: company,
+    role: role,
     linkedinUrl,
     // Pass through location and education data from Apollo
     city: emailResult.city,

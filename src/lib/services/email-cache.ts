@@ -1,5 +1,5 @@
 import prisma from '@/lib/prisma';
-import { findEmail, EmailResult, EducationInfo } from './enrichment';
+import { findEmail, EmailResult, EducationInfo, EmploymentInfo } from './enrichment';
 import { EmailStatus } from '@prisma/client';
 
 // Type matching Prisma EmailStatus enum
@@ -24,7 +24,7 @@ export interface CachedEmailResult extends EmailResult {
   };
 }
 
-export type { EducationInfo };
+export type { EducationInfo, EmploymentInfo };
 
 /**
  * Smart email lookup with caching and company change detection
@@ -60,6 +60,7 @@ export async function getOrFindEmail(
         city: true,
         state: true,
         country: true,
+        role: true,
         educationSchool: true,
         educationDegree: true,
         educationField: true,
@@ -97,8 +98,14 @@ export async function getOrFindEmail(
       graduationYear: existingPerson.educationYear,
     } : null;
 
+    // Build employment info from cached data (company is the search company, role from Apollo)
+    const employment: EmploymentInfo | null = existingPerson.role ? {
+      company: company, // Use the search company (which is also the Person's company)
+      title: existingPerson.role,
+    } : null;
+
     console.log(
-      `[EmailCache] ✅ CACHE HIT for "${fullName}" at ${company} - Email: ${existingPerson.email} (${status}, confidence: ${existingPerson.emailConfidence || 0}) - NO Apollo call`
+      `[EmailCache] ✅ CACHE HIT for "${fullName}" at ${company} - Email: ${existingPerson.email} (${status}, confidence: ${existingPerson.emailConfidence || 0}), Role: ${existingPerson.role || 'unknown'} - NO Apollo call`
     );
     return {
       email: existingPerson.email,
@@ -108,6 +115,7 @@ export async function getOrFindEmail(
       state: existingPerson.state,
       country: existingPerson.country,
       education,
+      employment,
       fromCache: true,
       apolloCalled: false,
       existingPerson: {
@@ -158,6 +166,7 @@ export async function getOrFindEmail(
       state: null,
       country: null,
       education: null,
+      employment: null,
       fromCache: false,
       apolloCalled: false,
       existingPerson: existingPerson ? {
@@ -199,13 +208,18 @@ export async function getOrFindEmail(
       if (emailResult.education.graduationYear) updateData.educationYear = emailResult.education.graduationYear;
     }
 
+    // Update role from Apollo employment if found
+    if (emailResult.employment?.title) {
+      updateData.role = emailResult.employment.title;
+    }
+
     await prisma.person.update({
       where: { id: existingPerson.id },
       data: updateData,
     });
 
     console.log(
-      `[EmailCache] 💾 Updated Person in cache for "${fullName}" at ${company} - Email: ${emailResult.email || 'none'} (${emailResult.status}, confidence: ${emailResult.confidence}), Location: ${emailResult.city || 'unknown'}, School: ${emailResult.education?.schoolName || 'unknown'}`
+      `[EmailCache] 💾 Updated Person in cache for "${fullName}" at ${company} - Email: ${emailResult.email || 'none'} (${emailResult.status}, confidence: ${emailResult.confidence}), Role: ${emailResult.employment?.title || 'unknown'}, Location: ${emailResult.city || 'unknown'}, School: ${emailResult.education?.schoolName || 'unknown'}`
     );
   } else if (emailResult.email) {
     console.log(
