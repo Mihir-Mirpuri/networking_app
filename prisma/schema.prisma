@@ -91,10 +91,37 @@ model Person {
   updatedAt        DateTime        @updatedAt
   sourceLinks      SourceLink[]
   userCandidates   UserCandidate[]
+  searchPeople     SearchPerson[]
 
   @@unique([fullName, company])
   @@index([fullName, company])
   @@index([emailStatus])
+}
+
+model Search {
+  id           String         @id @default(cuid())
+  name         String?
+  company      String?
+  role         String?
+  university   String?
+  location     String?
+  createdAt    DateTime       @default(now())
+  searchPeople SearchPerson[]
+
+  @@index([createdAt])
+}
+
+model SearchPerson {
+  id        String   @id @default(cuid())
+  searchId  String
+  personId  String
+  createdAt DateTime @default(now())
+  search    Search   @relation(fields: [searchId], references: [id], onDelete: Cascade)
+  person    Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@unique([searchId, personId])
+  @@index([searchId])
+  @@index([personId])
 }
 
 model UserCandidate {

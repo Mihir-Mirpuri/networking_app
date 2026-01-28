@@ -623,15 +623,16 @@ export async function searchPeople(params: SearchParams): Promise<SearchResult[]
   const { name, university, company, role, location, limit, excludePersonKeys = new Set() } = params;
 
   // Build query from all non-empty parameters
+  // Format: "location, company, role, university, name" (comma-separated)
   const queryParts: string[] = [];
 
-  if (name && name.trim()) queryParts.push(name.trim());
-  if (university && university.trim()) queryParts.push(university.trim());
+  if (location && location.trim()) queryParts.push(location.trim());
   if (company && company.trim()) queryParts.push(company.trim());
   if (role && role.trim()) queryParts.push(role.trim());
-  if (location && location.trim()) queryParts.push(`"${location.trim()}"`);
+  if (university && university.trim()) queryParts.push(university.trim());
+  if (name && name.trim()) queryParts.push(name.trim());
 
-  const query = queryParts.join(' ');
+  const query = queryParts.join(', ');
 
   if (!query) {
     console.log('[Discovery] No search parameters provided, returning empty results');
@@ -639,7 +640,7 @@ export async function searchPeople(params: SearchParams): Promise<SearchResult[]
   }
 
   console.log(`[Discovery] Search query: ${query}`);
-  const pages = [1, 11, 21, 31, 41, 51]; // 6 pages = 60 results max
+  const pages = [1, 11, 21, 31, 41, 51, 61, 71, 81]; // 9 pages = 90 results max
 
   const seenKeys = new Set<string>();
   const candidates: SearchResult[] = [];
