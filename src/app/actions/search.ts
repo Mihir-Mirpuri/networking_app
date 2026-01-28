@@ -66,6 +66,8 @@ export interface SearchResultWithDraft {
   education?: EducationInfo | null;
   // Whether Apollo returned employment data (company/role)
   hasApolloEmployment?: boolean;
+  // Whether Apollo's company matches the search company
+  companyVerified?: boolean;
 }
 
 function extractLinkedInUrl(person: SearchResult): string | null {
@@ -73,6 +75,30 @@ function extractLinkedInUrl(person: SearchResult): string | null {
     return person.sourceUrl;
   }
   return null;
+}
+
+/**
+ * Check if Apollo's company matches the user's search company
+ * Returns true if either contains the other (case-insensitive)
+ * e.g., "Bain & Company" matches "Bain", "Bain and Company", etc.
+ */
+function isCompanyMatch(
+  searchCompany: string | undefined,
+  apolloCompany: string | null | undefined
+): boolean {
+  if (!searchCompany || !searchCompany.trim()) {
+    return true; // No company filter specified
+  }
+
+  if (!apolloCompany || !apolloCompany.trim()) {
+    return false; // Apollo didn't return a company
+  }
+
+  const searchLower = searchCompany.toLowerCase().trim();
+  const apolloLower = apolloCompany.toLowerCase().trim();
+
+  // Check if either contains the other (handles "Bain" vs "Bain & Company")
+  return apolloLower.includes(searchLower) || searchLower.includes(apolloLower);
 }
 
 /**
@@ -447,6 +473,8 @@ export async function searchPeopleAction(
             } : null,
             // Cached results already passed Apollo employment filter
             hasApolloEmployment: true,
+            // Check if cached person's company matches search company
+            companyVerified: isCompanyMatch(input.company, person.company),
           };
         }
       );
@@ -599,6 +627,7 @@ export async function searchPeopleAction(
               company: apolloCompany,
               role: apolloRole,
               hasApolloEmployment: !!emailResult.employment?.company,
+              companyVerified: isCompanyMatch(input.company, apolloCompany),
               university: input.university || '',
               email: emailResult.email,
               emailStatus: emailResult.status,
@@ -639,6 +668,7 @@ export async function searchPeopleAction(
               company: apolloCompany,
               role: apolloRole,
               hasApolloEmployment: !!emailResult.employment?.company,
+              companyVerified: isCompanyMatch(input.company, apolloCompany),
               university: input.university || '',
               email: emailResult.email,
               emailStatus: emailResult.status,
@@ -703,15 +733,26 @@ export async function searchPeopleAction(
       );
     }
 
+    // Filter out results where Apollo's company doesn't match the search company
+    const resultsWithMatchingCompany = resultsWithEmployment.filter(
+      (result) => result.companyVerified === true
+    );
+    const companyMismatchCount = resultsWithEmployment.length - resultsWithMatchingCompany.length;
+    if (companyMismatchCount > 0) {
+      console.log(
+        `[Search] Company filter: Removed ${companyMismatchCount} results where Apollo company doesn't match "${input.company}"`
+      );
+    }
+
     // Filter by location if user specified a location search
     // Only include results where Apollo's location matches the search location
-    let locationFilteredResults = resultsWithEmployment;
+    let locationFilteredResults = resultsWithMatchingCompany;
     if (input.location && input.location.trim()) {
-      locationFilteredResults = resultsWithEmployment.filter(
+      locationFilteredResults = resultsWithMatchingCompany.filter(
         (result) => result.locationVerified === true
       );
 
-      const filteredOutCount = resultsWithEmployment.length - locationFilteredResults.length;
+      const filteredOutCount = resultsWithMatchingCompany.length - locationFilteredResults.length;
       if (filteredOutCount > 0) {
         console.log(
           `[Search] Location filter: Removed ${filteredOutCount} results that didn't match "${input.location}" (Apollo location mismatch or unavailable)`
