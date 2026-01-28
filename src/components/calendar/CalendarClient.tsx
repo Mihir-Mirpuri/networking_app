@@ -340,7 +340,7 @@ export function CalendarClient() {
               This allows you to see your schedule and create meetings with your networking contacts.
             </p>
             <button
-              onClick={() => signIn('google', { callbackUrl: '/calendar' })}
+              onClick={() => signIn('google', { callbackUrl: '/calendar' }, { prompt: 'consent' })}
               className="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
             >
               <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
