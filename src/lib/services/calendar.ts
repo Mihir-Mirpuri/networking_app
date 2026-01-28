@@ -118,7 +118,6 @@ export async function getCalendarClient(userId: string): Promise<calendar_v3.Cal
       access_token: true,
       refresh_token: true,
       expires_at: true,
-      scope: true,
     },
   });
 
@@ -126,12 +125,7 @@ export async function getCalendarClient(userId: string): Promise<calendar_v3.Cal
     throw new NoGoogleAccountError(userId);
   }
 
-  // 2. Check if calendar scope is granted
-  if (account.scope && !account.scope.includes('calendar')) {
-    throw new NoCalendarAccessError(userId);
-  }
-
-  // 3. Validate that refresh_token exists (required for auto-refresh)
+  // 2. Validate that refresh_token exists (required for auto-refresh)
   if (!account.refresh_token) {
     throw new NoRefreshTokenError(userId);
   }
