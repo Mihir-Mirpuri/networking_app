@@ -11,6 +11,7 @@ export function Header() {
   const tabs = [
     { name: 'Send Emails', href: '/' },
     { name: 'Email History', href: '/history' },
+    { name: 'Calendar', href: '/calendar' },
     { name: 'Profile', href: '/profile' },
   ];
 
