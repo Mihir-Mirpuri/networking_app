@@ -548,25 +548,41 @@ export async function suggestAvailableTimes(
 
 /**
  * Checks if a user has granted calendar access.
+ * Uses the calendarConnected field on User model as source of truth.
  */
 export async function hasCalendarAccess(userId: string): Promise<boolean> {
   try {
-    const account = await prisma.account.findFirst({
-      where: {
-        userId,
-        provider: 'google',
-      },
-      select: {
-        scope: true,
-      },
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { calendarConnected: true },
     });
 
-    if (!account?.scope) {
-      return false;
-    }
-
-    return account.scope.includes('calendar');
+    return user?.calendarConnected ?? false;
   } catch {
     return false;
   }
+}
+
+/**
+ * Marks a user as having connected their calendar.
+ * Call this after successfully verifying calendar API access.
+ */
+export async function markCalendarConnected(userId: string): Promise<void> {
+  await prisma.user.update({
+    where: { id: userId },
+    data: { calendarConnected: true },
+  });
+  console.log('[Calendar] Marked calendar as connected for user', userId);
+}
+
+/**
+ * Marks a user's calendar as disconnected.
+ * Call this if calendar access is revoked or fails.
+ */
+export async function markCalendarDisconnected(userId: string): Promise<void> {
+  await prisma.user.update({
+    where: { id: userId },
+    data: { calendarConnected: false },
+  });
+  console.log('[Calendar] Marked calendar as disconnected for user', userId);
 }

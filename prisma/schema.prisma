@@ -35,19 +35,20 @@ model Session {
 }
 
 model User {
-  id              String           @id @default(cuid())
-  name            String?
-  email           String?          @unique
-  emailVerified   DateTime?
-  image           String?
-  classification  String?
-  major           String?
-  university      String?
-  career          String?
-  dailySendCount  Int              @default(0)
-  lastSendDate    DateTime?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  id                String           @id @default(cuid())
+  name              String?
+  email             String?          @unique
+  emailVerified     DateTime?
+  image             String?
+  classification    String?
+  major             String?
+  university        String?
+  career            String?
+  dailySendCount    Int              @default(0)
+  lastSendDate      DateTime?
+  calendarConnected Boolean          @default(false)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
   accounts        Account[]
   emailTemplates  EmailTemplate[]
   scheduledEmails ScheduledEmail[]

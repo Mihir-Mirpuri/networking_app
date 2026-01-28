@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useSession, signIn } from 'next-auth/react';
 import {
   checkCalendarAccessAction,
+  verifyAndMarkCalendarAccessAction,
   listCalendarEventsAction,
   createCalendarEventAction,
   deleteCalendarEventAction,
@@ -75,12 +76,26 @@ export function CalendarClient() {
 
   const checkAccess = async () => {
     setIsCheckingAccess(true);
+
+    // First check if user already has access marked
     const result = await checkCalendarAccessAction();
-    if (result.success) {
-      setHasAccess(result.data?.hasAccess ?? false);
+
+    if (result.success && result.data?.hasAccess) {
+      setHasAccess(true);
+      setIsCheckingAccess(false);
+      return;
+    }
+
+    // User doesn't have access marked - try to verify in case they just re-authenticated
+    // This handles the case where user re-auths and comes back to calendar page
+    const verifyResult = await verifyAndMarkCalendarAccessAction();
+
+    if (verifyResult.success && verifyResult.data?.verified) {
+      setHasAccess(true);
     } else {
       setHasAccess(false);
     }
+
     setIsCheckingAccess(false);
   };
 

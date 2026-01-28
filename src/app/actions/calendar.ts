@@ -11,6 +11,8 @@ import {
   checkConflicts,
   suggestAvailableTimes,
   hasCalendarAccess,
+  markCalendarConnected,
+  markCalendarDisconnected,
   CalendarEvent,
   CalendarEventDisplay,
   ConflictCheckResult,
@@ -55,6 +57,7 @@ export interface UpdateEventInput {
 
 /**
  * Checks if the current user has granted calendar access.
+ * If user claims to have access but API fails, marks as disconnected.
  * Returns requiresReauth: true if they need to re-authenticate.
  */
 export async function checkCalendarAccessAction(): Promise<
@@ -67,15 +70,69 @@ export async function checkCalendarAccessAction(): Promise<
   }
 
   try {
+    // First check if we've already verified access
     const hasAccess = await hasCalendarAccess(session.user.id);
+
+    if (hasAccess) {
+      return {
+        success: true,
+        data: { hasAccess: true },
+      };
+    }
+
+    // User doesn't have access marked - they need to re-auth
     return {
       success: true,
-      data: { hasAccess },
-      requiresReauth: !hasAccess,
+      data: { hasAccess: false },
+      requiresReauth: true,
     };
   } catch (error) {
     console.error('[Calendar Action] Error checking access:', error);
     return { success: false, error: 'Failed to check calendar access' };
+  }
+}
+
+/**
+ * Verifies calendar access by making a test API call.
+ * Call this after user re-authenticates to confirm access works.
+ * Marks user as connected if successful.
+ */
+export async function verifyAndMarkCalendarAccessAction(): Promise<
+  CalendarActionResult<{ verified: boolean }>
+> {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.id) {
+    return { success: false, error: 'Not authenticated' };
+  }
+
+  try {
+    // Try to list events as a test (small date range)
+    const now = new Date();
+    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+    await listEvents(session.user.id, now, tomorrow, 1);
+
+    // If we get here, access works - mark as connected
+    await markCalendarConnected(session.user.id);
+
+    return {
+      success: true,
+      data: { verified: true },
+    };
+  } catch (error) {
+    console.error('[Calendar Action] Verification failed:', error);
+
+    if (error instanceof NoCalendarAccessError) {
+      await markCalendarDisconnected(session.user.id);
+      return {
+        success: true,
+        data: { verified: false },
+        requiresReauth: true,
+      };
+    }
+
+    return { success: false, error: 'Failed to verify calendar access' };
   }
 }
 
