@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSession, signIn } from 'next-auth/react';
+import { useSession, signIn, signOut } from 'next-auth/react';
 import {
   checkCalendarAccessAction,
   verifyAndMarkCalendarAccessAction,
@@ -340,7 +340,12 @@ export function CalendarClient() {
               This allows you to see your schedule and create meetings with your networking contacts.
             </p>
             <button
-              onClick={() => signIn('google', { callbackUrl: '/calendar' }, { prompt: 'consent' })}
+              onClick={async () => {
+                // Sign out first to force fresh OAuth flow with all scopes
+                await signOut({ redirect: false });
+                // Then sign in - will show full consent screen including calendar
+                signIn('google', { callbackUrl: '/calendar' });
+              }}
               className="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
             >
               <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
@@ -364,7 +369,7 @@ export function CalendarClient() {
               Connect Google Calendar
             </button>
             <p className="text-sm text-gray-500 mt-4">
-              You&apos;ll be asked to sign in again to grant calendar permissions.
+              You&apos;ll be signed out and asked to sign back in to grant calendar permissions.
             </p>
           </div>
         </div>
