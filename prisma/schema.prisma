@@ -35,31 +35,32 @@ model Session {
 }
 
 model User {
-  id                String           @id @default(cuid())
-  name              String?
-  email             String?          @unique
-  emailVerified     DateTime?
-  image             String?
-  classification    String?
-  major             String?
-  university        String?
-  career            String?
-  dailySendCount    Int              @default(0)
-  lastSendDate      DateTime?
-  calendarConnected Boolean          @default(false)
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
-  accounts        Account[]
-  emailTemplates  EmailTemplate[]
-  scheduledEmails ScheduledEmail[]
-  sendLogs        SendLog[]
-  sessions        Session[]
-  userCandidates  UserCandidate[]
-  userResumes     UserResume[]
-  gmailSyncState      gmail_sync_state?
-  conversations       conversations[]
-  messages            messages[]
-  meetingSuggestions  ExtractedMeetingSuggestion[]
+  id                         String                       @id @default(cuid())
+  name                       String?
+  email                      String?                      @unique
+  emailVerified              DateTime?
+  image                      String?
+  classification             String?
+  major                      String?
+  university                 String?
+  career                     String?
+  dailySendCount             Int                          @default(0)
+  lastSendDate               DateTime?
+  calendarConnected          Boolean                      @default(false)
+  createdAt                  DateTime                     @default(now())
+  updatedAt                  DateTime                     @updatedAt
+  accounts                   Account[]
+  emailTemplates             EmailTemplate[]
+  scheduledEmails            ScheduledEmail[]
+  sendLogs                   SendLog[]
+  sessions                   Session[]
+  userCandidates             UserCandidate[]
+  userResumes                UserResume[]
+  gmailSyncState             gmail_sync_state?
+  conversations              conversations[]
+  messages                   messages[]
+  outreachTrackers           OutreachTracker[]
+  ExtractedMeetingSuggestion ExtractedMeetingSuggestion[]
 }
 
 model VerificationToken {
@@ -143,6 +144,7 @@ model UserCandidate {
   sendLogs             SendLog[]
   person               Person           @relation(fields: [personId], references: [id], onDelete: Cascade)
   user                 User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  outreachTracker      OutreachTracker?
 
   @@unique([userId, personId])
   @@index([userId])
@@ -236,25 +238,27 @@ model EmailDraft {
 }
 
 model SendLog {
-  id                   String         @id @default(cuid())
+  id                   String           @id @default(cuid())
   userId               String
   userCandidateId      String?
   toEmail              String
   subject              String
   body                 String
-  resumeAttached       Boolean        @default(false)
+  resumeAttached       Boolean          @default(false)
   resumeId             String?
   status               SendLogStatus
   errorMessage         String?
-  gmailMessageId       String?        @unique
+  gmailMessageId       String?          @unique
   gmailThreadId        String?
-  sentAt               DateTime       @default(now())
+  sentAt               DateTime         @default(now())
   directRecipientEmail String?
   directRecipientName  String?
-  resume               UserResume?    @relation(fields: [resumeId], references: [id])
-  userCandidate        UserCandidate? @relation(fields: [userCandidateId], references: [id], onDelete: Cascade)
-  user                 User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  outreachTrackerId    String?
+  resume               UserResume?      @relation(fields: [resumeId], references: [id])
+  userCandidate        UserCandidate?   @relation(fields: [userCandidateId], references: [id], onDelete: Cascade)
+  user                 User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   messages             messages[]
+  outreachTracker      OutreachTracker? @relation("OutreachSendLogs", fields: [outreachTrackerId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([userCandidateId])
@@ -262,6 +266,7 @@ model SendLog {
   @@index([sentAt])
   @@index([gmailMessageId])
   @@index([gmailThreadId])
+  @@index([outreachTrackerId])
 }
 
 model ScheduledEmail {
@@ -316,6 +321,27 @@ enum ScheduledEmailStatus {
   SENT
   FAILED
   CANCELLED
+}
+
+enum OutreachStatus {
+  NOT_STARTED
+  SENT
+  WAITING
+  RESPONDED
+  SCHEDULED_CALL
+  HAD_CALL
+  GHOSTED
+  NOT_INTERESTED
+  CONNECTED
+}
+
+enum InteractionType {
+  NONE
+  PHONE
+  VIDEO
+  COFFEE_CHAT
+  IN_PERSON
+  OTHER
 }
 
 model gmail_sync_state {
@@ -386,22 +412,23 @@ model ExtractedMeetingSuggestion {
 }
 
 model messages {
-  messageId      String           @id
-  threadId       String
-  userId         String
-  direction      MessageDirection
-  sender         String
-  recipient_list Json
-  subject        String?
-  body_html      String?
-  body_text      String?
-  received_at    DateTime
-  sendLogId      String?
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  conversation   conversations    @relation(fields: [threadId], references: [threadId], onDelete: Cascade)
-  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  sendLog        SendLog?         @relation(fields: [sendLogId], references: [id], onDelete: SetNull)
+  messageId                  String                      @id
+  threadId                   String
+  userId                     String
+  direction                  MessageDirection
+  sender                     String
+  recipient_list             Json
+  subject                    String?
+  body_html                  String?
+  body_text                  String?
+  received_at                DateTime
+  sendLogId                  String?
+  createdAt                  DateTime                    @default(now())
+  updatedAt                  DateTime                    @updatedAt
+  conversation               conversations               @relation(fields: [threadId], references: [threadId], onDelete: Cascade)
+  user                       User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sendLog                    SendLog?                    @relation(fields: [sendLogId], references: [id], onDelete: SetNull)
+  ExtractedMeetingSuggestion ExtractedMeetingSuggestion?
 
   @@index([threadId])
   @@index([userId])
@@ -409,5 +436,53 @@ model messages {
   @@index([userId, received_at])
   @@index([sender])
   @@index([sendLogId])
-  meetingSuggestion ExtractedMeetingSuggestion?
+}
+
+model OutreachTracker {
+  id     String @id @default(cuid())
+  userId String
+
+  // Contact info
+  contactEmail String
+  contactName  String?
+  company      String?
+  role         String?
+  location     String?
+  linkedinUrl  String?
+
+  // Links
+  userCandidateId String? @unique
+  gmailThreadId   String?
+
+  // Dates
+  dateEmailed        DateTime?
+  responseReceivedAt DateTime?
+  followedUpAt       DateTime?
+
+  // Interaction
+  spokeToThem     Boolean         @default(false)
+  interactionType InteractionType @default(NONE)
+  interactionDate DateTime?
+
+  // Status & Notes
+  status OutreachStatus @default(NOT_STARTED)
+  notes  String?        @db.Text
+
+  // Reminder
+  reminderDate DateTime?
+  reminderNote String?
+  reminderSent Boolean   @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userCandidate UserCandidate? @relation(fields: [userCandidateId], references: [id], onDelete: SetNull)
+  sendLogs      SendLog[]      @relation("OutreachSendLogs")
+
+  @@unique([userId, contactEmail])
+  @@index([userId])
+  @@index([userId, status])
+  @@index([userId, reminderDate])
 }

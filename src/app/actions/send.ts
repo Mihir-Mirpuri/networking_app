@@ -10,6 +10,7 @@ import {
   checkDailyLimit,
   incrementDailyCount,
 } from '@/lib/services/gmail';
+import { upsertOutreachTrackerOnSend } from './outreach';
 
 const BATCH_LIMIT = 10;
 
@@ -111,7 +112,7 @@ export async function sendEmailsAction(
     console.log('[Send] Send result:', { email: person.email, success: sendResult.success, error: sendResult.error });
 
     // Log the send attempt
-    await prisma.sendLog.create({
+    const sendLog = await prisma.sendLog.create({
       data: {
         userId: session.user.id,
         userCandidateId: person.userCandidateId,
@@ -127,8 +128,44 @@ export async function sendEmailsAction(
       },
     });
 
-    // Update EmailDraft status to SENT if it exists
+    // Update EmailDraft status to SENT if it exists and upsert OutreachTracker
     if (sendResult.success) {
+      // Fetch UserCandidate with Person data for outreach tracker
+      let contactName: string | null = null;
+      let company: string | null = null;
+      let role: string | null = null;
+      let location: string | null = null;
+      let linkedinUrl: string | null = null;
+
+      if (person.userCandidateId) {
+        const userCandidate = await prisma.userCandidate.findUnique({
+          where: { id: person.userCandidateId },
+          include: { person: true },
+        });
+        if (userCandidate?.person) {
+          contactName = userCandidate.person.fullName;
+          company = userCandidate.person.company;
+          role = userCandidate.person.role;
+          location = [userCandidate.person.city, userCandidate.person.state, userCandidate.person.country]
+            .filter(Boolean)
+            .join(', ') || null;
+          linkedinUrl = userCandidate.person.linkedinUrl;
+        }
+      }
+
+      // Upsert outreach tracker
+      await upsertOutreachTrackerOnSend({
+        userId: session.user.id,
+        toEmail: person.email,
+        contactName,
+        company,
+        role,
+        location,
+        linkedinUrl,
+        userCandidateId: person.userCandidateId,
+        gmailThreadId: sendResult.threadId,
+        sendLogId: sendLog.id,
+      });
       try {
         await prisma.emailDraft.updateMany({
           where: {
@@ -450,7 +487,7 @@ export async function sendFollowUpAction(
   );
 
   // Log the follow-up send
-  await prisma.sendLog.create({
+  const sendLog = await prisma.sendLog.create({
     data: {
       userId: session.user.id,
       userCandidateId: input.userCandidateId,
@@ -466,9 +503,17 @@ export async function sendFollowUpAction(
     },
   });
 
-  // Increment daily count on success
+  // Increment daily count on success and update outreach tracker
   if (sendResult.success) {
     await incrementDailyCount(session.user.id);
+
+    // Update outreach tracker with follow-up info
+    await upsertOutreachTrackerOnSend({
+      userId: session.user.id,
+      toEmail: input.toEmail,
+      gmailThreadId: sendResult.threadId,
+      sendLogId: sendLog.id,
+    });
   }
 
   return {

@@ -2,8 +2,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { Header } from '@/components/Header';
-import { EmailHistoryClient } from '@/components/history/EmailHistoryClient';
-import { getInitialSendLogs } from '@/app/actions/sendlog';
+import { OutreachTrackerClient } from '@/components/outreach/OutreachTrackerClient';
+import { getInitialOutreachTrackers, getOutreachStats } from '@/app/actions/outreach';
 
 export default async function HistoryPage() {
   const session = await getServerSession(authOptions);
@@ -12,17 +12,29 @@ export default async function HistoryPage() {
     redirect('/auth/signin');
   }
 
-  // Fetch initial data on the server
-  const initialData = await getInitialSendLogs(session.user.id);
+  // Fetch initial outreach data on the server
+  const [trackersResult, statsResult] = await Promise.all([
+    getInitialOutreachTrackers(session.user.id),
+    getOutreachStats(),
+  ]);
+
+  const defaultStats = {
+    sent: 0,
+    waiting: 0,
+    ongoingConversations: 0,
+    connected: 0,
+    upcomingReminders: 0,
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <EmailHistoryClient
-          initialLogs={initialData.success ? initialData.logs : []}
-          initialCursor={initialData.success ? initialData.nextCursor : null}
-          initialHasMore={initialData.success ? initialData.hasMore : false}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <OutreachTrackerClient
+          initialTrackers={trackersResult.success ? trackersResult.trackers : []}
+          initialCursor={trackersResult.success ? trackersResult.nextCursor : null}
+          initialHasMore={trackersResult.success ? trackersResult.hasMore : false}
+          initialStats={statsResult.success ? statsResult.stats : defaultStats}
         />
       </main>
     </div>

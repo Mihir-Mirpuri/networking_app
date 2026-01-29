@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { getGmailClient, NoGoogleAccountError, NoRefreshTokenError } from '@/lib/gmail/client';
 import { parseGmailResponse } from '@/lib/gmail/parser';
 import { extractMeetingFromThread } from '@/lib/services/meetingExtractor';
+import { updateOutreachTrackerOnResponse } from '@/app/actions/outreach';
 
 /**
  * Maximum duration for sync operations (25 seconds)
@@ -436,7 +437,15 @@ async function fetchAndProcessMessage(
   // 7. Upsert to database
   await upsertEmailData(userId, processedMessage);
 
-  // 8. Extract meeting suggestions from RECEIVED messages (fire-and-forget)
+  // 8. If this is a RECEIVED message, update OutreachTracker
+  if (direction === 'RECEIVED' && threadId) {
+    await updateOutreachTrackerOnResponse({
+      userId,
+      gmailThreadId: threadId,
+    });
+  }
+
+  // 9. Extract meeting suggestions from RECEIVED messages (fire-and-forget)
   // Analyzes full thread context to detect CONFIRMED meetings
   // We don't await this to avoid slowing down the sync process
   if (direction === 'RECEIVED') {

@@ -169,6 +169,7 @@ export interface SearchResult {
   confidence?: number;
   isLowConfidence?: boolean;
   extractionMethod?: 'linkedin' | 'pipe' | 'snippet' | 'role-first' | 'fallback';
+  locationConfidence?: number;  // 0-1 score indicating confidence person is based in requested location
 }
 
 async function searchCSE(query: string, start?: number): Promise<CSEResult[]> {
@@ -622,6 +623,61 @@ function normalizeKey(name: string, company: string, url: string): string {
   return `${name.toLowerCase().replace(/\s+/g, '_')}_${company.toLowerCase().replace(/\s+/g, '_')}_${url}`;
 }
 
+// Validate that a location mention in the result actually indicates the person is based there
+function validateLocationContext(snippet: string, title: string, location: string): { isValid: boolean; confidence: number } {
+  const text = `${title} ${snippet}`.toLowerCase();
+  const loc = location.toLowerCase();
+
+  // Strong positive patterns - high confidence they're based there
+  const strongPositivePatterns = [
+    new RegExp(`based in[\\s\\w]*${loc}`, 'i'),
+    new RegExp(`located in[\\s\\w]*${loc}`, 'i'),
+    new RegExp(`${loc}\\s*area`, 'i'),
+    new RegExp(`greater\\s*${loc}`, 'i'),
+    new RegExp(`${loc}\\s*metro`, 'i'),
+    new RegExp(`lives in[\\s\\w]*${loc}`, 'i'),
+    new RegExp(`residing in[\\s\\w]*${loc}`, 'i'),
+    new RegExp(`${loc},\\s*[a-z]{2}\\b`, 'i'),  // "New York, NY" format
+  ];
+
+  // Weak positive patterns - location mentioned but context unclear
+  const weakPositivePatterns = [
+    new RegExp(`${loc}`, 'i'),  // Just mentioned somewhere
+  ];
+
+  // Negative patterns - indicates they're NOT based there
+  const negativePatterns = [
+    new RegExp(`(visited|traveled to|travel to|trips? to)\\s*${loc}`, 'i'),
+    new RegExp(`(moved from|relocated from|formerly in)\\s*${loc}`, 'i'),
+    new RegExp(`(clients? in|serving|serves)\\s*${loc}`, 'i'),
+    new RegExp(`(offices? in|branches? in)\\s*${loc}`, 'i'),  // Company has office there, not person
+    new RegExp(`(conference|event|meeting) in\\s*${loc}`, 'i'),
+  ];
+
+  // Check for negative patterns first
+  const hasNegative = negativePatterns.some(p => p.test(text));
+  if (hasNegative) {
+    return { isValid: false, confidence: 0.2 };
+  }
+
+  // Check for strong positive patterns
+  const hasStrongPositive = strongPositivePatterns.some(p => p.test(text));
+  if (hasStrongPositive) {
+    return { isValid: true, confidence: 0.9 };
+  }
+
+  // Check for weak positive (location mentioned but no strong context)
+  const hasWeakPositive = weakPositivePatterns.some(p => p.test(text));
+  if (hasWeakPositive) {
+    // Location is mentioned but we can't confirm they're based there
+    // Still return valid but with lower confidence
+    return { isValid: true, confidence: 0.5 };
+  }
+
+  // Location not mentioned at all
+  return { isValid: false, confidence: 0 };
+}
+
 export async function searchPeople(params: SearchParams): Promise<SearchResult[]> {
   const { name, university, company, role, location, limit, excludePersonKeys = new Set() } = params;
 
@@ -682,6 +738,24 @@ export async function searchPeople(params: SearchParams): Promise<SearchResult[]
           continue;
         }
 
+        // Validate location context if a location filter was specified
+        let locationConfidence = 1;  // Default to 1 if no location filter
+        if (location && location.trim()) {
+          const locationValidation = validateLocationContext(result.snippet, result.title, location);
+          locationConfidence = locationValidation.confidence;
+
+          // Skip results with very low location confidence (likely false positives)
+          if (!locationValidation.isValid) {
+            console.log(`[Discovery] Skipping - weak location match for "${location}": ${parsed.fullName} (confidence: ${locationConfidence})`);
+            continue;
+          }
+
+          // Log medium confidence matches for monitoring
+          if (locationConfidence < 0.7) {
+            console.log(`[Discovery] Medium location confidence (${locationConfidence}): ${parsed.fullName} in ${location}`);
+          }
+        }
+
         // Calculate confidence score
         const confidence = calculateConfidence(parsed, result, company || '');
         const isLowConfidence = confidence < 0.6;
@@ -716,6 +790,7 @@ export async function searchPeople(params: SearchParams): Promise<SearchResult[]
           confidence,
           isLowConfidence,
           extractionMethod: parsed.extractionMethod,
+          locationConfidence,
         });
       }
     }

@@ -10,6 +10,7 @@ import {
   incrementDailyCount,
   EmailAttachment,
 } from '@/lib/services/gmail';
+import { upsertOutreachTrackerOnSend } from './outreach';
 
 // Max file size: 10MB (Gmail limit is 25MB but we'll be conservative)
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -144,7 +145,7 @@ export async function sendComposedEmailAction(
   );
 
   // Log the send attempt (with direct recipient fields since no UserCandidate)
-  await prisma.sendLog.create({
+  const sendLog = await prisma.sendLog.create({
     data: {
       userId: session.user.id,
       userCandidateId: null,
@@ -162,9 +163,18 @@ export async function sendComposedEmailAction(
     },
   });
 
-  // Increment daily count on success
+  // Increment daily count on success and upsert outreach tracker
   if (sendResult.success) {
     await incrementDailyCount(session.user.id);
+
+    // Upsert outreach tracker for direct sends
+    await upsertOutreachTrackerOnSend({
+      userId: session.user.id,
+      toEmail: input.recipientEmail,
+      contactName: input.recipientName || null,
+      gmailThreadId: sendResult.threadId,
+      sendLogId: sendLog.id,
+    });
   }
 
   if (!sendResult.success) {
