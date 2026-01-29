@@ -183,6 +183,10 @@ async function searchCSE(query: string, start?: number): Promise<CSEResult[]> {
   url.searchParams.set('cx', CSE_CX);
   url.searchParams.set('q', query);
   url.searchParams.set('num', '10');
+  // Geolocation params to align with browser behavior
+  url.searchParams.set('gl', 'us');
+  url.searchParams.set('cr', 'countryUS');
+  url.searchParams.set('hl', 'en');
   if (start) {
     url.searchParams.set('start', start.toString());
   }
@@ -624,6 +628,9 @@ function normalizeKey(name: string, company: string, url: string): string {
 }
 
 // Validate that a location mention in the result actually indicates the person is based there
+// NOTE: This is a preliminary filter. Apollo does the real location verification later.
+// We only reject results with NEGATIVE signals (clearly NOT in location).
+// Results with no location signal are allowed through for Apollo to verify.
 function validateLocationContext(snippet: string, title: string, location: string): { isValid: boolean; confidence: number } {
   const text = `${title} ${snippet}`.toLowerCase();
   const loc = location.toLowerCase();
@@ -650,11 +657,10 @@ function validateLocationContext(snippet: string, title: string, location: strin
     new RegExp(`(visited|traveled to|travel to|trips? to)\\s*${loc}`, 'i'),
     new RegExp(`(moved from|relocated from|formerly in)\\s*${loc}`, 'i'),
     new RegExp(`(clients? in|serving|serves)\\s*${loc}`, 'i'),
-    new RegExp(`(offices? in|branches? in)\\s*${loc}`, 'i'),  // Company has office there, not person
     new RegExp(`(conference|event|meeting) in\\s*${loc}`, 'i'),
   ];
 
-  // Check for negative patterns first
+  // Check for negative patterns first - ONLY reject on negative signals
   const hasNegative = negativePatterns.some(p => p.test(text));
   if (hasNegative) {
     return { isValid: false, confidence: 0.2 };
@@ -669,29 +675,40 @@ function validateLocationContext(snippet: string, title: string, location: strin
   // Check for weak positive (location mentioned but no strong context)
   const hasWeakPositive = weakPositivePatterns.some(p => p.test(text));
   if (hasWeakPositive) {
-    // Location is mentioned but we can't confirm they're based there
-    // Still return valid but with lower confidence
     return { isValid: true, confidence: 0.5 };
   }
 
-  // Location not mentioned at all
-  return { isValid: false, confidence: 0 };
+  // Location not mentioned - still allow through, Apollo will verify
+  // This is important: CSE snippets often don't include location,
+  // but Apollo has accurate location data for verification
+  return { isValid: true, confidence: 0.3 };
 }
 
 export async function searchPeople(params: SearchParams): Promise<SearchResult[]> {
   const { name, university, company, role, location, limit, excludePersonKeys = new Set() } = params;
 
-  // Build query from all non-empty parameters
-  // Format: "location, company, role, university, name" (comma-separated)
+  // Build optimized query for LinkedIn profile search
+  // Format: site:linkedin.com/in/ "Company" Location "Role" "University" Name
+  // - site filter eliminates directory pages
+  // - quoted terms for exact matching on key fields
+  // - company first for emphasis
   const queryParts: string[] = [];
 
+  // Always restrict to individual LinkedIn profiles (not directory pages)
+  queryParts.push('site:linkedin.com/in/');
+
+  // Company first (quoted for exact match)
+  if (company && company.trim()) queryParts.push(`"${company.trim()}"`);
+  // Location without quotes (allows flexible matching)
   if (location && location.trim()) queryParts.push(location.trim());
-  if (company && company.trim()) queryParts.push(company.trim());
-  if (role && role.trim()) queryParts.push(role.trim());
-  if (university && university.trim()) queryParts.push(university.trim());
+  // Role quoted for exact match
+  if (role && role.trim()) queryParts.push(`"${role.trim()}"`);
+  // University quoted for exact match
+  if (university && university.trim()) queryParts.push(`"${university.trim()}"`);
+  // Name without quotes (allows partial matching)
   if (name && name.trim()) queryParts.push(name.trim());
 
-  const query = queryParts.join(', ');
+  const query = queryParts.join(' ');
 
   if (!query) {
     console.log('[Discovery] No search parameters provided, returning empty results');
