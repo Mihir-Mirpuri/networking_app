@@ -322,12 +322,15 @@ export async function searchPeopleAction(
         cachedPersons = await getPersonsByIds(cachedPersonIds);
       }
 
-      // Filter out excluded people
+      // Filter out excluded people and those without emails
       const filteredPersons = cachedPersons.filter((person) => {
         const key = `${person.fullName}_${person.company}`.toLowerCase();
-        return !excludedKeys.has(key);
+        if (excludedKeys.has(key)) return false;
+        // Hard filter: must have email
+        if (!person.email) return false;
+        return true;
       });
-      console.log(`[Search] After excluding sent/hidden: ${filteredPersons.length} people`);
+      console.log(`[Search] After filtering (excluded + no email): ${filteredPersons.length} people`);
 
       // Apply ranking to cached persons
       const rankedCached = rankCandidates(
@@ -453,7 +456,8 @@ export async function searchPeopleAction(
       }
 
       // Request more candidates for ranking (we'll rank and take top N)
-      const discoveryLimit = Math.max(input.limit * 3, 30);
+      // Use 5x multiplier to account for email filter (~70% have emails)
+      const discoveryLimit = Math.max(input.limit * 5, 50);
       console.log(`[Search] Requesting ${discoveryLimit} candidates for ranking`);
 
       // Search for people via CSE
@@ -522,10 +526,14 @@ export async function searchPeopleAction(
         }
       );
 
+      // Hard filter: only keep candidates with emails
+      const peopleWithEmails = enrichedPeople.filter(({ emailResult }) => emailResult.email);
+      console.log(`[Search] After email filter: ${peopleWithEmails.length}/${enrichedPeople.length} have emails`);
+
       // Apply ranking to enriched candidates
       const rankedEnriched = rankCandidates(
         searchCriteria,
-        enrichedPeople,
+        peopleWithEmails,
         ({ emailResult }): CandidateData => ({
           company: emailResult.employment?.company || null,
           role: emailResult.employment?.title || null,
