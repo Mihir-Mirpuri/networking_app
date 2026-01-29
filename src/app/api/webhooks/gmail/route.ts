@@ -161,7 +161,35 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Gmail Webhook] User lookup successful - userId: ${userId}`);
 
-    // 5. Trigger sync processing
+    // 5. Check for duplicate notification (deduplication)
+    try {
+      await prisma.processed_notifications.create({
+        data: {
+          userId,
+          historyId,
+        },
+      });
+      console.log(`[Gmail Webhook] New notification recorded - userId: ${userId}, historyId: ${historyId}`);
+    } catch (error: any) {
+      // P2002 is Prisma's unique constraint violation code
+      if (error?.code === 'P2002') {
+        console.log(`[Gmail Webhook] Duplicate notification ignored - userId: ${userId}, historyId: ${historyId}`);
+        return NextResponse.json(
+          {
+            acknowledged: true,
+            duplicate: true,
+            userId,
+            historyId,
+            message: 'Duplicate notification ignored',
+          },
+          { status: 200 }
+        );
+      }
+      // For other errors, log but continue processing
+      console.error(`[Gmail Webhook] Error recording notification:`, error);
+    }
+
+    // 6. Trigger sync processing
     try {
       await processSync(userId);
       console.log(`[Gmail Webhook] Sync processing triggered for userId: ${userId}`);
@@ -171,7 +199,7 @@ export async function POST(request: NextRequest) {
       // Continue to return 200 to acknowledge receipt
     }
 
-    // 6. Return success response
+    // 7. Return success response
     return NextResponse.json(
       {
         acknowledged: true,

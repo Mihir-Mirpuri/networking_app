@@ -12,7 +12,9 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
     "test:db": "tsx test-db-connection.ts",
-    "test:db-pooling": "tsx test-db-pooling.ts"
+    "test:db-pooling": "tsx test-db-pooling.ts",
+    "test:groq": "tsx src/lib/services/groq/test-groq.ts",
+    "test:meeting-suggestions": "tsx src/app/actions/test-meetingSuggestions.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.0.0",

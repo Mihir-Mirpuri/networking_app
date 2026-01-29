@@ -56,9 +56,10 @@ model User {
   sessions        Session[]
   userCandidates  UserCandidate[]
   userResumes     UserResume[]
-  gmailSyncState  gmail_sync_state?
-  conversations   conversations[]
-  messages        messages[]
+  gmailSyncState      gmail_sync_state?
+  conversations       conversations[]
+  messages            messages[]
+  meetingSuggestions  ExtractedMeetingSuggestion[]
 }
 
 model VerificationToken {
@@ -330,6 +331,16 @@ model gmail_sync_state {
   @@index([email_address])
 }
 
+model processed_notifications {
+  id        String   @id @default(cuid())
+  userId    String
+  historyId String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, historyId])
+  @@index([createdAt])
+}
+
 model conversations {
   threadId      String     @id
   userId        String
@@ -349,6 +360,29 @@ model conversations {
 enum MessageDirection {
   SENT
   RECEIVED
+}
+
+enum MeetingSuggestionStatus {
+  PENDING
+  ACCEPTED
+  DISMISSED
+}
+
+model ExtractedMeetingSuggestion {
+  id            String                   @id @default(cuid())
+  userId        String
+  messageId     String                   @unique
+  status        MeetingSuggestionStatus  @default(PENDING)
+  extractedData Json
+  confidence    Float
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+
+  user          User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  message       messages                 @relation(fields: [messageId], references: [messageId], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([userId, createdAt])
 }
 
 model messages {
@@ -375,4 +409,5 @@ model messages {
   @@index([userId, received_at])
   @@index([sender])
   @@index([sendLogId])
+  meetingSuggestion ExtractedMeetingSuggestion?
 }

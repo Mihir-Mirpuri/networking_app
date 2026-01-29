@@ -2,6 +2,7 @@ import { gmail_v1 } from 'googleapis';
 import prisma from '@/lib/prisma';
 import { getGmailClient, NoGoogleAccountError, NoRefreshTokenError } from '@/lib/gmail/client';
 import { parseGmailResponse } from '@/lib/gmail/parser';
+import { extractMeetingFromEmail } from '@/lib/services/meetingExtractor';
 
 /**
  * Maximum duration for sync operations (25 seconds)
@@ -434,6 +435,29 @@ async function fetchAndProcessMessage(
 
   // 7. Upsert to database
   await upsertEmailData(userId, processedMessage);
+
+  // 8. Extract meeting suggestions from RECEIVED messages (fire-and-forget)
+  // We don't await this to avoid slowing down the sync process
+  if (direction === 'RECEIVED') {
+    extractMeetingFromEmail({
+      messageId,
+      userId,
+      subject: processedMessage.subject,
+      bodyText: processedMessage.body_text,
+      sender: processedMessage.sender,
+      receivedAt: processedMessage.received_at,
+    }).then(result => {
+      if (result.extracted) {
+        console.log(`[Email Sync] Meeting suggestion created for ${messageId}:`, {
+          suggestionId: result.suggestionId,
+          confidence: result.confidence,
+        });
+      }
+    }).catch(error => {
+      // This should never happen as extractMeetingFromEmail handles all errors internally
+      console.error(`[Email Sync] Unexpected error in meeting extraction for ${messageId}:`, error);
+    });
+  }
 
   console.log(`[Email Sync] Processed message ${messageId} (${direction})`);
   return processedMessage;
