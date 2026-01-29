@@ -452,26 +452,31 @@ async function fetchAndProcessMessage(
     });
   }
 
-  // 9. Extract meeting suggestions from RECEIVED messages (fire-and-forget)
-  // Analyzes full thread context to detect CONFIRMED meetings
-  // We don't await this to avoid slowing down the sync process
+  // 9. Extract meeting suggestions from RECEIVED messages
+  // Now properly awaited to prevent connection pool exhaustion
   if (direction === 'RECEIVED') {
-    extractMeetingFromThread({
-      messageId,
-      threadId,
-      userId,
-      userEmail,
-    }).then(result => {
-      if (result.extracted) {
+    try {
+      const extractionResult = await extractMeetingFromThread({
+        messageId,
+        threadId,
+        userId,
+        userEmail,
+      });
+
+      if (extractionResult.extracted) {
         console.log(`[Email Sync] Meeting suggestion created for thread ${threadId}:`, {
-          suggestionId: result.suggestionId,
-          confidence: result.confidence,
+          suggestionId: extractionResult.suggestionId,
+          confidence: extractionResult.confidence,
         });
+      } else if (extractionResult.error) {
+        console.error(`[Email Sync] Meeting extraction failed for thread ${threadId}:`, extractionResult.error);
+      } else {
+        console.log(`[Email Sync] No meeting extracted for thread ${threadId}:`, extractionResult.skippedReason);
       }
-    }).catch(error => {
-      // This should never happen as extractMeetingFromThread handles all errors internally
-      console.error(`[Email Sync] Unexpected error in meeting extraction for thread ${threadId}:`, error);
-    });
+    } catch (error) {
+      // Log but don't fail the sync - extraction is non-critical
+      console.error(`[Email Sync] Meeting extraction error for thread ${threadId}:`, error);
+    }
   }
 
   console.log(`[Email Sync] Processed message ${messageId} (${direction})`);
