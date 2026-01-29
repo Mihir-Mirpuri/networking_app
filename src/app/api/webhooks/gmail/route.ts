@@ -51,7 +51,8 @@ function parsePubSubMessage(body: any): { emailAddress: string; historyId: strin
       return null;
     }
 
-    return { emailAddress, historyId };
+    // Google sends historyId as a number, convert to string for Prisma
+    return { emailAddress, historyId: String(historyId) };
   } catch (error) {
     console.error('[Gmail Webhook] Error parsing Pub/Sub message:', error);
     return null;

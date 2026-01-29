@@ -179,7 +179,13 @@ async function processHistoryChanges(
       latestHistoryId = historyResponse.data.historyId || latestHistoryId;
       const historyRecords = historyResponse.data.history || [];
 
+      console.log(`[Email Sync] History response: ${historyRecords.length} records, returnedHistoryId: ${historyResponse.data.historyId}, latestHistoryId: ${latestHistoryId}`);
+
       // Process each history record
+      if (historyRecords.length > 0) {
+        const messageIds = historyRecords.flatMap(r => r.messagesAdded?.map(m => m.message?.id) || []);
+        console.log(`[Email Sync] Messages to process: ${messageIds.join(', ')}`);
+      }
       for (const record of historyRecords) {
         // Timeout check inside inner loop too
         if (Date.now() - startTime > MAX_SYNC_DURATION_MS) {
@@ -405,6 +411,7 @@ async function fetchAndProcessMessage(
 
   if (!appThread) {
     // Not an app-initiated thread, skip
+    console.log(`[Email Sync] Skipping message ${messageId} - thread ${threadId} not app-initiated`);
     return null;
   }
 
