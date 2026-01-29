@@ -688,14 +688,11 @@ export async function searchPeople(params: SearchParams): Promise<SearchResult[]
   const { name, university, company, role, location, limit, excludePersonKeys = new Set() } = params;
 
   // Build optimized query for LinkedIn profile search
-  // Format: site:linkedin.com/in/ "Company" Location "Role" "University" Name
-  // - site filter eliminates directory pages
+  // Format: "Company" Location "Role" "University" Name
   // - quoted terms for exact matching on key fields
   // - company first for emphasis
+  // NOTE: Don't add site:linkedin.com - CSE is already configured for LinkedIn
   const queryParts: string[] = [];
-
-  // Always restrict to individual LinkedIn profiles (not directory pages)
-  queryParts.push('site:linkedin.com/in/');
 
   // Company first (quoted for exact match)
   if (company && company.trim()) queryParts.push(`"${company.trim()}"`);
