@@ -580,3 +580,67 @@ export async function markCalendarDisconnected(userId: string): Promise<void> {
   });
   console.log('[Calendar] Marked calendar as disconnected for user', userId);
 }
+
+/**
+ * Verifies calendar access during sign-in and marks the user as connected.
+ * This is called from the NextAuth signIn event to ensure new users
+ * get their calendarConnected flag set properly.
+ *
+ * Includes retry logic for transient failures.
+ */
+export async function verifyCalendarAccessOnSignIn(userId: string): Promise<boolean> {
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY_MS = 1000;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const calendar = await getCalendarClient(userId);
+
+      // Make a minimal API call to verify access
+      const now = new Date();
+      const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+      await calendar.events.list({
+        calendarId: 'primary',
+        timeMin: now.toISOString(),
+        timeMax: tomorrow.toISOString(),
+        maxResults: 1,
+        singleEvents: true,
+      });
+
+      // If we get here, access works - mark as connected
+      await markCalendarConnected(userId);
+      return true;
+    } catch (error: unknown) {
+      const isLastAttempt = attempt === MAX_RETRIES;
+      const errorCode = (error as { code?: number })?.code;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      // If it's a permission error (403), don't retry - user doesn't have access
+      if (errorCode === 403 || errorMessage.includes('insufficient')) {
+        console.log(`[Calendar] User ${userId} does not have calendar permissions`);
+        await markCalendarDisconnected(userId);
+        return false;
+      }
+
+      // If it's a missing account/token error, don't retry
+      if (error instanceof NoGoogleAccountError || error instanceof NoRefreshTokenError) {
+        console.log(`[Calendar] User ${userId} missing Google account or refresh token`);
+        return false;
+      }
+
+      if (isLastAttempt) {
+        console.error(`[Calendar] Failed to verify calendar access after ${MAX_RETRIES} attempts:`, error);
+        // Don't mark as disconnected for transient errors - leave state unchanged
+        // User can try again later via the calendar page
+        return false;
+      }
+
+      // Wait before retrying
+      console.log(`[Calendar] Verification attempt ${attempt} failed, retrying in ${RETRY_DELAY_MS}ms...`);
+      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+    }
+  }
+
+  return false;
+}

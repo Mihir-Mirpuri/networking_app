@@ -96,6 +96,8 @@ export async function checkCalendarAccessAction(): Promise<
  * Verifies calendar access by making a test API call.
  * Call this after user re-authenticates to confirm access works.
  * Marks user as connected if successful.
+ *
+ * Includes retry logic for transient failures.
  */
 export async function verifyAndMarkCalendarAccessAction(): Promise<
   CalendarActionResult<{ verified: boolean }>
@@ -106,34 +108,51 @@ export async function verifyAndMarkCalendarAccessAction(): Promise<
     return { success: false, error: 'Not authenticated' };
   }
 
-  try {
-    // Try to list events as a test (small date range)
-    const now = new Date();
-    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY_MS = 500;
 
-    await listEvents(session.user.id, now, tomorrow, 1);
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      // Try to list events as a test (small date range)
+      const now = new Date();
+      const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
-    // If we get here, access works - mark as connected
-    await markCalendarConnected(session.user.id);
+      await listEvents(session.user.id, now, tomorrow, 1);
 
-    return {
-      success: true,
-      data: { verified: true },
-    };
-  } catch (error) {
-    console.error('[Calendar Action] Verification failed:', error);
+      // If we get here, access works - mark as connected
+      await markCalendarConnected(session.user.id);
 
-    if (error instanceof NoCalendarAccessError) {
-      await markCalendarDisconnected(session.user.id);
       return {
         success: true,
-        data: { verified: false },
-        requiresReauth: true,
+        data: { verified: true },
       };
-    }
+    } catch (error) {
+      const isLastAttempt = attempt === MAX_RETRIES;
 
-    return { success: false, error: 'Failed to verify calendar access' };
+      if (error instanceof NoCalendarAccessError) {
+        // Permission error - don't retry, user needs to re-auth
+        await markCalendarDisconnected(session.user.id);
+        return {
+          success: true,
+          data: { verified: false },
+          requiresReauth: true,
+        };
+      }
+
+      if (isLastAttempt) {
+        console.error('[Calendar Action] Verification failed after retries:', error);
+        // For transient errors, return failure but don't mark as disconnected
+        // This allows the user to try again
+        return { success: false, error: 'Failed to verify calendar access. Please try again.' };
+      }
+
+      // Wait before retrying
+      console.log(`[Calendar Action] Verification attempt ${attempt} failed, retrying...`);
+      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+    }
   }
+
+  return { success: false, error: 'Failed to verify calendar access' };
 }
 
 // ============================================================================
