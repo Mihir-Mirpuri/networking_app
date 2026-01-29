@@ -10,31 +10,41 @@ import {
 import { MeetingSuggestionWithMessage } from '@/lib/types/meetingSuggestion';
 import { CreateEventInput } from '@/components/calendar/types';
 import Link from 'next/link';
+import { usePolling } from '@/hooks/usePolling';
 
 export function SuggestionsClient() {
   const [suggestions, setSuggestions] = useState<MeetingSuggestionWithMessage[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
 
+  const { data: fetchedSuggestions, error: fetchError } = usePolling(
+    async () => {
+      const result = await getPendingSuggestionsAction();
+      if (result.success && result.data) {
+        return result.data;
+      }
+      throw new Error(result.error || 'Failed to load suggestions');
+    },
+    { interval: 30000, enabled: true }
+  );
+
+  // Sync fetched data to local state for optimistic updates
   useEffect(() => {
-    loadSuggestions();
-  }, []);
-
-  async function loadSuggestions() {
-    setLoading(true);
-    setError(null);
-
-    const result = await getPendingSuggestionsAction();
-
-    if (result.success && result.data) {
-      setSuggestions(result.data);
-    } else {
-      setError(result.error || 'Failed to load suggestions');
+    if (fetchedSuggestions) {
+      setSuggestions(fetchedSuggestions);
+      setInitialLoading(false);
+      setError(null);
     }
+  }, [fetchedSuggestions]);
 
-    setLoading(false);
-  }
+  // Handle fetch errors
+  useEffect(() => {
+    if (fetchError) {
+      setError(fetchError.message);
+      setInitialLoading(false);
+    }
+  }, [fetchError]);
 
   async function handleAccept(suggestionId: string, eventData: CreateEventInput) {
     setActionInProgress(suggestionId);
@@ -68,7 +78,7 @@ export function SuggestionsClient() {
     setActionInProgress(null);
   }
 
-  if (loading) {
+  if (initialLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-16">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>

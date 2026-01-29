@@ -3,32 +3,35 @@
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef } from 'react';
+import { usePolling } from '@/hooks/usePolling';
 import { getPendingSuggestionsCountAction } from '@/app/actions/meetingSuggestions';
 
 export function Header() {
   const { data: session, status } = useSession();
   const pathname = usePathname();
-  const [pendingSuggestionsCount, setPendingSuggestionsCount] = useState(0);
+  const prevPathnameRef = useRef(pathname);
 
-  const fetchPendingCount = useCallback(async () => {
-    if (!session?.user) return;
+  const { data: pendingSuggestionsCount, refetch } = usePolling(
+    async () => {
+      const result = await getPendingSuggestionsCountAction();
+      return result.success ? result.data ?? 0 : 0;
+    },
+    { interval: 30000, enabled: !!session?.user }
+  );
 
-    const result = await getPendingSuggestionsCountAction();
-    if (result.success && result.data !== undefined) {
-      setPendingSuggestionsCount(result.data);
-    }
-  }, [session?.user]);
-
-  // Fetch count on mount and when navigating (to update after accept/dismiss)
+  // Refetch when pathname changes (to update after accept/dismiss)
   useEffect(() => {
-    fetchPendingCount();
-  }, [fetchPendingCount, pathname]);
+    if (prevPathnameRef.current !== pathname) {
+      prevPathnameRef.current = pathname;
+      refetch();
+    }
+  }, [pathname, refetch]);
 
   const tabs = [
     { name: 'Send Emails', href: '/' },
     { name: 'Email History', href: '/history' },
-    { name: 'Calendar', href: '/calendar', badge: pendingSuggestionsCount },
+    { name: 'Calendar', href: '/calendar', badge: pendingSuggestionsCount ?? 0 },
     { name: 'Profile', href: '/profile' },
   ];
 
