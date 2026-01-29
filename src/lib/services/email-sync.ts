@@ -2,7 +2,7 @@ import { gmail_v1 } from 'googleapis';
 import prisma from '@/lib/prisma';
 import { getGmailClient, NoGoogleAccountError, NoRefreshTokenError } from '@/lib/gmail/client';
 import { parseGmailResponse } from '@/lib/gmail/parser';
-import { extractMeetingFromEmail } from '@/lib/services/meetingExtractor';
+import { extractMeetingFromThread } from '@/lib/services/meetingExtractor';
 
 /**
  * Maximum duration for sync operations (25 seconds)
@@ -437,25 +437,24 @@ async function fetchAndProcessMessage(
   await upsertEmailData(userId, processedMessage);
 
   // 8. Extract meeting suggestions from RECEIVED messages (fire-and-forget)
+  // Analyzes full thread context to detect CONFIRMED meetings
   // We don't await this to avoid slowing down the sync process
   if (direction === 'RECEIVED') {
-    extractMeetingFromEmail({
+    extractMeetingFromThread({
       messageId,
+      threadId,
       userId,
-      subject: processedMessage.subject,
-      bodyText: processedMessage.body_text,
-      sender: processedMessage.sender,
-      receivedAt: processedMessage.received_at,
+      userEmail,
     }).then(result => {
       if (result.extracted) {
-        console.log(`[Email Sync] Meeting suggestion created for ${messageId}:`, {
+        console.log(`[Email Sync] Meeting suggestion created for thread ${threadId}:`, {
           suggestionId: result.suggestionId,
           confidence: result.confidence,
         });
       }
     }).catch(error => {
-      // This should never happen as extractMeetingFromEmail handles all errors internally
-      console.error(`[Email Sync] Unexpected error in meeting extraction for ${messageId}:`, error);
+      // This should never happen as extractMeetingFromThread handles all errors internally
+      console.error(`[Email Sync] Unexpected error in meeting extraction for thread ${threadId}:`, error);
     });
   }
 

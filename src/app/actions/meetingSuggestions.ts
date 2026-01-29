@@ -49,6 +49,7 @@ export async function getPendingSuggestionsAction(): Promise<
             subject: true,
             sender: true,
             received_at: true,
+            body_text: true,
           },
         },
       },
@@ -71,6 +72,7 @@ export async function getPendingSuggestionsAction(): Promise<
         subject: s.message.subject,
         sender: s.message.sender,
         received_at: s.message.received_at,
+        body_text: s.message.body_text,
       },
     }));
 
@@ -114,6 +116,7 @@ export async function getSuggestionByIdAction(
             subject: true,
             sender: true,
             received_at: true,
+            body_text: true,
           },
         },
       },
@@ -136,6 +139,7 @@ export async function getSuggestionByIdAction(
         subject: suggestion.message.subject,
         sender: suggestion.message.sender,
         received_at: suggestion.message.received_at,
+        body_text: suggestion.message.body_text,
       },
     };
 

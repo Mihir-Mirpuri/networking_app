@@ -49,5 +49,6 @@ export interface MeetingSuggestionWithMessage {
     subject: string | null;
     sender: string;
     received_at: Date;
+    body_text: string | null;
   };
 }

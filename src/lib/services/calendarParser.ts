@@ -2,8 +2,13 @@
  * Calendar Parser Service
  *
  * Uses Groq LLM to extract meeting/scheduling information from emails.
- * Designed to be called after the pre-filter (meetingDetector) confirms
- * potential meeting content.
+ *
+ * Supports two modes:
+ * 1. Single message parsing (legacy) - parseCalendarFromEmail
+ * 2. Thread-based parsing (new) - parseCalendarFromThread
+ *
+ * Thread-based parsing analyzes full conversation context to detect
+ * CONFIRMED meetings (both parties agreed), not just proposals.
  */
 
 import { completeJson, GroqJsonParseError, GroqError } from '@/lib/services/groq';
@@ -114,6 +119,66 @@ export interface CalendarParserOutput {
   result: ParsedMeetingResult | null;
   error?: string;
   skipped?: boolean; // True if pre-filter said no meeting
+}
+
+// ============================================================================
+// Thread-Based Parsing Types (New)
+// ============================================================================
+
+/**
+ * A single message in a conversation thread
+ */
+export interface ThreadMessage {
+  direction: 'SENT' | 'RECEIVED';
+  sender: string;
+  subject: string | null;
+  bodyText: string | null;
+  receivedAt: Date;
+}
+
+/**
+ * Input for thread-based calendar parsing
+ */
+export interface ThreadParserInput {
+  messageId: string;        // The triggering message (latest reply)
+  threadId: string;
+  thread: ThreadMessage[];  // Full conversation, chronological order
+  userEmail: string;        // To identify which messages are from the user
+  userTimezone?: string;
+}
+
+/**
+ * LLM result for thread analysis - includes isConfirmed flag
+ */
+export interface ThreadLLMResult {
+  isConfirmed: boolean;     // True ONLY if meeting is mutually agreed upon
+  hasMeeting: boolean;      // Alias for isConfirmed (backwards compat)
+  title: string | null;
+  description: string | null;
+  startTime: string | null;
+  endTime: string | null;
+  duration: number | null;
+  isAllDay: boolean;
+  location: string | null;
+  meetingLink: string | null;
+  meetingPlatform: MeetingPlatform | null;
+  organizer: string | null;
+  attendees: Attendee[];
+  confidence: number;
+  extractedFields: string[];
+  ambiguities: string[];
+  reasoning: string;        // Explanation of why meeting is/isn't confirmed
+}
+
+/**
+ * Output from thread-based parsing
+ */
+export interface ThreadParserOutput {
+  success: boolean;
+  isConfirmed: boolean;
+  result: ParsedMeetingResult | null;
+  reasoning?: string;
+  error?: string;
 }
 
 // ============================================================================
@@ -648,4 +713,243 @@ export function fromStorableFormat(data: Record<string, unknown>): ParsedMeeting
     llmModel: data.llmModel as string,
     processingTimeMs: data.processingTimeMs as number,
   };
+}
+
+// ============================================================================
+// Thread-Based Parsing (New)
+// ============================================================================
+
+const THREAD_SYSTEM_PROMPT = `You are analyzing an email conversation thread to determine if a meeting has been CONFIRMED between the parties.
+
+CRITICAL: A meeting is CONFIRMED only when BOTH conditions are met:
+1. One party proposes a specific meeting time/date
+2. The other party explicitly AGREES to that specific time
+
+A meeting is NOT confirmed when:
+- A meeting is proposed but no response yet
+- The response is ambiguous ("Maybe", "Let me check my calendar", "I'll get back to you")
+- The response declines or suggests a different time without agreement
+- Only one party has spoken about meeting
+
+Examples of CONFIRMED meetings:
+- "How about Tuesday at 2pm?" → "Yes, that works!" ✓
+- "Let's meet Friday at 10am" → "Sounds good, see you then" ✓
+- "Can we do 3pm?" → "Perfect, 3pm it is" ✓
+
+Examples of NOT confirmed:
+- "Want to grab coffee sometime?" → "Sure, let me know when" ✗ (no specific time agreed)
+- "How about Tuesday?" → (no response) ✗
+- "Can we meet at 2pm?" → "I'm busy then, how about 3pm?" ✗ (counter-proposal, not confirmed)
+- "Let's chat soon" → "Definitely!" ✗ (no specific time)
+
+When analyzing, look at the FINAL state of the conversation. If times were changed, use the LAST agreed-upon time.
+
+Always return valid JSON matching the specified schema.`;
+
+function buildThreadPrompt(input: ThreadParserInput): string {
+  const { thread, userEmail, userTimezone } = input;
+
+  // Format the conversation
+  const conversationText = thread.map((msg, idx) => {
+    const role = msg.direction === 'SENT' ? 'USER' : 'CONTACT';
+    const timestamp = msg.receivedAt.toISOString();
+    return `[${idx + 1}] ${role} (${msg.sender}) - ${timestamp}
+Subject: ${msg.subject || '(No subject)'}
+${msg.bodyText || '(No body)'}`;
+  }).join('\n\n---\n\n');
+
+  const contextInfo = [
+    `Reference date: ${new Date().toISOString()}`,
+    userTimezone ? `User timezone: ${userTimezone}` : 'User timezone: Not specified',
+    `User email: ${userEmail}`,
+    `Total messages in thread: ${thread.length}`,
+  ].join('\n');
+
+  return `Analyze this email conversation to determine if a meeting has been CONFIRMED.
+
+CONTEXT:
+${contextInfo}
+
+CONVERSATION (oldest to newest):
+${conversationText}
+
+Based on this conversation, determine:
+1. Has a meeting been CONFIRMED (both parties agreed to a specific time)?
+2. If confirmed, what are the meeting details?
+
+Return JSON with this exact structure:
+{
+  "isConfirmed": boolean (true ONLY if both parties agreed to a specific meeting time),
+  "hasMeeting": boolean (same as isConfirmed),
+  "reasoning": string (brief explanation of why the meeting is or isn't confirmed),
+  "title": string or null (meeting title/purpose - infer from context if not explicit),
+  "description": string or null (additional notes),
+  "startTime": string or null (the AGREED time - natural language or ISO format),
+  "endTime": string or null (end time if mentioned),
+  "duration": number or null (duration in minutes),
+  "isAllDay": boolean,
+  "location": string or null,
+  "meetingLink": string or null,
+  "meetingPlatform": "zoom" | "google-meet" | "teams" | "skype" | "webex" | "phone" | "in-person" | "other" | null,
+  "organizer": string or null,
+  "attendees": [{"name": string, "email": string}],
+  "confidence": number (0-1, how confident you are in the extraction),
+  "extractedFields": [list of successfully extracted fields],
+  "ambiguities": [list of unclear aspects]
+}`;
+}
+
+/**
+ * Parse meeting information from a full email thread using LLM
+ * This analyzes conversation context to detect CONFIRMED meetings
+ */
+export async function parseCalendarFromThread(
+  input: ThreadParserInput
+): Promise<ThreadParserOutput> {
+  const startTime = Date.now();
+  const { messageId, threadId, thread, userEmail, userTimezone } = input;
+
+  console.log(`[CalendarParser] Processing thread ${threadId} (${thread.length} messages)`);
+
+  // Validate we have messages to analyze
+  if (thread.length === 0) {
+    console.log(`[CalendarParser] Skipping thread ${threadId} - no messages`);
+    return {
+      success: true,
+      isConfirmed: false,
+      result: null,
+    };
+  }
+
+  // Need at least 2 messages for a confirmed meeting (proposal + acceptance)
+  if (thread.length < 2) {
+    console.log(`[CalendarParser] Skipping thread ${threadId} - only ${thread.length} message(s)`);
+    return {
+      success: true,
+      isConfirmed: false,
+      result: null,
+      reasoning: 'Need at least 2 messages for a confirmed meeting',
+    };
+  }
+
+  try {
+    // Build prompt with thread context
+    const userPrompt = buildThreadPrompt(input);
+
+    const response = await completeJson<ThreadLLMResult>({
+      systemPrompt: THREAD_SYSTEM_PROMPT,
+      userPrompt,
+      options: {
+        model: 'llama-3.1-8b-instant',
+        temperature: 0.2,
+        maxTokens: 1500,
+      },
+    });
+
+    const llmResult = response.content;
+    const processingTimeMs = Date.now() - startTime;
+
+    console.log(`[CalendarParser] Thread analysis complete for ${threadId}:`, {
+      isConfirmed: llmResult.isConfirmed,
+      confidence: llmResult.confidence,
+      reasoning: llmResult.reasoning,
+      model: response.model,
+      tokens: response.usage.totalTokens,
+      timeMs: processingTimeMs,
+    });
+
+    // If not confirmed, return early
+    if (!llmResult.isConfirmed) {
+      return {
+        success: true,
+        isConfirmed: false,
+        result: null,
+        reasoning: llmResult.reasoning,
+      };
+    }
+
+    // Get the last message for reference date
+    const lastMessage = thread[thread.length - 1];
+
+    // Resolve dates relative to the last message
+    const startResolution = resolveDateTime(llmResult.startTime, lastMessage.receivedAt, userTimezone);
+    const endResolution = resolveDateTime(llmResult.endTime, lastMessage.receivedAt, userTimezone);
+
+    // Calculate end time if needed
+    let resolvedEndTime = endResolution.date;
+    if (startResolution.date && !resolvedEndTime && llmResult.duration) {
+      resolvedEndTime = new Date(startResolution.date.getTime() + llmResult.duration * 60 * 1000);
+    }
+    if (startResolution.date && !resolvedEndTime && !llmResult.isAllDay) {
+      resolvedEndTime = new Date(startResolution.date.getTime() + 60 * 60 * 1000);
+    }
+
+    const needsTimeConfirmation =
+      startResolution.needsConfirmation ||
+      !startResolution.date;
+
+    // Find the contact (non-user) in the thread
+    const contactMessage = thread.find(m => m.direction === 'RECEIVED');
+    const suggestedBy = contactMessage?.sender || null;
+
+    const result: ParsedMeetingResult = {
+      hasMeeting: true,
+      title: llmResult.title,
+      description: llmResult.description,
+      startTime: startResolution.date,
+      endTime: resolvedEndTime,
+      rawStartTime: llmResult.startTime,
+      rawEndTime: llmResult.endTime,
+      duration: llmResult.duration,
+      isAllDay: llmResult.isAllDay,
+      needsTimeConfirmation,
+      location: llmResult.location,
+      meetingLink: llmResult.meetingLink,
+      meetingPlatform: llmResult.meetingPlatform,
+      organizer: llmResult.organizer,
+      attendees: llmResult.attendees,
+      suggestedBy,
+      sourceSubject: thread[0]?.subject || null,
+      confidence: llmResult.confidence,
+      extractedFields: llmResult.extractedFields,
+      ambiguities: llmResult.ambiguities,
+      llmModel: response.model,
+      processingTimeMs,
+    };
+
+    return {
+      success: true,
+      isConfirmed: true,
+      result,
+      reasoning: llmResult.reasoning,
+    };
+  } catch (error) {
+    if (error instanceof GroqJsonParseError) {
+      console.error(`[CalendarParser] JSON parse error for thread ${threadId}:`, error.message);
+      return {
+        success: false,
+        isConfirmed: false,
+        result: null,
+        error: `Failed to parse LLM response: ${error.message}`,
+      };
+    }
+
+    if (error instanceof GroqError) {
+      console.error(`[CalendarParser] Groq error for thread ${threadId}:`, error.message);
+      return {
+        success: false,
+        isConfirmed: false,
+        result: null,
+        error: `LLM service error: ${error.message}`,
+      };
+    }
+
+    console.error(`[CalendarParser] Unexpected error for thread ${threadId}:`, error);
+    return {
+      success: false,
+      isConfirmed: false,
+      result: null,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
 }

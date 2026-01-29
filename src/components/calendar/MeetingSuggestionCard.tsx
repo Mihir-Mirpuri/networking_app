@@ -18,6 +18,7 @@ export function MeetingSuggestionCard({
   isLoading,
 }: MeetingSuggestionCardProps) {
   const [isEditing, setIsEditing] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
   const [editedData, setEditedData] = useState({
     summary: suggestion.extractedData.title,
     startDateTime: formatForInput(suggestion.extractedData.startTime),
@@ -74,9 +75,17 @@ export function MeetingSuggestionCard({
             {confidencePercent}% confidence
           </span>
         </div>
-        <p className="text-sm text-gray-900 mt-1 truncate">
-          {suggestion.message.subject || '(No subject)'}
-        </p>
+        <div className="flex items-center justify-between mt-1">
+          <p className="text-sm text-gray-900 truncate flex-1">
+            {suggestion.message.subject || '(No subject)'}
+          </p>
+          <button
+            onClick={() => setShowEmailModal(true)}
+            className="ml-2 text-xs text-blue-600 hover:text-blue-700 font-medium whitespace-nowrap"
+          >
+            View Email
+          </button>
+        </div>
       </div>
 
       {/* Meeting details */}
@@ -239,6 +248,79 @@ export function MeetingSuggestionCard({
           Dismiss
         </button>
       </div>
+
+      {/* Email Modal */}
+      {showEmailModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
+            {/* Backdrop */}
+            <div
+              className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+              onClick={() => setShowEmailModal(false)}
+            />
+
+            {/* Modal */}
+            <div className="relative bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:max-w-2xl sm:w-full">
+              {/* Header */}
+              <div className="px-6 py-4 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-gray-900">Email</h3>
+                  <button
+                    onClick={() => setShowEmailModal(false)}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* Email Content */}
+              <div className="px-6 py-4 max-h-[60vh] overflow-y-auto">
+                <div className="space-y-3 mb-4">
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="font-medium text-gray-500">From:</span>
+                    <span className="text-gray-900">{suggestion.message.sender}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="font-medium text-gray-500">Subject:</span>
+                    <span className="text-gray-900">{suggestion.message.subject || '(No subject)'}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="font-medium text-gray-500">Date:</span>
+                    <span className="text-gray-900">
+                      {new Date(suggestion.message.received_at).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+
+                <hr className="my-4" />
+
+                <div className="prose prose-sm max-w-none">
+                  {suggestion.message.body_text ? (
+                    <pre className="whitespace-pre-wrap font-sans text-sm text-gray-700">
+                      {suggestion.message.body_text}
+                    </pre>
+                  ) : (
+                    <p className="text-gray-500 italic">No email content available</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
+                <button
+                  onClick={() => setShowEmailModal(false)}
+                  className="w-full px-4 py-2 bg-gray-200 text-gray-800 font-medium rounded-md hover:bg-gray-300"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

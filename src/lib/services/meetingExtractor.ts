@@ -1,8 +1,12 @@
 /**
  * Meeting Extractor Service
  *
- * Integrates pre-filter + calendar parser + database storage
- * for automatic meeting suggestion extraction from emails.
+ * Analyzes email threads to detect CONFIRMED meetings and creates suggestions.
+ *
+ * Key behavior:
+ * - Analyzes full thread context (not just single messages)
+ * - Only creates suggestions for CONFIRMED meetings (both parties agreed)
+ * - Proposals without acceptance are ignored
  *
  * Designed to be called after email sync with graceful error handling
  * to never block the sync process.
@@ -10,17 +14,31 @@
 
 import prisma from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
-import { detectMeetingInEmail, MeetingDetectionResult } from '@/lib/utils/meetingDetector';
 import {
-  parseCalendarFromEmail,
+  parseCalendarFromThread,
   toStorableFormat,
   ParsedMeetingResult,
+  ThreadMessage,
+  ThreadParserInput,
 } from '@/lib/services/calendarParser';
 
 // ============================================================================
 // Types
 // ============================================================================
 
+/**
+ * Input for thread-based meeting extraction
+ */
+export interface ThreadExtractionInput {
+  messageId: string;    // The triggering message (latest reply)
+  threadId: string;
+  userId: string;
+  userEmail: string;
+}
+
+/**
+ * Legacy: Single email extraction input (kept for backwards compatibility)
+ */
 export interface EmailForExtraction {
   messageId: string;
   userId: string;
@@ -49,13 +67,206 @@ export interface ExtractionResult {
 const MIN_CONFIDENCE_THRESHOLD = 0.4;
 
 /**
- * Maximum body text length to send to LLM
+ * Maximum body text length per message to send to LLM
  * Truncate longer emails to save tokens and processing time
  */
-const MAX_BODY_LENGTH = 4000;
+const MAX_BODY_LENGTH = 2000;
+
+/**
+ * Maximum number of messages to include in thread context
+ * Older messages are excluded to control token usage
+ */
+const MAX_THREAD_MESSAGES = 10;
 
 // ============================================================================
-// Main Extraction Function
+// Thread Context Fetching
+// ============================================================================
+
+/**
+ * Fetch all messages in a thread for context
+ */
+async function fetchThreadContext(
+  threadId: string,
+  userId: string
+): Promise<ThreadMessage[]> {
+  const messages = await prisma.messages.findMany({
+    where: { threadId, userId },
+    orderBy: { received_at: 'asc' },
+    select: {
+      direction: true,
+      sender: true,
+      subject: true,
+      body_text: true,
+      received_at: true,
+    },
+    take: MAX_THREAD_MESSAGES,
+  });
+
+  return messages.map((m) => ({
+    direction: m.direction as 'SENT' | 'RECEIVED',
+    sender: m.sender,
+    subject: m.subject,
+    bodyText: m.body_text && m.body_text.length > MAX_BODY_LENGTH
+      ? m.body_text.substring(0, MAX_BODY_LENGTH) + '\n[truncated]'
+      : m.body_text,
+    receivedAt: m.received_at,
+  }));
+}
+
+/**
+ * Check if a suggestion already exists for any message in the thread
+ */
+async function hasThreadSuggestion(
+  threadId: string,
+  userId: string
+): Promise<{ exists: boolean; suggestionId?: string }> {
+  // Get all message IDs in the thread
+  const messages = await prisma.messages.findMany({
+    where: { threadId, userId },
+    select: { messageId: true },
+  });
+
+  const messageIds = messages.map((m) => m.messageId);
+
+  // Check if any have a suggestion
+  const suggestion = await prisma.extractedMeetingSuggestion.findFirst({
+    where: {
+      messageId: { in: messageIds },
+      userId,
+    },
+    select: { id: true },
+  });
+
+  return {
+    exists: !!suggestion,
+    suggestionId: suggestion?.id,
+  };
+}
+
+// ============================================================================
+// Thread-Based Extraction (Primary)
+// ============================================================================
+
+/**
+ * Analyze an email thread for a CONFIRMED meeting and store suggestion if found.
+ *
+ * This function:
+ * 1. Fetches full thread context
+ * 2. Calls LLM to analyze conversation
+ * 3. Only creates suggestion if meeting is CONFIRMED (both parties agreed)
+ *
+ * This function is designed to be fail-safe - it will never throw.
+ *
+ * @param input - Thread extraction input
+ * @param options - Optional configuration
+ * @returns Extraction result with status and any error
+ */
+export async function extractMeetingFromThread(
+  input: ThreadExtractionInput,
+  options: {
+    userTimezone?: string;
+    skipIfExists?: boolean;
+  } = {}
+): Promise<ExtractionResult> {
+  const { messageId, threadId, userId, userEmail } = input;
+  const { userTimezone, skipIfExists = true } = options;
+
+  try {
+    // 1. Check if suggestion already exists for this thread (idempotency)
+    if (skipIfExists) {
+      const existing = await hasThreadSuggestion(threadId, userId);
+
+      if (existing.exists) {
+        console.log(`[MeetingExtractor] Suggestion already exists for thread ${threadId}, skipping`);
+        return {
+          extracted: false,
+          skippedReason: 'already_exists',
+          suggestionId: existing.suggestionId,
+        };
+      }
+    }
+
+    // 2. Fetch full thread context
+    const thread = await fetchThreadContext(threadId, userId);
+
+    if (thread.length < 2) {
+      console.log(`[MeetingExtractor] Thread ${threadId} has < 2 messages, skipping`);
+      return {
+        extracted: false,
+        skippedReason: 'insufficient_messages',
+      };
+    }
+
+    console.log(`[MeetingExtractor] Analyzing thread ${threadId} (${thread.length} messages)`);
+
+    // 3. Call thread-based parser (LLM)
+    const parseResult = await parseCalendarFromThread({
+      messageId,
+      threadId,
+      thread,
+      userEmail,
+      userTimezone,
+    });
+
+    if (!parseResult.success) {
+      console.error(`[MeetingExtractor] Parser failed for thread ${threadId}:`, parseResult.error);
+      return {
+        extracted: false,
+        error: parseResult.error,
+      };
+    }
+
+    // 4. Check if meeting was CONFIRMED
+    if (!parseResult.isConfirmed || !parseResult.result) {
+      console.log(`[MeetingExtractor] No confirmed meeting in thread ${threadId}:`, parseResult.reasoning);
+      return {
+        extracted: false,
+        skippedReason: 'no_confirmed_meeting',
+      };
+    }
+
+    const parsedMeeting = parseResult.result;
+
+    // 5. Check confidence threshold
+    if (parsedMeeting.confidence < MIN_CONFIDENCE_THRESHOLD) {
+      console.log(`[MeetingExtractor] Confidence too low for thread ${threadId}:`, {
+        confidence: parsedMeeting.confidence,
+        threshold: MIN_CONFIDENCE_THRESHOLD,
+      });
+      return {
+        extracted: false,
+        skippedReason: 'low_confidence',
+        confidence: parsedMeeting.confidence,
+      };
+    }
+
+    // 6. Store suggestion in database (linked to triggering message)
+    const suggestion = await storeMeetingSuggestion(userId, messageId, parsedMeeting);
+
+    console.log(`[MeetingExtractor] Created suggestion for thread ${threadId}:`, {
+      suggestionId: suggestion.id,
+      title: parsedMeeting.title,
+      confidence: parsedMeeting.confidence,
+      startTime: parsedMeeting.startTime?.toISOString(),
+    });
+
+    return {
+      extracted: true,
+      suggestionId: suggestion.id,
+      confidence: parsedMeeting.confidence,
+    };
+
+  } catch (error) {
+    console.error(`[MeetingExtractor] Unexpected error for thread ${threadId}:`, error);
+    return {
+      extracted: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
+// ============================================================================
+// Legacy Single-Message Extraction (Deprecated)
 // ============================================================================
 
 /**
