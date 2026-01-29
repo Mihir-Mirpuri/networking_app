@@ -193,6 +193,11 @@ export async function acceptSuggestionAction(
     const extractedData = suggestion.extractedData as unknown as ExtractedMeetingData;
 
     // 3. Build calendar event input
+    // Extract email strings from attendees (which may be objects with {name, email})
+    const attendeeEmails = extractedData.attendees?.map((a: string | { email?: string }) =>
+      typeof a === 'string' ? a : a.email
+    ).filter((email): email is string => !!email);
+
     const eventInput: CreateEventInput = {
       summary: eventDataOverride?.summary ?? extractedData.title,
       description: eventDataOverride?.description ?? extractedData.description,
@@ -200,7 +205,7 @@ export async function acceptSuggestionAction(
       startDateTime: eventDataOverride?.startDateTime ?? extractedData.startTime,
       endDateTime: eventDataOverride?.endDateTime ?? calculateEndTime(extractedData),
       timeZone: eventDataOverride?.timeZone,
-      attendeeEmails: eventDataOverride?.attendeeEmails ?? extractedData.attendees,
+      attendeeEmails: eventDataOverride?.attendeeEmails ?? attendeeEmails,
       addGoogleMeet: eventDataOverride?.addGoogleMeet,
     };
 
