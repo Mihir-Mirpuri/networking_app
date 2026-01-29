@@ -56,6 +56,8 @@ export interface SearchResultWithDraft {
   userCandidateId?: string;
   emailDraftId?: string;
   resumeId?: string | null;
+  // Person ID for cache tracking (internal use)
+  personId?: string;
   // Location fields from Apollo
   city?: string | null;
   state?: string | null;
@@ -352,6 +354,7 @@ export async function searchPeopleAction(
     }
 
     let results: SearchResultWithDraft[];
+    let staleSearch: Awaited<ReturnType<typeof findStaleSearch>> = null;
 
     if (cachedSearch) {
       // ===== CACHED SEARCH PATH =====
@@ -459,11 +462,13 @@ export async function searchPeopleAction(
             userCandidateId: userCandidate.id,
             emailDraftId: emailDraft.id,
             resumeId: shouldAttachResume ? resumeIdToAttach : null,
+            personId: person.id, // Track person ID for cache updates
             // Location from cached Person
             city: person.city,
             state: person.state,
             country: person.country,
-            locationVerified: isLocationVerified(input.location, person.city, person.state, person.country),
+            // Cached entries already passed all filters - mark as verified
+            locationVerified: true,
             // Education from cached Person
             education: person.educationSchool ? {
               schoolName: person.educationSchool,
@@ -473,8 +478,8 @@ export async function searchPeopleAction(
             } : null,
             // Cached results already passed Apollo employment filter
             hasApolloEmployment: true,
-            // Check if cached person's company matches search company
-            companyVerified: isCompanyMatch(input.company, person.company),
+            // Cached entries already passed company filter
+            companyVerified: true,
           };
         }
       );
@@ -482,7 +487,7 @@ export async function searchPeopleAction(
       // ===== FRESH SEARCH PATH (or stale cache update) =====
 
       // Check for stale cache to update in place
-      const staleSearch = await findStaleSearch(normalizedParams);
+      staleSearch = await findStaleSearch(normalizedParams);
       if (staleSearch) {
         console.log(`[Search] Found stale cache from ${staleSearch.createdAt.toISOString()}, will update in place`);
       } else {
@@ -580,9 +585,6 @@ export async function searchPeopleAction(
         }
       );
 
-      // Collect Person IDs for cache storage
-      const personIdsForCache: string[] = [];
-
       // Step 2: Process database saves with controlled concurrency
       results = await processWithConcurrency(
         emailLookupResults,
@@ -606,11 +608,6 @@ export async function searchPeopleAction(
                 resumeId: resumeIdToAttach,
               }
             );
-
-            // Collect person ID for cache (only if they have a valid email)
-            if (emailResult.status !== 'MISSING') {
-              personIdsForCache.push(saved.personId);
-            }
 
             // Extract LinkedIn URL from search result or use saved one
             const linkedinUrl = saved.linkedinUrl || (person.sourceDomain?.includes('linkedin.com') ? person.sourceUrl : null);
@@ -643,6 +640,7 @@ export async function searchPeopleAction(
               userCandidateId: saved.userCandidateId,
               emailDraftId: saved.emailDraftId,
               resumeId: shouldAttachResume ? resumeIdToAttach : null,
+              personId: saved.personId, // Track person ID for cache storage
               // Location and education from Apollo
               city: emailResult.city,
               state: emailResult.state,
@@ -692,24 +690,6 @@ export async function searchPeopleAction(
           }
         }
       );
-
-      // Save search to cache (create new or update stale)
-      if (personIdsForCache.length > 0) {
-        try {
-          if (staleSearch) {
-            // Update stale cache in place
-            await updateSearchWithPeople(staleSearch.id, personIdsForCache);
-            console.log(`[Search] Updated stale cache with ${personIdsForCache.length} people`);
-          } else {
-            // Create new cache entry
-            const { searchId } = await createSearchWithPeople(normalizedParams, personIdsForCache);
-            console.log(`[Search] Created new cache entry ${searchId} with ${personIdsForCache.length} people`);
-          }
-        } catch (cacheError) {
-          // Don't fail the search if caching fails
-          console.error('[Search] Failed to save search cache:', cacheError);
-        }
-      }
     }
 
     // Filter out results that failed to save (no valid userCandidateId)
@@ -775,6 +755,30 @@ export async function searchPeopleAction(
 
     // Apply limit after sorting
     const finalResults = sortedResults.slice(0, input.limit);
+
+    // Save to cache ONLY for fresh searches, and ONLY people who passed all filters
+    if (!cachedSearch) {
+      const personIdsForCache = finalResults
+        .filter((r) => r.personId)
+        .map((r) => r.personId!);
+
+      if (personIdsForCache.length > 0) {
+        try {
+          if (staleSearch) {
+            // Update stale cache in place
+            await updateSearchWithPeople(staleSearch.id, personIdsForCache);
+            console.log(`[Search] Updated stale cache with ${personIdsForCache.length} verified people`);
+          } else {
+            // Create new cache entry
+            const { searchId } = await createSearchWithPeople(normalizedParams, personIdsForCache);
+            console.log(`[Search] Created new cache entry ${searchId} with ${personIdsForCache.length} verified people`);
+          }
+        } catch (cacheError) {
+          // Don't fail the search if caching fails
+          console.error('[Search] Failed to save search cache:', cacheError);
+        }
+      }
+    }
 
     // Count results by status for logging
     const verifiedCount = finalResults.filter((r) => r.emailStatus === 'VERIFIED').length;
