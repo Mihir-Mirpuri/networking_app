@@ -1,139 +1,14 @@
+/**
+ * Discovery service for finding LinkedIn profiles via Google Custom Search
+ *
+ * Simplified approach:
+ * - CSE extracts only name + LinkedIn URL
+ * - Apollo is the source of truth for ALL data (email, location, education, employment)
+ * - Ranking service scores and returns top candidates
+ */
+
 const CSE_API_KEY = process.env.GOOGLE_CSE_API_KEY;
 const CSE_CX = process.env.GOOGLE_CSE_CX || 'bf53ffdb484f145c5';
-
-// Comprehensive job title dictionary to filter out false positives
-// Case-insensitive matching is used when checking against this set
-const JOB_TITLES = new Set([
-  // Consulting
-  'associate consultant', 'consultant', 'senior consultant', 'principal consultant',
-  'managing consultant', 'lead consultant', 'staff consultant', 'junior consultant',
-  'associate', 'senior associate', 'principal associate', 'managing associate',
-  'analyst', 'senior analyst', 'principal analyst', 'lead analyst', 'staff analyst',
-  'business analyst', 'management consultant', 'strategy consultant',
-  'technology consultant', 'financial consultant', 'operations consultant',
-  
-  // Finance & Banking
-  'vice president', 'vp', 'senior vice president', 'svp', 'executive vice president', 'evp',
-  'director', 'senior director', 'managing director', 'md', 'executive director',
-  'associate', 'senior associate', 'principal', 'senior principal',
-  'analyst', 'senior analyst', 'investment analyst', 'research analyst',
-  'investment banker', 'investment banking analyst', 'ib analyst',
-  'portfolio manager', 'fund manager', 'hedge fund manager',
-  'trader', 'senior trader', 'quantitative analyst', 'quant',
-  'risk analyst', 'credit analyst', 'equity analyst', 'fixed income analyst',
-  'financial analyst', 'corporate finance analyst', 'm&a analyst',
-  'chief financial officer', 'cfo', 'chief investment officer', 'cio',
-  'treasurer', 'controller', 'accountant', 'senior accountant',
-  
-  // Technology
-  'software engineer', 'senior software engineer', 'staff software engineer',
-  'principal software engineer', 'lead software engineer', 'engineering manager',
-  'senior engineering manager', 'director of engineering', 'vp of engineering',
-  'product manager', 'senior product manager', 'principal product manager',
-  'group product manager', 'director of product', 'vp of product',
-  'technical lead', 'tech lead', 'engineering lead', 'architect',
-  'senior architect', 'principal architect', 'solutions architect',
-  'data scientist', 'senior data scientist', 'data engineer', 'ml engineer',
-  'devops engineer', 'site reliability engineer', 'sre',
-  'qa engineer', 'test engineer', 'quality assurance engineer',
-  'security engineer', 'cybersecurity engineer', 'information security',
-  'chief technology officer', 'cto', 'chief information officer', 'cio',
-  'it director', 'it manager', 'systems administrator', 'network engineer',
-  
-  // General Business
-  'manager', 'senior manager', 'general manager', 'regional manager',
-  'area manager', 'district manager', 'store manager', 'branch manager',
-  'operations manager', 'project manager', 'program manager',
-  'senior project manager', 'portfolio manager', 'product manager',
-  'marketing manager', 'sales manager', 'account manager', 'client manager',
-  'business development manager', 'bd manager', 'partnership manager',
-  'director', 'senior director', 'executive director', 'managing director',
-  'vice president', 'vp', 'senior vice president', 'svp',
-  'president', 'coo', 'chief operating officer', 'ceo', 'chief executive officer',
-  'chief marketing officer', 'cmo', 'chief sales officer', 'cso',
-  'chief revenue officer', 'cro', 'chief people officer', 'cpo',
-  'chief strategy officer', 'cso', 'chief data officer', 'cdo',
-  
-  // Sales & Business Development
-  'sales representative', 'sales rep', 'account executive', 'ae',
-  'senior account executive', 'sales director', 'sales manager',
-  'business development representative', 'bdr', 'sales development representative', 'sdr',
-  'account manager', 'key account manager', 'territory manager',
-  'inside sales', 'outside sales', 'field sales',
-  'sales engineer', 'pre-sales engineer', 'solutions engineer',
-  
-  // Marketing
-  'marketing manager', 'marketing director', 'vp of marketing',
-  'brand manager', 'product marketing manager', 'growth marketing manager',
-  'digital marketing manager', 'content marketing manager', 'social media manager',
-  'marketing analyst', 'marketing coordinator', 'marketing specialist',
-  'community manager', 'brand ambassador', 'influencer relations',
-  
-  // Human Resources
-  'hr manager', 'human resources manager', 'hr director', 'hr business partner',
-  'talent acquisition', 'recruiter', 'senior recruiter', 'technical recruiter',
-  'people operations', 'people manager', 'head of people',
-  'chief people officer', 'cpo', 'chief human resources officer', 'chro',
-  
-  // Legal & Compliance
-  'attorney', 'lawyer', 'counsel', 'senior counsel', 'general counsel',
-  'legal counsel', 'corporate counsel', 'compliance officer',
-  'chief legal officer', 'clo', 'paralegal', 'legal assistant',
-  
-  // Operations & Supply Chain
-  'operations manager', 'operations director', 'vp of operations',
-  'supply chain manager', 'logistics manager', 'procurement manager',
-  'operations analyst', 'process improvement', 'lean manager',
-  'chief operating officer', 'coo', 'chief supply chain officer',
-  
-  // Finance & Accounting (additional)
-  'accountant', 'senior accountant', 'staff accountant', 'cost accountant',
-  'tax accountant', 'auditor', 'internal auditor', 'external auditor',
-  'financial controller', 'assistant controller', 'accounting manager',
-  'billing manager', 'accounts payable', 'accounts receivable',
-  
-  // Academia & Research
-  'professor', 'assistant professor', 'associate professor', 'full professor',
-  'research scientist', 'postdoctoral researcher', 'postdoc',
-  'research associate', 'research assistant', 'graduate student',
-  'phd student', 'doctoral student', 'lab manager', 'research director',
-  
-  // Healthcare
-  'physician', 'doctor', 'nurse', 'registered nurse', 'rn',
-  'physician assistant', 'pa', 'nurse practitioner', 'np',
-  'medical director', 'chief medical officer', 'cmo',
-  'clinical researcher', 'clinical trial manager',
-  
-  // Real Estate
-  'real estate agent', 'realtor', 'broker', 'real estate broker',
-  'property manager', 'leasing agent', 'commercial real estate',
-  
-  // Media & Communications
-  'editor', 'senior editor', 'managing editor', 'editor in chief',
-  'journalist', 'reporter', 'correspondent', 'news anchor',
-  'content creator', 'content strategist', 'copywriter', 'technical writer',
-  'communications manager', 'public relations manager', 'pr manager',
-  'social media coordinator', 'community manager',
-  
-  // Education
-  'teacher', 'instructor', 'professor', 'lecturer', 'adjunct professor',
-  'principal', 'vice principal', 'superintendent', 'dean',
-  'curriculum director', 'education coordinator',
-  
-  // Non-profit & Government
-  'executive director', 'program director', 'development director',
-  'grant writer', 'volunteer coordinator', 'outreach coordinator',
-  'policy analyst', 'policy advisor', 'legislative assistant',
-  
-  // Common abbreviations and variations
-  'ceo', 'cto', 'cfo', 'coo', 'cmo', 'cpo', 'cso', 'cio', 'clo', 'chro',
-  'vp', 'svp', 'evp', 'md', 'sdr', 'bdr', 'ae', 'pa', 'np', 'rn',
-  
-  // Generic titles that are often confused with names
-  'assistant', 'associate', 'coordinator', 'specialist', 'administrator',
-  'representative', 'executive', 'officer', 'director', 'manager',
-  'supervisor', 'lead', 'senior', 'principal', 'staff', 'junior',
-]);
 
 interface CSEResult {
   title: string;
@@ -156,6 +31,24 @@ export interface SearchParams {
   excludePersonKeys?: Set<string>; // Set of "fullName_company" keys (lowercase) to exclude
 }
 
+/**
+ * Simplified discovery result - only contains data from CSE
+ * Apollo will provide all additional data (email, location, education, employment)
+ */
+export interface CSEDiscoveryResult {
+  fullName: string;
+  firstName: string | null;
+  lastName: string | null;
+  linkedinUrl: string;
+  sourceTitle: string;
+  sourceSnippet: string;
+  sourceDomain: string;
+}
+
+/**
+ * Legacy SearchResult interface for backward compatibility with existing code
+ * The 'company' field is populated from search params since CSE doesn't provide it reliably
+ */
 export interface SearchResult {
   fullName: string;
   firstName: string | null;
@@ -166,12 +59,11 @@ export interface SearchResult {
   sourceTitle: string;
   sourceSnippet: string;
   sourceDomain: string;
-  confidence?: number;
-  isLowConfidence?: boolean;
-  extractionMethod?: 'linkedin' | 'pipe' | 'snippet' | 'role-first' | 'fallback';
-  locationConfidence?: number;  // 0-1 score indicating confidence person is based in requested location
 }
 
+/**
+ * Call Google Custom Search API
+ */
 async function searchCSE(query: string, start?: number): Promise<CSEResult[]> {
   if (!CSE_API_KEY) {
     console.log('CSE API key not configured, skipping search');
@@ -205,22 +97,24 @@ async function searchCSE(query: string, start?: number): Promise<CSEResult[]> {
   }
 }
 
-// Helper to parse name components (handles titles, middle names, hyphenated names)
+/**
+ * Parse name components from a full name string
+ */
 function parseNameComponents(nameStr: string): { firstName: string; lastName: string; fullName: string } {
   // Remove common titles
   const cleaned = nameStr.replace(/^(Dr\.?|Mr\.?|Mrs\.?|Ms\.?|Prof\.?|Professor)\s+/i, '').trim();
   const parts = cleaned.split(/\s+/);
-  
+
   if (parts.length === 0) {
     return { firstName: '', lastName: '', fullName: '' };
   }
-  
+
   // First name is first part
   const firstName = parts[0];
-  
+
   // Last name is everything else (handles middle names, hyphenated last names)
   const lastName = parts.slice(1).join(' ');
-  
+
   return {
     firstName,
     lastName,
@@ -228,106 +122,39 @@ function parseNameComponents(nameStr: string): { firstName: string; lastName: st
   };
 }
 
-// Parse candidate name from search result with enhanced pattern matching
-function parseCandidate(result: CSEResult, company: string): {
-  fullName: string;
-  firstName: string | null;
-  lastName: string | null;
-  role: string | null;
-  extractionMethod: 'linkedin' | 'pipe' | 'snippet' | 'role-first' | 'fallback';
-} | null {
-  const title = result.title;
-  const snippet = result.snippet;
-
-  // Pattern 1: LinkedIn-style "Name - Role at Company" (highest priority)
-  // Handles: "John Doe - Analyst at Company", "Dr. Jane Smith - VP at Company"
-  const linkedinMatch = title.match(/^((?:Dr\.?|Mr\.?|Mrs\.?|Ms\.?|Prof\.?|Professor)\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})\s*[-–|]/);
-  if (linkedinMatch) {
-    const nameStr = (linkedinMatch[1] || '') + linkedinMatch[2];
-    const nameParts = parseNameComponents(nameStr);
-    
+/**
+ * Extract name from LinkedIn title
+ *
+ * LinkedIn titles follow patterns like:
+ * - "Name - Role at Company | LinkedIn"
+ * - "Name | LinkedIn"
+ * - "Name - Role | LinkedIn"
+ *
+ * We extract just the name portion before the first separator.
+ */
+function extractNameFromTitle(title: string): { fullName: string; firstName: string | null; lastName: string | null } | null {
+  // Pattern 1: "Name - ..." or "Name | ..." (standard LinkedIn format)
+  const match = title.match(/^([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+){1,3})\s*[-–|]/);
+  if (match) {
+    const nameParts = parseNameComponents(match[1]);
     if (nameParts.firstName && nameParts.lastName) {
-      // Try to extract role
-      const roleMatch = title.match(/[-–|]\s*([^|–-]+?)(?:\s+at\s+|\s+@\s+|$)/i);
-      const role = roleMatch ? roleMatch[1].trim() : null;
-
       return {
         fullName: nameParts.fullName,
         firstName: nameParts.firstName,
         lastName: nameParts.lastName,
-        role,
-        extractionMethod: 'linkedin',
       };
     }
   }
 
-  // Pattern 2: Pipe format "Name | Role at Company"
-  const pipeMatch = title.match(/^((?:Dr\.?|Mr\.?|Mrs\.?|Ms\.?|Prof\.?|Professor)\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})\s*\|/);
-  if (pipeMatch) {
-    const nameStr = (pipeMatch[1] || '') + pipeMatch[2];
-    const nameParts = parseNameComponents(nameStr);
-    
+  // Pattern 2: Try to find capitalized name at start of title
+  const fallback = title.match(/^([A-Z][a-z]+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/);
+  if (fallback) {
+    const nameParts = parseNameComponents(fallback[1]);
     if (nameParts.firstName && nameParts.lastName) {
       return {
         fullName: nameParts.fullName,
         firstName: nameParts.firstName,
         lastName: nameParts.lastName,
-        role: null,
-        extractionMethod: 'pipe',
-      };
-    }
-  }
-
-  // Pattern 3: Role-first format "Role - Name at Company" (NEW - handles the Eleanor McLeod case)
-  // Handles: "Associate Consultant - Eleanor McLeod at Bain"
-  const roleFirstMatch = title.match(/^([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3})\s*[-–|]\s*((?:Dr\.?|Mr\.?|Mrs\.?|Ms\.?|Prof\.?|Professor)\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})(?:\s+at\s+|\s+@\s+|$)/i);
-  if (roleFirstMatch) {
-    const potentialRole = roleFirstMatch[1].trim();
-    const nameStr = (roleFirstMatch[2] || '') + roleFirstMatch[3];
-    const nameParts = parseNameComponents(nameStr);
-    
-    if (nameParts.firstName && nameParts.lastName) {
-      // Check if the "role" part is actually a job title (will be validated later)
-      return {
-        fullName: nameParts.fullName,
-        firstName: nameParts.firstName,
-        lastName: nameParts.lastName,
-        role: potentialRole,
-        extractionMethod: 'role-first',
-      };
-    }
-  }
-
-  // Pattern 4: Snippet-based extraction (name mentioned with company)
-  const companyRegex = new RegExp(`((?:Dr\.?|Mr\.?|Mrs\.?|Ms\.?|Prof\.?|Professor)\\s+)?([A-Z][a-z]+\\s+[A-Z][a-z]+).*?${company.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i');
-  const snippetMatch = snippet.match(companyRegex);
-  if (snippetMatch) {
-    const nameStr = (snippetMatch[1] || '') + snippetMatch[2];
-    const nameParts = parseNameComponents(nameStr);
-    
-    if (nameParts.firstName && nameParts.lastName) {
-      return {
-        fullName: nameParts.fullName,
-        firstName: nameParts.firstName,
-        lastName: nameParts.lastName,
-        role: null,
-        extractionMethod: 'snippet',
-      };
-    }
-  }
-
-  // Pattern 5: Fallback - try to find any capitalized name pattern in title
-  const fallbackMatch = title.match(/\b([A-Z][a-z]+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\b/);
-  if (fallbackMatch) {
-    const nameParts = parseNameComponents(fallbackMatch[1]);
-    
-    if (nameParts.firstName && nameParts.lastName) {
-      return {
-        fullName: nameParts.fullName,
-        firstName: nameParts.firstName,
-        lastName: nameParts.lastName,
-        role: null,
-        extractionMethod: 'fallback',
       };
     }
   }
@@ -335,374 +162,38 @@ function parseCandidate(result: CSEResult, company: string): {
   return null;
 }
 
-// Calculate confidence score for a parsed candidate
-function calculateConfidence(
-  parsed: { fullName: string; firstName: string | null; lastName: string | null; extractionMethod: string },
-  result: CSEResult,
-  company: string
-): number {
-  const { fullName, extractionMethod } = parsed;
-  const title = result.title;
-  const snippet = result.snippet;
-  
-  // Pattern type score (which extraction method was used)
-  const patternScores: Record<string, number> = {
-    'linkedin': 0.9,
-    'pipe': 0.8,
-    'role-first': 0.7,
-    'snippet': 0.6,
-    'fallback': 0.5,
-  };
-  const patternScore = patternScores[extractionMethod] || 0.5;
-  
-  // Position score (where name appears in title)
-  const titleLower = title.toLowerCase();
-  const fullNameLower = fullName.toLowerCase();
-  let positionScore = 0.5;
-  
-  if (titleLower.startsWith(fullNameLower)) {
-    positionScore = 0.9; // Name at start of title
-  } else if (titleLower.includes(fullNameLower)) {
-    const nameIndex = titleLower.indexOf(fullNameLower);
-    const titleLength = title.length;
-    const relativePosition = nameIndex / titleLength;
-    
-    if (relativePosition < 0.3) {
-      positionScore = 0.8; // Early in title
-    } else if (relativePosition < 0.7) {
-      positionScore = 0.7; // Middle of title
-    } else {
-      positionScore = 0.5; // Late in title
-    }
-  }
-  
-  // Capitalization score (proper name format)
-  const nameWords = fullName.split(/\s+/);
-  let capitalizationScore = 0.5;
-  
-  if (nameWords.length >= 2) {
-    const allProperCase = nameWords.every(word => 
-      word.length > 0 && word[0] === word[0].toUpperCase() && word.slice(1) === word.slice(1).toLowerCase()
-    );
-    
-    if (allProperCase) {
-      capitalizationScore = 0.9; // Perfect proper case
-    } else if (nameWords[0][0] === nameWords[0][0].toUpperCase()) {
-      capitalizationScore = 0.7; // First word capitalized
-    } else {
-      capitalizationScore = 0.4; // Poor capitalization
-    }
-  }
-  
-  // Context score (presence of company name, role keywords)
-  let contextScore = 0.5;
-  
-  const companyLower = company.toLowerCase();
-  const titleAndSnippet = (title + ' ' + snippet).toLowerCase();
-  
-  if (titleAndSnippet.includes(companyLower)) {
-    contextScore = 0.8; // Company name present
-  }
-  
-  // Check for role keywords
-  const roleKeywords = ['at', 'works at', 'employed at', 'role', 'position', 'title'];
-  if (roleKeywords.some(keyword => titleAndSnippet.includes(keyword))) {
-    contextScore = Math.max(contextScore, 0.7); // Role keywords present
-  }
-  
-  // Weighted combination
-  const confidence = (
-    patternScore * 0.4 +
-    positionScore * 0.3 +
-    capitalizationScore * 0.2 +
-    contextScore * 0.1
-  );
-  
-  return Math.round(confidence * 100) / 100; // Round to 2 decimal places
+/**
+ * Check if a URL is a LinkedIn profile URL
+ */
+function isLinkedInProfileUrl(url: string): boolean {
+  return url.includes('linkedin.com/in/');
 }
 
-// Validate that a parsed candidate name is actually a valid person name
-function isValidPersonName(
-  parsed: { fullName: string; firstName: string | null; lastName: string | null },
-  company: string
-): boolean {
-  const { fullName, firstName, lastName } = parsed;
-
-  // 0. Check if it's a job title (FIRST CHECK - most important)
-  // Normalize whitespace for consistent matching
-  const fullNameLower = fullName.toLowerCase().replace(/\s+/g, ' ').trim();
-  if (JOB_TITLES.has(fullNameLower)) {
-    return false;
-  }
-  
-  // Also check if firstName or lastName individually are job titles
-  if (firstName && JOB_TITLES.has(firstName.toLowerCase().trim())) {
-    return false;
-  }
-  if (lastName && JOB_TITLES.has(lastName.toLowerCase().trim())) {
-    return false;
-  }
-  
-  // Check if fullName contains a job title (e.g., "Senior Associate Consultant")
-  const nameWords = fullNameLower.split(/\s+/);
-  for (const word of nameWords) {
-    if (JOB_TITLES.has(word)) {
-      return false;
-    }
-  }
-  
-  // Check for multi-word job titles (e.g., "associate consultant")
-  for (let i = 0; i < nameWords.length - 1; i++) {
-    const twoWord = `${nameWords[i]} ${nameWords[i + 1]}`;
-    if (JOB_TITLES.has(twoWord)) {
-      return false;
-    }
-  }
-  
-  // Check for three-word job titles
-  for (let i = 0; i < nameWords.length - 2; i++) {
-    const threeWord = `${nameWords[i]} ${nameWords[i + 1]} ${nameWords[i + 2]}`;
-    if (JOB_TITLES.has(threeWord)) {
-      return false;
-    }
-  }
-
-  // 1. Must have both first and last name
-  if (!firstName || !lastName || firstName.trim() === '' || lastName.trim() === '') {
-    return false;
-  }
-
-  // 2. Reject names that are too short (likely incomplete)
-  if (firstName.length < 2 || lastName.length < 2) {
-    return false;
-  }
-
-  // 3. Reject if name matches or contains company name (case-insensitive)
-  // This catches "Goldman Sachs" being parsed as a person name
-  // Normalize whitespace for better matching
-  const companyLower = company.toLowerCase().replace(/\s+/g, ' ').trim();
-  
-  // Check for exact match or substring match
-  if (fullNameLower === companyLower || 
-      fullNameLower.includes(companyLower) || 
-      companyLower.includes(fullNameLower)) {
-    return false;
-  }
-
-  // 4. Reject if name contains email address pattern (like "10ksb_voices@gs.com")
-  const emailPattern = /@|\.(com|org|net|edu|gov|io|co)/i;
-  if (emailPattern.test(fullName)) {
-    return false;
-  }
-
-  // 5. Reject common non-person patterns (but NOT "no email" - that's just status info)
-  const invalidPatterns = [
-    /^n\/a$/i,
-    /^unknown$/i,
-    /^tbd$/i,
-    /^company$/i,
-    /^department$/i,
-    /^team$/i,
-    /^group$/i,
-    /^review$/i,
-    /^verified$/i,
-    // Temporal phrases from LinkedIn snippets (e.g., "3 days ago", "Posted 2 weeks ago")
-    /\d+\s*(days?|weeks?|months?|years?|hours?|minutes?)\s*ago/i,
-    /^days?\s+ago$/i,
-    /^weeks?\s+ago$/i,
-    /^months?\s+ago$/i,
-    /^years?\s+ago$/i,
-    // Industry/department names that look like names
-    /^investment\s+banking$/i,
-    /^private\s+equity$/i,
-    /^venture\s+capital$/i,
-    /^asset\s+management$/i,
-    /^wealth\s+management$/i,
-    /^corporate\s+finance$/i,
-    /^mergers?\s*(and|&)?\s*acquisitions?$/i,
-    /^human\s+resources$/i,
-    /^public\s+relations$/i,
-    /^business\s+development$/i,
-    /^customer\s+success$/i,
-    /^customer\s+service$/i,
-    /^information\s+technology$/i,
-    /^data\s+science$/i,
-    /^machine\s+learning$/i,
-    /^artificial\s+intelligence$/i,
-    /^software\s+engineering$/i,
-    /^product\s+management$/i,
-    /^project\s+management$/i,
-    /^supply\s+chain$/i,
-    /^real\s+estate$/i,
-    /^capital\s+markets$/i,
-    /^equity\s+research$/i,
-    /^fixed\s+income$/i,
-    /^sales\s+(and|&)?\s*trading$/i,
-    // Common LinkedIn post phrases
-    /^im\s+thrilled$/i,
-    /^excited\s+to$/i,
-    /^happy\s+to$/i,
-    /^proud\s+to$/i,
-    /^pleased\s+to$/i,
-    /^delighted\s+to$/i,
-    /^honored\s+to$/i,
-    /^grateful\s+to$/i,
-    /^whats\s+up$/i,
-    /^check\s+out$/i,
-    /^looking\s+for$/i,
-    /^hiring\s+now$/i,
-    /^join\s+us$/i,
-    /^open\s+to$/i,
-    /^new\s+post$/i,
-    /^new\s+job$/i,
-    /^new\s+role$/i,
-    // LinkedIn activity fragments
-    /^posted\s+/i,
-    /^shared\s+/i,
-    /^liked\s+/i,
-    /^commented\s+/i,
-    /^reacted\s+/i,
-    /^following\s+/i,
-    /^celebrating\s+/i,
-  ];
-  if (invalidPatterns.some(pattern => pattern.test(fullName))) {
-    return false;
-  }
-
-  // 6. Reject if name starts with or contains common non-name words
-  // This catches "From Goldman" where "From" is a common word
-  const commonWords = [
-    // Prepositions and articles
-    'from', 'the', 'and', 'or', 'at', 'in', 'on', 'to', 'for', 'of', 'by', 'with',
-    // Generic business words that appear in titles but aren't names
-    'company', 'companies', 'team', 'group', 'department', 'division', 'office',
-    'about', 'contact', 'careers', 'jobs', 'page', 'profile', 'linkedin',
-    // Temporal words (from LinkedIn snippets)
-    'days', 'day', 'weeks', 'week', 'months', 'month', 'years', 'year', 'ago', 'today', 'yesterday',
-    'hours', 'hour', 'minutes', 'minute', 'just', 'now', 'recently', 'posted', 'updated',
-    // Common verbs from LinkedIn
-    'im', 'ive', 'excited', 'thrilled', 'happy', 'proud', 'pleased', 'honored', 'grateful',
-    'hiring', 'looking', 'seeking', 'join', 'joining', 'joined', 'started', 'starting',
-    'announcing', 'announced', 'sharing', 'shared', 'celebrating', 'celebrated',
-    // Industry words that might be capitalized
-    'investment', 'banking', 'private', 'equity', 'venture', 'capital', 'corporate',
-    'finance', 'consulting', 'technology', 'healthcare', 'retail', 'energy',
-    // Other common non-name words
-    'new', 'open', 'available', 'remote', 'hybrid', 'full', 'part', 'time',
-  ];
-  // Check if first word is a common word
-  if (nameWords.length > 0 && commonWords.includes(nameWords[0])) {
-    return false;
-  }
-  // Check if last word is a temporal word (catches "3 days ago" parsed as "Days Ago")
-  const temporalWords = ['ago', 'days', 'day', 'weeks', 'week', 'months', 'month', 'years', 'year', 'hours', 'hour'];
-  if (nameWords.length > 0 && temporalWords.includes(nameWords[nameWords.length - 1])) {
-    return false;
-  }
-  // Also check if it's a single common word
-  if (nameWords.length === 1 && commonWords.includes(nameWords[0])) {
-    return false;
-  }
-
-  // 7. Reject if name contains only numbers or special characters
-  if (!/[a-zA-Z]/.test(fullName)) {
-    return false;
-  }
-
-  // 8. Reject if name looks like it's just a fragment (starts with lowercase)
-  // This catches things like "rom Goldman" where "rom" is a fragment
-  const firstWord = fullName.split(/\s+/)[0];
-  if (firstWord && firstWord[0] && firstWord[0] === firstWord[0].toLowerCase()) {
-    // Exception: Allow if it's a valid name that happens to start lowercase in context
-    // But reject if it's clearly a fragment (very short)
-    if (firstWord.length < 3) {
-      return false;
-    }
-  }
-
-  return true;
+/**
+ * Normalize a key for deduplication
+ */
+function normalizeKey(name: string, url: string): string {
+  return `${name.toLowerCase().replace(/\s+/g, '_')}_${url}`;
 }
 
-function normalizeKey(name: string, company: string, url: string): string {
-  return `${name.toLowerCase().replace(/\s+/g, '_')}_${company.toLowerCase().replace(/\s+/g, '_')}_${url}`;
-}
-
-// Validate that a location mention in the result actually indicates the person is based there
-// NOTE: This is a preliminary filter. Apollo does the real location verification later.
-// We only reject results with NEGATIVE signals (clearly NOT in location).
-// Results with no location signal are allowed through for Apollo to verify.
-function validateLocationContext(snippet: string, title: string, location: string): { isValid: boolean; confidence: number } {
-  const text = `${title} ${snippet}`.toLowerCase();
-  const loc = location.toLowerCase();
-
-  // Strong positive patterns - high confidence they're based there
-  const strongPositivePatterns = [
-    new RegExp(`based in[\\s\\w]*${loc}`, 'i'),
-    new RegExp(`located in[\\s\\w]*${loc}`, 'i'),
-    new RegExp(`${loc}\\s*area`, 'i'),
-    new RegExp(`greater\\s*${loc}`, 'i'),
-    new RegExp(`${loc}\\s*metro`, 'i'),
-    new RegExp(`lives in[\\s\\w]*${loc}`, 'i'),
-    new RegExp(`residing in[\\s\\w]*${loc}`, 'i'),
-    new RegExp(`${loc},\\s*[a-z]{2}\\b`, 'i'),  // "New York, NY" format
-  ];
-
-  // Weak positive patterns - location mentioned but context unclear
-  const weakPositivePatterns = [
-    new RegExp(`${loc}`, 'i'),  // Just mentioned somewhere
-  ];
-
-  // Negative patterns - indicates they're NOT based there
-  const negativePatterns = [
-    new RegExp(`(visited|traveled to|travel to|trips? to)\\s*${loc}`, 'i'),
-    new RegExp(`(moved from|relocated from|formerly in)\\s*${loc}`, 'i'),
-    new RegExp(`(clients? in|serving|serves)\\s*${loc}`, 'i'),
-    new RegExp(`(conference|event|meeting) in\\s*${loc}`, 'i'),
-  ];
-
-  // Check for negative patterns first - ONLY reject on negative signals
-  const hasNegative = negativePatterns.some(p => p.test(text));
-  if (hasNegative) {
-    return { isValid: false, confidence: 0.2 };
-  }
-
-  // Check for strong positive patterns
-  const hasStrongPositive = strongPositivePatterns.some(p => p.test(text));
-  if (hasStrongPositive) {
-    return { isValid: true, confidence: 0.9 };
-  }
-
-  // Check for weak positive (location mentioned but no strong context)
-  const hasWeakPositive = weakPositivePatterns.some(p => p.test(text));
-  if (hasWeakPositive) {
-    return { isValid: true, confidence: 0.5 };
-  }
-
-  // Location not mentioned - still allow through, Apollo will verify
-  // This is important: CSE snippets often don't include location,
-  // but Apollo has accurate location data for verification
-  return { isValid: true, confidence: 0.3 };
-}
-
-export async function searchPeople(params: SearchParams): Promise<SearchResult[]> {
+/**
+ * Discover LinkedIn profiles via Google Custom Search
+ *
+ * This simplified version:
+ * 1. Builds a search query from the parameters
+ * 2. Calls CSE to get LinkedIn profile URLs
+ * 3. Extracts name from title (CSE snippet)
+ * 4. Returns basic profile info - Apollo will enrich with all other data
+ */
+export async function discoverLinkedInProfiles(params: SearchParams): Promise<CSEDiscoveryResult[]> {
   const { name, university, company, role, location, limit, excludePersonKeys = new Set() } = params;
 
-  // Build optimized query for LinkedIn profile search
-  // Format: "Company" Location "Role" "University" Name
-  // - quoted terms for exact matching on key fields
-  // - company first for emphasis
-  // NOTE: Don't add site:linkedin.com - CSE is already configured for LinkedIn
+  // Build query for LinkedIn profile search
   const queryParts: string[] = [];
-
-  // Company first (quoted for exact match)
   if (company && company.trim()) queryParts.push(`"${company.trim()}"`);
-  // Location without quotes (allows flexible matching)
   if (location && location.trim()) queryParts.push(location.trim());
-  // Role quoted for exact match
   if (role && role.trim()) queryParts.push(`"${role.trim()}"`);
-  // University quoted for exact match
   if (university && university.trim()) queryParts.push(`"${university.trim()}"`);
-  // Name without quotes (allows partial matching)
   if (name && name.trim()) queryParts.push(name.trim());
 
   const query = queryParts.join(' ');
@@ -716,7 +207,7 @@ export async function searchPeople(params: SearchParams): Promise<SearchResult[]
   const pages = [1, 11, 21, 31, 41, 51, 61, 71, 81]; // 9 pages = 90 results max
 
   const seenKeys = new Set<string>();
-  const candidates: SearchResult[] = [];
+  const candidates: CSEDiscoveryResult[] = [];
 
   // Split pages into batches of 3 for controlled concurrency
   const BATCH_SIZE = 3;
@@ -743,77 +234,75 @@ export async function searchPeople(params: SearchParams): Promise<SearchResult[]
       for (const result of results) {
         if (candidates.length >= limit) break;
 
-        const parsed = parseCandidate(result, company || '');
-        if (!parsed) continue;
-
-        // Validate that the parsed name is actually a valid person name
-        if (!isValidPersonName(parsed, company || '')) {
-          console.log(`[Discovery] Skipping invalid person name: ${parsed.fullName}`);
+        // Only process LinkedIn profile URLs
+        if (!isLinkedInProfileUrl(result.link)) {
           continue;
         }
 
-        // Validate location context if a location filter was specified
-        let locationConfidence = 1;  // Default to 1 if no location filter
-        if (location && location.trim()) {
-          const locationValidation = validateLocationContext(result.snippet, result.title, location);
-          locationConfidence = locationValidation.confidence;
-
-          // Skip results with very low location confidence (likely false positives)
-          if (!locationValidation.isValid) {
-            console.log(`[Discovery] Skipping - weak location match for "${location}": ${parsed.fullName} (confidence: ${locationConfidence})`);
-            continue;
-          }
-
-          // Log medium confidence matches for monitoring
-          if (locationConfidence < 0.7) {
-            console.log(`[Discovery] Medium location confidence (${locationConfidence}): ${parsed.fullName} in ${location}`);
-          }
-        }
-
-        // Calculate confidence score
-        const confidence = calculateConfidence(parsed, result, company || '');
-        const isLowConfidence = confidence < 0.6;
-
-        // Log low-confidence matches for monitoring
-        if (isLowConfidence) {
-          console.log(`[Discovery] Low confidence match (${confidence}): ${parsed.fullName} at ${company} (method: ${parsed.extractionMethod})`);
-        }
-
-        // Check if person is already discovered by this user
-        const personKey = `${parsed.fullName}_${company}`.toLowerCase();
-        if (excludePersonKeys.has(personKey)) {
-          console.log(`[Discovery] Skipping already discovered: ${parsed.fullName} at ${company}`);
+        // Extract name from title
+        const parsed = extractNameFromTitle(result.title);
+        if (!parsed) {
+          console.log(`[Discovery] Could not extract name from title: ${result.title}`);
           continue;
         }
 
-        // Check for duplicate URLs (same person from different pages)
-        const key = normalizeKey(parsed.fullName, company || '', result.link);
+        // Basic validation: must have first and last name
+        if (!parsed.firstName || !parsed.lastName) {
+          continue;
+        }
+
+        // Check for duplicate URLs
+        const key = normalizeKey(parsed.fullName, result.link);
         if (seenKeys.has(key)) continue;
         seenKeys.add(key);
+
+        // Check if this person should be excluded (already sent/hidden)
+        // Use company from search params since CSE doesn't provide reliable company
+        const personKey = `${parsed.fullName}_${company || ''}`.toLowerCase();
+        if (excludePersonKeys.has(personKey)) {
+          console.log(`[Discovery] Skipping excluded person: ${parsed.fullName}`);
+          continue;
+        }
 
         candidates.push({
           fullName: parsed.fullName,
           firstName: parsed.firstName,
           lastName: parsed.lastName,
-          company: company || '',
-          role: parsed.role,
-          sourceUrl: result.link,
+          linkedinUrl: result.link,
           sourceTitle: result.title,
           sourceSnippet: result.snippet,
           sourceDomain: result.displayLink,
-          confidence,
-          isLowConfidence,
-          extractionMethod: parsed.extractionMethod,
-          locationConfidence,
         });
       }
     }
 
-    // Rate limiting between batches (not after last batch or if limit reached)
+    // Rate limiting between batches
     if (candidates.length < limit && batchIndex < batches.length - 1) {
       await new Promise((r) => setTimeout(r, 200));
     }
   }
 
+  console.log(`[Discovery] Found ${candidates.length} LinkedIn profiles`);
   return candidates;
+}
+
+/**
+ * Legacy function for backward compatibility
+ * Wraps discoverLinkedInProfiles and adds company from search params
+ */
+export async function searchPeople(params: SearchParams): Promise<SearchResult[]> {
+  const profiles = await discoverLinkedInProfiles(params);
+
+  // Convert to legacy SearchResult format
+  return profiles.map(profile => ({
+    fullName: profile.fullName,
+    firstName: profile.firstName,
+    lastName: profile.lastName,
+    company: params.company || '', // Use search company - Apollo will verify/update
+    role: null, // Apollo will provide this
+    sourceUrl: profile.linkedinUrl,
+    sourceTitle: profile.sourceTitle,
+    sourceSnippet: profile.sourceSnippet,
+    sourceDomain: profile.sourceDomain,
+  }));
 }

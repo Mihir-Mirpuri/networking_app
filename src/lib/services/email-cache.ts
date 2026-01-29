@@ -5,6 +5,9 @@ import { EmailStatus } from '@prisma/client';
 // Type matching Prisma EmailStatus enum
 export type EmailStatusType = 'VERIFIED' | 'UNVERIFIED' | 'MISSING' | 'MANUAL';
 
+// Person cache TTL: 30 days
+const PERSON_CACHE_TTL_DAYS = 30;
+
 export interface PersonEmailData {
   fullName: string;
   firstName: string | null;
@@ -57,6 +60,7 @@ export async function getOrFindEmail(
         emailStatus: true,
         emailConfidence: true,
         emailLastUpdated: true,
+        apolloEnrichedAt: true,
         city: true,
         state: true,
         country: true,
@@ -82,10 +86,19 @@ export async function getOrFindEmail(
     throw error;
   }
 
-  // Step 2: If exists AND has email (VERIFIED or UNVERIFIED) → Use cache (NO APOLLO CALL)
+  // Check if Apollo data is stale (> 30 days old)
+  const isStale = (): boolean => {
+    if (!existingPerson?.apolloEnrichedAt) return true;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - PERSON_CACHE_TTL_DAYS);
+    return existingPerson.apolloEnrichedAt < cutoff;
+  };
+
+  // Step 2: If exists AND has email (VERIFIED or UNVERIFIED) AND not stale → Use cache (NO APOLLO CALL)
   if (
     existingPerson?.email &&
-    (existingPerson.emailStatus === 'VERIFIED' || existingPerson.emailStatus === 'UNVERIFIED')
+    (existingPerson.emailStatus === 'VERIFIED' || existingPerson.emailStatus === 'UNVERIFIED') &&
+    !isStale()
   ) {
     const status = existingPerson.emailStatus === 'VERIFIED' ? 'VERIFIED' :
                    existingPerson.emailStatus === 'UNVERIFIED' ? 'UNVERIFIED' : 'MISSING';
@@ -125,6 +138,13 @@ export async function getOrFindEmail(
         emailConfidence: existingPerson.emailConfidence,
       },
     };
+  }
+
+  // Step 2b: If person exists with email but data is stale, refresh via Apollo
+  if (existingPerson?.email && isStale()) {
+    console.log(
+      `[EmailCache] ⏰ STALE DATA for "${fullName}" at ${company} - Apollo data is > 30 days old. Refreshing via Apollo.`
+    );
   }
 
   // Step 3: If Person exists but no email or MISSING → Check if company changed
@@ -186,6 +206,7 @@ export async function getOrFindEmail(
   if (existingPerson) {
     const updateData: Record<string, unknown> = {
       emailLastUpdated: new Date(),
+      apolloEnrichedAt: new Date(), // Track when Apollo data was fetched
     };
 
     // Update email if found

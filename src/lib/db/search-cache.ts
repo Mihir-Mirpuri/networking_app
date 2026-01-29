@@ -1,6 +1,7 @@
 import prisma from '@/lib/prisma';
 
 const CACHE_TTL_HOURS = 24;
+const PERSON_CACHE_TTL_DAYS = 30;
 
 export interface NormalizedSearchParams {
   name: string | null;
@@ -165,6 +166,39 @@ export async function updateSearchWithPeople(
 }
 
 /**
+ * Checks if a person's Apollo data is stale (older than 30 days)
+ */
+export function isPersonStale(apolloEnrichedAt: Date | null): boolean {
+  if (!apolloEnrichedAt) return true;
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - PERSON_CACHE_TTL_DAYS);
+  return apolloEnrichedAt < cutoff;
+}
+
+/**
+ * Gets Person IDs that have stale Apollo data (null or older than 30 days)
+ */
+export async function getStalePersonIds(personIds: string[]): Promise<string[]> {
+  if (personIds.length === 0) return [];
+
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - PERSON_CACHE_TTL_DAYS);
+
+  const stalePersons = await prisma.person.findMany({
+    where: {
+      id: { in: personIds },
+      OR: [
+        { apolloEnrichedAt: null },
+        { apolloEnrichedAt: { lt: cutoff } },
+      ],
+    },
+    select: { id: true },
+  });
+
+  return stalePersons.map(p => p.id);
+}
+
+/**
  * Fetches Person records by IDs with their associated data.
  * Returns in the same order as input IDs.
  */
@@ -180,6 +214,7 @@ export async function getPersonsByIds(personIds: string[]): Promise<
     email: string | null;
     emailStatus: string | null;
     emailConfidence: number | null;
+    apolloEnrichedAt: Date | null;
     city: string | null;
     state: string | null;
     country: string | null;
@@ -213,6 +248,7 @@ export async function getPersonsByIds(personIds: string[]): Promise<
       email: true,
       emailStatus: true,
       emailConfidence: true,
+      apolloEnrichedAt: true,
       city: true,
       state: true,
       country: true,

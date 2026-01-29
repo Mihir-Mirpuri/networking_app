@@ -84,6 +84,7 @@ model Person {
   emailStatus      EmailStatus?
   emailConfidence  Float?
   emailLastUpdated DateTime?
+  apolloEnrichedAt DateTime?       // Track when Apollo data was last fetched
   city             String?
   state            String?
   country          String?
@@ -100,6 +101,7 @@ model Person {
   @@unique([fullName, company])
   @@index([fullName, company])
   @@index([emailStatus])
+  @@index([apolloEnrichedAt])       // For TTL queries
 }
 
 model Search {

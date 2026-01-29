@@ -118,14 +118,6 @@ export function PersonCard({
       <div className="flex-1 pr-6">
         <div className="flex items-center gap-2 mb-1">
           <h3 className="font-semibold text-gray-900">{person.fullName}</h3>
-          {person.isLowConfidence && (
-            <span
-              className="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800 border border-yellow-300"
-              title="Name extraction confidence: Low - Please verify"
-            >
-              ⚠️ Verify
-            </span>
-          )}
           {getStatusBadge()}
           {getScheduledBadge()}
         </div>

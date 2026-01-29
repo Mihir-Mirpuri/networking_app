@@ -16,6 +16,8 @@ export interface PersonData {
   country?: string | null;
   // Education fields
   education?: EducationInfo | null;
+  // Apollo enrichment timestamp
+  apolloEnrichedAt?: Date | null;
 }
 
 export interface UserCandidateData {
@@ -70,6 +72,11 @@ export async function createOrUpdatePerson(
     if (personData.education.graduationYear) createData.educationYear = personData.education.graduationYear;
   }
 
+  // Set apolloEnrichedAt if provided (indicates Apollo data was fetched)
+  if (personData.apolloEnrichedAt) {
+    createData.apolloEnrichedAt = personData.apolloEnrichedAt;
+  }
+
   // Build update data - only update if we have new info
   const updateData: Record<string, unknown> = {};
   if (personData.role) updateData.role = personData.role;
@@ -81,6 +88,7 @@ export async function createOrUpdatePerson(
   if (personData.education?.degree) updateData.educationDegree = personData.education.degree;
   if (personData.education?.fieldOfStudy) updateData.educationField = personData.education.fieldOfStudy;
   if (personData.education?.graduationYear) updateData.educationYear = personData.education.graduationYear;
+  if (personData.apolloEnrichedAt) updateData.apolloEnrichedAt = personData.apolloEnrichedAt;
 
   const person = await prisma.person.upsert({
     where: {
@@ -302,6 +310,7 @@ export async function saveSearchResult(
   const role = emailResult.employment?.title || searchResult.role;
 
   // 1. Create/update Person (including location, education, company and role from Apollo)
+  // Set apolloEnrichedAt to now since this data comes from Apollo
   const person = await createOrUpdatePerson({
     fullName: searchResult.fullName,
     firstName: searchResult.firstName,
@@ -314,6 +323,8 @@ export async function saveSearchResult(
     state: emailResult.state,
     country: emailResult.country,
     education: emailResult.education,
+    // Track when Apollo data was fetched (for 30-day TTL)
+    apolloEnrichedAt: new Date(),
   });
 
   // Get the person's LinkedIn URL (may have been updated or already existed)
