@@ -54,7 +54,7 @@ export function Header() {
         <nav className="flex items-center gap-1">
           {tabs.map((tab) => {
             const isActive = pathname === tab.href;
-            const showBadge = 'badge' in tab && tab.badge && tab.badge > 0;
+            const showBadge = 'badge' in tab && tab.badge !== undefined && tab.badge > 0;
             return (
               <Link
                 key={tab.href}
