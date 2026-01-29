@@ -28,7 +28,6 @@ interface SearchFormProps {
     role?: string;
     university?: string;
     location?: string;
-    limit: number;
     templateId: string;
   } | null;
 }
@@ -41,7 +40,6 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
   const [role, setRole] = useState<string>(initialParams?.role || '');
   const [university, setUniversity] = useState<string>(initialParams?.university || '');
   const [location, setLocation] = useState<string>(initialParams?.location || '');
-  const [limit, setLimit] = useState(initialParams?.limit || 10);
   const [templateId, setTemplateId] = useState<string>(
     initialParams?.templateId || EMAIL_TEMPLATES[0].id
   );
@@ -129,7 +127,6 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
       setRole(initialParams.role || '');
       setUniversity(initialParams.university || '');
       setLocation(initialParams.location || '');
-      setLimit(initialParams.limit);
 
       // Only set templateId if templates are loaded
       if (templates.length > 0 || !isLoadingTemplates) {
@@ -151,7 +148,7 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
       role: role || undefined,
       university: university || undefined,
       location: location || undefined,
-      limit,
+      limit: 10,
       templateId,
     });
   };
@@ -207,25 +204,6 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
           placeholder="Select a location..."
           id="location"
         />
-
-        {/* Number of Results */}
-        <div>
-          <label htmlFor="limit" className="block text-sm font-medium text-gray-700 mb-1">
-            Number of Results
-          </label>
-          <select
-            id="limit"
-            value={limit}
-            onChange={(e) => setLimit(Number(e.target.value))}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
-        </div>
 
         {/* Template */}
         <div>

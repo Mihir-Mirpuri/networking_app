@@ -3,6 +3,7 @@ import { NextAuthOptions } from 'next-auth';
 import { Adapter } from 'next-auth/adapters';
 import GoogleProvider from 'next-auth/providers/google';
 import prisma from './prisma';
+import { startMailboxWatch } from './gmail/client';
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma) as Adapter,
@@ -34,6 +35,21 @@ export const authOptions: NextAuthOptions = {
         token.refreshToken = account.refresh_token;
       }
       return token;
+    },
+  },
+  events: {
+    async signIn({ user }) {
+      // Start Gmail watch subscription for push notifications
+      const topicName = process.env.GOOGLE_PUBSUB_TOPIC;
+      if (topicName && user.id) {
+        try {
+          await startMailboxWatch(user.id, topicName);
+          console.log(`[Auth] Gmail watch started for user ${user.id}`);
+        } catch (error) {
+          // Log but don't block sign-in if watch fails
+          console.error(`[Auth] Failed to start Gmail watch for user ${user.id}:`, error);
+        }
+      }
     },
   },
   pages: {

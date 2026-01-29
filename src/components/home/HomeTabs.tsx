@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { SearchPageClient } from '@/components/search/SearchPageClient';
 import { ComposeEmailModal } from '@/components/compose/ComposeEmailModal';
+import { Toast } from '@/components/ui/Toast';
 
 type HomeTabId = 'find' | 'quick';
 
@@ -12,6 +13,11 @@ interface HomeTabsProps {
 
 export function HomeTabs({ initialRemainingDaily }: HomeTabsProps) {
   const [activeTab, setActiveTab] = useState<HomeTabId>('find');
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  const handleQuickSendSuccess = () => {
+    setToast({ message: 'Email sent successfully!', type: 'success' });
+  };
 
   return (
     <div>
@@ -48,8 +54,21 @@ export function HomeTabs({ initialRemainingDaily }: HomeTabsProps) {
 
       {activeTab === 'quick' && (
         <div className="flex justify-center">
-          <ComposeEmailModal isOpen onClose={() => {}} variant="embedded" />
+          <ComposeEmailModal
+            isOpen
+            onClose={() => {}}
+            onSuccess={handleQuickSendSuccess}
+            variant="embedded"
+          />
         </div>
+      )}
+
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
       )}
     </div>
   );

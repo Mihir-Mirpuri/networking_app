@@ -7,6 +7,15 @@ import { getOrFindEmail, CachedEmailResult } from '@/lib/services/email-cache';
 import { EMAIL_TEMPLATES } from '@/lib/constants';
 import prisma from '@/lib/prisma';
 import { saveSearchResult, getExcludedPersonKeys } from '@/lib/db/person-service';
+import {
+  normalizeSearchParams,
+  findCachedSearch,
+  findStaleSearch,
+  getCachedPersonIds,
+  getPersonsByIds,
+  createSearchWithPeople,
+  updateSearchWithPeople,
+} from '@/lib/db/search-cache';
 
 export interface SearchInput {
   name?: string;
@@ -51,8 +60,14 @@ export interface SearchResultWithDraft {
   city?: string | null;
   state?: string | null;
   country?: string | null;
+  // Whether Apollo's location matches the search location
+  locationVerified?: boolean;
   // Education from Apollo
   education?: EducationInfo | null;
+  // Whether Apollo returned employment data (company/role)
+  hasApolloEmployment?: boolean;
+  // Whether Apollo's company matches the search company
+  companyVerified?: boolean;
 }
 
 function extractLinkedInUrl(person: SearchResult): string | null {
@@ -60,6 +75,63 @@ function extractLinkedInUrl(person: SearchResult): string | null {
     return person.sourceUrl;
   }
   return null;
+}
+
+/**
+ * Check if Apollo's company matches the user's search company
+ * Returns true if either contains the other (case-insensitive)
+ * e.g., "Bain & Company" matches "Bain", "Bain and Company", etc.
+ */
+function isCompanyMatch(
+  searchCompany: string | undefined,
+  apolloCompany: string | null | undefined
+): boolean {
+  if (!searchCompany || !searchCompany.trim()) {
+    return true; // No company filter specified
+  }
+
+  if (!apolloCompany || !apolloCompany.trim()) {
+    return false; // Apollo didn't return a company
+  }
+
+  const searchLower = searchCompany.toLowerCase().trim();
+  const apolloLower = apolloCompany.toLowerCase().trim();
+
+  // Check if either contains the other (handles "Bain" vs "Bain & Company")
+  return apolloLower.includes(searchLower) || searchLower.includes(apolloLower);
+}
+
+/**
+ * Check if Apollo's location matches the user's search location
+ * Returns true if any of city/state/country contain the search location (case-insensitive)
+ */
+function isLocationVerified(
+  searchLocation: string | undefined,
+  apolloCity: string | null | undefined,
+  apolloState: string | null | undefined,
+  apolloCountry: string | null | undefined
+): boolean {
+  if (!searchLocation || !searchLocation.trim()) {
+    return false;
+  }
+
+  const searchLower = searchLocation.toLowerCase().trim();
+  const cityLower = apolloCity?.toLowerCase()?.trim() || '';
+  const stateLower = apolloState?.toLowerCase()?.trim() || '';
+  const countryLower = apolloCountry?.toLowerCase()?.trim() || '';
+
+  // If Apollo returned no location data at all, location is NOT verified
+  if (!cityLower && !stateLower && !countryLower) {
+    return false;
+  }
+
+  // Check if search location matches or is contained in any Apollo location field
+  // Only check non-empty fields to avoid false positives
+  const cityMatch = cityLower && (cityLower.includes(searchLower) || searchLower.includes(cityLower));
+  const stateMatch = stateLower && (stateLower.includes(searchLower) || searchLower.includes(stateLower));
+  const countryMatch = countryLower && (countryLower.includes(searchLower) || searchLower.includes(countryLower));
+
+  return !!(cityMatch || stateMatch || countryMatch);
 }
 
 interface UserProfileData {
@@ -73,6 +145,40 @@ interface UserProfileData {
 function generateDraft(
   template: { subject: string; body: string },
   person: SearchResult,
+  searchUniversity: string,
+  role: string,
+  userProfile: UserProfileData
+): { subject: string; body: string } {
+  const firstName = person.firstName || 'there';
+  const userName = userProfile.name || 'Your Name';
+  const classification = userProfile.classification || 'student';
+  const major = userProfile.major || 'degree';
+  const university = userProfile.university || searchUniversity;
+  const career = userProfile.career || role;
+
+  const replacePlaceholders = (text: string) =>
+    text
+      .replace(/{first_name}/g, firstName)
+      .replace(/{user_name}/g, userName)
+      .replace(/{company}/g, person.company)
+      .replace(/{university}/g, university)
+      .replace(/{classification}/g, classification)
+      .replace(/{major}/g, major)
+      .replace(/{career}/g, career)
+      .replace(/{role}/g, role);
+
+  return {
+    subject: replacePlaceholders(template.subject),
+    body: replacePlaceholders(template.body),
+  };
+}
+
+/**
+ * Generate draft for a cached Person (not a SearchResult)
+ */
+function generateDraftForCachedPerson(
+  template: { subject: string; body: string },
+  person: { firstName: string | null; company: string },
   searchUniversity: string,
   role: string,
   userProfile: UserProfileData
@@ -191,107 +297,33 @@ export async function searchPeopleAction(
   }
 
   try {
-    // Fetch user profile for template personalization
-    const userProfile = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: {
-        name: true,
-        classification: true,
-        major: true,
-        university: true,
-        career: true,
-      },
-    });
-
-    // Get excluded Person keys (sent emails or marked "do not show again")
-    // Only these people should be excluded from future searches
-    const excludedKeys = await getExcludedPersonKeys(session.user.id);
+    // Fetch user profile and excluded keys in parallel (independent queries)
+    const [userProfile, excludedKeys] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: {
+          name: true,
+          classification: true,
+          major: true,
+          university: true,
+          career: true,
+        },
+      }),
+      getExcludedPersonKeys(session.user.id),
+    ]);
     console.log(`[Search] User has ${excludedKeys.size} excluded people (sent/hidden).`);
 
-    // Request more candidates than user limit to account for unverified and missing emails
-    // Strategy: Request limit * 2 or limit + 10, whichever is higher
-    const discoveryLimit = Math.max(input.limit + 10, Math.ceil(input.limit * 2));
-    console.log(`[Search] Requesting ${discoveryLimit} candidates to ensure ${input.limit} results with emails (accounting for MISSING emails being filtered).`);
-
-    // Search for people, excluding only sent/hidden people
-    const people = await searchPeople({
+    // Normalize search params for caching
+    const normalizedParams = normalizeSearchParams({
       name: input.name,
-      university: input.university,
       company: input.company,
       role: input.role,
+      university: input.university,
       location: input.location,
-      limit: discoveryLimit,
-      excludePersonKeys: excludedKeys,
     });
 
-    // Log if we got fewer results than requested for discovery
-    if (people.length < discoveryLimit) {
-      console.log(
-        `[Search] Found ${people.length} new people (requested ${discoveryLimit} for discovery). User may have already discovered many people for this search.`
-      );
-    }
-
-    // Enrich with emails, generate drafts, and save to database
-    const EMAIL_LOOKUP_CONCURRENCY = 3;
-    const DB_SAVE_CONCURRENCY = 3;
-
-    // Step 1: Process email lookups with controlled concurrency
-    interface EmailLookupResult {
-      person: SearchResult;
-      emailResult: CachedEmailResult;
-      emailSource: 'cache' | 'apollo' | 'none';
-    }
-
-    const emptyEmailResult: CachedEmailResult = {
-      email: null,
-      status: 'MISSING',
-      confidence: 0,
-      city: null,
-      state: null,
-      country: null,
-      education: null,
-      fromCache: false,
-      apolloCalled: false,
-    };
-
-    const emailLookupResults = await processWithConcurrency(
-      people,
-      EMAIL_LOOKUP_CONCURRENCY,
-      async (person): Promise<EmailLookupResult> => {
-        // Smart email lookup with caching
-        let emailResult: CachedEmailResult = emptyEmailResult;
-        let emailSource: 'cache' | 'apollo' | 'none' = 'none';
-
-        if (person.firstName && person.lastName) {
-          // Extract LinkedIn URL if the source is from LinkedIn
-          const linkedinUrl = person.sourceDomain?.includes('linkedin.com') ? person.sourceUrl : null;
-
-          emailResult = await getOrFindEmail({
-            fullName: person.fullName,
-            firstName: person.firstName,
-            lastName: person.lastName,
-            company: person.company,
-            linkedinUrl,
-          });
-          
-          // Determine email source for debugging
-          if (emailResult.fromCache) {
-            emailSource = 'cache';
-            console.log(`[Search] ✅ ${person.fullName} at ${person.company}: Email from CACHE (${emailResult.email || 'none'}, ${emailResult.status})`);
-          } else if (emailResult.apolloCalled) {
-            emailSource = 'apollo';
-            console.log(`[Search] 📞 ${person.fullName} at ${person.company}: Email from APOLLO API (${emailResult.email || 'none'}, ${emailResult.status})`);
-          } else {
-            emailSource = 'none';
-            console.log(`[Search] ⚠️  ${person.fullName} at ${person.company}: No email found (missing firstName/lastName)`);
-          }
-        } else {
-          console.log(`[Search] ⚠️  ${person.fullName} at ${person.company}: Skipping email lookup (missing firstName or lastName)`);
-        }
-
-        return { person, emailResult, emailSource };
-      }
-    );
+    // Check for cached search (< 24 hours old)
+    const cachedSearch = await findCachedSearch(normalizedParams);
 
     // Determine resume to attach based on template settings
     let resumeIdToAttach: string | null = null;
@@ -319,101 +351,414 @@ export async function searchPeopleAction(
       }
     }
 
-    // Step 2: Process database saves with controlled concurrency
-    const results: SearchResultWithDraft[] = await processWithConcurrency(
-      emailLookupResults,
-      DB_SAVE_CONCURRENCY,
-      async ({ person, emailResult, emailSource }): Promise<SearchResultWithDraft> => {
-        // Generate placeholder draft (simple template replacement)
-        const placeholderDraft = generateDraft(template, person, input.university || '', input.role || '', userProfile || { name: null, classification: null, major: null, university: null, career: null });
+    let results: SearchResultWithDraft[];
 
-        // Save to database with placeholder
-        try {
-          const saved = await saveSearchResult(
-            session.user.id,
+    if (cachedSearch) {
+      // ===== CACHED SEARCH PATH =====
+      console.log(`[Search] Cache HIT! Using cached search from ${cachedSearch.createdAt.toISOString()}`);
+
+      // Get cached Person IDs
+      const cachedPersonIds = await getCachedPersonIds(cachedSearch.id);
+      console.log(`[Search] Found ${cachedPersonIds.length} cached people`);
+
+      // Fetch Person records with their data
+      const cachedPersons = await getPersonsByIds(cachedPersonIds);
+
+      // Filter out user's excluded people (sent/hidden)
+      const filteredPersons = cachedPersons.filter((person) => {
+        const key = `${person.fullName}_${person.company}`.toLowerCase();
+        return !excludedKeys.has(key);
+      });
+      console.log(`[Search] After excluding sent/hidden: ${filteredPersons.length} people`);
+
+      // Process cached persons: create UserCandidate + EmailDraft for each
+      const DB_SAVE_CONCURRENCY = 3;
+
+      results = await processWithConcurrency(
+        filteredPersons,
+        DB_SAVE_CONCURRENCY,
+        async (person): Promise<SearchResultWithDraft> => {
+          // Generate draft from cached person data
+          const placeholderDraft = generateDraftForCachedPerson(
+            template,
             person,
-            emailResult,
             input.university || '',
-            {
-              subject: placeholderDraft.subject,
-              body: placeholderDraft.body,
-              templateId: templateId,
-              attachResume: shouldAttachResume,
-              resumeId: resumeIdToAttach,
-            }
+            input.role || '',
+            userProfile || { name: null, classification: null, major: null, university: null, career: null }
           );
 
-          // Extract LinkedIn URL from search result or use saved one
-          const linkedinUrl = saved.linkedinUrl || (person.sourceDomain?.includes('linkedin.com') ? person.sourceUrl : null);
+          // Create/update UserCandidate and EmailDraft
+          const userCandidate = await prisma.userCandidate.upsert({
+            where: {
+              userId_personId: {
+                userId: session.user.id,
+                personId: person.id,
+              },
+            },
+            create: {
+              userId: session.user.id,
+              personId: person.id,
+              email: person.email,
+              emailStatus: (person.emailStatus as 'VERIFIED' | 'UNVERIFIED' | 'MISSING') || 'MISSING',
+              emailConfidence: person.emailConfidence,
+              university: input.university || null,
+            },
+            update: {
+              // Update email if we have one from Person cache
+              email: person.email || undefined,
+              emailStatus: (person.emailStatus as 'VERIFIED' | 'UNVERIFIED' | 'MISSING') || undefined,
+              emailConfidence: person.emailConfidence || undefined,
+              university: input.university || undefined,
+            },
+          });
+
+          // Create/update EmailDraft
+          const emailDraft = await prisma.emailDraft.upsert({
+            where: {
+              userCandidateId: userCandidate.id,
+            },
+            create: {
+              userCandidateId: userCandidate.id,
+              templateId: templateId,
+              subject: placeholderDraft.subject,
+              body: placeholderDraft.body,
+              attachResume: shouldAttachResume,
+              resumeId: resumeIdToAttach,
+              status: 'APPROVED',
+            },
+            update: {
+              subject: placeholderDraft.subject,
+              body: placeholderDraft.body,
+              templateId: templateId || undefined,
+              attachResume: shouldAttachResume,
+              resumeId: resumeIdToAttach,
+              status: 'APPROVED',
+            },
+          });
+
+          // Get source URL from first source link
+          const sourceLink = person.sourceLinks[0];
+          const sourceUrl = sourceLink?.url || '';
 
           return {
-            id: saved.userCandidateId,
+            id: userCandidate.id,
             fullName: person.fullName,
             firstName: person.firstName,
             lastName: person.lastName,
             company: person.company,
             role: person.role,
             university: input.university || '',
-            email: emailResult.email,
-            emailStatus: emailResult.status,
-            emailConfidence: emailResult.confidence,
-            emailSource,
+            email: person.email,
+            emailStatus: (person.emailStatus as 'VERIFIED' | 'UNVERIFIED' | 'MISSING') || 'MISSING',
+            emailConfidence: person.emailConfidence || 0,
+            emailSource: 'cache', // All cached results are from person cache
             draftSubject: placeholderDraft.subject,
             draftBody: placeholderDraft.body,
-            sourceUrl: person.sourceUrl,
-            linkedinUrl: linkedinUrl || extractLinkedInUrl(person),
-            confidence: person.confidence,
-            isLowConfidence: person.isLowConfidence,
-            extractionMethod: person.extractionMethod,
-            userCandidateId: saved.userCandidateId,
-            emailDraftId: saved.emailDraftId,
+            sourceUrl,
+            linkedinUrl: person.linkedinUrl,
+            userCandidateId: userCandidate.id,
+            emailDraftId: emailDraft.id,
             resumeId: shouldAttachResume ? resumeIdToAttach : null,
-            // Location and education from Apollo
-            city: emailResult.city,
-            state: emailResult.state,
-            country: emailResult.country,
-            education: emailResult.education,
-          };
-        } catch (error) {
-          console.error('Error saving search result to database:', error);
-          // Still return result even if save fails
-          // Extract LinkedIn URL from search result
-          const linkedinUrl = person.sourceDomain?.includes('linkedin.com') ? person.sourceUrl : null;
-
-          return {
-            id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            fullName: person.fullName,
-            firstName: person.firstName,
-            lastName: person.lastName,
-            company: person.company,
-            role: person.role,
-            university: input.university || '',
-            email: emailResult.email,
-            emailStatus: emailResult.status,
-            emailConfidence: emailResult.confidence,
-            emailSource,
-            draftSubject: placeholderDraft.subject,
-            draftBody: placeholderDraft.body,
-            resumeId: shouldAttachResume ? resumeIdToAttach : null,
-            sourceUrl: person.sourceUrl,
-            linkedinUrl: linkedinUrl || extractLinkedInUrl(person),
-            confidence: person.confidence,
-            isLowConfidence: person.isLowConfidence,
-            extractionMethod: person.extractionMethod,
-            // Location and education from Apollo
-            city: emailResult.city,
-            state: emailResult.state,
-            country: emailResult.country,
-            education: emailResult.education,
+            // Location from cached Person
+            city: person.city,
+            state: person.state,
+            country: person.country,
+            locationVerified: isLocationVerified(input.location, person.city, person.state, person.country),
+            // Education from cached Person
+            education: person.educationSchool ? {
+              schoolName: person.educationSchool,
+              degree: person.educationDegree,
+              fieldOfStudy: person.educationField,
+              graduationYear: person.educationYear,
+            } : null,
+            // Cached results already passed Apollo employment filter
+            hasApolloEmployment: true,
+            // Check if cached person's company matches search company
+            companyVerified: isCompanyMatch(input.company, person.company),
           };
         }
+      );
+    } else {
+      // ===== FRESH SEARCH PATH (or stale cache update) =====
+
+      // Check for stale cache to update in place
+      const staleSearch = await findStaleSearch(normalizedParams);
+      if (staleSearch) {
+        console.log(`[Search] Found stale cache from ${staleSearch.createdAt.toISOString()}, will update in place`);
+      } else {
+        console.log(`[Search] Cache MISS - performing fresh CSE search`);
       }
+
+      // Request more candidates than user limit to account for unverified and missing emails
+      let discoveryLimit = Math.max(input.limit + 10, Math.ceil(input.limit * 2));
+      if (input.location && input.location.trim()) {
+        // Location filtering can remove many results, so request 3x the limit
+        discoveryLimit = Math.max(discoveryLimit, Math.ceil(input.limit * 3));
+        console.log(`[Search] Requesting ${discoveryLimit} candidates (location filter "${input.location}" active - requesting extra to account for location mismatches).`);
+      } else {
+        console.log(`[Search] Requesting ${discoveryLimit} candidates to ensure ${input.limit} results with emails (accounting for MISSING emails being filtered).`);
+      }
+
+      // Search for people, excluding only sent/hidden people
+      const people = await searchPeople({
+        name: input.name,
+        university: input.university,
+        company: input.company,
+        role: input.role,
+        location: input.location,
+        limit: discoveryLimit,
+        excludePersonKeys: excludedKeys,
+      });
+
+      // Log if we got fewer results than requested for discovery
+      if (people.length < discoveryLimit) {
+        console.log(
+          `[Search] Found ${people.length} new people (requested ${discoveryLimit} for discovery). User may have already discovered many people for this search.`
+        );
+      }
+
+      // Enrich with emails, generate drafts, and save to database
+      const EMAIL_LOOKUP_CONCURRENCY = 3;
+      const DB_SAVE_CONCURRENCY = 3;
+
+      // Step 1: Process email lookups with controlled concurrency
+      interface EmailLookupResult {
+        person: SearchResult;
+        emailResult: CachedEmailResult;
+        emailSource: 'cache' | 'apollo' | 'none';
+      }
+
+      const emptyEmailResult: CachedEmailResult = {
+        email: null,
+        status: 'MISSING',
+        confidence: 0,
+        city: null,
+        state: null,
+        country: null,
+        education: null,
+        employment: null,
+        fromCache: false,
+        apolloCalled: false,
+      };
+
+      const emailLookupResults = await processWithConcurrency(
+        people,
+        EMAIL_LOOKUP_CONCURRENCY,
+        async (person): Promise<EmailLookupResult> => {
+          // Smart email lookup with caching
+          let emailResult: CachedEmailResult = emptyEmailResult;
+          let emailSource: 'cache' | 'apollo' | 'none' = 'none';
+
+          if (person.firstName && person.lastName) {
+            // Extract LinkedIn URL if the source is from LinkedIn
+            const linkedinUrl = person.sourceDomain?.includes('linkedin.com') ? person.sourceUrl : null;
+
+            emailResult = await getOrFindEmail({
+              fullName: person.fullName,
+              firstName: person.firstName,
+              lastName: person.lastName,
+              company: person.company,
+              linkedinUrl,
+            });
+
+            // Determine email source for debugging
+            if (emailResult.fromCache) {
+              emailSource = 'cache';
+              console.log(`[Search] ✅ ${person.fullName} at ${person.company}: Email from CACHE (${emailResult.email || 'none'}, ${emailResult.status})`);
+            } else if (emailResult.apolloCalled) {
+              emailSource = 'apollo';
+              console.log(`[Search] 📞 ${person.fullName} at ${person.company}: Email from APOLLO API (${emailResult.email || 'none'}, ${emailResult.status})`);
+            } else {
+              emailSource = 'none';
+              console.log(`[Search] ⚠️  ${person.fullName} at ${person.company}: No email found (missing firstName/lastName)`);
+            }
+          } else {
+            console.log(`[Search] ⚠️  ${person.fullName} at ${person.company}: Skipping email lookup (missing firstName or lastName)`);
+          }
+
+          return { person, emailResult, emailSource };
+        }
+      );
+
+      // Collect Person IDs for cache storage
+      const personIdsForCache: string[] = [];
+
+      // Step 2: Process database saves with controlled concurrency
+      results = await processWithConcurrency(
+        emailLookupResults,
+        DB_SAVE_CONCURRENCY,
+        async ({ person, emailResult, emailSource }): Promise<SearchResultWithDraft> => {
+          // Generate placeholder draft (simple template replacement)
+          const placeholderDraft = generateDraft(template, person, input.university || '', input.role || '', userProfile || { name: null, classification: null, major: null, university: null, career: null });
+
+          // Save to database with placeholder
+          try {
+            const saved = await saveSearchResult(
+              session.user.id,
+              person,
+              emailResult,
+              input.university || '',
+              {
+                subject: placeholderDraft.subject,
+                body: placeholderDraft.body,
+                templateId: templateId,
+                attachResume: shouldAttachResume,
+                resumeId: resumeIdToAttach,
+              }
+            );
+
+            // Collect person ID for cache (only if they have a valid email)
+            if (emailResult.status !== 'MISSING') {
+              personIdsForCache.push(saved.personId);
+            }
+
+            // Extract LinkedIn URL from search result or use saved one
+            const linkedinUrl = saved.linkedinUrl || (person.sourceDomain?.includes('linkedin.com') ? person.sourceUrl : null);
+
+            // Use Apollo's employment data for company and role
+            const apolloCompany = emailResult.employment?.company || person.company;
+            const apolloRole = emailResult.employment?.title || person.role;
+
+            return {
+              id: saved.userCandidateId,
+              fullName: person.fullName,
+              firstName: person.firstName,
+              lastName: person.lastName,
+              company: apolloCompany,
+              role: apolloRole,
+              hasApolloEmployment: !!emailResult.employment?.company,
+              companyVerified: isCompanyMatch(input.company, apolloCompany),
+              university: input.university || '',
+              email: emailResult.email,
+              emailStatus: emailResult.status,
+              emailConfidence: emailResult.confidence,
+              emailSource,
+              draftSubject: placeholderDraft.subject,
+              draftBody: placeholderDraft.body,
+              sourceUrl: person.sourceUrl,
+              linkedinUrl: linkedinUrl || extractLinkedInUrl(person),
+              confidence: person.confidence,
+              isLowConfidence: person.isLowConfidence,
+              extractionMethod: person.extractionMethod,
+              userCandidateId: saved.userCandidateId,
+              emailDraftId: saved.emailDraftId,
+              resumeId: shouldAttachResume ? resumeIdToAttach : null,
+              // Location and education from Apollo
+              city: emailResult.city,
+              state: emailResult.state,
+              country: emailResult.country,
+              locationVerified: isLocationVerified(input.location, emailResult.city, emailResult.state, emailResult.country),
+              education: emailResult.education,
+            };
+          } catch (error) {
+            console.error('Error saving search result to database:', error);
+            // Still return result even if save fails
+            // Extract LinkedIn URL from search result
+            const linkedinUrl = person.sourceDomain?.includes('linkedin.com') ? person.sourceUrl : null;
+
+            // Use Apollo's employment data for company and role
+            const apolloCompany = emailResult.employment?.company || person.company;
+            const apolloRole = emailResult.employment?.title || person.role;
+
+            return {
+              id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              fullName: person.fullName,
+              firstName: person.firstName,
+              lastName: person.lastName,
+              company: apolloCompany,
+              role: apolloRole,
+              hasApolloEmployment: !!emailResult.employment?.company,
+              companyVerified: isCompanyMatch(input.company, apolloCompany),
+              university: input.university || '',
+              email: emailResult.email,
+              emailStatus: emailResult.status,
+              emailConfidence: emailResult.confidence,
+              emailSource,
+              draftSubject: placeholderDraft.subject,
+              draftBody: placeholderDraft.body,
+              resumeId: shouldAttachResume ? resumeIdToAttach : null,
+              sourceUrl: person.sourceUrl,
+              linkedinUrl: linkedinUrl || extractLinkedInUrl(person),
+              confidence: person.confidence,
+              isLowConfidence: person.isLowConfidence,
+              extractionMethod: person.extractionMethod,
+              // Location and education from Apollo
+              city: emailResult.city,
+              state: emailResult.state,
+              country: emailResult.country,
+              locationVerified: isLocationVerified(input.location, emailResult.city, emailResult.state, emailResult.country),
+              education: emailResult.education,
+            };
+          }
+        }
+      );
+
+      // Save search to cache (create new or update stale)
+      if (personIdsForCache.length > 0) {
+        try {
+          if (staleSearch) {
+            // Update stale cache in place
+            await updateSearchWithPeople(staleSearch.id, personIdsForCache);
+            console.log(`[Search] Updated stale cache with ${personIdsForCache.length} people`);
+          } else {
+            // Create new cache entry
+            const { searchId } = await createSearchWithPeople(normalizedParams, personIdsForCache);
+            console.log(`[Search] Created new cache entry ${searchId} with ${personIdsForCache.length} people`);
+          }
+        } catch (cacheError) {
+          // Don't fail the search if caching fails
+          console.error('[Search] Failed to save search cache:', cacheError);
+        }
+      }
+    }
+
+    // Filter out results that failed to save (no valid userCandidateId)
+    const savedResults = results.filter(
+      (result) => result.userCandidateId !== undefined
     );
 
     // Filter out results with MISSING email status (only show results with emails)
-    const resultsWithEmails = results.filter(
+    const resultsWithEmails = savedResults.filter(
       (result) => result.emailStatus !== 'MISSING'
     );
+
+    // Filter out results without Apollo employment data (company must come from Apollo)
+    const resultsWithEmployment = resultsWithEmails.filter(
+      (result) => result.hasApolloEmployment === true
+    );
+    const noEmploymentCount = resultsWithEmails.length - resultsWithEmployment.length;
+    if (noEmploymentCount > 0) {
+      console.log(
+        `[Search] Employment filter: Removed ${noEmploymentCount} results without Apollo employment data`
+      );
+    }
+
+    // Filter out results where Apollo's company doesn't match the search company
+    const resultsWithMatchingCompany = resultsWithEmployment.filter(
+      (result) => result.companyVerified === true
+    );
+    const companyMismatchCount = resultsWithEmployment.length - resultsWithMatchingCompany.length;
+    if (companyMismatchCount > 0) {
+      console.log(
+        `[Search] Company filter: Removed ${companyMismatchCount} results where Apollo company doesn't match "${input.company}"`
+      );
+    }
+
+    // Filter by location if user specified a location search
+    // Only include results where Apollo's location matches the search location
+    let locationFilteredResults = resultsWithMatchingCompany;
+    if (input.location && input.location.trim()) {
+      locationFilteredResults = resultsWithMatchingCompany.filter(
+        (result) => result.locationVerified === true
+      );
+
+      const filteredOutCount = resultsWithMatchingCompany.length - locationFilteredResults.length;
+      if (filteredOutCount > 0) {
+        console.log(
+          `[Search] Location filter: Removed ${filteredOutCount} results that didn't match "${input.location}" (Apollo location mismatch or unavailable)`
+        );
+      }
+    }
 
     // Sort results by verification status: VERIFIED → UNVERIFIED
     const statusPriority: Record<'VERIFIED' | 'UNVERIFIED' | 'MISSING', number> = {
@@ -422,7 +767,7 @@ export async function searchPeopleAction(
       MISSING: 999,
     };
 
-    const sortedResults = resultsWithEmails.sort((a, b) => {
+    const sortedResults = locationFilteredResults.sort((a, b) => {
       const aPriority = statusPriority[a.emailStatus] || 999;
       const bPriority = statusPriority[b.emailStatus] || 999;
       return aPriority - bPriority;

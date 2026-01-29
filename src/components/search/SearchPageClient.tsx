@@ -1,13 +1,24 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { SearchForm } from './SearchForm';
 import { ResultsList } from './ResultsList';
 import { ExpandedReview } from './ExpandedReview';
 import { BulkReview } from './BulkReview';
 import { LoadingSpinner } from './LoadingSpinner';
+import { Toast } from '@/components/ui/Toast';
 import { searchPeopleAction, SearchResultWithDraft, hidePersonAction } from '@/app/actions/search';
 import { sendSingleEmailAction, sendEmailsAction, PersonToSend } from '@/app/actions/send';
+
+// Loading messages that cycle during search
+const LOADING_MESSAGES = [
+  'Searching LinkedIn profiles...',
+  'Finding matching candidates...',
+  'Verifying contact information...',
+  'Enriching with Apollo...',
+  'Processing results...',
+  'Almost there...',
+];
 
 interface SearchPageClientProps {
   initialRemainingDaily: number;
@@ -32,7 +43,6 @@ interface SearchPageState {
     role?: string;
     university?: string;
     location?: string;
-    limit: number;
     templateId: string;
   };
   savedAt: number;
@@ -59,12 +69,13 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
   const [showBulkReview, setShowBulkReview] = useState(false);
   const [generatingStatuses, setGeneratingStatuses] = useState<Map<string, boolean>>(new Map());
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
   const [searchParams, setSearchParams] = useState<{
     company?: string;
     role?: string;
     university?: string;
     location?: string;
-    limit: number;
     templateId: string;
   } | null>(null);
 
@@ -110,6 +121,20 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
       }
     }
   }, []);
+
+  // Cycle through loading messages while searching
+  useEffect(() => {
+    if (!isSearching) {
+      setLoadingMessageIndex(0);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setLoadingMessageIndex((prev) => (prev + 1) % LOADING_MESSAGES.length);
+    }, 2500); // Change message every 2.5 seconds
+
+    return () => clearInterval(interval);
+  }, [isSearching]);
 
   // Debounced save to sessionStorage
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -231,6 +256,9 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
 
     if (result.success) {
       setRemainingDaily((prev) => Math.max(0, prev - 1));
+      setToast({ message: 'Email sent successfully!', type: 'success' });
+    } else {
+      setToast({ message: 'Failed to send email', type: 'error' });
     }
   };
 
@@ -308,7 +336,9 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
       {isSearching && (
         <div className="flex items-center gap-3 py-8 text-gray-600">
           <LoadingSpinner size="md" />
-          <span className="text-base">Discovering people...</span>
+          <span className="text-base transition-opacity duration-300">
+            {LOADING_MESSAGES[loadingMessageIndex]}
+          </span>
         </div>
       )}
 
@@ -341,6 +371,14 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
           onClose={() => setShowBulkReview(false)}
           onSendAll={handleBulkSend}
           sendStatuses={sendStatuses}
+        />
+      )}
+
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
         />
       )}
     </div>
