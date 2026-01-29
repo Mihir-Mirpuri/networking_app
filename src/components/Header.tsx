@@ -3,15 +3,32 @@
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState, useCallback } from 'react';
+import { getPendingSuggestionsCountAction } from '@/app/actions/meetingSuggestions';
 
 export function Header() {
   const { data: session, status } = useSession();
   const pathname = usePathname();
+  const [pendingSuggestionsCount, setPendingSuggestionsCount] = useState(0);
+
+  const fetchPendingCount = useCallback(async () => {
+    if (!session?.user) return;
+
+    const result = await getPendingSuggestionsCountAction();
+    if (result.success && result.data !== undefined) {
+      setPendingSuggestionsCount(result.data);
+    }
+  }, [session?.user]);
+
+  // Fetch count on mount and when navigating (to update after accept/dismiss)
+  useEffect(() => {
+    fetchPendingCount();
+  }, [fetchPendingCount, pathname]);
 
   const tabs = [
     { name: 'Send Emails', href: '/' },
     { name: 'Email History', href: '/history' },
-    { name: 'Calendar', href: '/calendar' },
+    { name: 'Calendar', href: '/calendar', badge: pendingSuggestionsCount },
     { name: 'Profile', href: '/profile' },
   ];
 
@@ -37,17 +54,29 @@ export function Header() {
         <nav className="flex items-center gap-1">
           {tabs.map((tab) => {
             const isActive = pathname === tab.href;
+            const showBadge = 'badge' in tab && tab.badge && tab.badge > 0;
             return (
               <Link
                 key={tab.href}
                 href={tab.href}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                className={`relative px-4 py-2 text-sm font-medium rounded-md transition-colors ${
                   isActive
                     ? 'bg-blue-600 text-white'
                     : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                 }`}
               >
                 {tab.name}
+                {showBadge && (
+                  <span
+                    className={`absolute -top-1 -right-1 min-w-[18px] h-[18px] flex items-center justify-center text-xs font-semibold rounded-full ${
+                      isActive
+                        ? 'bg-white text-blue-600'
+                        : 'bg-red-500 text-white'
+                    }`}
+                  >
+                    {tab.badge! > 99 ? '99+' : tab.badge}
+                  </span>
+                )}
               </Link>
             );
           })}
