@@ -2,6 +2,7 @@ import { gmail_v1 } from 'googleapis';
 import prisma from '@/lib/prisma';
 import { getGmailClient, NoGoogleAccountError, NoRefreshTokenError } from '@/lib/gmail/client';
 import { parseGmailResponse } from '@/lib/gmail/parser';
+import { updateOutreachTrackerOnResponse } from '@/app/actions/outreach';
 
 /**
  * Maximum duration for sync operations (25 seconds)
@@ -434,6 +435,14 @@ async function fetchAndProcessMessage(
 
   // 7. Upsert to database
   await upsertEmailData(userId, processedMessage);
+
+  // 8. If this is a RECEIVED message, update OutreachTracker
+  if (direction === 'RECEIVED' && threadId) {
+    await updateOutreachTrackerOnResponse({
+      userId,
+      gmailThreadId: threadId,
+    });
+  }
 
   console.log(`[Email Sync] Processed message ${messageId} (${direction})`);
   return processedMessage;
