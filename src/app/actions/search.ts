@@ -322,7 +322,7 @@ export async function searchPeopleAction(
         cachedPersons = await getPersonsByIds(cachedPersonIds);
       }
 
-      // Filter out excluded people, those without emails, and wrong location
+      // Filter out excluded people, those without emails, wrong location, and wrong company
       const filteredPersons = cachedPersons.filter((person) => {
         const key = `${person.fullName}_${person.company}`.toLowerCase();
         if (excludedKeys.has(key)) return false;
@@ -332,13 +332,23 @@ export async function searchPeopleAction(
         if (input.location && input.location.trim()) {
           const searchLoc = input.location.trim().toLowerCase();
           const personCity = person.city?.toLowerCase() || '';
+          // Must have a city and it must match
+          if (!personCity) return false;
           if (!personCity.includes(searchLoc) && !searchLoc.includes(personCity)) {
+            return false;
+          }
+        }
+        // Hard filter: company must match search company
+        if (input.company && input.company.trim()) {
+          const searchCompany = input.company.trim().toLowerCase();
+          const personCompany = person.company?.toLowerCase() || '';
+          if (!personCompany.includes(searchCompany) && !searchCompany.includes(personCompany)) {
             return false;
           }
         }
         return true;
       });
-      console.log(`[Search] After filtering (excluded + no email + location): ${filteredPersons.length} people`);
+      console.log(`[Search] After filtering (excluded + email + location + company): ${filteredPersons.length} people`);
 
       // Apply ranking to cached persons
       const rankedCached = rankCandidates(
@@ -544,15 +554,29 @@ export async function searchPeopleAction(
         const searchLoc = input.location.trim().toLowerCase();
         locationFiltered = peopleWithEmails.filter(({ emailResult }) => {
           const personCity = emailResult.city?.toLowerCase() || '';
+          // Must have a city and it must match search location
+          if (!personCity) return false;
           return personCity.includes(searchLoc) || searchLoc.includes(personCity);
         });
         console.log(`[Search] After location filter: ${locationFiltered.length}/${peopleWithEmails.length} in ${input.location}`);
       }
 
+      // Hard filter: verify company matches search (Apollo may reveal different company)
+      let companyVerified = locationFiltered;
+      if (input.company && input.company.trim()) {
+        const searchCompany = input.company.trim().toLowerCase();
+        companyVerified = locationFiltered.filter(({ emailResult }) => {
+          const apolloCompany = emailResult.employment?.company?.toLowerCase() || '';
+          if (!apolloCompany) return true; // Keep if Apollo didn't return company
+          return apolloCompany.includes(searchCompany) || searchCompany.includes(apolloCompany);
+        });
+        console.log(`[Search] After company verification: ${companyVerified.length}/${locationFiltered.length} at ${input.company}`);
+      }
+
       // Apply ranking to enriched candidates
       const rankedEnriched = rankCandidates(
         searchCriteria,
-        locationFiltered,
+        companyVerified,
         ({ emailResult }): CandidateData => ({
           company: emailResult.employment?.company || null,
           role: emailResult.employment?.title || null,
