@@ -184,6 +184,9 @@ export async function findEmail(params: FindEmailParams): Promise<EmailResult> {
       const locationParts = [person.city, person.state, person.country].filter(Boolean);
       const locationStr = locationParts.length > 0 ? locationParts.join(', ') : 'unknown';
 
+      // Log raw Apollo education data for debugging
+      console.log(`[Apollo] Raw education data: ${JSON.stringify(person.education || 'none')}`);
+      console.log(`[Apollo] Parsed education: ${JSON.stringify(education)}`);
       console.log(`Found: ${person.email || 'no email'} (${isVerified ? 'verified' : 'unverified'}), location: ${locationStr}, education: ${education?.schoolName || 'unknown'}, employment: ${employment?.company || 'unknown'} - ${employment?.title || 'unknown'}`);
 
       return {
