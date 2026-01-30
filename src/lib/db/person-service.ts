@@ -491,3 +491,232 @@ export async function getExcludedPersonKeys(
 
   return keys;
 }
+
+/**
+ * Filter criteria for querying Person table
+ */
+export interface PersonFilters {
+  company: string;           // Required - ILIKE match
+  location?: string;         // Optional - city ILIKE match
+  role?: string;             // Optional - role ILIKE match
+  university?: string;       // Optional - educationSchool ILIKE match
+  requireEmail?: boolean;    // Default true - only return people with emails
+  excludePersonKeys?: Set<string>; // Set of "fullName_company" keys to exclude
+  limit: number;
+}
+
+/**
+ * Find people in the database matching the given filters
+ * This is the main query function for the database-first search approach
+ */
+export async function findPeopleByFilters(filters: PersonFilters): Promise<
+  Array<{
+    id: string;
+    fullName: string;
+    firstName: string | null;
+    lastName: string | null;
+    company: string;
+    role: string | null;
+    linkedinUrl: string | null;
+    email: string | null;
+    emailStatus: string | null;
+    emailConfidence: number | null;
+    city: string | null;
+    state: string | null;
+    country: string | null;
+    educationSchool: string | null;
+    educationDegree: string | null;
+    educationField: string | null;
+    educationYear: string | null;
+    sourceLinks: Array<{
+      url: string;
+      title: string;
+      snippet: string | null;
+      domain: string | null;
+    }>;
+  }>
+> {
+  const { company, location, role, university, requireEmail = true, excludePersonKeys, limit } = filters;
+
+  // Build where clause
+  const where: Record<string, unknown> = {};
+
+  // Company filter (required) - case insensitive contains
+  if (company && company.trim()) {
+    where.company = { contains: company.trim(), mode: 'insensitive' };
+  }
+
+  // Location filter - city must contain search term
+  if (location && location.trim()) {
+    where.city = { contains: location.trim(), mode: 'insensitive' };
+  }
+
+  // Role filter - role must contain search term
+  if (role && role.trim()) {
+    where.role = { contains: role.trim(), mode: 'insensitive' };
+  }
+
+  // University filter - educationSchool must contain search term
+  if (university && university.trim()) {
+    where.educationSchool = { contains: university.trim(), mode: 'insensitive' };
+  }
+
+  // Email filter - must have email
+  if (requireEmail) {
+    where.email = { not: null };
+  }
+
+  // Query the database
+  const people = await prisma.person.findMany({
+    where,
+    select: {
+      id: true,
+      fullName: true,
+      firstName: true,
+      lastName: true,
+      company: true,
+      role: true,
+      linkedinUrl: true,
+      email: true,
+      emailStatus: true,
+      emailConfidence: true,
+      city: true,
+      state: true,
+      country: true,
+      educationSchool: true,
+      educationDegree: true,
+      educationField: true,
+      educationYear: true,
+      sourceLinks: {
+        where: { kind: 'DISCOVERY' },
+        orderBy: { createdAt: 'asc' },
+        take: 1,
+        select: {
+          url: true,
+          title: true,
+          snippet: true,
+          domain: true,
+        },
+      },
+    },
+    orderBy: [
+      { emailStatus: 'asc' }, // VERIFIED first
+      { emailConfidence: 'desc' },
+    ],
+    take: limit * 2, // Get extra to allow for exclusions
+  });
+
+  // Filter out excluded people
+  let filtered = people;
+  if (excludePersonKeys && excludePersonKeys.size > 0) {
+    filtered = people.filter((person) => {
+      const key = `${person.fullName}_${person.company}`.toLowerCase();
+      return !excludePersonKeys.has(key);
+    });
+  }
+
+  return filtered.slice(0, limit);
+}
+
+/**
+ * Save a person discovered via CSE + Apollo enrichment
+ * Returns the person ID (existing or newly created)
+ */
+export async function saveDiscoveredPerson(
+  fullName: string,
+  firstName: string | null,
+  lastName: string | null,
+  linkedinUrl: string | null,
+  sourceUrl: string,
+  sourceTitle: string,
+  sourceSnippet: string | null,
+  sourceDomain: string | null,
+  apolloData: {
+    company: string;
+    role: string | null;
+    email: string | null;
+    emailStatus: 'VERIFIED' | 'UNVERIFIED' | 'MISSING';
+    emailConfidence: number;
+    city: string | null;
+    state: string | null;
+    country: string | null;
+    education: {
+      schoolName: string | null;
+      degree: string | null;
+      fieldOfStudy: string | null;
+      graduationYear: string | null;
+    } | null;
+  }
+): Promise<{ personId: string; isNew: boolean }> {
+  // Check if person already exists
+  const existing = await prisma.person.findUnique({
+    where: {
+      fullName_company: {
+        fullName,
+        company: apolloData.company,
+      },
+    },
+    select: { id: true },
+  });
+
+  if (existing) {
+    // Update with fresh Apollo data
+    await prisma.person.update({
+      where: { id: existing.id },
+      data: {
+        role: apolloData.role || undefined,
+        email: apolloData.email || undefined,
+        emailStatus: apolloData.email ? apolloData.emailStatus : undefined,
+        emailConfidence: apolloData.email ? apolloData.emailConfidence : undefined,
+        city: apolloData.city || undefined,
+        state: apolloData.state || undefined,
+        country: apolloData.country || undefined,
+        educationSchool: apolloData.education?.schoolName || undefined,
+        educationDegree: apolloData.education?.degree || undefined,
+        educationField: apolloData.education?.fieldOfStudy || undefined,
+        educationYear: apolloData.education?.graduationYear || undefined,
+        apolloEnrichedAt: new Date(),
+        linkedinUrl: linkedinUrl || undefined,
+      },
+    });
+
+    return { personId: existing.id, isNew: false };
+  }
+
+  // Create new person
+  const person = await prisma.person.create({
+    data: {
+      fullName,
+      firstName,
+      lastName,
+      company: apolloData.company,
+      role: apolloData.role,
+      linkedinUrl,
+      email: apolloData.email,
+      emailStatus: apolloData.email ? apolloData.emailStatus : 'MISSING',
+      emailConfidence: apolloData.emailConfidence,
+      city: apolloData.city,
+      state: apolloData.state,
+      country: apolloData.country,
+      educationSchool: apolloData.education?.schoolName,
+      educationDegree: apolloData.education?.degree,
+      educationField: apolloData.education?.fieldOfStudy,
+      educationYear: apolloData.education?.graduationYear,
+      apolloEnrichedAt: new Date(),
+    },
+  });
+
+  // Create source link
+  await prisma.sourceLink.create({
+    data: {
+      personId: person.id,
+      kind: 'DISCOVERY',
+      url: sourceUrl,
+      title: sourceTitle,
+      snippet: sourceSnippet,
+      domain: sourceDomain,
+    },
+  });
+
+  return { personId: person.id, isNew: true };
+}

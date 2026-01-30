@@ -189,12 +189,13 @@ export async function discoverLinkedInProfiles(params: SearchParams): Promise<CS
   const { name, university, company, role, location, limit, excludePersonKeys = new Set() } = params;
 
   // Build query for LinkedIn profile search
+  // SIMPLIFIED: Only use company (required) and university (optional)
+  // Role and location are filtered at the database level after Apollo enrichment
   const queryParts: string[] = [];
   if (company && company.trim()) queryParts.push(`"${company.trim()}"`);
-  if (location && location.trim()) queryParts.push(location.trim());
-  if (role && role.trim()) queryParts.push(`"${role.trim()}"`);
   if (university && university.trim()) queryParts.push(`"${university.trim()}"`);
   if (name && name.trim()) queryParts.push(name.trim());
+  // Note: role and location intentionally excluded - they over-restrict CSE results
 
   const query = queryParts.join(' ');
 
