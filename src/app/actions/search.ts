@@ -277,6 +277,15 @@ export async function searchPeopleAction(
       const apolloCompany = emailResult.employment?.company || person.company;
 
       // Save to database (ALL people, not just those with email)
+      // Use search university as education if Apollo doesn't provide it
+      // (CSE already filtered for this university in the LinkedIn search)
+      const education = emailResult.education || (input.university ? {
+        schoolName: input.university,
+        degree: null,
+        fieldOfStudy: null,
+        graduationYear: null,
+      } : null);
+
       const { isNew } = await saveDiscoveredPerson(
         person.fullName,
         person.firstName,
@@ -295,7 +304,7 @@ export async function searchPeopleAction(
           city: emailResult.city,
           state: emailResult.state,
           country: emailResult.country,
-          education: emailResult.education,
+          education,
         }
       );
 
