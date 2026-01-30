@@ -321,15 +321,14 @@ export async function searchPeopleAction(
     // Now query the Person table with user's full criteria
     console.log(`[Search] Step 3: Query DB with filters - company="${input.company}", location="${input.location || 'any'}", role="${input.role || 'any'}"`);
 
-    // NOTE: University filter is NOT applied here because:
-    // 1. CSE already searched for company + university, so results are university-affiliated
-    // 2. educationSchool field may be null or have different school names from Apollo
-    // 3. Apollo school names often don't match search terms (e.g., "Texas McCombs" vs "University of Texas")
+    // Hard filters: Company + Location + Email only
+    // Role and University are used for RANKING, not filtering
+    // This ensures we return all valid candidates and rank them by relevance
     const filters: PersonFilters = {
       company: input.company,
       location: input.location,
-      role: input.role,
-      // university filter removed - CSE already filtered by university
+      // role removed from hard filter - used for ranking instead
+      // university removed - CSE already filtered by university
       requireEmail: true,
       excludePersonKeys: excludedKeys,
       limit: input.limit * 3, // Get extra for ranking
