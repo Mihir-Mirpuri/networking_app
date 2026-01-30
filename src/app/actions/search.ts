@@ -392,11 +392,12 @@ export async function searchPeopleAction(
       console.log(`[Search] Saved to DB: ${newPeopleCount} new, ${existingPeopleCount} updated`);
 
       // ===== STEP 3: QUERY DATABASE WITH FILTERS =====
-      console.log(`[Search] Step 3: Query DB with filters - company="${input.company}", location="${input.location || 'any'}", role="${input.role || 'any'}"`);
+      console.log(`[Search] Step 3: Query DB with filters - company="${input.company}", location="${input.location || 'any'}", university="${input.university || 'any'}"`);
 
       const filters: PersonFilters = {
         company: input.company,
         location: input.location,
+        university: input.university,
         requireEmail: true,
         excludePersonKeys: excludedKeys,
         limit: input.limit * 3,
