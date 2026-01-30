@@ -154,7 +154,7 @@ export async function sendEmailsAction(
       }
 
       // Upsert outreach tracker
-      await upsertOutreachTrackerOnSend({
+      const trackerResult = await upsertOutreachTrackerOnSend({
         userId: session.user.id,
         toEmail: person.email,
         contactName,
@@ -166,6 +166,9 @@ export async function sendEmailsAction(
         gmailThreadId: sendResult.threadId,
         sendLogId: sendLog.id,
       });
+      if (!trackerResult.success) {
+        console.error('[Send] Failed to upsert outreach tracker:', trackerResult.error);
+      }
       try {
         await prisma.emailDraft.updateMany({
           where: {

@@ -28,14 +28,13 @@ export interface OutreachTrackerEntry {
   updatedAt: Date;
   userCandidateId: string | null;
   gmailThreadId: string | null;
+  messageCount: number;
 }
 
 export interface OutreachStats {
   sent: number;
   waiting: number;
   ongoingConversations: number;
-  connected: number;
-  upcomingReminders: number;
 }
 
 export type SortField =
@@ -44,10 +43,7 @@ export type SortField =
   | 'role'
   | 'location'
   | 'dateEmailed'
-  | 'responseReceivedAt'
-  | 'followedUpAt'
   | 'status'
-  | 'reminderDate'
   | 'createdAt';
 
 export type SortDirection = 'asc' | 'desc';
@@ -125,6 +121,26 @@ export async function getOutreachTrackers(
     const results = hasMore ? trackers.slice(0, limit) : trackers;
     const nextCursor = hasMore ? results[results.length - 1].id : null;
 
+    // Get message counts for all threads
+    const threadIds = results
+      .map((t) => t.gmailThreadId)
+      .filter((id): id is string => id !== null);
+
+    const messageCounts = threadIds.length > 0
+      ? await prisma.messages.groupBy({
+          by: ['threadId'],
+          where: {
+            threadId: { in: threadIds },
+            userId: session.user.id,
+          },
+          _count: { messageId: true },
+        })
+      : [];
+
+    const messageCountMap = new Map(
+      messageCounts.map((mc) => [mc.threadId, mc._count.messageId])
+    );
+
     return {
       success: true,
       trackers: results.map((t) => ({
@@ -150,6 +166,7 @@ export async function getOutreachTrackers(
         updatedAt: t.updatedAt,
         userCandidateId: t.userCandidateId,
         gmailThreadId: t.gmailThreadId,
+        messageCount: t.gmailThreadId ? messageCountMap.get(t.gmailThreadId) || 0 : 0,
       })),
       nextCursor,
       hasMore,
@@ -180,6 +197,26 @@ export async function getInitialOutreachTrackers(userId: string): Promise<{
     const results = hasMore ? trackers.slice(0, 50) : trackers;
     const nextCursor = hasMore ? results[results.length - 1].id : null;
 
+    // Get message counts for all threads
+    const threadIds = results
+      .map((t) => t.gmailThreadId)
+      .filter((id): id is string => id !== null);
+
+    const messageCounts = threadIds.length > 0
+      ? await prisma.messages.groupBy({
+          by: ['threadId'],
+          where: {
+            threadId: { in: threadIds },
+            userId,
+          },
+          _count: { messageId: true },
+        })
+      : [];
+
+    const messageCountMap = new Map(
+      messageCounts.map((mc) => [mc.threadId, mc._count.messageId])
+    );
+
     return {
       success: true,
       trackers: results.map((t) => ({
@@ -205,6 +242,7 @@ export async function getInitialOutreachTrackers(userId: string): Promise<{
         updatedAt: t.updatedAt,
         userCandidateId: t.userCandidateId,
         gmailThreadId: t.gmailThreadId,
+        messageCount: t.gmailThreadId ? messageCountMap.get(t.gmailThreadId) || 0 : 0,
       })),
       nextCursor,
       hasMore,
@@ -265,6 +303,16 @@ export async function updateOutreachTracker(
       data,
     });
 
+    // Get message count for the thread
+    const messageCount = updated.gmailThreadId
+      ? await prisma.messages.count({
+          where: {
+            threadId: updated.gmailThreadId,
+            userId: session.user.id,
+          },
+        })
+      : 0;
+
     return {
       success: true,
       tracker: {
@@ -290,6 +338,7 @@ export async function updateOutreachTracker(
         updatedAt: updated.updatedAt,
         userCandidateId: updated.userCandidateId,
         gmailThreadId: updated.gmailThreadId,
+        messageCount,
       },
     };
   } catch (error) {
@@ -343,7 +392,7 @@ export async function getOutreachStats(): Promise<{
   }
 
   try {
-    const [sent, waiting, ongoingConversations, connected, upcomingReminders] = await Promise.all([
+    const [sent, waiting, ongoingConversations] = await Promise.all([
       // Count all trackers where an email was sent
       prisma.outreachTracker.count({
         where: { userId: session.user.id, dateEmailed: { not: null } },
@@ -363,16 +412,6 @@ export async function getOutreachStats(): Promise<{
           responseReceivedAt: { not: null },
         },
       }),
-      prisma.outreachTracker.count({
-        where: { userId: session.user.id, status: 'CONNECTED' },
-      }),
-      prisma.outreachTracker.count({
-        where: {
-          userId: session.user.id,
-          reminderDate: { lte: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) },
-          reminderSent: false,
-        },
-      }),
     ]);
 
     return {
@@ -381,8 +420,6 @@ export async function getOutreachStats(): Promise<{
         sent,
         waiting,
         ongoingConversations,
-        connected,
-        upcomingReminders,
       },
     };
   } catch (error) {
@@ -437,11 +474,13 @@ export async function upsertOutreachTrackerOnSend(params: {
     let tracker;
 
     if (existing) {
-      // Update existing tracker - this is a follow-up
+      // Update existing tracker - this is a follow-up or first send
       tracker = await prisma.outreachTracker.update({
         where: { id: existing.id },
         data: {
-          followedUpAt: new Date(),
+          // Set dateEmailed if not already set (first email to this contact)
+          dateEmailed: existing.dateEmailed || new Date(),
+          followedUpAt: existing.dateEmailed ? new Date() : undefined,
           gmailThreadId: gmailThreadId || existing.gmailThreadId,
           // Update status if it was NOT_STARTED
           status: existing.status === 'NOT_STARTED' ? 'SENT' : existing.status,
@@ -608,6 +647,7 @@ export async function createOutreachTracker(params: {
         updatedAt: tracker.updatedAt,
         userCandidateId: tracker.userCandidateId,
         gmailThreadId: tracker.gmailThreadId,
+        messageCount: 0,
       },
     };
   } catch (error) {
@@ -615,6 +655,59 @@ export async function createOutreachTracker(params: {
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to create outreach tracker',
+    };
+  }
+}
+
+export interface ThreadMessage {
+  messageId: string;
+  threadId: string;
+  direction: 'SENT' | 'RECEIVED';
+  sender: string;
+  recipients: string[];
+  subject: string | null;
+  bodyHtml: string | null;
+  bodyText: string | null;
+  receivedAt: Date;
+}
+
+export async function getThreadMessages(threadId: string): Promise<{
+  success: true;
+  messages: ThreadMessage[];
+} | { success: false; error: string }> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return { success: false, error: 'Not authenticated' };
+  }
+
+  try {
+    const messages = await prisma.messages.findMany({
+      where: {
+        threadId,
+        userId: session.user.id,
+      },
+      orderBy: { received_at: 'asc' },
+    });
+
+    return {
+      success: true,
+      messages: messages.map((m) => ({
+        messageId: m.messageId,
+        threadId: m.threadId,
+        direction: m.direction as 'SENT' | 'RECEIVED',
+        sender: m.sender,
+        recipients: (m.recipient_list as string[]) || [],
+        subject: m.subject,
+        bodyHtml: m.body_html,
+        bodyText: m.body_text,
+        receivedAt: m.received_at,
+      })),
+    };
+  } catch (error) {
+    console.error('[Outreach] Error fetching thread messages:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch thread messages',
     };
   }
 }

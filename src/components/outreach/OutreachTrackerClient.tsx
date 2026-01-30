@@ -12,6 +12,7 @@ import {
 } from '@/app/actions/outreach';
 import { OutreachTable } from './OutreachTable';
 import { OutreachFilters } from './OutreachFilters';
+import { ThreadPanel } from './ThreadPanel';
 
 interface OutreachTrackerClientProps {
   initialTrackers: OutreachTrackerEntry[];
@@ -38,6 +39,7 @@ export function OutreachTrackerClient({
 
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [selectedTracker, setSelectedTracker] = useState<OutreachTrackerEntry | null>(null);
 
   const fetchTrackers = useCallback(
     async (resetCursor = true) => {
@@ -131,7 +133,7 @@ export function OutreachTrackerClient({
         </div>
 
         {/* Stats Summary */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-3 gap-4 mb-6">
           <div className="bg-white rounded-lg shadow p-4">
             <div className="text-2xl font-bold text-blue-600">{stats.sent ?? 0}</div>
             <div className="text-sm text-gray-500">Emails Sent</div>
@@ -144,29 +146,7 @@ export function OutreachTrackerClient({
             <div className="text-2xl font-bold text-green-600">{stats.ongoingConversations ?? 0}</div>
             <div className="text-sm text-gray-500">Ongoing Conversations</div>
           </div>
-          <div className="bg-white rounded-lg shadow p-4">
-            <div className="text-2xl font-bold text-emerald-600">{stats.connected ?? 0}</div>
-            <div className="text-sm text-gray-500">Connected</div>
-          </div>
         </div>
-
-        {/* Upcoming Reminders Alert */}
-        {stats.upcomingReminders > 0 && (
-          <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center gap-3">
-            <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <span className="text-yellow-800">
-              You have <strong>{stats.upcomingReminders}</strong> upcoming reminder
-              {stats.upcomingReminders === 1 ? '' : 's'} in the next 7 days
-            </span>
-          </div>
-        )}
 
         {/* Filters */}
         <OutreachFilters
@@ -186,7 +166,7 @@ export function OutreachTrackerClient({
         </div>
       ) : (
         <>
-          <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="bg-white rounded-lg overflow-hidden">
             <OutreachTable
               trackers={trackers}
               sortField={sortField}
@@ -194,6 +174,7 @@ export function OutreachTrackerClient({
               onSort={handleSort}
               onUpdate={handleUpdate}
               onDelete={handleDelete}
+              onRowClick={setSelectedTracker}
             />
           </div>
 
@@ -212,6 +193,14 @@ export function OutreachTrackerClient({
         </>
       )}
 
+      {/* Thread Panel */}
+      {selectedTracker && (
+        <ThreadPanel
+          tracker={selectedTracker}
+          isOpen={!!selectedTracker}
+          onClose={() => setSelectedTracker(null)}
+        />
+      )}
     </div>
   );
 }

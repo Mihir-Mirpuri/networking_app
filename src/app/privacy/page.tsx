@@ -18,7 +18,7 @@ export default function PrivacyPage() {
         </Link>
 
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Privacy Policy</h1>
-        <p className="text-gray-500 mb-8">Last updated: January 26, 2025</p>
+        <p className="text-gray-500 mb-8">Last updated: January 29, 2025</p>
 
         <div className="prose prose-gray max-w-none">
           <section className="mb-8">
@@ -64,6 +64,26 @@ export default function PrivacyPage() {
               your outreach emails.
             </p>
 
+            <h3 className="text-lg font-medium text-gray-900 mt-4 mb-2">Chrome Extension &amp; LinkedIn Data</h3>
+            <p className="text-gray-700 mb-4">
+              If you install our optional Chrome extension (&quot;Lattice LinkedIn Helper&quot;), it collects
+              the following information from LinkedIn profiles you visit:
+            </p>
+            <ul className="list-disc pl-6 text-gray-700 mb-4">
+              <li>Profile &quot;About&quot; section text</li>
+              <li>Education history (school, degree, field of study, dates, activities)</li>
+            </ul>
+            <p className="text-gray-700 mb-4">
+              This data is collected only when you actively use the personalization feature and is used
+              solely to help generate more relevant outreach emails. The extension does not:
+            </p>
+            <ul className="list-disc pl-6 text-gray-700 mb-4">
+              <li>Run in the background or collect data automatically</li>
+              <li>Store LinkedIn data permanently - it is used only for the current email session</li>
+              <li>Share LinkedIn data with third parties</li>
+              <li>Access your LinkedIn credentials or account</li>
+            </ul>
+
             <h3 className="text-lg font-medium text-gray-900 mt-4 mb-2">Usage Data</h3>
             <p className="text-gray-700 mb-4">
               We collect information about how you use the service, including:
@@ -93,6 +113,7 @@ export default function PrivacyPage() {
             <p className="text-gray-700 mb-4">We use the following third-party services:</p>
             <ul className="list-disc pl-6 text-gray-700 mb-4">
               <li><strong>Google OAuth &amp; Gmail API:</strong> For authentication and email functionality</li>
+              <li><strong>LinkedIn:</strong> Our Chrome extension reads publicly visible profile data to personalize emails</li>
               <li><strong>Supabase:</strong> For secure file storage (resumes)</li>
               <li><strong>Groq:</strong> For AI-powered resume analysis and email generation</li>
               <li><strong>Vercel:</strong> For hosting and deployment</li>

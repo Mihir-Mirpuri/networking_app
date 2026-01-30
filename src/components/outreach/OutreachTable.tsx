@@ -10,6 +10,7 @@ interface OutreachTableProps {
   onSort: (field: SortField) => void;
   onUpdate: (tracker: OutreachTrackerEntry) => void;
   onDelete: (id: string) => void;
+  onRowClick: (tracker: OutreachTrackerEntry) => void;
 }
 
 interface ColumnConfig {
@@ -21,17 +22,14 @@ interface ColumnConfig {
 
 const COLUMNS: ColumnConfig[] = [
   { key: 'contactName', label: 'Name', sortable: true },
+  { key: 'status', label: 'Status', sortable: true },
   { key: 'company', label: 'Company', sortable: true },
   { key: 'role', label: 'Role', sortable: true },
   { key: 'location', label: 'Location', sortable: true },
   { key: 'dateEmailed', label: 'Emailed', sortable: true },
-  { key: 'responseReceivedAt', label: 'Response', sortable: true },
-  { key: 'followedUpAt', label: 'Followed Up', sortable: true },
   { key: null, label: 'Spoke To', sortable: false },
   { key: null, label: 'Notes', sortable: false },
-  { key: 'status', label: 'Status', sortable: true },
-  { key: 'reminderDate', label: 'Reminder', sortable: true },
-  { key: null, label: '', sortable: false, className: 'w-16' },
+  { key: null, label: '', sortable: false, className: 'w-12' },
 ];
 
 export function OutreachTable({
@@ -41,6 +39,7 @@ export function OutreachTable({
   onSort,
   onUpdate,
   onDelete,
+  onRowClick,
 }: OutreachTableProps) {
   const renderSortIcon = (field: SortField | null) => {
     if (!field) return null;
@@ -82,21 +81,21 @@ export function OutreachTable({
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full border-collapse">
-        <thead>
-          <tr className="bg-gray-50 border-b border-gray-200">
+    <div className="border border-gray-300">
+      <table className="w-full border-collapse table-fixed">
+        <thead className="sticky top-0 z-10">
+          <tr className="bg-gray-100">
             {COLUMNS.map((column, index) => (
               <th
                 key={index}
-                className={`px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
+                className={`px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider border-b border-r border-gray-300 last:border-r-0 bg-gray-100 ${
                   column.className || ''
                 }`}
               >
                 {column.sortable && column.key ? (
                   <button
                     onClick={() => onSort(column.key!)}
-                    className="flex items-center gap-1 hover:text-gray-700"
+                    className="flex items-center gap-1 hover:text-gray-900"
                   >
                     {column.label}
                     {renderSortIcon(column.key)}
@@ -108,13 +107,15 @@ export function OutreachTable({
             ))}
           </tr>
         </thead>
-        <tbody>
-          {trackers.map((tracker) => (
+        <tbody className="bg-white">
+          {trackers.map((tracker, index) => (
             <OutreachRow
               key={tracker.id}
               tracker={tracker}
               onUpdate={onUpdate}
               onDelete={onDelete}
+              onRowClick={onRowClick}
+              isEven={index % 2 === 0}
             />
           ))}
         </tbody>

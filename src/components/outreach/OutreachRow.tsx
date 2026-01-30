@@ -3,9 +3,7 @@
 import { useState } from 'react';
 import { OutreachStatus, InteractionType } from '@prisma/client';
 import { OutreachTrackerEntry, updateOutreachTracker } from '@/app/actions/outreach';
-import { setReminder } from '@/app/actions/reminders';
 import { StatusDropdown } from './StatusDropdown';
-import { ReminderModal } from './ReminderModal';
 import { NotesModal } from './NotesModal';
 import { InteractionModal, getInteractionLabel } from './InteractionModal';
 
@@ -13,13 +11,14 @@ interface OutreachRowProps {
   tracker: OutreachTrackerEntry;
   onUpdate: (tracker: OutreachTrackerEntry) => void;
   onDelete: (id: string) => void;
+  onRowClick: (tracker: OutreachTrackerEntry) => void;
+  isEven?: boolean;
 }
 
-export function OutreachRow({ tracker, onUpdate, onDelete }: OutreachRowProps) {
+export function OutreachRow({ tracker, onUpdate, onDelete, onRowClick, isEven = false }: OutreachRowProps) {
   const [isEditing, setIsEditing] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  const [showReminderModal, setShowReminderModal] = useState(false);
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [showInteractionModal, setShowInteractionModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -73,20 +72,6 @@ export function OutreachRow({ tracker, onUpdate, onDelete }: OutreachRowProps) {
       console.error('Error updating status:', error);
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  const handleReminderSave = async (date: Date | null, note: string | null) => {
-    const result = await setReminder(tracker.id, date, note);
-    if (result.success) {
-      onUpdate({
-        ...tracker,
-        reminderDate: date,
-        reminderNote: note,
-        reminderSent: false,
-      });
-    } else {
-      throw new Error(result.error);
     }
   };
 
@@ -154,64 +139,103 @@ export function OutreachRow({ tracker, onUpdate, onDelete }: OutreachRowProps) {
     );
   };
 
-  const isReminderDue = tracker.reminderDate && new Date(tracker.reminderDate) <= new Date();
-  const isReminderUpcoming =
-    tracker.reminderDate &&
-    new Date(tracker.reminderDate) <= new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  const cellClass = "px-3 py-2 text-sm border-b border-r border-gray-200 last:border-r-0";
+  const rowBg = isEven ? 'bg-white' : 'bg-gray-50/50';
+
+  const renderNameCell = () => {
+    const nameContent = (
+      <div className="flex items-center gap-1">
+        <span className="truncate">{tracker.contactName || tracker.contactEmail}</span>
+        {tracker.messageCount >= 2 && (
+          <span className="text-xs text-gray-500">({tracker.messageCount})</span>
+        )}
+      </div>
+    );
+
+    if (tracker.linkedinUrl) {
+      return (
+        <a
+          href={tracker.linkedinUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-600 hover:text-blue-800 hover:underline"
+          title="View LinkedIn"
+        >
+          {nameContent}
+        </a>
+      );
+    }
+
+    return (
+      <button
+        onClick={() => handleStartEdit('contactName', tracker.contactName)}
+        className="text-left hover:text-blue-600"
+      >
+        {nameContent}
+      </button>
+    );
+  };
+
+  const handleRowClick = (e: React.MouseEvent) => {
+    // Don't trigger row click if clicking on interactive elements
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('a') || target.closest('input') || target.closest('select')) {
+      return;
+    }
+    onRowClick(tracker);
+  };
 
   return (
     <>
-      <tr className="border-b border-gray-200 hover:bg-gray-50">
+      <tr
+        className={`${rowBg} hover:bg-blue-50/50 cursor-pointer`}
+        onClick={handleRowClick}
+      >
         {/* Name */}
-        <td className="px-3 py-2 text-sm">
-          <div className="max-w-[150px]">
-            {renderEditableCell('contactName', tracker.contactName)}
+        <td className={cellClass}>
+          <div className="truncate">
+            {renderNameCell()}
           </div>
           <div className="text-xs text-gray-500 truncate">{tracker.contactEmail}</div>
         </td>
 
+        {/* Status */}
+        <td className={cellClass} onClick={(e) => e.stopPropagation()}>
+          <StatusDropdown
+            value={tracker.status}
+            onChange={handleStatusChange}
+            disabled={isSaving}
+          />
+        </td>
+
         {/* Company */}
-        <td className="px-3 py-2 text-sm">
-          <div className="max-w-[120px]">
+        <td className={cellClass}>
+          <div className="truncate">
             {renderEditableCell('company', tracker.company)}
           </div>
         </td>
 
         {/* Role */}
-        <td className="px-3 py-2 text-sm">
-          <div className="max-w-[120px]">
+        <td className={cellClass}>
+          <div className="truncate">
             {renderEditableCell('role', tracker.role)}
           </div>
         </td>
 
         {/* Location */}
-        <td className="px-3 py-2 text-sm">
-          <div className="max-w-[100px]">
+        <td className={cellClass}>
+          <div className="truncate">
             {renderEditableCell('location', tracker.location)}
           </div>
         </td>
 
         {/* Date Emailed */}
-        <td className="px-3 py-2 text-sm text-gray-600 whitespace-nowrap">
+        <td className={`${cellClass} text-gray-600 whitespace-nowrap`}>
           {formatDate(tracker.dateEmailed)}
         </td>
 
-        {/* Response */}
-        <td className="px-3 py-2 text-sm whitespace-nowrap">
-          {tracker.responseReceivedAt ? (
-            <span className="text-green-600">{formatDate(tracker.responseReceivedAt)}</span>
-          ) : (
-            <span className="text-gray-400">-</span>
-          )}
-        </td>
-
-        {/* Followed Up */}
-        <td className="px-3 py-2 text-sm text-gray-600 whitespace-nowrap">
-          {formatDate(tracker.followedUpAt)}
-        </td>
-
         {/* Spoke To */}
-        <td className="px-3 py-2 text-sm">
+        <td className={cellClass} onClick={(e) => e.stopPropagation()}>
           <button
             onClick={() => setShowInteractionModal(true)}
             className={`px-2 py-1 rounded text-xs ${
@@ -225,87 +249,36 @@ export function OutreachRow({ tracker, onUpdate, onDelete }: OutreachRowProps) {
         </td>
 
         {/* Notes */}
-        <td className="px-3 py-2 text-sm">
+        <td className={cellClass} onClick={(e) => e.stopPropagation()}>
           <button
             onClick={() => setShowNotesModal(true)}
-            className="px-2 py-1 rounded text-xs bg-gray-100 text-gray-600 hover:bg-gray-200 max-w-[80px] truncate"
-            title={tracker.notes || 'Add notes'}
+            className="w-full text-left text-gray-700 hover:text-blue-600 truncate"
+            title={tracker.notes || 'Click to add notes'}
           >
-            {tracker.notes ? 'View' : 'Add'}
-          </button>
-        </td>
-
-        {/* Status */}
-        <td className="px-3 py-2">
-          <StatusDropdown
-            value={tracker.status}
-            onChange={handleStatusChange}
-            disabled={isSaving}
-          />
-        </td>
-
-        {/* Reminder */}
-        <td className="px-3 py-2 text-sm">
-          <button
-            onClick={() => setShowReminderModal(true)}
-            className={`px-2 py-1 rounded text-xs ${
-              isReminderDue
-                ? 'bg-red-100 text-red-700 animate-pulse'
-                : isReminderUpcoming
-                ? 'bg-yellow-100 text-yellow-700'
-                : tracker.reminderDate
-                ? 'bg-blue-100 text-blue-700'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            {tracker.reminderDate ? formatDate(tracker.reminderDate) : 'Set'}
+            {tracker.notes || <span className="text-gray-400">-</span>}
           </button>
         </td>
 
         {/* Actions */}
-        <td className="px-3 py-2">
-          <div className="flex items-center gap-1">
-            {tracker.linkedinUrl && (
-              <a
-                href={tracker.linkedinUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-1 text-blue-600 hover:text-blue-800"
-                title="View LinkedIn"
-              >
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" />
-                </svg>
-              </a>
-            )}
-            <button
-              onClick={() => setShowDeleteConfirm(true)}
-              className="p-1 text-gray-400 hover:text-red-600"
-              title="Delete"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                />
-              </svg>
-            </button>
-          </div>
+        <td className={cellClass} onClick={(e) => e.stopPropagation()}>
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            className="p-1 text-gray-400 hover:text-red-600"
+            title="Delete"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
+            </svg>
+          </button>
         </td>
       </tr>
 
       {/* Modals */}
-      <ReminderModal
-        isOpen={showReminderModal}
-        onClose={() => setShowReminderModal(false)}
-        onSave={handleReminderSave}
-        currentDate={tracker.reminderDate}
-        currentNote={tracker.reminderNote}
-        contactName={tracker.contactName}
-      />
-
       <NotesModal
         isOpen={showNotesModal}
         onClose={() => setShowNotesModal(false)}

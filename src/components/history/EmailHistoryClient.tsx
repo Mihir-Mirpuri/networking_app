@@ -351,7 +351,7 @@ export function EmailHistoryClient({
         <h1 className="text-2xl font-bold text-gray-900 mb-4">Email History</h1>
 
         {/* Tabs */}
-        <div className="flex border-b border-gray-200 mb-4">
+        <div className="flex border-b border-gray-300 mb-4">
           <button
             onClick={() => setActiveTab('all')}
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
@@ -524,17 +524,17 @@ export function EmailHistoryClient({
         </div>
       ) : (
         <>
-          <div className="space-y-6">
-            {sortedDates.map((dateKey) => (
+          <div className="border border-gray-400 rounded-md overflow-hidden">
+            {sortedDates.map((dateKey, dateIndex) => (
               <div key={dateKey}>
-                <h2 className="text-lg font-semibold text-gray-700 mb-3 pb-2 border-b border-gray-200">
+                <h2 className={`text-sm font-semibold text-gray-700 px-4 py-2 bg-gray-100 border-b border-gray-400 ${dateIndex > 0 ? 'border-t border-gray-400' : ''}`}>
                   {formatDate(new Date(dateKey))}
                 </h2>
-                <div className="space-y-3">
+                <div className="divide-y divide-gray-300">
                   {groupedLogs[dateKey].map((log) => (
                     <div
                       key={log.id}
-                      className="bg-white rounded-lg shadow p-4"
+                      className="bg-white px-4 py-3 hover:bg-gray-50"
                     >
                       <button
                         onClick={() =>
@@ -613,7 +613,7 @@ export function EmailHistoryClient({
                       </button>
 
                       {expandedId === log.id && (
-                        <div className="mt-4 pt-4 border-t border-gray-200">
+                        <div className="mt-3 pt-3 border-t border-gray-300">
                           <div className="mb-3">
                             <p className="text-xs font-medium text-gray-500 mb-1">To:</p>
                             <p className="text-sm text-gray-900">{log.toEmail}</p>
@@ -624,12 +624,12 @@ export function EmailHistoryClient({
                           </div>
                           <div className="mb-3">
                             <p className="text-xs font-medium text-gray-500 mb-1">Body:</p>
-                            <p className="text-sm text-gray-900 whitespace-pre-wrap bg-gray-50 p-3 rounded">
+                            <p className="text-sm text-gray-900 whitespace-pre-wrap bg-gray-50 p-3 border border-gray-300">
                               {log.body}
                             </p>
                           </div>
                           {log.isScheduled && log.scheduledEmailId && log.status === 'PENDING' && (
-                            <div className="mt-4 pt-4 border-t border-gray-200 flex gap-2">
+                            <div className="mt-3 pt-3 border-t border-gray-300 flex gap-2">
                               <button
                                 onClick={() => {
                                   if (log.scheduledFor) {

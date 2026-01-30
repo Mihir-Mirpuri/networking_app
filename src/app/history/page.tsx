@@ -22,8 +22,6 @@ export default async function HistoryPage() {
     sent: 0,
     waiting: 0,
     ongoingConversations: 0,
-    connected: 0,
-    upcomingReminders: 0,
   };
 
   return (
