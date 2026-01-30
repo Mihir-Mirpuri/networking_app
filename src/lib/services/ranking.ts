@@ -36,12 +36,14 @@ export interface RankedCandidate<T> {
 }
 
 // Weights for each criterion
+// Note: company, location, university are hard-filtered in DB query,
+// so they don't differentiate candidates. Role is the primary ranking factor.
 const WEIGHTS = {
-  company: 0.30,
-  role: 0.25,
-  location: 0.20,
-  university: 0.15,
-  email: 0.10,
+  company: 0.00,
+  role: 0.85,
+  location: 0.00,
+  university: 0.00,
+  email: 0.15,
 };
 
 /**
