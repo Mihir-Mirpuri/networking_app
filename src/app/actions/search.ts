@@ -464,8 +464,8 @@ export async function searchPeopleAction(
       }
 
       // Request more candidates for ranking (we'll rank and take top N)
-      // Use 5x multiplier to account for email filter (~70% have emails)
-      const discoveryLimit = Math.max(input.limit * 5, 50);
+      // Use 10x multiplier to account for email filter (~70%) + location filter (~50%)
+      const discoveryLimit = Math.max(input.limit * 10, 80);
       console.log(`[Search] Requesting ${discoveryLimit} candidates for ranking`);
 
       // Search for people via CSE
