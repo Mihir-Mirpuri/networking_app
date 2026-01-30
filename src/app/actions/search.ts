@@ -322,15 +322,23 @@ export async function searchPeopleAction(
         cachedPersons = await getPersonsByIds(cachedPersonIds);
       }
 
-      // Filter out excluded people and those without emails
+      // Filter out excluded people, those without emails, and wrong location
       const filteredPersons = cachedPersons.filter((person) => {
         const key = `${person.fullName}_${person.company}`.toLowerCase();
         if (excludedKeys.has(key)) return false;
         // Hard filter: must have email
         if (!person.email) return false;
+        // Hard filter: must match location if specified
+        if (input.location && input.location.trim()) {
+          const searchLoc = input.location.trim().toLowerCase();
+          const personCity = person.city?.toLowerCase() || '';
+          if (!personCity.includes(searchLoc) && !searchLoc.includes(personCity)) {
+            return false;
+          }
+        }
         return true;
       });
-      console.log(`[Search] After filtering (excluded + no email): ${filteredPersons.length} people`);
+      console.log(`[Search] After filtering (excluded + no email + location): ${filteredPersons.length} people`);
 
       // Apply ranking to cached persons
       const rankedCached = rankCandidates(
@@ -530,10 +538,21 @@ export async function searchPeopleAction(
       const peopleWithEmails = enrichedPeople.filter(({ emailResult }) => emailResult.email);
       console.log(`[Search] After email filter: ${peopleWithEmails.length}/${enrichedPeople.length} have emails`);
 
+      // Hard filter: only keep candidates matching location if specified
+      let locationFiltered = peopleWithEmails;
+      if (input.location && input.location.trim()) {
+        const searchLoc = input.location.trim().toLowerCase();
+        locationFiltered = peopleWithEmails.filter(({ emailResult }) => {
+          const personCity = emailResult.city?.toLowerCase() || '';
+          return personCity.includes(searchLoc) || searchLoc.includes(personCity);
+        });
+        console.log(`[Search] After location filter: ${locationFiltered.length}/${peopleWithEmails.length} in ${input.location}`);
+      }
+
       // Apply ranking to enriched candidates
       const rankedEnriched = rankCandidates(
         searchCriteria,
-        peopleWithEmails,
+        locationFiltered,
         ({ emailResult }): CandidateData => ({
           company: emailResult.employment?.company || null,
           role: emailResult.employment?.title || null,
