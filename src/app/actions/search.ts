@@ -2,8 +2,8 @@
 
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { searchPeople, SearchResult } from '@/lib/services/discovery';
-import { getOrFindEmail, CachedEmailResult } from '@/lib/services/email-cache';
+import { searchPeople } from '@/lib/services/discovery';
+import { getOrFindEmail } from '@/lib/services/email-cache';
 import { rankCandidates, SearchCriteria, CandidateData, ScoreBreakdown } from '@/lib/services/ranking';
 import { EMAIL_TEMPLATES } from '@/lib/constants';
 import prisma from '@/lib/prisma';
@@ -13,6 +13,16 @@ import {
   saveDiscoveredPerson,
   PersonFilters
 } from '@/lib/db/person-service';
+import {
+  normalizeSearchParams,
+  findCachedSearch,
+  findStaleSearch,
+  getCachedPersonIds,
+  createSearchWithPeople,
+  updateSearchWithPeople,
+  getStalePersonIds,
+  getPersonsByIds,
+} from '@/lib/db/search-cache';
 
 export interface SearchInput {
   name?: string;
@@ -98,6 +108,9 @@ function generateDraft(
   };
 }
 
+// Concurrency limits
+const APOLLO_CONCURRENCY = 3;
+
 // Helper function for controlled concurrency
 async function processWithConcurrency<T, R>(
   items: T[],
@@ -111,6 +124,40 @@ async function processWithConcurrency<T, R>(
     results.push(...batchResults);
   }
   return results;
+}
+
+/**
+ * Re-enrich stale people with fresh Apollo data
+ */
+async function reEnrichStalePeople(personIds: string[]): Promise<void> {
+  const people = await prisma.person.findMany({
+    where: { id: { in: personIds } },
+    select: { id: true, fullName: true, firstName: true, lastName: true, company: true, linkedinUrl: true },
+  });
+
+  await processWithConcurrency(people, APOLLO_CONCURRENCY, async (person) => {
+    const emailResult = await getOrFindEmail({
+      fullName: person.fullName,
+      firstName: person.firstName,
+      lastName: person.lastName,
+      company: person.company,
+      linkedinUrl: person.linkedinUrl,
+    });
+
+    await prisma.person.update({
+      where: { id: person.id },
+      data: {
+        email: emailResult.email,
+        emailStatus: emailResult.status,
+        emailConfidence: emailResult.confidence,
+        role: emailResult.employment?.title,
+        city: emailResult.city,
+        state: emailResult.state,
+        country: emailResult.country,
+        apolloEnrichedAt: new Date(),
+      },
+    });
+  });
 }
 
 /**
@@ -236,113 +283,170 @@ export async function searchPeopleAction(
       }
     }
 
-    // ===== STEP 1: CSE DISCOVERY (Broad Query) =====
-    // Only use company + university for CSE query
-    // Role and location are filtered at DB level
-    const CSE_LIMIT = 100; // Get many candidates for Apollo enrichment
-    console.log(`[Search] Step 1: CSE Discovery for "${input.company}" + "${input.university || 'any university'}"`);
-
-    const cseResults = await searchPeople({
-      company: input.company,
-      university: input.university,
+    // ===== CACHE CHECK =====
+    const normalizedParams = normalizeSearchParams({
       name: input.name,
-      limit: CSE_LIMIT,
+      company: input.company,
+      role: input.role,
+      university: input.university,
+      location: input.location,
     });
-    console.log(`[Search] CSE found ${cseResults.length} LinkedIn profiles`);
 
-    // ===== STEP 2: APOLLO ENRICHMENT (All People) =====
-    // Enrich ALL discovered people and save to database
-    console.log(`[Search] Step 2: Apollo enrichment for ${cseResults.length} people`);
+    const cachedSearch = await findCachedSearch(normalizedParams);
+    let matchingPeople: Awaited<ReturnType<typeof findPeopleByFilters>> | Awaited<ReturnType<typeof getPersonsByIds>>;
 
-    const APOLLO_CONCURRENCY = 3;
-    let newPeopleCount = 0;
-    let existingPeopleCount = 0;
+    if (cachedSearch) {
+      // ===== CACHE HIT =====
+      console.log(`[Search] CACHE HIT - search ${cachedSearch.id} from ${cachedSearch.createdAt}`);
 
-    await processWithConcurrency(cseResults, APOLLO_CONCURRENCY, async (person) => {
-      if (!person.firstName || !person.lastName) {
-        return; // Skip if no name
+      // Get cached person IDs
+      const cachedPersonIds = await getCachedPersonIds(cachedSearch.id);
+      console.log(`[Search] Found ${cachedPersonIds.length} cached people`);
+
+      // Check for stale Apollo data
+      const stalePersonIds = await getStalePersonIds(cachedPersonIds);
+
+      if (stalePersonIds.length > 0) {
+        console.log(`[Search] Re-enriching ${stalePersonIds.length} stale people`);
+        await reEnrichStalePeople(stalePersonIds);
       }
 
-      // Get Apollo data
-      const linkedinUrl = person.sourceDomain?.includes('linkedin.com') ? person.sourceUrl : null;
-      const emailResult = await getOrFindEmail({
-        fullName: person.fullName,
-        firstName: person.firstName,
-        lastName: person.lastName,
-        company: person.company,
-        linkedinUrl,
+      // Fetch fresh person data
+      matchingPeople = await getPersonsByIds(cachedPersonIds);
+      console.log(`[Search] Retrieved ${matchingPeople.length} people from cache`);
+    } else {
+      // ===== CACHE MISS - do full CSE + Apollo =====
+      console.log('[Search] CACHE MISS - running full discovery');
+
+      // ===== STEP 1: CSE DISCOVERY =====
+      const CSE_LIMIT = 100;
+      console.log(`[Search] Step 1: CSE Discovery for "${input.company}" + "${input.university || 'any university'}" + "${input.role || 'any role'}" + "${input.location || 'any location'}"`);
+
+      const cseResults = await searchPeople({
+        company: input.company,
+        university: input.university,
+        role: input.role,
+        location: input.location,
+        name: input.name,
+        limit: CSE_LIMIT,
+      });
+      console.log(`[Search] CSE found ${cseResults.length} LinkedIn profiles`);
+
+      // ===== STEP 2: APOLLO ENRICHMENT =====
+      console.log(`[Search] Step 2: Apollo enrichment for ${cseResults.length} people`);
+
+      let newPeopleCount = 0;
+      let existingPeopleCount = 0;
+
+      await processWithConcurrency(cseResults, APOLLO_CONCURRENCY, async (person) => {
+        if (!person.firstName || !person.lastName) {
+          return;
+        }
+
+        const linkedinUrl = person.sourceDomain?.includes('linkedin.com') ? person.sourceUrl : null;
+        const emailResult = await getOrFindEmail({
+          fullName: person.fullName,
+          firstName: person.firstName,
+          lastName: person.lastName,
+          company: person.company,
+          linkedinUrl,
+        });
+
+        const apolloCompany = emailResult.employment?.company || person.company;
+        const education = emailResult.education || (input.university ? {
+          schoolName: input.university,
+          degree: null,
+          fieldOfStudy: null,
+          graduationYear: null,
+        } : null);
+
+        const { isNew } = await saveDiscoveredPerson(
+          person.fullName,
+          person.firstName,
+          person.lastName,
+          linkedinUrl,
+          person.sourceUrl,
+          person.sourceTitle,
+          person.sourceSnippet,
+          person.sourceDomain,
+          {
+            company: apolloCompany,
+            role: emailResult.employment?.title || null,
+            email: emailResult.email,
+            emailStatus: emailResult.status,
+            emailConfidence: emailResult.confidence,
+            city: emailResult.city,
+            state: emailResult.state,
+            country: emailResult.country,
+            education,
+          }
+        );
+
+        if (isNew) {
+          newPeopleCount++;
+        } else {
+          existingPeopleCount++;
+        }
       });
 
-      // Determine the actual company from Apollo (or fallback to search company)
-      const apolloCompany = emailResult.employment?.company || person.company;
+      console.log(`[Search] Saved to DB: ${newPeopleCount} new, ${existingPeopleCount} updated`);
 
-      // Save to database (ALL people, not just those with email)
-      // Use search university as education if Apollo doesn't provide it
-      // (CSE already filtered for this university in the LinkedIn search)
-      const education = emailResult.education || (input.university ? {
-        schoolName: input.university,
-        degree: null,
-        fieldOfStudy: null,
-        graduationYear: null,
-      } : null);
+      // ===== STEP 3: QUERY DATABASE WITH FILTERS =====
+      console.log(`[Search] Step 3: Query DB with filters - company="${input.company}", location="${input.location || 'any'}", role="${input.role || 'any'}"`);
 
-      const { isNew } = await saveDiscoveredPerson(
-        person.fullName,
-        person.firstName,
-        person.lastName,
-        linkedinUrl,
-        person.sourceUrl,
-        person.sourceTitle,
-        person.sourceSnippet,
-        person.sourceDomain,
-        {
-          company: apolloCompany,
-          role: emailResult.employment?.title || null,
-          email: emailResult.email,
-          emailStatus: emailResult.status,
-          emailConfidence: emailResult.confidence,
-          city: emailResult.city,
-          state: emailResult.state,
-          country: emailResult.country,
-          education,
+      const filters: PersonFilters = {
+        company: input.company,
+        location: input.location,
+        requireEmail: true,
+        excludePersonKeys: excludedKeys,
+        limit: input.limit * 3,
+      };
+
+      matchingPeople = await findPeopleByFilters(filters);
+      console.log(`[Search] DB query returned ${matchingPeople.length} matching people`);
+
+      // ===== SAVE TO CACHE =====
+      if (matchingPeople.length > 0) {
+        const personIds = matchingPeople.map(p => p.id);
+        const staleSearch = await findStaleSearch(normalizedParams);
+        if (staleSearch) {
+          await updateSearchWithPeople(staleSearch.id, personIds);
+          console.log(`[Search] Updated stale search ${staleSearch.id} with ${personIds.length} people`);
+        } else {
+          const { searchId } = await createSearchWithPeople(normalizedParams, personIds);
+          console.log(`[Search] Created new search cache ${searchId} with ${personIds.length} people`);
         }
-      );
-
-      if (isNew) {
-        newPeopleCount++;
-      } else {
-        existingPeopleCount++;
       }
-    });
-
-    console.log(`[Search] Saved to DB: ${newPeopleCount} new, ${existingPeopleCount} updated`);
-
-    // ===== STEP 3: QUERY DATABASE WITH FILTERS =====
-    // Now query the Person table with user's full criteria
-    console.log(`[Search] Step 3: Query DB with filters - company="${input.company}", location="${input.location || 'any'}", role="${input.role || 'any'}"`);
-
-    // Hard filters: Company + Location + Email only
-    // Role and University are used for RANKING, not filtering
-    // This ensures we return all valid candidates and rank them by relevance
-    const filters: PersonFilters = {
-      company: input.company,
-      location: input.location,
-      // role removed from hard filter - used for ranking instead
-      // university removed - CSE already filtered by university
-      requireEmail: true,
-      excludePersonKeys: excludedKeys,
-      limit: input.limit * 3, // Get extra for ranking
-    };
-
-    const matchingPeople = await findPeopleByFilters(filters);
-    console.log(`[Search] DB query returned ${matchingPeople.length} matching people`);
+    }
 
     if (matchingPeople.length === 0) {
-      console.log('[Search] No matching people found in database');
+      console.log('[Search] No matching people found');
       return { success: true, results: [] };
     }
 
-    // ===== STEP 4: RANK RESULTS =====
+    // ===== STEP 4: FILTER AND RANK RESULTS =====
+    // For cache hits, we need to filter out excluded people
+    // For cache misses, this was already done in findPeopleByFilters
+    const filteredPeople = matchingPeople.filter(person => {
+      // Filter out excluded people (sent/hidden)
+      const personKey = `${person.fullName}_${person.company}`.toLowerCase();
+      if (excludedKeys.has(personKey)) {
+        return false;
+      }
+      // Only include people with email
+      if (!person.email) {
+        return false;
+      }
+      return true;
+    });
+
+    if (filteredPeople.length === 0) {
+      console.log('[Search] No matching people after filtering');
+      return { success: true, results: [] };
+    }
+
+    console.log(`[Search] ${filteredPeople.length} people after filtering`);
+
     const searchCriteria: SearchCriteria = {
       company: input.company,
       role: input.role,
@@ -352,7 +456,7 @@ export async function searchPeopleAction(
 
     const rankedPeople = rankCandidates(
       searchCriteria,
-      matchingPeople,
+      filteredPeople,
       (person): CandidateData => ({
         company: person.company,
         role: person.role,
