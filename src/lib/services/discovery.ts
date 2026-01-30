@@ -197,7 +197,7 @@ export async function discoverLinkedInProfiles(params: SearchParams): Promise<CS
   if (location && location.trim()) queryParts.push(location.trim()); // Unquoted for flexibility
   if (name && name.trim()) queryParts.push(name.trim());
 
-  const query = queryParts.join(' ');
+  const query = `site:linkedin.com/in ${queryParts.join(' ')}`;
 
   if (!query) {
     console.log('[Discovery] No search parameters provided, returning empty results');
