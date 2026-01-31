@@ -45,6 +45,24 @@ export async function getOrFindEmail(
   const { fullName, firstName, lastName, company, linkedinUrl } = personData;
 
   // Step 1: Check if Person exists for THIS company
+  const personSelectFields = {
+    id: true,
+    email: true,
+    emailStatus: true,
+    emailConfidence: true,
+    emailLastUpdated: true,
+    apolloEnrichedAt: true,
+    city: true,
+    state: true,
+    country: true,
+    role: true,
+    company: true,
+    educationSchool: true,
+    educationDegree: true,
+    educationField: true,
+    educationYear: true,
+  };
+
   let existingPerson;
   try {
     existingPerson = await prisma.person.findUnique({
@@ -54,23 +72,24 @@ export async function getOrFindEmail(
           company,
         },
       },
-      select: {
-        id: true,
-        email: true,
-        emailStatus: true,
-        emailConfidence: true,
-        emailLastUpdated: true,
-        apolloEnrichedAt: true,
-        city: true,
-        state: true,
-        country: true,
-        role: true,
-        educationSchool: true,
-        educationDegree: true,
-        educationField: true,
-        educationYear: true,
-      },
+      select: personSelectFields,
     });
+
+    // Fallback: If not found by company, try to find by LinkedIn URL
+    // This handles cases where Person was saved with Apollo's company (different from search company)
+    if (!existingPerson && linkedinUrl) {
+      existingPerson = await prisma.person.findFirst({
+        where: {
+          linkedinUrl,
+        },
+        select: personSelectFields,
+      });
+      if (existingPerson) {
+        console.log(
+          `[EmailCache] 🔍 Found person "${fullName}" by LinkedIn URL (stored company: ${existingPerson.company}, search company: ${company})`
+        );
+      }
+    }
   } catch (error: any) {
     // If columns don't exist, this will fail - guide user to run migration
     if (error?.message?.includes('column') || error?.code === 'P2021') {
@@ -111,9 +130,9 @@ export async function getOrFindEmail(
       graduationYear: existingPerson.educationYear,
     } : null;
 
-    // Build employment info from cached data (company is the search company, role from Apollo)
+    // Build employment info from cached data (use stored company from Apollo)
     const employment: EmploymentInfo | null = existingPerson.role ? {
-      company: company, // Use the search company (which is also the Person's company)
+      company: existingPerson.company, // Use stored company (from Apollo)
       title: existingPerson.role,
     } : null;
 

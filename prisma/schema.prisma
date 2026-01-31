@@ -104,6 +104,7 @@ model Person {
   @@index([emailStatus])
   @@index([apolloEnrichedAt])       // For TTL queries
   @@index([apolloStatus])           // For filtering by enrichment status
+  @@index([linkedinUrl])            // For cache lookup by LinkedIn URL
 }
 
 model Search {
