@@ -22,16 +22,16 @@ export function CalendarControls({
   onRefresh,
 }: CalendarControlsProps) {
   return (
-    <div className="bg-white rounded-lg shadow p-4">
+    <div className="card p-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <button
             onClick={onPrevious}
-            className="p-2 hover:bg-gray-100 rounded-lg"
+            className="p-2 hover:bg-surface-100 rounded-lg transition-colors"
             aria-label="Previous"
           >
             <svg
-              className="w-5 h-5 text-gray-600"
+              className="w-5 h-5 text-surface-600"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -46,17 +46,17 @@ export function CalendarControls({
           </button>
           <button
             onClick={onToday}
-            className="px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg"
+            className="px-3 py-1.5 text-sm font-medium text-surface-700 hover:bg-surface-100 rounded-lg transition-colors"
           >
             Today
           </button>
           <button
             onClick={onNext}
-            className="p-2 hover:bg-gray-100 rounded-lg"
+            className="p-2 hover:bg-surface-100 rounded-lg transition-colors"
             aria-label="Next"
           >
             <svg
-              className="w-5 h-5 text-gray-600"
+              className="w-5 h-5 text-surface-600"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -69,7 +69,7 @@ export function CalendarControls({
               />
             </svg>
           </button>
-          <span className="ml-4 text-lg font-semibold text-gray-900">
+          <span className="ml-4 text-lg font-semibold text-surface-900">
             {dateRangeLabel}
           </span>
         </div>
@@ -77,20 +77,20 @@ export function CalendarControls({
         <div className="flex items-center gap-2">
           <button
             onClick={() => onViewModeChange('week')}
-            className={`px-3 py-1.5 text-sm font-medium rounded-lg ${
+            className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
               viewMode === 'week'
-                ? 'bg-blue-100 text-blue-700'
-                : 'text-gray-600 hover:bg-gray-100'
+                ? 'bg-primary-100 text-primary-700'
+                : 'text-surface-600 hover:bg-surface-100'
             }`}
           >
             Week
           </button>
           <button
             onClick={() => onViewModeChange('month')}
-            className={`px-3 py-1.5 text-sm font-medium rounded-lg ${
+            className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
               viewMode === 'month'
-                ? 'bg-blue-100 text-blue-700'
-                : 'text-gray-600 hover:bg-gray-100'
+                ? 'bg-primary-100 text-primary-700'
+                : 'text-surface-600 hover:bg-surface-100'
             }`}
           >
             Month
@@ -98,11 +98,11 @@ export function CalendarControls({
           <button
             onClick={onRefresh}
             disabled={isLoading}
-            className="p-2 hover:bg-gray-100 rounded-lg"
+            className="p-2 hover:bg-surface-100 rounded-lg transition-colors"
             title="Refresh"
           >
             <svg
-              className={`w-5 h-5 text-gray-600 ${isLoading ? 'animate-spin' : ''}`}
+              className={`w-5 h-5 text-surface-600 ${isLoading ? 'animate-spin' : ''}`}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"

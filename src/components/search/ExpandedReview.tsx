@@ -362,7 +362,7 @@ export function ExpandedReview({
             </p>
             {currentPerson.email ? (
               <div className="flex items-center gap-2">
-                <p className="text-sm text-blue-600">{currentPerson.email}</p>
+                <p className="text-sm text-primary-600">{currentPerson.email}</p>
                 {currentPerson.emailStatus === 'VERIFIED' && (
                   <span className="px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-800">
                     Verified
@@ -382,7 +382,7 @@ export function ExpandedReview({
                 href={currentPerson.linkedinUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 mt-2 text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                className="inline-flex items-center gap-1.5 mt-2 text-sm text-primary-600 hover:text-primary-800 hover:underline"
                 aria-label="View LinkedIn profile"
               >
                 <svg
@@ -518,7 +518,7 @@ export function ExpandedReview({
               type="text"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
           </div>
           <div>
@@ -529,7 +529,7 @@ export function ExpandedReview({
               value={body}
               onChange={(e) => setBody(e.target.value)}
               rows={12}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
             />
           </div>
           
@@ -579,14 +579,14 @@ export function ExpandedReview({
             <button
               onClick={() => setShowScheduleModal(true)}
               disabled={!canSend || isSending}
-              className="px-4 py-2 text-sm border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 text-sm border border-primary-600 text-primary-600 rounded-md hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Schedule
             </button>
             <button
               onClick={handleSend}
               disabled={!canSend || isSending}
-              className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSending ? 'Sending...' : 'Send & Next'}
             </button>
@@ -612,7 +612,7 @@ export function ExpandedReview({
                   setScheduleError(null);
                 }}
                 min={new Date(new Date().getTime() + 5 * 60 * 1000).toISOString().slice(0, 16)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
               <p className="mt-1 text-xs text-gray-500">
                 Minimum: 5 minutes from now
@@ -640,7 +640,7 @@ export function ExpandedReview({
               <button
                 onClick={handleSchedule}
                 disabled={isScheduling || !scheduledDateTime}
-                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isScheduling ? 'Scheduling...' : 'Schedule'}
               </button>

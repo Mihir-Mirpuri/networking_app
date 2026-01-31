@@ -356,7 +356,7 @@ export function EmailHistoryClient({
             onClick={() => setActiveTab('all')}
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
               activeTab === 'all'
-                ? 'border-blue-600 text-blue-600'
+                ? 'border-primary-600 text-primary-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
@@ -369,7 +369,7 @@ export function EmailHistoryClient({
             onClick={() => setActiveTab('ongoing')}
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
               activeTab === 'ongoing'
-                ? 'border-blue-600 text-blue-600'
+                ? 'border-primary-600 text-primary-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
@@ -384,7 +384,7 @@ export function EmailHistoryClient({
             onClick={() => setActiveTab('no-response')}
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
               activeTab === 'no-response'
-                ? 'border-blue-600 text-blue-600'
+                ? 'border-primary-600 text-primary-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
@@ -404,7 +404,7 @@ export function EmailHistoryClient({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            className="flex-1 min-w-[200px] px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 min-w-[200px] px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
           <div className="flex gap-2">
             {showCustomInput ? (
@@ -430,7 +430,7 @@ export function EmailHistoryClient({
                     }
                   }}
                   placeholder="days"
-                  className="w-20 px-2 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-20 px-2 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                   autoFocus
                 />
                 <span className="text-sm text-gray-600">days</span>
@@ -443,7 +443,7 @@ export function EmailHistoryClient({
                     }
                   }}
                   disabled={!customDays || parseInt(customDays, 10) <= 0}
-                  className="px-2 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                  className="px-2 py-2 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
                 >
                   Apply
                 </button>
@@ -471,7 +471,7 @@ export function EmailHistoryClient({
                     setTimeFilter(parseInt(val, 10));
                   }
                 }}
-                className="px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                className="px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500 cursor-pointer"
               >
                 {TIME_FILTER_PRESETS.map((option) => (
                   <option key={String(option.value)} value={String(option.value)}>
@@ -488,7 +488,7 @@ export function EmailHistoryClient({
           <button
             onClick={handleSearch}
             disabled={isLoading}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+            className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
           >
             {isLoading ? 'Searching...' : 'Search'}
           </button>
@@ -553,7 +553,7 @@ export function EmailHistoryClient({
                               </span>
                             )}
                             {log.isScheduled ? (
-                              <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-primary-100 text-primary-800">
                                 Scheduled
                               </span>
                             ) : (
@@ -641,7 +641,7 @@ export function EmailHistoryClient({
                                     setEditScheduleError(null);
                                   }
                                 }}
-                                className="px-3 py-1.5 text-sm border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50"
+                                className="px-3 py-1.5 text-sm border border-primary-600 text-primary-600 rounded-md hover:bg-primary-50"
                               >
                                 Edit Time
                               </button>
@@ -695,7 +695,7 @@ export function EmailHistoryClient({
                   setEditScheduleError(null);
                 }}
                 min={new Date(new Date().getTime() + 5 * 60 * 1000).toISOString().slice(0, 16)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
               <p className="mt-1 text-xs text-gray-500">
                 Minimum: 5 minutes from now
@@ -723,7 +723,7 @@ export function EmailHistoryClient({
               <button
                 onClick={() => editingScheduleId && handleEditSchedule(editingScheduleId, new Date(editScheduledDateTime))}
                 disabled={isUpdatingSchedule || !editScheduledDateTime}
-                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isUpdatingSchedule ? 'Updating...' : 'Update'}
               </button>
@@ -753,7 +753,7 @@ export function EmailHistoryClient({
                 type="text"
                 value={followUpData.subject}
                 onChange={(e) => setFollowUpData({ ...followUpData, subject: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
             </div>
 
@@ -765,7 +765,7 @@ export function EmailHistoryClient({
                 value={followUpData.body}
                 onChange={(e) => setFollowUpData({ ...followUpData, body: e.target.value })}
                 rows={8}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 resize-y"
               />
             </div>
 

@@ -106,26 +106,26 @@ export function ThreadPanel({ tracker, isOpen, onClose }: ThreadPanelProps) {
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black bg-opacity-30 z-40"
+        className="fixed inset-0 bg-surface-900/40 backdrop-blur-sm z-40 animate-fade-in"
         onClick={onClose}
       />
 
       {/* Panel */}
-      <div className="fixed right-0 top-0 h-full w-full max-w-2xl bg-white shadow-xl z-50 flex flex-col">
+      <div className="fixed right-0 top-0 h-full w-full max-w-2xl bg-white shadow-soft-xl z-50 flex flex-col animate-slide-in-right">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-surface-200">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">
+            <h2 className="text-lg font-semibold text-surface-900">
               {tracker.contactName || tracker.contactEmail}
             </h2>
-            <p className="text-sm text-gray-500">{tracker.contactEmail}</p>
+            <p className="text-sm text-surface-500">{tracker.contactEmail}</p>
             {tracker.company && (
-              <p className="text-sm text-gray-500">{tracker.company}</p>
+              <p className="text-sm text-surface-500">{tracker.company}</p>
             )}
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100"
+            className="p-2 text-surface-400 hover:text-surface-600 rounded-lg hover:bg-surface-100 transition-colors"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -136,15 +136,19 @@ export function ThreadPanel({ tracker, isOpen, onClose }: ThreadPanelProps) {
         {/* Messages */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {isLoading ? (
-            <div className="flex items-center justify-center h-full">
-              <p className="text-gray-500">Loading messages...</p>
+            <div className="flex items-center justify-center h-full gap-2 text-surface-500">
+              <svg className="animate-spin h-5 w-5 text-primary-600" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              <span>Loading messages...</span>
             </div>
           ) : error ? (
             <div className="flex items-center justify-center h-full">
               <p className="text-red-500">{error}</p>
             </div>
           ) : messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-gray-500">
+            <div className="flex flex-col items-center justify-center h-full text-surface-500">
               <p>No messages in this thread yet.</p>
               <p className="text-sm mt-1">Send an email to start the conversation.</p>
             </div>
@@ -153,44 +157,44 @@ export function ThreadPanel({ tracker, isOpen, onClose }: ThreadPanelProps) {
               {messages.map((message) => (
                 <div
                   key={message.messageId}
-                  className={`rounded-lg border ${
+                  className={`rounded-xl border ${
                     message.direction === 'SENT'
-                      ? 'bg-blue-50 border-blue-200'
-                      : 'bg-gray-50 border-gray-200'
+                      ? 'bg-primary-50 border-primary-200'
+                      : 'bg-surface-50 border-surface-200'
                   }`}
                 >
-                  <div className="px-4 py-3 border-b border-gray-200">
+                  <div className="px-4 py-3 border-b border-surface-200">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className={`text-sm font-medium ${
-                          message.direction === 'SENT' ? 'text-blue-700' : 'text-gray-700'
+                          message.direction === 'SENT' ? 'text-primary-700' : 'text-surface-700'
                         }`}>
                           {message.direction === 'SENT' ? 'You' : formatSender(message.sender)}
                         </span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                           message.direction === 'SENT'
-                            ? 'bg-blue-100 text-blue-600'
-                            : 'bg-green-100 text-green-600'
+                            ? 'bg-primary-100 text-primary-600'
+                            : 'bg-emerald-100 text-emerald-600'
                         }`}>
                           {message.direction === 'SENT' ? 'Sent' : 'Received'}
                         </span>
                       </div>
-                      <span className="text-xs text-gray-500">
+                      <span className="text-xs text-surface-500">
                         {formatDate(message.receivedAt)}
                       </span>
                     </div>
                     {message.subject && (
-                      <p className="text-sm text-gray-600 mt-1">{message.subject}</p>
+                      <p className="text-sm text-surface-600 mt-1">{message.subject}</p>
                     )}
                   </div>
                   <div className="px-4 py-3">
                     {message.bodyHtml ? (
                       <div
-                        className="text-sm text-gray-700 prose prose-sm max-w-none"
+                        className="text-sm text-surface-700 prose prose-sm max-w-none"
                         dangerouslySetInnerHTML={{ __html: message.bodyHtml }}
                       />
                     ) : (
-                      <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                      <p className="text-sm text-surface-700 whitespace-pre-wrap">
                         {message.bodyText || '(No content)'}
                       </p>
                     )}
@@ -203,7 +207,7 @@ export function ThreadPanel({ tracker, isOpen, onClose }: ThreadPanelProps) {
         </div>
 
         {/* Compose Area */}
-        <div className="border-t border-gray-200 px-6 py-4">
+        <div className="border-t border-surface-200 px-6 py-4">
           {showCompose ? (
             <div className="space-y-3">
               <input
@@ -211,19 +215,19 @@ export function ThreadPanel({ tracker, isOpen, onClose }: ThreadPanelProps) {
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
                 placeholder="Subject"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="input text-sm"
               />
               <textarea
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
                 placeholder="Write your message..."
                 rows={4}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="input text-sm resize-none"
               />
               {sendError && (
                 <p className="text-sm text-red-600">{sendError}</p>
               )}
-              <div className="flex items-center justify-end gap-2">
+              <div className="flex items-center justify-end gap-3">
                 <button
                   onClick={() => {
                     setShowCompose(false);
@@ -231,14 +235,14 @@ export function ThreadPanel({ tracker, isOpen, onClose }: ThreadPanelProps) {
                     setSendError(null);
                   }}
                   disabled={isSending}
-                  className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 disabled:opacity-50"
+                  className="btn-ghost text-sm"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSend}
                   disabled={isSending || !body.trim()}
-                  className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="btn-primary text-sm"
                 >
                   {isSending ? 'Sending...' : 'Send'}
                 </button>
@@ -248,7 +252,7 @@ export function ThreadPanel({ tracker, isOpen, onClose }: ThreadPanelProps) {
             <button
               onClick={() => setShowCompose(true)}
               disabled={!tracker.gmailThreadId}
-              className="w-full px-4 py-3 text-sm text-blue-600 border border-blue-300 rounded-md hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full px-4 py-3 text-sm font-medium text-primary-600 border border-primary-300 rounded-lg hover:bg-primary-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {tracker.gmailThreadId ? 'Reply to this thread' : 'No thread available'}
             </button>

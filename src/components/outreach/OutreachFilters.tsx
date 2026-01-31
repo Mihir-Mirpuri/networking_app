@@ -61,7 +61,7 @@ export function OutreachFilters({
         value={searchQuery}
         onChange={(e) => onSearchChange(e.target.value)}
         onKeyDown={handleKeyDown}
-        className="flex-1 min-w-[200px] px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="flex-1 min-w-[200px] px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
       />
 
       <div className="relative">
@@ -69,13 +69,13 @@ export function OutreachFilters({
           onClick={() => setShowStatusDropdown(!showStatusDropdown)}
           className={`px-4 py-2 border rounded-md flex items-center gap-2 ${
             statusFilter.length > 0
-              ? 'border-blue-500 bg-blue-50 text-blue-700'
+              ? 'border-primary-500 bg-primary-50 text-primary-700'
               : 'border-gray-300 bg-white text-gray-700'
           }`}
         >
           <span>Status</span>
           {statusFilter.length > 0 && (
-            <span className="px-1.5 py-0.5 text-xs bg-blue-600 text-white rounded-full">
+            <span className="px-1.5 py-0.5 text-xs bg-primary-600 text-white rounded-full">
               {statusFilter.length}
             </span>
           )}
@@ -95,7 +95,7 @@ export function OutreachFilters({
                   type="checkbox"
                   checked={statusFilter.includes(option.value)}
                   onChange={() => toggleStatus(option.value)}
-                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
                 />
                 <span className="ml-2 text-sm text-gray-700">{option.label}</span>
               </label>
@@ -118,7 +118,7 @@ export function OutreachFilters({
       <button
         onClick={onSearch}
         disabled={isLoading}
-        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+        className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
       >
         {isLoading ? 'Searching...' : 'Search'}
       </button>

@@ -127,7 +127,7 @@ export function BulkReview({
                   <p className="text-sm text-gray-600">
                     {result.role ? `${result.role} at ` : ''}{result.company}
                   </p>
-                  <p className="text-sm text-blue-600">{result.email}</p>
+                  <p className="text-sm text-primary-600">{result.email}</p>
                   {result.resumeId && (
                     <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-1 bg-green-50 border border-green-200 rounded-md">
                       <svg
@@ -160,7 +160,7 @@ export function BulkReview({
                     type="text"
                     value={draft.subject}
                     onChange={(e) => handleSubjectChange(index, e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
                   />
                 </div>
 
@@ -173,7 +173,7 @@ export function BulkReview({
                     value={draft.body}
                     onChange={(e) => handleBodyChange(index, e.target.value)}
                     rows={6}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none text-sm"
                   />
                 </div>
               </div>

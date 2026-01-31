@@ -38,9 +38,9 @@ export function MonthDayCell({
 
   return (
     <div
-      className={`min-h-[100px] border-b border-r border-gray-200 p-1 cursor-pointer hover:bg-gray-50 transition-colors ${
-        !isCurrentMonth ? 'bg-gray-50' : ''
-      } ${today ? 'bg-blue-50' : ''}`}
+      className={`min-h-[100px] border-b border-r border-surface-200 p-1 cursor-pointer hover:bg-surface-50 transition-colors ${
+        !isCurrentMonth ? 'bg-surface-50' : ''
+      } ${today ? 'bg-primary-50' : ''}`}
       onClick={handleClick}
     >
       {/* Day number */}
@@ -48,10 +48,10 @@ export function MonthDayCell({
         <span
           className={`text-sm ${
             today
-              ? 'bg-blue-600 text-white w-6 h-6 rounded-full flex items-center justify-center font-semibold'
+              ? 'bg-primary-600 text-white w-6 h-6 rounded-full flex items-center justify-center font-semibold'
               : isCurrentMonth
-              ? 'text-gray-900'
-              : 'text-gray-400'
+              ? 'text-surface-900'
+              : 'text-surface-400'
           }`}
         >
           {date.getDate()}
@@ -72,7 +72,7 @@ export function MonthDayCell({
         {hiddenCount > 0 && (
           <button
             onClick={handleShowMore}
-            className="w-full text-left text-xs text-gray-500 hover:text-gray-700 px-2 py-0.5"
+            className="w-full text-left text-xs text-surface-500 hover:text-surface-700 px-2 py-0.5 transition-colors"
           >
             +{hiddenCount} more
           </button>

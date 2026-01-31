@@ -127,24 +127,52 @@ export function OutreachTrackerClient({
   return (
     <div>
       {/* Header with Stats */}
-      <div className="mb-6">
-        <div className="mb-4">
-          <h1 className="text-2xl font-bold text-gray-900">Outreach Tracker</h1>
+      <div className="mb-8">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-surface-900">Outreach Tracker</h1>
+          <p className="text-surface-500 mt-1">Track and manage your networking outreach</p>
         </div>
 
         {/* Stats Summary */}
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          <div className="bg-white rounded-lg shadow p-4">
-            <div className="text-2xl font-bold text-blue-600">{stats.sent ?? 0}</div>
-            <div className="text-sm text-gray-500">Emails Sent</div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+          <div className="card p-5 group hover:shadow-soft-lg transition-all">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-primary-100 flex items-center justify-center">
+                <svg className="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-primary-600">{stats.sent ?? 0}</div>
+                <div className="text-sm text-surface-500">Emails Sent</div>
+              </div>
+            </div>
           </div>
-          <div className="bg-white rounded-lg shadow p-4">
-            <div className="text-2xl font-bold text-yellow-600">{stats.waiting ?? 0}</div>
-            <div className="text-sm text-gray-500">No Response Yet</div>
+          <div className="card p-5 group hover:shadow-soft-lg transition-all">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center">
+                <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-amber-600">{stats.waiting ?? 0}</div>
+                <div className="text-sm text-surface-500">No Response Yet</div>
+              </div>
+            </div>
           </div>
-          <div className="bg-white rounded-lg shadow p-4">
-            <div className="text-2xl font-bold text-green-600">{stats.ongoingConversations ?? 0}</div>
-            <div className="text-sm text-gray-500">Ongoing Conversations</div>
+          <div className="card p-5 group hover:shadow-soft-lg transition-all">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center">
+                <svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-emerald-600">{stats.ongoingConversations ?? 0}</div>
+                <div className="text-sm text-surface-500">Ongoing Conversations</div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -162,21 +190,25 @@ export function OutreachTrackerClient({
       {/* Table */}
       {isLoading && trackers.length === 0 ? (
         <div className="flex items-center justify-center h-64">
-          <div className="text-gray-500">Loading...</div>
+          <div className="flex items-center gap-3 text-surface-500">
+            <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+            Loading...
+          </div>
         </div>
       ) : (
         <>
-          <div className="bg-white rounded-lg overflow-hidden">
-            <OutreachTable
-              trackers={trackers}
-              sortField={sortField}
-              sortDirection={sortDirection}
-              onSort={handleSort}
-              onUpdate={handleUpdate}
-              onDelete={handleDelete}
-              onRowClick={setSelectedTracker}
-            />
-          </div>
+          <OutreachTable
+            trackers={trackers}
+            sortField={sortField}
+            sortDirection={sortDirection}
+            onSort={handleSort}
+            onUpdate={handleUpdate}
+            onDelete={handleDelete}
+            onRowClick={setSelectedTracker}
+          />
 
           {/* Load More Button */}
           {hasMore && (
@@ -184,9 +216,19 @@ export function OutreachTrackerClient({
               <button
                 onClick={handleLoadMore}
                 disabled={isLoadingMore}
-                className="px-6 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50"
+                className="btn-secondary"
               >
-                {isLoadingMore ? 'Loading...' : 'Load More'}
+                {isLoadingMore ? (
+                  <span className="flex items-center gap-2">
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Loading...
+                  </span>
+                ) : (
+                  'Load More'
+                )}
               </button>
             </div>
           )}

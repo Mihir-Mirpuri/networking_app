@@ -83,7 +83,7 @@ export function InteractionModal({
               type="checkbox"
               checked={spokeToThem}
               onChange={(e) => setSpokeToThem(e.target.checked)}
-              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
             />
             <span className="text-sm font-medium text-gray-700">Spoke to them</span>
           </label>
@@ -96,7 +96,7 @@ export function InteractionModal({
           <select
             value={interactionType}
             onChange={(e) => setInteractionType(e.target.value as InteractionType)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
           >
             {INTERACTION_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
@@ -114,7 +114,7 @@ export function InteractionModal({
             type="date"
             value={interactionDate}
             onChange={(e) => setInteractionDate(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </div>
 
@@ -143,7 +143,7 @@ export function InteractionModal({
             <button
               onClick={handleSave}
               disabled={isSaving}
-              className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSaving ? 'Saving...' : 'Save'}
             </button>

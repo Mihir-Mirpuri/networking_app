@@ -14,11 +14,11 @@ export function MonthEventPill({ event, onClick, showTime = true }: MonthEventPi
         e.stopPropagation();
         onClick();
       }}
-      className="w-full text-left bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded truncate hover:bg-blue-200 transition-colors"
+      className="w-full text-left bg-primary-100 text-primary-800 text-xs px-2 py-0.5 rounded truncate hover:bg-primary-200 transition-colors"
       title={`${event.summary}${!event.isAllDay ? `\n${formatTime(event.start)} - ${formatTime(event.end)}` : ''}`}
     >
       {!event.isAllDay && showTime && (
-        <span className="text-blue-600 mr-1">{formatTime(event.start)}</span>
+        <span className="text-primary-600 mr-1">{formatTime(event.start)}</span>
       )}
       {event.summary}
     </button>

@@ -27,16 +27,16 @@ export function EventDetailPopover({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+    <div className="fixed inset-0 bg-surface-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+      <div className="card max-w-md w-full animate-scale-in">
         <div className="p-6">
           {/* Header */}
           <div className="flex items-start justify-between mb-4">
             <div className="flex-1">
-              <h2 className="text-lg font-semibold text-gray-900">
+              <h2 className="text-lg font-semibold text-surface-900">
                 {event.summary}
               </h2>
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-sm text-surface-500 mt-1">
                 {event.isAllDay ? (
                   formatDate(event.start)
                 ) : (
@@ -49,7 +49,7 @@ export function EventDetailPopover({
             </div>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 ml-4"
+              className="text-surface-400 hover:text-surface-600 ml-4 transition-colors"
             >
               <svg
                 className="w-6 h-6"
@@ -72,7 +72,7 @@ export function EventDetailPopover({
             {event.location && (
               <div className="flex items-start gap-3">
                 <svg
-                  className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0"
+                  className="w-5 h-5 text-surface-400 mt-0.5 flex-shrink-0"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -90,14 +90,14 @@ export function EventDetailPopover({
                     d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
                   />
                 </svg>
-                <span className="text-sm text-gray-700">{event.location}</span>
+                <span className="text-sm text-surface-700">{event.location}</span>
               </div>
             )}
 
             {event.hangoutLink && (
               <div className="flex items-start gap-3">
                 <svg
-                  className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0"
+                  className="w-5 h-5 text-surface-400 mt-0.5 flex-shrink-0"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -113,7 +113,7 @@ export function EventDetailPopover({
                   href={event.hangoutLink}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-blue-600 hover:text-blue-700"
+                  className="text-sm text-primary-600 hover:text-primary-700 transition-colors"
                 >
                   Join Google Meet
                 </a>
@@ -123,7 +123,7 @@ export function EventDetailPopover({
             {event.description && (
               <div className="flex items-start gap-3">
                 <svg
-                  className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0"
+                  className="w-5 h-5 text-surface-400 mt-0.5 flex-shrink-0"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -135,7 +135,7 @@ export function EventDetailPopover({
                     d="M4 6h16M4 12h16M4 18h7"
                   />
                 </svg>
-                <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                <p className="text-sm text-surface-700 whitespace-pre-wrap">
                   {event.description}
                 </p>
               </div>
@@ -144,7 +144,7 @@ export function EventDetailPopover({
             {event.attendees.length > 0 && (
               <div className="flex items-start gap-3">
                 <svg
-                  className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0"
+                  className="w-5 h-5 text-surface-400 mt-0.5 flex-shrink-0"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -156,24 +156,24 @@ export function EventDetailPopover({
                     d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
                   />
                 </svg>
-                <div className="text-sm text-gray-700">
+                <div className="text-sm text-surface-700">
                   <p className="font-medium mb-1">
                     {event.attendees.length} attendee
                     {event.attendees.length > 1 ? 's' : ''}
                   </p>
                   <ul className="space-y-0.5">
                     {event.attendees.slice(0, 5).map((attendee, i) => (
-                      <li key={i} className="text-gray-500">
+                      <li key={i} className="text-surface-500">
                         {attendee.displayName || attendee.email}
                         {attendee.responseStatus && (
-                          <span className="ml-1 text-xs text-gray-400">
+                          <span className="ml-1 text-xs text-surface-400">
                             ({attendee.responseStatus})
                           </span>
                         )}
                       </li>
                     ))}
                     {event.attendees.length > 5 && (
-                      <li className="text-gray-400">
+                      <li className="text-surface-400">
                         +{event.attendees.length - 5} more
                       </li>
                     )}
@@ -184,14 +184,14 @@ export function EventDetailPopover({
           </div>
 
           {/* Actions */}
-          <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200">
+          <div className="flex items-center justify-between mt-6 pt-4 border-t border-surface-200">
             <div className="flex items-center gap-2">
               {event.htmlLink && (
                 <a
                   href={event.htmlLink}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded-md"
+                  className="inline-flex items-center px-3 py-1.5 text-sm text-surface-700 hover:bg-surface-100 rounded-md transition-colors"
                 >
                   <svg
                     className="w-4 h-4 mr-1.5"

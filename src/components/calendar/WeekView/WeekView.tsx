@@ -36,13 +36,13 @@ export function WeekView({
   }, []);
 
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
+    <div className="card overflow-hidden">
       {/* All-day events section */}
       {allDayEvents.length > 0 && (
-        <div className="border-b border-gray-200 bg-gray-50">
+        <div className="border-b border-surface-200 bg-surface-50">
           <div className="flex">
-            <div className="w-16 flex-shrink-0 border-r border-gray-200 px-2 py-2">
-              <span className="text-xs text-gray-500">All day</span>
+            <div className="w-16 flex-shrink-0 border-r border-surface-200 px-2 py-2">
+              <span className="text-xs text-surface-500">All day</span>
             </div>
             <div className="flex-1 flex">
               {days.map((day) => {
@@ -52,13 +52,13 @@ export function WeekView({
                 return (
                   <div
                     key={day.toISOString()}
-                    className="flex-1 min-w-0 border-r border-gray-200 last:border-r-0 px-1 py-1"
+                    className="flex-1 min-w-0 border-r border-surface-200 last:border-r-0 px-1 py-1"
                   >
                     {dayAllDayEvents.map((event) => (
                       <button
                         key={event.id}
                         onClick={() => onEventClick(event)}
-                        className="w-full text-left bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded truncate hover:bg-blue-200 mb-0.5"
+                        className="w-full text-left bg-primary-100 text-primary-800 text-xs px-2 py-0.5 rounded truncate hover:bg-primary-200 mb-0.5 transition-colors"
                       >
                         {event.summary}
                       </button>

@@ -157,8 +157,8 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
   const hasSearchParams = company || role || university || location;
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow p-6 mb-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+    <form onSubmit={handleSubmit} className="card p-6 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mb-6">
         {/* Company */}
         <SearchableCombobox
           options={['', ...COMPANIES]}
@@ -207,7 +207,7 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
 
         {/* Template */}
         <div>
-          <label htmlFor="template" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="template" className="block text-sm font-medium text-surface-700 mb-1.5">
             Email Template
           </label>
           <select
@@ -215,7 +215,7 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
             value={templateId}
             onChange={(e) => setTemplateId(e.target.value)}
             disabled={isLoadingTemplates}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="input"
           >
             {isLoadingTemplates ? (
               <option value="">Loading templates...</option>
@@ -230,23 +230,25 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
               ))
             )}
           </select>
-          {templateError && <p className="mt-1 text-sm text-amber-600">{templateError}</p>}
+          {templateError && <p className="mt-1.5 text-sm text-amber-600">{templateError}</p>}
         </div>
       </div>
 
-      <button
-        type="submit"
-        disabled={isLoading || !hasSearchParams}
-        className="w-full md:w-auto px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-      >
-        {isLoading && <LoadingSpinner size="sm" />}
-        {isLoading ? 'Searching...' : 'Search'}
-      </button>
-      {!hasSearchParams && (
-        <p className="mt-2 text-sm text-gray-500">
-          Please fill in at least one search field (company, role, university, or location)
-        </p>
-      )}
+      <div className="flex items-center gap-4">
+        <button
+          type="submit"
+          disabled={isLoading || !hasSearchParams}
+          className="btn-primary"
+        >
+          {isLoading && <LoadingSpinner size="sm" />}
+          {isLoading ? 'Searching...' : 'Search Contacts'}
+        </button>
+        {!hasSearchParams && (
+          <p className="text-sm text-surface-500">
+            Fill in at least one field to search
+          </p>
+        )}
+      </div>
     </form>
   );
 }

@@ -8,7 +8,7 @@ interface CalendarHeaderProps {
 export function CalendarHeader({ onCreateEvent, pendingSuggestionsCount = 0 }: CalendarHeaderProps) {
   return (
     <div className="flex items-center justify-between">
-      <h1 className="text-2xl font-bold text-gray-900">Calendar</h1>
+      <h1 className="text-2xl font-bold text-surface-900">Calendar</h1>
       <div className="flex items-center gap-3">
         {pendingSuggestionsCount > 0 && (
           <Link
@@ -33,7 +33,7 @@ export function CalendarHeader({ onCreateEvent, pendingSuggestionsCount = 0 }: C
         )}
         <button
           onClick={onCreateEvent}
-          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+          className="btn-primary"
         >
           <svg
             className="w-5 h-5 mr-2"

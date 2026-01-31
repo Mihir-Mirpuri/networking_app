@@ -76,7 +76,7 @@ export function ReminderModal({
             value={date}
             onChange={(e) => setDate(e.target.value)}
             min={minDate}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </div>
 
@@ -89,7 +89,7 @@ export function ReminderModal({
             onChange={(e) => setNote(e.target.value)}
             rows={3}
             placeholder="e.g., Follow up on internship opportunity"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 resize-y"
           />
         </div>
 
@@ -118,7 +118,7 @@ export function ReminderModal({
             <button
               onClick={handleSave}
               disabled={isSaving || !date}
-              className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSaving ? 'Saving...' : 'Save'}
             </button>

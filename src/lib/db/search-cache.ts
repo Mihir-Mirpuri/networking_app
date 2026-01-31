@@ -11,6 +11,12 @@ export interface NormalizedSearchParams {
   location: string | null;
 }
 
+export interface ApiUsageStats {
+  apolloCallsMade: number;
+  apolloCacheHits: number;
+  cseCallsMade: number;
+}
+
 /**
  * Normalizes search parameters for consistent caching.
  * - Converts to lowercase
@@ -109,7 +115,8 @@ export async function getCachedPersonIds(searchId: string): Promise<string[]> {
  */
 export async function createSearchWithPeople(
   params: NormalizedSearchParams,
-  personIds: string[]
+  personIds: string[],
+  apiStats?: ApiUsageStats
 ): Promise<{ searchId: string }> {
   const search = await prisma.search.create({
     data: {
@@ -118,6 +125,10 @@ export async function createSearchWithPeople(
       role: params.role,
       university: params.university,
       location: params.location,
+      apolloCallsMade: apiStats?.apolloCallsMade ?? 0,
+      apolloCacheHits: apiStats?.apolloCacheHits ?? 0,
+      cseCallsMade: apiStats?.cseCallsMade ?? 0,
+      completedAt: new Date(),
     },
   });
 
@@ -139,10 +150,12 @@ export async function createSearchWithPeople(
  * - Deletes old SearchPerson links
  * - Creates new SearchPerson links
  * - Updates createdAt to now
+ * - Updates API usage stats
  */
 export async function updateSearchWithPeople(
   searchId: string,
-  personIds: string[]
+  personIds: string[],
+  apiStats?: ApiUsageStats
 ): Promise<void> {
   await prisma.$transaction([
     // Delete old links
@@ -157,10 +170,18 @@ export async function updateSearchWithPeople(
       })),
       skipDuplicates: true,
     }),
-    // Update timestamp
+    // Update timestamp and stats
     prisma.search.update({
       where: { id: searchId },
-      data: { createdAt: new Date() },
+      data: {
+        createdAt: new Date(),
+        completedAt: new Date(),
+        ...(apiStats && {
+          apolloCallsMade: apiStats.apolloCallsMade,
+          apolloCacheHits: apiStats.apolloCacheHits,
+          cseCallsMade: apiStats.cseCallsMade,
+        }),
+      },
     }),
   ]);
 }

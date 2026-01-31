@@ -49,7 +49,7 @@ export function PastEmailsSidebar({ isOpen, onToggle }: PastEmailsSidebarProps) 
       {/* Toggle Button */}
       <button
         onClick={onToggle}
-        className="fixed right-0 top-1/2 -translate-y-1/2 bg-blue-600 text-white px-2 py-4 rounded-l-md shadow-lg hover:bg-blue-700 z-40"
+        className="fixed right-0 top-1/2 -translate-y-1/2 bg-primary-600 text-white px-2 py-4 rounded-l-lg shadow-lg hover:bg-primary-700 transition-colors z-40"
         style={{ writingMode: 'vertical-rl' }}
       >
         {isOpen ? 'Close' : 'Past Emails'}
@@ -57,22 +57,22 @@ export function PastEmailsSidebar({ isOpen, onToggle }: PastEmailsSidebarProps) 
 
       {/* Sidebar */}
       <div
-        className={`fixed right-0 top-0 h-full w-80 bg-white shadow-xl transform transition-transform duration-300 z-50 ${
+        className={`fixed right-0 top-0 h-full w-80 bg-white shadow-soft-xl transform transition-transform duration-300 z-50 ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
         <div className="flex flex-col h-full">
           {/* Header */}
-          <div className="p-4 border-b">
+          <div className="p-4 border-b border-surface-200">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">Past Emails</h2>
+              <h2 className="text-lg font-semibold text-surface-900">Past Emails</h2>
               <button
                 onClick={onToggle}
-                className="p-2 hover:bg-gray-100 rounded-full"
+                className="p-2 hover:bg-surface-100 rounded-lg transition-colors"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5"
+                  className="h-5 w-5 text-surface-500"
                   viewBox="0 0 20 20"
                   fill="currentColor"
                 >
@@ -91,11 +91,11 @@ export function PastEmailsSidebar({ isOpen, onToggle }: PastEmailsSidebarProps) 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="input flex-1 text-sm"
               />
               <button
                 onClick={handleSearch}
-                className="px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                className="btn-primary text-sm"
               >
                 Search
               </button>
@@ -105,17 +105,21 @@ export function PastEmailsSidebar({ isOpen, onToggle }: PastEmailsSidebarProps) 
           {/* Email List */}
           <div className="flex-1 overflow-y-auto">
             {isLoading ? (
-              <div className="flex items-center justify-center h-32">
-                <p className="text-gray-500">Loading...</p>
+              <div className="flex items-center justify-center h-32 gap-2 text-surface-500">
+                <svg className="animate-spin h-5 w-5 text-primary-600" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                <span className="text-sm">Loading...</span>
               </div>
             ) : logs.length === 0 ? (
               <div className="flex items-center justify-center h-32">
-                <p className="text-gray-500">No emails sent yet</p>
+                <p className="text-surface-500">No emails sent yet</p>
               </div>
             ) : (
-              <div className="divide-y">
+              <div className="divide-y divide-surface-100">
                 {logs.map((log) => (
-                  <div key={log.id} className="p-3">
+                  <div key={log.id} className="p-3 hover:bg-surface-50 transition-colors">
                     <button
                       onClick={() =>
                         setExpandedId(expandedId === log.id ? null : log.id)
@@ -123,36 +127,36 @@ export function PastEmailsSidebar({ isOpen, onToggle }: PastEmailsSidebarProps) 
                       className="w-full text-left"
                     >
                       <div className="flex items-center justify-between mb-1">
-                        <span className="font-medium text-sm truncate">
+                        <span className="font-medium text-sm truncate text-surface-900">
                           {log.toName || log.toEmail}
                         </span>
                         <span
-                          className={`text-xs px-2 py-0.5 rounded-full ${
+                          className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                             log.status === 'SUCCESS'
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-red-100 text-red-800'
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-red-100 text-red-700'
                           }`}
                         >
                           {log.status === 'SUCCESS' ? 'Sent' : 'Failed'}
                         </span>
                       </div>
-                      <p className="text-xs text-gray-500 truncate">
+                      <p className="text-xs text-surface-500 truncate">
                         {log.company}
                       </p>
-                      <p className="text-xs text-gray-400">
+                      <p className="text-xs text-surface-400">
                         {formatDate(log.sentAt)}
                       </p>
                     </button>
 
                     {/* Expanded View */}
                     {expandedId === log.id && (
-                      <div className="mt-2 p-2 bg-gray-50 rounded text-sm">
-                        <p className="text-xs text-gray-500 mb-1">To:</p>
-                        <p className="mb-2">{log.toEmail}</p>
-                        <p className="text-xs text-gray-500 mb-1">Subject:</p>
-                        <p className="mb-2 font-medium">{log.subject}</p>
-                        <p className="text-xs text-gray-500 mb-1">Body:</p>
-                        <p className="whitespace-pre-wrap text-xs">
+                      <div className="mt-2 p-3 bg-surface-50 rounded-lg text-sm">
+                        <p className="text-xs text-surface-500 mb-1">To:</p>
+                        <p className="mb-2 text-surface-800">{log.toEmail}</p>
+                        <p className="text-xs text-surface-500 mb-1">Subject:</p>
+                        <p className="mb-2 font-medium text-surface-800">{log.subject}</p>
+                        <p className="text-xs text-surface-500 mb-1">Body:</p>
+                        <p className="whitespace-pre-wrap text-xs text-surface-700">
                           {log.body}
                         </p>
                       </div>
@@ -168,7 +172,7 @@ export function PastEmailsSidebar({ isOpen, onToggle }: PastEmailsSidebarProps) 
       {/* Overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-25 z-40"
+          className="fixed inset-0 bg-surface-900/30 backdrop-blur-sm z-40"
           onClick={onToggle}
         />
       )}

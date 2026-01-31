@@ -22,6 +22,7 @@ import {
   updateSearchWithPeople,
   getStalePersonIds,
   getPersonsByIds,
+  ApiUsageStats,
 } from '@/lib/db/search-cache';
 
 export interface SearchInput {
@@ -337,6 +338,8 @@ export async function searchPeopleAction(
 
       let newPeopleCount = 0;
       let existingPeopleCount = 0;
+      let apolloCallsMade = 0;
+      let apolloCacheHits = 0;
 
       await processWithConcurrency(cseResults, APOLLO_CONCURRENCY, async (person) => {
         if (!person.firstName || !person.lastName) {
@@ -351,6 +354,13 @@ export async function searchPeopleAction(
           company: person.company,
           linkedinUrl,
         });
+
+        // Track Apollo API usage
+        if (emailResult.apolloCalled) {
+          apolloCallsMade++;
+        } else if (emailResult.fromCache) {
+          apolloCacheHits++;
+        }
 
         const apolloCompany = emailResult.employment?.company || person.company;
         const education = emailResult.education || (input.university ? {
@@ -390,6 +400,7 @@ export async function searchPeopleAction(
       });
 
       console.log(`[Search] Saved to DB: ${newPeopleCount} new, ${existingPeopleCount} updated`);
+      console.log(`[Search] Apollo API: ${apolloCallsMade} calls made, ${apolloCacheHits} cache hits`);
 
       // ===== STEP 3: QUERY DATABASE WITH FILTERS =====
       console.log(`[Search] Step 3: Query DB with filters - company="${input.company}", location="${input.location || 'any'}", university="${input.university || 'any'}"`);
@@ -407,14 +418,20 @@ export async function searchPeopleAction(
       console.log(`[Search] DB query returned ${matchingPeople.length} matching people`);
 
       // ===== SAVE TO CACHE =====
+      const apiStats: ApiUsageStats = {
+        apolloCallsMade,
+        apolloCacheHits,
+        cseCallsMade: 1, // CSE is called once per search
+      };
+
       if (matchingPeople.length > 0) {
         const personIds = matchingPeople.map(p => p.id);
         const staleSearch = await findStaleSearch(normalizedParams);
         if (staleSearch) {
-          await updateSearchWithPeople(staleSearch.id, personIds);
+          await updateSearchWithPeople(staleSearch.id, personIds, apiStats);
           console.log(`[Search] Updated stale search ${staleSearch.id} with ${personIds.length} people`);
         } else {
-          const { searchId } = await createSearchWithPeople(normalizedParams, personIds);
+          const { searchId } = await createSearchWithPeople(normalizedParams, personIds, apiStats);
           console.log(`[Search] Created new search cache ${searchId} with ${personIds.length} people`);
         }
       }

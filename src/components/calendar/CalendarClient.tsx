@@ -252,11 +252,14 @@ export function CalendarClient() {
   if (status === 'loading' || isCheckingAccess) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold text-gray-900">Calendar</h1>
-        <div className="bg-white rounded-lg shadow p-8">
-          <div className="flex items-center justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <span className="ml-3 text-gray-600">Checking calendar access...</span>
+        <h1 className="text-2xl font-bold text-surface-900">Calendar</h1>
+        <div className="card p-8">
+          <div className="flex items-center justify-center gap-3">
+            <svg className="animate-spin h-6 w-6 text-primary-600" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+            <span className="text-surface-600">Checking calendar access...</span>
           </div>
         </div>
       </div>
@@ -267,7 +270,7 @@ export function CalendarClient() {
   if (!hasAccess) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold text-gray-900">Calendar</h1>
+        <h1 className="text-2xl font-bold text-surface-900">Calendar</h1>
         <CalendarAccessPrompt />
       </div>
     );
@@ -304,7 +307,10 @@ export function CalendarClient() {
       {/* Loading overlay */}
       {isLoadingEvents && (
         <div className="flex justify-center py-4">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+          <svg className="animate-spin h-6 w-6 text-primary-600" viewBox="0 0 24 24" fill="none">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+          </svg>
         </div>
       )}
 

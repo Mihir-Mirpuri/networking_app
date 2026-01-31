@@ -39,19 +39,19 @@ export function DayColumn({ date, events, onEventClick, onTimeSlotClick }: DayCo
   };
 
   return (
-    <div className="flex-1 min-w-0 border-r border-gray-200 last:border-r-0">
+    <div className="flex-1 min-w-0 border-r border-surface-200 last:border-r-0">
       {/* Day header */}
       <div
-        className={`h-14 border-b border-gray-200 flex flex-col items-center justify-center ${
-          today ? 'bg-blue-50' : ''
+        className={`h-14 border-b border-surface-200 flex flex-col items-center justify-center ${
+          today ? 'bg-primary-50' : ''
         }`}
       >
-        <span className="text-xs text-gray-500 uppercase">{dayName}</span>
+        <span className="text-xs text-surface-500 uppercase">{dayName}</span>
         <span
           className={`text-lg font-semibold ${
             today
-              ? 'bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center'
-              : 'text-gray-900'
+              ? 'bg-primary-600 text-white w-8 h-8 rounded-full flex items-center justify-center'
+              : 'text-surface-900'
           }`}
         >
           {date.getDate()}
@@ -63,8 +63,8 @@ export function DayColumn({ date, events, onEventClick, onTimeSlotClick }: DayCo
         {HOURS.map((hour) => (
           <div
             key={hour}
-            className={`border-b border-gray-100 cursor-pointer hover:bg-gray-50 ${
-              today ? 'bg-blue-50/30' : ''
+            className={`border-b border-surface-100 cursor-pointer hover:bg-surface-50 transition-colors ${
+              today ? 'bg-primary-50/30' : ''
             }`}
             style={{ height: HOUR_HEIGHT }}
             onClick={() => handleSlotClick(hour)}

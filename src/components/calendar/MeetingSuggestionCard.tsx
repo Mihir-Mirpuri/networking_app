@@ -51,11 +51,11 @@ export function MeetingSuggestionCard({
   }
 
   return (
-    <div className="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+    <div className="card overflow-hidden">
       {/* Email context header */}
-      <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+      <div className="px-4 py-3 bg-surface-50 border-b border-surface-200">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm text-gray-600">
+          <div className="flex items-center gap-2 text-sm text-surface-600">
             <svg
               className="w-4 h-4"
               fill="none"
@@ -76,12 +76,12 @@ export function MeetingSuggestionCard({
           </span>
         </div>
         <div className="flex items-center justify-between mt-1">
-          <p className="text-sm text-gray-900 truncate flex-1">
+          <p className="text-sm text-surface-900 truncate flex-1">
             {suggestion.message.subject || '(No subject)'}
           </p>
           <button
             onClick={() => setShowEmailModal(true)}
-            className="ml-2 text-xs text-blue-600 hover:text-blue-700 font-medium whitespace-nowrap"
+            className="ml-2 text-xs text-primary-600 hover:text-primary-700 font-medium whitespace-nowrap transition-colors"
           >
             View Email
           </button>
@@ -93,51 +93,51 @@ export function MeetingSuggestionCard({
         {isEditing ? (
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-surface-700 mb-1">
                 Event Title
               </label>
               <input
                 type="text"
                 value={editedData.summary}
                 onChange={(e) => setEditedData({ ...editedData, summary: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="input"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-surface-700 mb-1">
                   Start
                 </label>
                 <input
                   type="datetime-local"
                   value={editedData.startDateTime}
                   onChange={(e) => setEditedData({ ...editedData, startDateTime: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="input"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-surface-700 mb-1">
                   End
                 </label>
                 <input
                   type="datetime-local"
                   value={editedData.endDateTime}
                   onChange={(e) => setEditedData({ ...editedData, endDateTime: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="input"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-surface-700 mb-1">
                 Location
               </label>
               <input
                 type="text"
                 value={editedData.location}
                 onChange={(e) => setEditedData({ ...editedData, location: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="input"
                 placeholder="Starbucks, Zoom, etc."
               />
             </div>
@@ -148,9 +148,9 @@ export function MeetingSuggestionCard({
                   type="checkbox"
                   checked={editedData.addGoogleMeet}
                   onChange={(e) => setEditedData({ ...editedData, addGoogleMeet: e.target.checked })}
-                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  className="w-4 h-4 text-primary-600 border-surface-300 rounded focus:ring-primary-500"
                 />
-                <span className="text-sm font-medium text-gray-700">
+                <span className="text-sm font-medium text-surface-700">
                   Add Google Meet
                 </span>
               </label>
@@ -158,7 +158,7 @@ export function MeetingSuggestionCard({
 
             <button
               onClick={() => setIsEditing(false)}
-              className="text-sm text-blue-600 hover:text-blue-700"
+              className="text-sm text-primary-600 hover:text-primary-700 transition-colors"
             >
               Done editing
             </button>
@@ -167,7 +167,7 @@ export function MeetingSuggestionCard({
           <div className="space-y-3">
             <div className="flex items-start gap-3">
               <svg
-                className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0"
+                className="w-5 h-5 text-surface-400 mt-0.5 flex-shrink-0"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -180,8 +180,8 @@ export function MeetingSuggestionCard({
                 />
               </svg>
               <div>
-                <p className="font-medium text-gray-900">{editedData.summary}</p>
-                <p className="text-sm text-gray-600">
+                <p className="font-medium text-surface-900">{editedData.summary}</p>
+                <p className="text-sm text-surface-600">
                   {formatDateTime(editedData.startDateTime)} - {formatTime(editedData.endDateTime)}
                 </p>
               </div>
@@ -190,7 +190,7 @@ export function MeetingSuggestionCard({
             {editedData.location && (
               <div className="flex items-start gap-3">
                 <svg
-                  className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0"
+                  className="w-5 h-5 text-surface-400 mt-0.5 flex-shrink-0"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -208,14 +208,14 @@ export function MeetingSuggestionCard({
                     d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
                   />
                 </svg>
-                <p className="text-sm text-gray-600">{editedData.location}</p>
+                <p className="text-sm text-surface-600">{editedData.location}</p>
               </div>
             )}
 
             {suggestion.extractedData.rawText && (
-              <div className="mt-3 p-3 bg-gray-50 rounded-md">
-                <p className="text-xs text-gray-500 mb-1">From email:</p>
-                <p className="text-sm text-gray-700 italic">
+              <div className="mt-3 p-3 bg-surface-50 rounded-lg">
+                <p className="text-xs text-surface-500 mb-1">From email:</p>
+                <p className="text-sm text-surface-700 italic">
                   &quot;{suggestion.extractedData.rawText}&quot;
                 </p>
               </div>
@@ -223,7 +223,7 @@ export function MeetingSuggestionCard({
 
             <button
               onClick={() => setIsEditing(true)}
-              className="text-sm text-blue-600 hover:text-blue-700"
+              className="text-sm text-primary-600 hover:text-primary-700 transition-colors"
             >
               Edit details
             </button>
@@ -232,18 +232,18 @@ export function MeetingSuggestionCard({
       </div>
 
       {/* Actions */}
-      <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex gap-3">
+      <div className="px-4 py-3 bg-surface-50 border-t border-surface-200 flex gap-3">
         <button
           onClick={handleAccept}
           disabled={isLoading}
-          className="flex-1 px-4 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 disabled:opacity-50"
+          className="btn-primary flex-1"
         >
           {isLoading ? 'Creating...' : 'Accept & Create Event'}
         </button>
         <button
           onClick={() => onDismiss(suggestion.id)}
           disabled={isLoading}
-          className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50"
+          className="btn-ghost"
         >
           Dismiss
         </button>
@@ -251,23 +251,23 @@ export function MeetingSuggestionCard({
 
       {/* Email Modal */}
       {showEmailModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
+        <div className="fixed inset-0 z-50 overflow-y-auto animate-fade-in">
           <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
             {/* Backdrop */}
             <div
-              className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+              className="fixed inset-0 bg-surface-900/50 backdrop-blur-sm transition-opacity"
               onClick={() => setShowEmailModal(false)}
             />
 
             {/* Modal */}
-            <div className="relative bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:max-w-2xl sm:w-full">
+            <div className="relative card text-left overflow-hidden transform transition-all sm:my-8 sm:max-w-2xl sm:w-full animate-scale-in">
               {/* Header */}
-              <div className="px-6 py-4 border-b border-gray-200">
+              <div className="px-6 py-4 border-b border-surface-200">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-gray-900">Email</h3>
+                  <h3 className="text-lg font-semibold text-surface-900">Email</h3>
                   <button
                     onClick={() => setShowEmailModal(false)}
-                    className="text-gray-400 hover:text-gray-600"
+                    className="text-surface-400 hover:text-surface-600 transition-colors"
                   >
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -280,39 +280,39 @@ export function MeetingSuggestionCard({
               <div className="px-6 py-4 max-h-[60vh] overflow-y-auto">
                 <div className="space-y-3 mb-4">
                   <div className="flex items-center gap-2 text-sm">
-                    <span className="font-medium text-gray-500">From:</span>
-                    <span className="text-gray-900">{suggestion.message.sender}</span>
+                    <span className="font-medium text-surface-500">From:</span>
+                    <span className="text-surface-900">{suggestion.message.sender}</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm">
-                    <span className="font-medium text-gray-500">Subject:</span>
-                    <span className="text-gray-900">{suggestion.message.subject || '(No subject)'}</span>
+                    <span className="font-medium text-surface-500">Subject:</span>
+                    <span className="text-surface-900">{suggestion.message.subject || '(No subject)'}</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm">
-                    <span className="font-medium text-gray-500">Date:</span>
-                    <span className="text-gray-900">
+                    <span className="font-medium text-surface-500">Date:</span>
+                    <span className="text-surface-900">
                       {new Date(suggestion.message.received_at).toLocaleString()}
                     </span>
                   </div>
                 </div>
 
-                <hr className="my-4" />
+                <hr className="my-4 border-surface-200" />
 
                 <div className="prose prose-sm max-w-none">
                   {suggestion.message.body_text ? (
-                    <pre className="whitespace-pre-wrap font-sans text-sm text-gray-700">
+                    <pre className="whitespace-pre-wrap font-sans text-sm text-surface-700">
                       {suggestion.message.body_text}
                     </pre>
                   ) : (
-                    <p className="text-gray-500 italic">No email content available</p>
+                    <p className="text-surface-500 italic">No email content available</p>
                   )}
                 </div>
               </div>
 
               {/* Footer */}
-              <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
+              <div className="px-6 py-4 bg-surface-50 border-t border-surface-200">
                 <button
                   onClick={() => setShowEmailModal(false)}
-                  className="w-full px-4 py-2 bg-gray-200 text-gray-800 font-medium rounded-md hover:bg-gray-300"
+                  className="btn-secondary w-full"
                 >
                   Close
                 </button>

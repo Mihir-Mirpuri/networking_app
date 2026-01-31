@@ -123,7 +123,7 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onRowClick, isEven = 
           onBlur={() => handleSaveEdit(field)}
           onKeyDown={(e) => handleKeyDown(e, field)}
           autoFocus
-          className="w-full px-1 py-0.5 text-sm border border-blue-400 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="w-full px-2 py-1 text-sm border border-primary-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/30 bg-white"
         />
       );
     }
@@ -131,16 +131,16 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onRowClick, isEven = 
     return (
       <button
         onClick={() => handleStartEdit(field, value)}
-        className="w-full text-left truncate hover:text-blue-600 cursor-pointer"
+        className="w-full text-left truncate hover:text-primary-600 cursor-pointer transition-colors"
         title={value || 'Click to edit'}
       >
-        {value || <span className="text-gray-400">-</span>}
+        {value || <span className="text-surface-400">-</span>}
       </button>
     );
   };
 
-  const cellClass = "px-3 py-2 text-sm border-b border-r border-gray-200 last:border-r-0";
-  const rowBg = isEven ? 'bg-white' : 'bg-gray-50/50';
+  const cellClass = "px-4 py-3 text-sm border-r border-surface-100 last:border-r-0";
+  const rowBg = isEven ? 'bg-white' : 'bg-surface-50/30';
 
   const renderNameCell = () => {
     const nameContent = (
@@ -158,7 +158,7 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onRowClick, isEven = 
           href={tracker.linkedinUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-blue-600 hover:text-blue-800 hover:underline"
+          className="text-primary-600 hover:text-primary-800 hover:underline"
           title="View LinkedIn"
         >
           {nameContent}
@@ -169,7 +169,7 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onRowClick, isEven = 
     return (
       <button
         onClick={() => handleStartEdit('contactName', tracker.contactName)}
-        className="text-left hover:text-blue-600"
+        className="text-left hover:text-primary-600"
       >
         {nameContent}
       </button>
@@ -188,15 +188,15 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onRowClick, isEven = 
   return (
     <>
       <tr
-        className={`${rowBg} hover:bg-blue-50/50 cursor-pointer`}
+        className={`${rowBg} hover:bg-primary-50/40 cursor-pointer transition-colors`}
         onClick={handleRowClick}
       >
         {/* Name */}
         <td className={cellClass}>
-          <div className="truncate">
+          <div className="truncate font-medium text-surface-900">
             {renderNameCell()}
           </div>
-          <div className="text-xs text-gray-500 truncate">{tracker.contactEmail}</div>
+          <div className="text-xs text-surface-500 truncate">{tracker.contactEmail}</div>
         </td>
 
         {/* Status */}
@@ -210,27 +210,27 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onRowClick, isEven = 
 
         {/* Company */}
         <td className={cellClass}>
-          <div className="truncate">
+          <div className="truncate text-surface-700">
             {renderEditableCell('company', tracker.company)}
           </div>
         </td>
 
         {/* Role */}
         <td className={cellClass}>
-          <div className="truncate">
+          <div className="truncate text-surface-700">
             {renderEditableCell('role', tracker.role)}
           </div>
         </td>
 
         {/* Location */}
         <td className={cellClass}>
-          <div className="truncate">
+          <div className="truncate text-surface-700">
             {renderEditableCell('location', tracker.location)}
           </div>
         </td>
 
         {/* Date Emailed */}
-        <td className={`${cellClass} text-gray-600 whitespace-nowrap`}>
+        <td className={`${cellClass} text-surface-600 whitespace-nowrap`}>
           {formatDate(tracker.dateEmailed)}
         </td>
 
@@ -238,10 +238,10 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onRowClick, isEven = 
         <td className={cellClass} onClick={(e) => e.stopPropagation()}>
           <button
             onClick={() => setShowInteractionModal(true)}
-            className={`px-2 py-1 rounded text-xs ${
+            className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
               tracker.spokeToThem
-                ? 'bg-green-100 text-green-700'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                ? 'bg-emerald-100 text-emerald-700'
+                : 'bg-surface-100 text-surface-600 hover:bg-surface-200'
             }`}
           >
             {tracker.spokeToThem ? getInteractionLabel(tracker.interactionType) : 'No'}
@@ -252,10 +252,10 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onRowClick, isEven = 
         <td className={cellClass} onClick={(e) => e.stopPropagation()}>
           <button
             onClick={() => setShowNotesModal(true)}
-            className="w-full text-left text-gray-700 hover:text-blue-600 truncate"
+            className="w-full text-left text-surface-700 hover:text-primary-600 truncate transition-colors"
             title={tracker.notes || 'Click to add notes'}
           >
-            {tracker.notes || <span className="text-gray-400">-</span>}
+            {tracker.notes || <span className="text-surface-400">-</span>}
           </button>
         </td>
 
@@ -263,7 +263,7 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onRowClick, isEven = 
         <td className={cellClass} onClick={(e) => e.stopPropagation()}>
           <button
             onClick={() => setShowDeleteConfirm(true)}
-            className="p-1 text-gray-400 hover:text-red-600"
+            className="p-1.5 text-surface-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
             title="Delete"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -299,18 +299,23 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onRowClick, isEven = 
 
       {/* Delete Confirmation */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-sm w-full p-6">
-            <h3 className="text-lg font-semibold mb-2">Delete Contact</h3>
-            <p className="text-gray-600 mb-4">
+        <div className="fixed inset-0 bg-surface-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-soft-xl max-w-sm w-full p-6 animate-scale-in">
+            <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-red-100 flex items-center justify-center">
+              <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-center text-surface-900 mb-2">Delete Contact</h3>
+            <p className="text-surface-600 text-center mb-6">
               Are you sure you want to delete{' '}
-              <span className="font-medium">{tracker.contactName || tracker.contactEmail}</span>?
+              <span className="font-medium text-surface-900">{tracker.contactName || tracker.contactEmail}</span>?
               This cannot be undone.
             </p>
-            <div className="flex gap-2 justify-end">
+            <div className="flex gap-3 justify-center">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
-                className="px-4 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-100"
+                className="btn-secondary"
               >
                 Cancel
               </button>
@@ -319,7 +324,7 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onRowClick, isEven = 
                   onDelete(tracker.id);
                   setShowDeleteConfirm(false);
                 }}
-                className="px-4 py-2 text-sm bg-red-600 text-white rounded-md hover:bg-red-700"
+                className="px-4 py-2.5 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all shadow-sm"
               >
                 Delete
               </button>

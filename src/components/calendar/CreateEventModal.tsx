@@ -67,14 +67,14 @@ export function CreateEventModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-surface-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+      <div className="card max-w-lg w-full max-h-[90vh] overflow-y-auto animate-scale-in">
         <div className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Create Event</h2>
+            <h2 className="text-lg font-semibold text-surface-900">Create Event</h2>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600"
+              className="text-surface-400 hover:text-surface-600 transition-colors"
             >
               <svg
                 className="w-6 h-6"
@@ -106,7 +106,7 @@ export function CreateEventModal({
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-surface-700 mb-1">
                 Event Title *
               </label>
               <input
@@ -115,14 +115,14 @@ export function CreateEventModal({
                 onChange={(e) =>
                   setFormData({ ...formData, summary: e.target.value })
                 }
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="input"
                 placeholder="Coffee chat with John"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-surface-700 mb-1">
                   Start *
                 </label>
                 <input
@@ -132,11 +132,11 @@ export function CreateEventModal({
                     setFormData({ ...formData, startDateTime: e.target.value })
                   }
                   onBlur={handleTimeBlur}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="input"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-surface-700 mb-1">
                   End *
                 </label>
                 <input
@@ -146,13 +146,13 @@ export function CreateEventModal({
                     setFormData({ ...formData, endDateTime: e.target.value })
                   }
                   onBlur={handleTimeBlur}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="input"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-surface-700 mb-1">
                 Location
               </label>
               <input
@@ -161,13 +161,13 @@ export function CreateEventModal({
                 onChange={(e) =>
                   setFormData({ ...formData, location: e.target.value })
                 }
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="input"
                 placeholder="Starbucks, Zoom, etc."
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-surface-700 mb-1">
                 Description
               </label>
               <textarea
@@ -176,7 +176,7 @@ export function CreateEventModal({
                   setFormData({ ...formData, description: e.target.value })
                 }
                 rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="input"
                 placeholder="Notes about this meeting..."
               />
             </div>
@@ -189,9 +189,9 @@ export function CreateEventModal({
                   onChange={(e) =>
                     setFormData({ ...formData, addGoogleMeet: e.target.checked })
                   }
-                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  className="w-4 h-4 text-primary-600 border-surface-300 rounded focus:ring-primary-500"
                 />
-                <span className="text-sm font-medium text-gray-700">
+                <span className="text-sm font-medium text-surface-700">
                   Add Google Meet video conferencing
                 </span>
               </label>
@@ -201,13 +201,13 @@ export function CreateEventModal({
               <button
                 onClick={handleSubmit}
                 disabled={isSubmitting}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 disabled:opacity-50"
+                className="btn-primary flex-1"
               >
                 {isSubmitting ? 'Creating...' : 'Create Event'}
               </button>
               <button
                 onClick={onClose}
-                className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+                className="btn-ghost"
               >
                 Cancel
               </button>

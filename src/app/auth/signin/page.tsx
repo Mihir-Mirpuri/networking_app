@@ -18,8 +18,14 @@ export default function SignInPage() {
 
   if (status === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-gray-600">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-surface-50 to-primary-50">
+        <div className="flex items-center gap-3 text-surface-600">
+          <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+          </svg>
+          Loading...
+        </div>
       </div>
     );
   }
@@ -29,29 +35,43 @@ export default function SignInPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="max-w-md w-full space-y-8 p-8">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900">Lattice</h1>
-          <p className="mt-2 text-gray-600">
-            Finance & consulting recruiting outreach tool
-          </p>
-        </div>
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm">
-            <p className="font-medium">Authentication failed</p>
-            <p className="mt-1">
-              {error === 'OAuthCallback' && 'There was a problem with the Google sign-in. Please try again.'}
-              {error === 'OAuthAccountNotLinked' && 'This email is already linked to another account.'}
-              {error === 'AccessDenied' && 'Access was denied. Please grant the required permissions.'}
-              {!['OAuthCallback', 'OAuthAccountNotLinked', 'AccessDenied'].includes(error) && `Error: ${error}`}
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-surface-50 via-white to-primary-50/30 px-4">
+      <div className="max-w-md w-full">
+        {/* Card */}
+        <div className="card p-8 animate-fade-in-up">
+          {/* Logo and Title */}
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-700 shadow-glow mb-6">
+              <span className="text-white font-bold text-2xl">L</span>
+            </div>
+            <h1 className="text-2xl font-bold text-surface-900">Welcome to Lattice</h1>
+            <p className="mt-2 text-surface-500">
+              Finance & consulting recruiting outreach tool
             </p>
           </div>
-        )}
-        <div className="mt-8">
+
+          {/* Error Message */}
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+              <p className="font-semibold flex items-center gap-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Authentication failed
+              </p>
+              <p className="mt-1 text-red-600">
+                {error === 'OAuthCallback' && 'There was a problem with the Google sign-in. Please try again.'}
+                {error === 'OAuthAccountNotLinked' && 'This email is already linked to another account.'}
+                {error === 'AccessDenied' && 'Access was denied. Please grant the required permissions.'}
+                {!['OAuthCallback', 'OAuthAccountNotLinked', 'AccessDenied'].includes(error) && `Error: ${error}`}
+              </p>
+            </div>
+          )}
+
+          {/* Sign In Button */}
           <button
             onClick={() => signIn('google', { callbackUrl: '/' })}
-            className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-gray-300 rounded-lg shadow-sm bg-white hover:bg-gray-50 transition-colors"
+            className="w-full flex items-center justify-center gap-3 px-5 py-3.5 border border-surface-300 rounded-xl shadow-soft bg-white hover:bg-surface-50 hover:border-surface-400 hover:shadow-soft-lg transition-all"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path
@@ -71,16 +91,20 @@ export default function SignInPage() {
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
               />
             </svg>
-            <span className="text-gray-700 font-medium">Sign in with Google</span>
+            <span className="text-surface-800 font-medium">Sign in with Google</span>
           </button>
+
+          {/* Info Text */}
+          <p className="mt-5 text-center text-sm text-surface-500">
+            Gmail access is required to send outreach emails on your behalf.
+          </p>
         </div>
-        <p className="mt-4 text-center text-sm text-gray-500">
-          Gmail access is required to send outreach emails on your behalf.
-        </p>
-        <div className="mt-6 text-center text-xs text-gray-400">
-          <a href="/privacy" className="hover:text-gray-600 underline">Privacy Policy</a>
-          <span className="mx-2">·</span>
-          <a href="/terms" className="hover:text-gray-600 underline">Terms of Service</a>
+
+        {/* Footer Links */}
+        <div className="mt-6 text-center text-sm text-surface-400">
+          <a href="/privacy" className="hover:text-surface-600 transition-colors">Privacy Policy</a>
+          <span className="mx-3">·</span>
+          <a href="/terms" className="hover:text-surface-600 transition-colors">Terms of Service</a>
         </div>
       </div>
     </div>

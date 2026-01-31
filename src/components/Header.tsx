@@ -6,6 +6,12 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useRef } from 'react';
 import { usePolling } from '@/hooks/usePolling';
 import { getPendingSuggestionsCountAction } from '@/app/actions/meetingSuggestions';
+import {
+  PaperAirplaneIcon,
+  ClockIcon,
+  CalendarDaysIcon,
+  UserCircleIcon,
+} from '@heroicons/react/24/outline';
 
 export function Header() {
   const { data: session, status } = useSession();
@@ -29,10 +35,10 @@ export function Header() {
   }, [pathname, refetch]);
 
   const tabs = [
-    { name: 'Send Emails', href: '/' },
-    { name: 'Email History', href: '/history' },
-    { name: 'Calendar', href: '/calendar', badge: pendingSuggestionsCount ?? 0 },
-    { name: 'Profile', href: '/profile' },
+    { name: 'Send Emails', href: '/', icon: PaperAirplaneIcon },
+    { name: 'History', href: '/history', icon: ClockIcon },
+    { name: 'Calendar', href: '/calendar', icon: CalendarDaysIcon, badge: pendingSuggestionsCount ?? 0 },
+    { name: 'Profile', href: '/profile', icon: UserCircleIcon },
   ];
 
   const renderNavContent = () => {
@@ -40,10 +46,10 @@ export function Header() {
     if (status === 'loading') {
       return (
         <nav className="flex items-center gap-1" aria-label="Loading navigation">
-          {[1, 2, 3].map((i) => (
+          {[1, 2, 3, 4].map((i) => (
             <div
               key={i}
-              className="px-4 py-2 w-24 h-9 bg-gray-200 rounded-md animate-pulse"
+              className="px-4 py-2 w-28 h-10 bg-surface-200 rounded-lg animate-pulse"
               aria-hidden="true"
             />
           ))}
@@ -58,23 +64,25 @@ export function Header() {
           {tabs.map((tab) => {
             const isActive = pathname === tab.href;
             const showBadge = 'badge' in tab && tab.badge !== undefined && tab.badge > 0;
+            const Icon = tab.icon;
             return (
               <Link
                 key={tab.href}
                 href={tab.href}
-                className={`relative px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                className={`relative flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
                   isActive
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                    ? 'bg-primary-600 text-white shadow-md shadow-primary-600/25'
+                    : 'text-surface-600 hover:bg-surface-100 hover:text-surface-900'
                 }`}
               >
-                {tab.name}
+                <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-surface-500'}`} />
+                <span>{tab.name}</span>
                 {showBadge && (
                   <span
-                    className={`absolute -top-1 -right-1 min-w-[18px] h-[18px] flex items-center justify-center text-xs font-semibold rounded-full ${
+                    className={`absolute -top-1.5 -right-1.5 min-w-[20px] h-[20px] flex items-center justify-center text-xs font-bold rounded-full shadow-sm ${
                       isActive
-                        ? 'bg-white text-blue-600'
-                        : 'bg-red-500 text-white'
+                        ? 'bg-white text-primary-600'
+                        : 'bg-accent-500 text-white'
                     }`}
                   >
                     {tab.badge! > 99 ? '99+' : tab.badge}
@@ -91,11 +99,16 @@ export function Header() {
   };
 
   return (
-    <header className="bg-white border-b border-gray-200">
+    <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-subtle border-b border-surface-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          <Link href="/" className="text-xl font-bold text-gray-900">
-            Lattice
+          <Link href="/" className="flex items-center gap-2 group">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow">
+              <span className="text-white font-bold text-sm">L</span>
+            </div>
+            <span className="text-xl font-bold text-surface-900 group-hover:text-primary-600 transition-colors">
+              Lattice
+            </span>
           </Link>
           {renderNavContent()}
         </div>

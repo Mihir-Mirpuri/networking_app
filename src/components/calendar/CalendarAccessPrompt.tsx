@@ -16,11 +16,11 @@ export function CalendarAccessPrompt({ onConnectStart }: CalendarAccessPromptPro
   };
 
   return (
-    <div className="bg-white rounded-lg shadow p-8">
+    <div className="card p-8">
       <div className="text-center">
-        <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+        <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
           <svg
-            className="w-8 h-8 text-blue-600"
+            className="w-8 h-8 text-primary-600"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -33,16 +33,16 @@ export function CalendarAccessPrompt({ onConnectStart }: CalendarAccessPromptPro
             />
           </svg>
         </div>
-        <h2 className="text-lg font-semibold text-gray-900 mb-2">
+        <h2 className="text-lg font-semibold text-surface-900 mb-2">
           Connect Your Google Calendar
         </h2>
-        <p className="text-gray-600 mb-6 max-w-md mx-auto">
+        <p className="text-surface-600 mb-6 max-w-md mx-auto">
           To view and manage your calendar, you need to grant access to your Google Calendar.
           This allows you to see your schedule and create meetings with your networking contacts.
         </p>
         <button
           onClick={handleConnect}
-          className="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+          className="btn-primary inline-flex items-center px-6 py-3"
         >
           <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
             <path
@@ -64,7 +64,7 @@ export function CalendarAccessPrompt({ onConnectStart }: CalendarAccessPromptPro
           </svg>
           Connect Google Calendar
         </button>
-        <p className="text-sm text-gray-500 mt-4">
+        <p className="text-sm text-surface-500 mt-4">
           You&apos;ll be signed out and asked to sign back in to grant calendar permissions.
         </p>
       </div>

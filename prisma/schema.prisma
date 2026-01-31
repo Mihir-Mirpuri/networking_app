@@ -105,16 +105,21 @@ model Person {
 }
 
 model Search {
-  id           String         @id @default(cuid())
-  name         String?
-  company      String?
-  role         String?
-  university   String?
-  location     String?
-  createdAt    DateTime       @default(now())
-  searchPeople SearchPerson[]
+  id              String         @id @default(cuid())
+  name            String?
+  company         String?
+  role            String?
+  university      String?
+  location        String?
+  apolloCallsMade Int            @default(0)
+  apolloCacheHits Int            @default(0)
+  cseCallsMade    Int            @default(0)
+  completedAt     DateTime?
+  createdAt       DateTime       @default(now())
+  searchPeople    SearchPerson[]
 
   @@index([createdAt])
+  @@index([completedAt])
 }
 
 model SearchPerson {

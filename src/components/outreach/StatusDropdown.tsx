@@ -11,7 +11,7 @@ interface StatusDropdownProps {
 
 const STATUS_CONFIG: Record<OutreachStatus, { label: string; color: string; bg: string }> = {
   NOT_STARTED: { label: 'Not Started', color: 'text-gray-700', bg: 'bg-gray-100' },
-  SENT: { label: 'Sent', color: 'text-blue-700', bg: 'bg-blue-100' },
+  SENT: { label: 'Sent', color: 'text-primary-700', bg: 'bg-primary-100' },
   WAITING: { label: 'Waiting', color: 'text-yellow-700', bg: 'bg-yellow-100' },
   RESPONDED: { label: 'Responded', color: 'text-green-700', bg: 'bg-green-100' },
   SCHEDULED_CALL: { label: 'Scheduled Call', color: 'text-purple-700', bg: 'bg-purple-100' },
