@@ -1,6 +1,6 @@
 import prisma from '@/lib/prisma';
 
-const CACHE_TTL_HOURS = 24;
+const CACHE_TTL_HOURS = 168; // 7 days
 const PERSON_CACHE_TTL_DAYS = 30;
 
 export interface NormalizedSearchParams {
