@@ -6,7 +6,7 @@ import { EmailStatus, ApolloStatus } from '@prisma/client';
 export type EmailStatusType = 'VERIFIED' | 'UNVERIFIED' | 'MISSING' | 'MANUAL';
 
 // Person cache TTL: 30 days
-const PERSON_CACHE_TTL_DAYS = 30;
+const PERSON_CACHE_TTL_DAYS = 90;
 
 export interface PersonEmailData {
   fullName: string;
@@ -167,7 +167,7 @@ export async function getOrFindEmail(
   // Step 2b: If person exists but data is stale, refresh via Apollo
   if (existingPerson && hasValidApolloResult && isStale()) {
     console.log(
-      `[EmailCache] ⏰ STALE DATA for "${fullName}" at ${company} - Apollo data is > 30 days old. Refreshing via Apollo.`
+      `[EmailCache] ⏰ STALE DATA for "${fullName}" at ${company} - Apollo data is > 90 days old. Refreshing via Apollo.`
     );
   }
 
