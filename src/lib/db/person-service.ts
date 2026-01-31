@@ -653,16 +653,31 @@ export async function saveDiscoveredPerson(
 ): Promise<{ personId: string; isNew: boolean }> {
   // Use Apollo's company if available, otherwise fall back to search company
   const resolvedCompany = apolloData.apolloCompany || apolloData.company;
-  // Check if person already exists
-  const existing = await prisma.person.findUnique({
+
+  // Check if person already exists - try resolvedCompany first, then fallback to search company
+  // This handles both new records (saved with Apollo company) and legacy records (saved with search company)
+  let existing = await prisma.person.findUnique({
     where: {
       fullName_company: {
         fullName,
-        company: apolloData.company,
+        company: resolvedCompany,
       },
     },
     select: { id: true },
   });
+
+  // Fallback: check if they exist with the search company (legacy data)
+  if (!existing && apolloData.apolloCompany && apolloData.apolloCompany !== apolloData.company) {
+    existing = await prisma.person.findUnique({
+      where: {
+        fullName_company: {
+          fullName,
+          company: apolloData.company,
+        },
+      },
+      select: { id: true },
+    });
+  }
 
   if (existing) {
     // Update with fresh Apollo data
