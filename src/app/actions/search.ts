@@ -362,7 +362,6 @@ export async function searchPeopleAction(
           apolloCacheHits++;
         }
 
-        const apolloCompany = emailResult.employment?.company || person.company;
         const education = emailResult.education || (input.university ? {
           schoolName: input.university,
           degree: null,
@@ -380,7 +379,8 @@ export async function searchPeopleAction(
           person.sourceSnippet,
           person.sourceDomain,
           {
-            company: apolloCompany,
+            company: person.company, // Search company (fallback)
+            apolloCompany: emailResult.employment?.company || null, // Apollo's current employer
             role: emailResult.employment?.title || null,
             email: emailResult.email,
             emailStatus: emailResult.status,
@@ -389,7 +389,9 @@ export async function searchPeopleAction(
             state: emailResult.state,
             country: emailResult.country,
             education,
-          }
+            apolloStatus: emailResult.apolloStatus,
+          },
+          input.university // Fallback university from search params
         );
 
         if (isNew) {

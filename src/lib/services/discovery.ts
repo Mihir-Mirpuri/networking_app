@@ -192,7 +192,10 @@ export async function discoverLinkedInProfiles(params: SearchParams): Promise<CS
   // Include company, university, role, and location for targeted results
   const queryParts: string[] = [];
   if (company && company.trim()) queryParts.push(`"${company.trim()}"`);
-  if (university && university.trim()) queryParts.push(`"${university.trim()}"`);
+  // Omit university if "any" is selected (case-insensitive)
+  if (university && university.trim() && university.trim().toLowerCase() !== 'any') {
+    queryParts.push(`"${university.trim()}"`);
+  }
   if (role && role.trim()) queryParts.push(role.trim()); // Unquoted for flexibility
   if (location && location.trim()) queryParts.push(location.trim()); // Unquoted for flexibility
   if (name && name.trim()) queryParts.push(name.trim());
@@ -205,7 +208,7 @@ export async function discoverLinkedInProfiles(params: SearchParams): Promise<CS
   }
 
   console.log(`[Discovery] Search query: ${query}`);
-  const pages = [1, 11, 21, 31, 41, 51, 61, 71, 81]; // 9 pages = 90 results max
+  const pages = [1, 11, 21, 31, 41]; // 5 pages = 50 results max
 
   const seenKeys = new Set<string>();
   const candidates: CSEDiscoveryResult[] = [];

@@ -1,6 +1,6 @@
 import prisma from '@/lib/prisma';
-import { findEmail, EmailResult, EducationInfo, EmploymentInfo } from './enrichment';
-import { EmailStatus } from '@prisma/client';
+import { findEmail, EmailResult, EducationInfo, EmploymentInfo, ApolloStatusType } from './enrichment';
+import { EmailStatus, ApolloStatus } from '@prisma/client';
 
 // Type matching Prisma EmailStatus enum
 export type EmailStatusType = 'VERIFIED' | 'UNVERIFIED' | 'MISSING' | 'MANUAL';
@@ -129,6 +129,7 @@ export async function getOrFindEmail(
       country: existingPerson.country,
       education,
       employment,
+      apolloStatus: 'SUCCESS' as ApolloStatusType, // Cache hit with email means previous Apollo was successful
       fromCache: true,
       apolloCalled: false,
       existingPerson: {
@@ -187,6 +188,7 @@ export async function getOrFindEmail(
       country: null,
       education: null,
       employment: null,
+      apolloStatus: 'SKIPPED' as ApolloStatusType,
       fromCache: false,
       apolloCalled: false,
       existingPerson: existingPerson ? {
@@ -206,8 +208,14 @@ export async function getOrFindEmail(
   if (existingPerson) {
     const updateData: Record<string, unknown> = {
       emailLastUpdated: new Date(),
-      apolloEnrichedAt: new Date(), // Track when Apollo data was fetched
+      apolloStatus: emailResult.apolloStatus as ApolloStatus,
     };
+
+    // Only set apolloEnrichedAt if Apollo actually returned a result (SUCCESS or NOT_FOUND)
+    // For API_ERROR, leave it null so these get retried
+    if (emailResult.apolloStatus === 'SUCCESS' || emailResult.apolloStatus === 'NOT_FOUND') {
+      updateData.apolloEnrichedAt = new Date();
+    }
 
     // Update email if found
     if (emailResult.email) {
