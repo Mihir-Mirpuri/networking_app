@@ -632,7 +632,8 @@ export async function saveDiscoveredPerson(
   sourceSnippet: string | null,
   sourceDomain: string | null,
   apolloData: {
-    company: string;
+    company: string; // Search company (fallback)
+    apolloCompany?: string | null; // Apollo's current employer (source of truth)
     role: string | null;
     email: string | null;
     emailStatus: 'VERIFIED' | 'UNVERIFIED' | 'MISSING';
@@ -646,24 +647,50 @@ export async function saveDiscoveredPerson(
       fieldOfStudy: string | null;
       graduationYear: string | null;
     } | null;
-  }
+    apolloStatus?: 'SUCCESS' | 'NOT_FOUND' | 'API_ERROR' | 'SKIPPED';
+  },
+  searchUniversity?: string | null // Fallback university from search params
 ): Promise<{ personId: string; isNew: boolean }> {
-  // Check if person already exists
-  const existing = await prisma.person.findUnique({
+  // Use Apollo's company if available, otherwise fall back to search company
+  const resolvedCompany = apolloData.apolloCompany || apolloData.company;
+
+  // Check if person already exists - try resolvedCompany first, then fallback to search company
+  // This handles both new records (saved with Apollo company) and legacy records (saved with search company)
+  let existing = await prisma.person.findUnique({
     where: {
       fullName_company: {
         fullName,
-        company: apolloData.company,
+        company: resolvedCompany,
       },
     },
     select: { id: true },
   });
 
+  // Fallback: check if they exist with the search company (legacy data)
+  if (!existing && apolloData.apolloCompany && apolloData.apolloCompany !== apolloData.company) {
+    existing = await prisma.person.findUnique({
+      where: {
+        fullName_company: {
+          fullName,
+          company: apolloData.company,
+        },
+      },
+      select: { id: true },
+    });
+  }
+
   if (existing) {
     // Update with fresh Apollo data
+    // Only set apolloEnrichedAt if status is SUCCESS or NOT_FOUND (not for API_ERROR)
+    const shouldSetEnrichedAt = apolloData.apolloStatus === 'SUCCESS' || apolloData.apolloStatus === 'NOT_FOUND';
+
+    // Use Apollo education if available, otherwise fallback to search university
+    const educationSchool = apolloData.education?.schoolName || searchUniversity || undefined;
+
     await prisma.person.update({
       where: { id: existing.id },
       data: {
+        company: resolvedCompany, // Update company from Apollo if available
         role: apolloData.role || undefined,
         email: apolloData.email || undefined,
         emailStatus: apolloData.email ? apolloData.emailStatus : undefined,
@@ -671,11 +698,12 @@ export async function saveDiscoveredPerson(
         city: apolloData.city || undefined,
         state: apolloData.state || undefined,
         country: apolloData.country || undefined,
-        educationSchool: apolloData.education?.schoolName || undefined,
+        educationSchool,
         educationDegree: apolloData.education?.degree || undefined,
         educationField: apolloData.education?.fieldOfStudy || undefined,
         educationYear: apolloData.education?.graduationYear || undefined,
-        apolloEnrichedAt: new Date(),
+        apolloEnrichedAt: shouldSetEnrichedAt ? new Date() : undefined,
+        apolloStatus: apolloData.apolloStatus || undefined,
         linkedinUrl: linkedinUrl || undefined,
       },
     });
@@ -684,12 +712,18 @@ export async function saveDiscoveredPerson(
   }
 
   // Create new person
+  // Only set apolloEnrichedAt if status is SUCCESS or NOT_FOUND (not for API_ERROR)
+  const shouldSetEnrichedAt = apolloData.apolloStatus === 'SUCCESS' || apolloData.apolloStatus === 'NOT_FOUND';
+
+  // Use Apollo education if available, otherwise fallback to search university
+  const educationSchool = apolloData.education?.schoolName || searchUniversity || null;
+
   const person = await prisma.person.create({
     data: {
       fullName,
       firstName,
       lastName,
-      company: apolloData.company,
+      company: resolvedCompany, // Use Apollo's company if available
       role: apolloData.role,
       linkedinUrl,
       email: apolloData.email,
@@ -698,11 +732,12 @@ export async function saveDiscoveredPerson(
       city: apolloData.city,
       state: apolloData.state,
       country: apolloData.country,
-      educationSchool: apolloData.education?.schoolName,
+      educationSchool,
       educationDegree: apolloData.education?.degree,
       educationField: apolloData.education?.fieldOfStudy,
       educationYear: apolloData.education?.graduationYear,
-      apolloEnrichedAt: new Date(),
+      apolloEnrichedAt: shouldSetEnrichedAt ? new Date() : null,
+      apolloStatus: apolloData.apolloStatus || null,
     },
   });
 
