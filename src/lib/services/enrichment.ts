@@ -43,6 +43,8 @@ export interface EmploymentInfo {
   title: string | null;
 }
 
+export type ApolloStatusType = 'SUCCESS' | 'NOT_FOUND' | 'API_ERROR' | 'SKIPPED';
+
 export interface EmailResult {
   email: string | null;
   status: 'VERIFIED' | 'UNVERIFIED' | 'MISSING';
@@ -52,6 +54,7 @@ export interface EmailResult {
   country: string | null;
   education: EducationInfo | null;
   employment: EmploymentInfo | null;
+  apolloStatus: ApolloStatusType;
 }
 
 export interface FindEmailParams {
@@ -125,20 +128,19 @@ function parseEmployment(employmentHistory?: ApolloPersonMatch['employment_histo
 export async function findEmail(params: FindEmailParams): Promise<EmailResult> {
   const { firstName, lastName, company, linkedinUrl } = params;
 
-  const emptyResult: EmailResult = {
-    email: null,
-    status: 'MISSING',
-    confidence: 0,
-    city: null,
-    state: null,
-    country: null,
-    education: null,
-    employment: null,
-  };
-
   if (!APOLLO_API_KEY) {
     console.log('No Apollo API key - skipping email lookup');
-    return emptyResult;
+    return {
+      email: null,
+      status: 'MISSING',
+      confidence: 0,
+      city: null,
+      state: null,
+      country: null,
+      education: null,
+      employment: null,
+      apolloStatus: 'SKIPPED',
+    };
   }
 
   console.log(`Looking up email for: ${firstName} ${lastName} at ${company}${linkedinUrl ? ` (LinkedIn: ${linkedinUrl})` : ''}`);
@@ -169,7 +171,17 @@ export async function findEmail(params: FindEmailParams): Promise<EmailResult> {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Apollo API error:', response.status, errorText);
-      return emptyResult;
+      return {
+        email: null,
+        status: 'MISSING',
+        confidence: 0,
+        city: null,
+        state: null,
+        country: null,
+        education: null,
+        employment: null,
+        apolloStatus: 'API_ERROR',
+      };
     }
 
     const data: ApolloResponse = await response.json();
@@ -198,14 +210,35 @@ export async function findEmail(params: FindEmailParams): Promise<EmailResult> {
         country: person.country || null,
         education,
         employment,
+        apolloStatus: 'SUCCESS',
       };
     }
 
     console.log(`No person found for ${firstName} ${lastName}`);
-    return emptyResult;
+    return {
+      email: null,
+      status: 'MISSING',
+      confidence: 0,
+      city: null,
+      state: null,
+      country: null,
+      education: null,
+      employment: null,
+      apolloStatus: 'NOT_FOUND',
+    };
   } catch (error) {
     console.error('Apollo enrichment error:', error);
-    return emptyResult;
+    return {
+      email: null,
+      status: 'MISSING',
+      confidence: 0,
+      city: null,
+      state: null,
+      country: null,
+      education: null,
+      employment: null,
+      apolloStatus: 'API_ERROR',
+    };
   }
 }
 
@@ -233,6 +266,7 @@ export async function enrichPeople(
         country: null,
         education: null,
         employment: null,
+        apolloStatus: 'SKIPPED',
       });
       continue;
     }

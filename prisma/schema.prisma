@@ -85,6 +85,7 @@ model Person {
   emailConfidence  Float?
   emailLastUpdated DateTime?
   apolloEnrichedAt DateTime?       // Track when Apollo data was last fetched
+  apolloStatus     ApolloStatus?   // Track the result of the last Apollo call
   city             String?
   state            String?
   country          String?
@@ -102,6 +103,8 @@ model Person {
   @@index([fullName, company])
   @@index([emailStatus])
   @@index([apolloEnrichedAt])       // For TTL queries
+  @@index([apolloStatus])           // For filtering by enrichment status
+  @@index([linkedinUrl])            // For cache lookup by LinkedIn URL
 }
 
 model Search {
@@ -305,6 +308,13 @@ enum EmailStatus {
   UNVERIFIED
   VERIFIED
   MANUAL
+}
+
+enum ApolloStatus {
+  SUCCESS      // Apollo returned data (person found, even if no email)
+  NOT_FOUND    // Apollo couldn't find the person
+  API_ERROR    // Apollo API failed (rate limit, out of credits, network error)
+  SKIPPED      // Apollo call was skipped (no API key, missing required fields)
 }
 
 enum SourceLinkKind {
