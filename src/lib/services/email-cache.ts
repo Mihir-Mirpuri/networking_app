@@ -52,6 +52,7 @@ export async function getOrFindEmail(
     emailConfidence: true,
     emailLastUpdated: true,
     apolloEnrichedAt: true,
+    apolloStatus: true,
     city: true,
     state: true,
     country: true,
@@ -113,12 +114,11 @@ export async function getOrFindEmail(
     return existingPerson.apolloEnrichedAt < cutoff;
   };
 
-  // Step 2: If exists AND has email (VERIFIED or UNVERIFIED) AND not stale → Use cache (NO APOLLO CALL)
-  if (
-    existingPerson?.email &&
-    (existingPerson.emailStatus === 'VERIFIED' || existingPerson.emailStatus === 'UNVERIFIED') &&
-    !isStale()
-  ) {
+  // Step 2: If Apollo has already processed this person (SUCCESS or NOT_FOUND) and not stale → CACHE HIT
+  // This respects the Apollo result regardless of whether an email was found
+  const hasValidApolloResult = existingPerson?.apolloStatus === 'SUCCESS' || existingPerson?.apolloStatus === 'NOT_FOUND';
+
+  if (existingPerson && hasValidApolloResult && !isStale()) {
     const status = existingPerson.emailStatus === 'VERIFIED' ? 'VERIFIED' :
                    existingPerson.emailStatus === 'UNVERIFIED' ? 'UNVERIFIED' : 'MISSING';
 
@@ -136,8 +136,12 @@ export async function getOrFindEmail(
       title: existingPerson.role,
     } : null;
 
+    const emailInfo = existingPerson.email
+      ? `Email: ${existingPerson.email} (${status}, confidence: ${existingPerson.emailConfidence || 0})`
+      : 'No email found';
+
     console.log(
-      `[EmailCache] ✅ CACHE HIT for "${fullName}" at ${company} - Email: ${existingPerson.email} (${status}, confidence: ${existingPerson.emailConfidence || 0}), Role: ${existingPerson.role || 'unknown'} - NO Apollo call`
+      `[EmailCache] ✅ CACHE HIT for "${fullName}" at ${company} - ${emailInfo}, Role: ${existingPerson.role || 'unknown'}, Apollo status: ${existingPerson.apolloStatus} - NO Apollo call`
     );
     return {
       email: existingPerson.email,
@@ -148,7 +152,7 @@ export async function getOrFindEmail(
       country: existingPerson.country,
       education,
       employment,
-      apolloStatus: 'SUCCESS' as ApolloStatusType, // Cache hit with email means previous Apollo was successful
+      apolloStatus: (existingPerson.apolloStatus || 'SUCCESS') as ApolloStatusType,
       fromCache: true,
       apolloCalled: false,
       existingPerson: {
@@ -160,38 +164,19 @@ export async function getOrFindEmail(
     };
   }
 
-  // Step 2b: If person exists with email but data is stale, refresh via Apollo
-  if (existingPerson?.email && isStale()) {
+  // Step 2b: If person exists but data is stale, refresh via Apollo
+  if (existingPerson && hasValidApolloResult && isStale()) {
     console.log(
       `[EmailCache] ⏰ STALE DATA for "${fullName}" at ${company} - Apollo data is > 30 days old. Refreshing via Apollo.`
     );
   }
 
-  // Step 3: If Person exists but no email or MISSING → Check if company changed
-  if (existingPerson) {
-    // Check if same person exists at different company
-    const differentCompanyPerson = await prisma.person.findFirst({
-      where: {
-        fullName,
-        company: { not: company },
-      },
-      select: {
-        company: true,
-        email: true,
-        emailStatus: true,
-      },
-    });
-
-    if (differentCompanyPerson) {
-      console.log(
-        `[EmailCache] 🔄 CACHE MISS - Company change detected for "${fullName}": ${differentCompanyPerson.company} → ${company}. Calling Apollo API for new company email.`
-      );
-    } else {
-      console.log(
-        `[EmailCache] ❌ CACHE MISS - Person "${fullName}" exists at ${company} but has no email or MISSING status. Calling Apollo API.`
-      );
-    }
-  } else {
+  // Step 3: If Person exists but Apollo hasn't processed them yet (or had API_ERROR) → Call Apollo
+  if (existingPerson && !hasValidApolloResult) {
+    console.log(
+      `[EmailCache] ❌ CACHE MISS - Person "${fullName}" exists but needs Apollo enrichment (status: ${existingPerson.apolloStatus || 'null'}). Calling Apollo API.`
+    );
+  } else if (!existingPerson) {
     // Person doesn't exist at all
     console.log(`[EmailCache] ❌ CACHE MISS - New person "${fullName}" at ${company}. Calling Apollo API.`);
   }
