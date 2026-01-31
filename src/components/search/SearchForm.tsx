@@ -2,16 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { COMPANIES, UNIVERSITIES, LOCATIONS, EMAIL_TEMPLATES } from '@/lib/constants';
+import { INDUSTRIES, COMPANIES_BY_INDUSTRY, ROLES_BY_COMPANY, UNIVERSITIES, LOCATIONS, EMAIL_TEMPLATES } from '@/lib/constants';
 import { LoadingSpinner } from './LoadingSpinner';
 import { SearchableCombobox } from './SearchableCombobox';
 import { getTemplatesAction, TemplateData } from '@/app/actions/profile';
 
-// Role options with display label and search value
-const ROLE_OPTIONS = [
-  { label: 'Investment Banking Analyst', value: 'Investment Banking Analyst' },
-  { label: 'Consulting Associate', value: 'Associate' },
-] as const;
 
 interface SearchFormProps {
   onSearch: (params: {
@@ -36,8 +31,15 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
   const { status } = useSession();
 
   // Initialize with initialParams if available, otherwise empty (user must select)
+  const [industry, setIndustry] = useState<string>(INDUSTRIES[0]); // Default to first industry (Consulting)
   const [company, setCompany] = useState<string>(initialParams?.company || '');
   const [role, setRole] = useState<string>(initialParams?.role || '');
+
+  // Get companies for the selected industry
+  const availableCompanies = industry ? (COMPANIES_BY_INDUSTRY[industry] || []) : [];
+
+  // Get roles for the selected company
+  const availableRoles = company ? (ROLES_BY_COMPANY[company] || []) : [];
   const [university, setUniversity] = useState<string>(initialParams?.university || '');
   const [location, setLocation] = useState<string>(initialParams?.location || '');
   const [templateId, setTemplateId] = useState<string>(
@@ -159,11 +161,36 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
   return (
     <form onSubmit={handleSubmit} className="card p-6 mb-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mb-6">
+        {/* Industry */}
+        <div>
+          <label htmlFor="industry" className="block text-sm font-medium text-surface-700 mb-1.5">
+            Industry
+          </label>
+          <select
+            id="industry"
+            value={industry}
+            onChange={(e) => {
+              setIndustry(e.target.value);
+              setCompany(''); // Reset company when industry changes
+            }}
+            className="input"
+          >
+            {INDUSTRIES.map((ind) => (
+              <option key={ind} value={ind}>
+                {ind}
+              </option>
+            ))}
+          </select>
+        </div>
+
         {/* Company */}
         <SearchableCombobox
-          options={['', ...COMPANIES]}
+          options={['', ...availableCompanies]}
           value={company}
-          onChange={setCompany}
+          onChange={(val) => {
+            setCompany(val);
+            setRole(''); // Reset role when company changes
+          }}
           label="Company"
           placeholder="Select a company..."
           id="company"
@@ -171,11 +198,11 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
 
         {/* Role */}
         <SearchableCombobox
-          options={ROLE_OPTIONS}
+          options={['', ...availableRoles]}
           value={role}
           onChange={setRole}
           label="Role"
-          placeholder="Select a role..."
+          placeholder={company ? "Select a role..." : "Select a company first..."}
           id="role"
         />
 

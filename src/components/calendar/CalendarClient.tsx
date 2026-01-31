@@ -6,12 +6,13 @@ import {
   checkCalendarAccessAction,
   verifyAndMarkCalendarAccessAction,
   listCalendarEventsAction,
+  listCalendarsAction,
   createCalendarEventAction,
   deleteCalendarEventAction,
   checkCalendarConflictsAction,
 } from '@/app/actions/calendar';
 import { getPendingSuggestionsCountAction } from '@/app/actions/meetingSuggestions';
-import { CalendarEvent, CreateEventInput, ViewMode } from './types';
+import { Calendar, CalendarEvent, CreateEventInput, ViewMode } from './types';
 import {
   getWeekRange,
   getMonthRange,
@@ -25,6 +26,9 @@ import { CreateEventModal } from './CreateEventModal';
 import { EventDetailPopover } from './EventDetailPopover';
 import { WeekView } from './WeekView/WeekView';
 import { MonthView } from './MonthView/MonthView';
+import { CalendarSidebar } from './CalendarSidebar';
+
+const VISIBLE_CALENDARS_STORAGE_KEY = 'calendar-visible-calendars';
 
 export function CalendarClient() {
   const { status } = useSession();
@@ -32,6 +36,11 @@ export function CalendarClient() {
   // Access state
   const [hasAccess, setHasAccess] = useState<boolean | null>(null);
   const [isCheckingAccess, setIsCheckingAccess] = useState(true);
+
+  // Calendars state
+  const [calendars, setCalendars] = useState<Calendar[]>([]);
+  const [visibleCalendarIds, setVisibleCalendarIds] = useState<Set<string>>(new Set());
+  const [isLoadingCalendars, setIsLoadingCalendars] = useState(false);
 
   // Events state
   const [events, setEvents] = useState<CalendarEvent[]>([]);
@@ -78,11 +87,87 @@ export function CalendarClient() {
     }
   }, [status]);
 
+  // Load calendars when access is confirmed
+  useEffect(() => {
+    if (hasAccess) {
+      loadCalendars();
+    }
+  }, [hasAccess]);
+
   const fetchPendingSuggestionsCount = async () => {
     const result = await getPendingSuggestionsCountAction();
     if (result.success && result.data !== undefined) {
       setPendingSuggestionsCount(result.data);
     }
+  };
+
+  const loadCalendars = async () => {
+    setIsLoadingCalendars(true);
+
+    const result = await listCalendarsAction();
+
+    if (result.success && result.data) {
+      const fetchedCalendars = result.data;
+      setCalendars(fetchedCalendars);
+
+      // Load saved visibility preferences from localStorage
+      const savedVisibleIds = loadVisibleCalendarIds();
+      if (savedVisibleIds) {
+        // Filter to only include IDs that still exist
+        const validIds = new Set(
+          savedVisibleIds.filter((id) => fetchedCalendars.some((c) => c.id === id))
+        );
+        // If all saved calendars are gone, show all
+        setVisibleCalendarIds(validIds.size > 0 ? validIds : new Set(fetchedCalendars.map((c) => c.id)));
+      } else {
+        // Default: show all calendars
+        setVisibleCalendarIds(new Set(fetchedCalendars.map((c) => c.id)));
+      }
+    }
+
+    setIsLoadingCalendars(false);
+  };
+
+  const loadVisibleCalendarIds = (): string[] | null => {
+    try {
+      const saved = localStorage.getItem(VISIBLE_CALENDARS_STORAGE_KEY);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const saveVisibleCalendarIds = (ids: Set<string>) => {
+    try {
+      localStorage.setItem(VISIBLE_CALENDARS_STORAGE_KEY, JSON.stringify(Array.from(ids)));
+    } catch {
+      // Ignore localStorage errors
+    }
+  };
+
+  const handleCalendarVisibilityChange = (calendarId: string, visible: boolean) => {
+    setVisibleCalendarIds((prev) => {
+      const next = new Set(prev);
+      if (visible) {
+        next.add(calendarId);
+      } else {
+        next.delete(calendarId);
+      }
+      saveVisibleCalendarIds(next);
+      return next;
+    });
+  };
+
+  const handleSelectAllCalendars = () => {
+    const allIds = new Set(calendars.map((c) => c.id));
+    setVisibleCalendarIds(allIds);
+    saveVisibleCalendarIds(allIds);
+  };
+
+  const handleDeselectAllCalendars = () => {
+    const empty = new Set<string>();
+    setVisibleCalendarIds(empty);
+    saveVisibleCalendarIds(empty);
   };
 
   // Load events when access is confirmed or view changes
@@ -279,6 +364,9 @@ export function CalendarClient() {
   // Get week start for week view
   const weekStart = getWeekRange(currentDate).start;
 
+  // Filter events by visible calendars
+  const filteredEvents = events.filter((event) => visibleCalendarIds.has(event.calendarId));
+
   return (
     <div className="space-y-6">
       <CalendarHeader
@@ -314,22 +402,36 @@ export function CalendarClient() {
         </div>
       )}
 
-      {/* Calendar view */}
-      {viewMode === 'week' ? (
-        <WeekView
-          events={events}
-          weekStart={weekStart}
-          onEventClick={handleEventClick}
-          onTimeSlotClick={handleTimeSlotClick}
+      {/* Main content with sidebar */}
+      <div className="flex gap-6">
+        <CalendarSidebar
+          calendars={calendars}
+          visibleCalendarIds={visibleCalendarIds}
+          onVisibilityChange={handleCalendarVisibilityChange}
+          onSelectAll={handleSelectAllCalendars}
+          onDeselectAll={handleDeselectAllCalendars}
+          isLoading={isLoadingCalendars}
         />
-      ) : (
-        <MonthView
-          events={events}
-          currentDate={currentDate}
-          onEventClick={handleEventClick}
-          onDayClick={handleDayClick}
-        />
-      )}
+
+        {/* Calendar view */}
+        <div className="flex-1 min-w-0">
+          {viewMode === 'week' ? (
+            <WeekView
+              events={filteredEvents}
+              weekStart={weekStart}
+              onEventClick={handleEventClick}
+              onTimeSlotClick={handleTimeSlotClick}
+            />
+          ) : (
+            <MonthView
+              events={filteredEvents}
+              currentDate={currentDate}
+              onEventClick={handleEventClick}
+              onDayClick={handleDayClick}
+            />
+          )}
+        </div>
+      </div>
 
       {/* Create event modal */}
       <CreateEventModal

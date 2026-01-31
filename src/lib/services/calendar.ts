@@ -86,6 +86,18 @@ export interface CalendarEventDisplay {
   }>;
   htmlLink?: string;
   hangoutLink?: string;
+  calendarId: string;
+  calendarName: string;
+}
+
+/**
+ * Calendar info from Google Calendar API
+ */
+export interface CalendarInfo {
+  id: string;
+  summary: string;
+  primary: boolean;
+  backgroundColor?: string;
 }
 
 /**
@@ -179,29 +191,74 @@ export async function getCalendarClient(userId: string): Promise<calendar_v3.Cal
 }
 
 /**
- * Lists calendar events within a date range.
+ * Lists all calendars the user has access to.
+ */
+export async function listCalendars(userId: string): Promise<CalendarInfo[]> {
+  try {
+    const calendar = await getCalendarClient(userId);
+    const response = await calendar.calendarList.list();
+
+    return (response.data.items || []).map((cal) => ({
+      id: cal.id || '',
+      summary: cal.summary || '',
+      primary: cal.primary || false,
+      backgroundColor: cal.backgroundColor || undefined,
+    }));
+  } catch (error: any) {
+    if (error?.code === 403 || error?.message?.includes('insufficient')) {
+      throw new NoCalendarAccessError(userId);
+    }
+    throw new CalendarApiError(
+      error instanceof Error ? error.message : 'Failed to list calendars',
+      error
+    );
+  }
+}
+
+/**
+ * Lists calendar events within a date range from all calendars.
  */
 export async function listEvents(
   userId: string,
   startDate: Date,
   endDate: Date,
-  maxResults: number = 50
+  maxResults: number = 100
 ): Promise<CalendarEventDisplay[]> {
   try {
     const calendar = await getCalendarClient(userId);
 
-    const response = await calendar.events.list({
-      calendarId: 'primary',
-      timeMin: startDate.toISOString(),
-      timeMax: endDate.toISOString(),
-      maxResults,
-      singleEvents: true, // Expand recurring events
-      orderBy: 'startTime',
+    // Get all calendars
+    const calendars = await listCalendars(userId);
+
+    // Fetch events from all calendars in parallel, including calendar info
+    const eventPromises = calendars.map(async (cal) => {
+      try {
+        const response = await calendar.events.list({
+          calendarId: cal.id,
+          timeMin: startDate.toISOString(),
+          timeMax: endDate.toISOString(),
+          maxResults: maxResults,
+          singleEvents: true, // Expand recurring events
+          orderBy: 'startTime',
+        });
+        // Return events with calendar info attached
+        return (response.data.items || []).map((event) => ({
+          event,
+          calendarId: cal.id,
+          calendarName: cal.summary,
+        }));
+      } catch (err) {
+        // Skip calendars we can't access (e.g., some subscribed calendars)
+        console.log(`[Calendar] Skipping calendar ${cal.summary}: ${err}`);
+        return [];
+      }
     });
 
-    const events = response.data.items || [];
+    const allEventsArrays = await Promise.all(eventPromises);
+    const allEventsWithCalendarInfo = allEventsArrays.flat();
 
-    return events.map((event) => ({
+    // Convert to display format and sort by start time
+    const displayEvents = allEventsWithCalendarInfo.map(({ event, calendarId, calendarName }) => ({
       id: event.id || '',
       summary: event.summary || '(No title)',
       description: event.description || undefined,
@@ -216,7 +273,14 @@ export async function listEvents(
       })),
       htmlLink: event.htmlLink || undefined,
       hangoutLink: event.hangoutLink || undefined,
+      calendarId,
+      calendarName,
     }));
+
+    // Sort by start time
+    displayEvents.sort((a, b) => a.start.getTime() - b.start.getTime());
+
+    return displayEvents;
   } catch (error: any) {
     // Check if it's a scope/permission error
     if (error?.code === 403 || error?.message?.includes('insufficient')) {
@@ -261,6 +325,8 @@ export async function getEvent(
       })),
       htmlLink: event.htmlLink || undefined,
       hangoutLink: event.hangoutLink || undefined,
+      calendarId: 'primary',
+      calendarName: 'Primary',
     };
   } catch (error: any) {
     if (error?.code === 404) {
@@ -318,6 +384,8 @@ export async function createEvent(
       })),
       htmlLink: created.htmlLink || undefined,
       hangoutLink: created.hangoutLink || undefined,
+      calendarId: 'primary',
+      calendarName: 'Primary',
     };
   } catch (error: any) {
     if (error?.code === 403) {
@@ -375,6 +443,8 @@ export async function updateEvent(
       })),
       htmlLink: updated.htmlLink || undefined,
       hangoutLink: updated.hangoutLink || undefined,
+      calendarId: 'primary',
+      calendarName: 'Primary',
     };
   } catch (error: any) {
     if (error?.code === 404) {

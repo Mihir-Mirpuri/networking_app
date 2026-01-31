@@ -15,6 +15,15 @@ export interface CalendarEvent {
   }>;
   htmlLink?: string;
   hangoutLink?: string;
+  calendarId: string;
+  calendarName: string;
+}
+
+export interface Calendar {
+  id: string;
+  summary: string;
+  primary: boolean;
+  backgroundColor?: string;
 }
 
 export interface CreateEventInput {

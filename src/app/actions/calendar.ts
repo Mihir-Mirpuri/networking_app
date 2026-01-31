@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import {
   listEvents,
+  listCalendars,
   getEvent,
   createEvent,
   updateEvent,
@@ -15,6 +16,7 @@ import {
   markCalendarDisconnected,
   CalendarEvent,
   CalendarEventDisplay,
+  CalendarInfo,
   ConflictCheckResult,
   NoCalendarAccessError,
 } from '@/lib/services/calendar';
@@ -153,6 +155,40 @@ export async function verifyAndMarkCalendarAccessAction(): Promise<
   }
 
   return { success: false, error: 'Failed to verify calendar access' };
+}
+
+// ============================================================================
+// List Calendars
+// ============================================================================
+
+/**
+ * Lists all calendars the user has access to.
+ */
+export async function listCalendarsAction(): Promise<
+  CalendarActionResult<CalendarInfo[]>
+> {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.id) {
+    return { success: false, error: 'Not authenticated' };
+  }
+
+  try {
+    const calendars = await listCalendars(session.user.id);
+    return { success: true, data: calendars };
+  } catch (error) {
+    console.error('[Calendar Action] Error listing calendars:', error);
+
+    if (error instanceof NoCalendarAccessError) {
+      return {
+        success: false,
+        error: 'Calendar access not granted. Please re-authenticate.',
+        requiresReauth: true,
+      };
+    }
+
+    return { success: false, error: 'Failed to fetch calendars' };
+  }
 }
 
 // ============================================================================
