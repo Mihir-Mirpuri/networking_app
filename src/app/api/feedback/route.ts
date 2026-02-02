@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
 
     // Send email via Resend
     const { error } = await resend.emails.send({
-      from: 'Lattice Feedback <feedback@resend.dev>',
+      from: 'Signl Feedback <feedback@resend.dev>',
       to: FEEDBACK_EMAIL,
       subject: `User Feedback from ${userName}`,
       html: `
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
           </table>
 
           <p style="color: #9ca3af; font-size: 12px; margin-top: 30px; text-align: center;">
-            Sent from Lattice App Feedback System
+            Sent from Signl App Feedback System
           </p>
         </div>
       `,

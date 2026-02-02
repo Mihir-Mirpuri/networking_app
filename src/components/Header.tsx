@@ -104,10 +104,10 @@ export function Header() {
         <div className="flex justify-between items-center h-16">
           <Link href="/" className="flex items-center gap-2 group">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow">
-              <span className="text-white font-bold text-sm">L</span>
+              <span className="text-white font-bold text-sm">S</span>
             </div>
             <span className="text-xl font-bold text-surface-900 group-hover:text-primary-600 transition-colors">
-              Lattice
+              Signl
             </span>
           </Link>
           {renderNavContent()}

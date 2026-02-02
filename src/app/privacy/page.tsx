@@ -2,8 +2,8 @@ import { Metadata } from 'next';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy - Lattice',
-  description: 'Privacy Policy for Lattice',
+  title: 'Privacy Policy - Signl',
+  description: 'Privacy Policy for Signl',
 };
 
 export default function PrivacyPage() {
@@ -24,7 +24,7 @@ export default function PrivacyPage() {
           <section className="mb-8">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">1. Introduction</h2>
             <p className="text-gray-700 mb-4">
-              Lattice (&quot;we,&quot; &quot;our,&quot; or &quot;us&quot;) is a recruiting outreach tool designed to help
+              Signl (&quot;we,&quot; &quot;our,&quot; or &quot;us&quot;) is a recruiting outreach tool designed to help
               users connect with professionals in finance and consulting. This Privacy Policy explains how we
               collect, use, disclose, and safeguard your information when you use our service.
             </p>
@@ -54,7 +54,7 @@ export default function PrivacyPage() {
             </ul>
             <p className="text-gray-700 mb-4">
               We store OAuth tokens securely to maintain your session. We do not read or store
-              the content of emails unrelated to Lattice outreach.
+              the content of emails unrelated to Signl outreach.
             </p>
 
             <h3 className="text-lg font-medium text-gray-900 mt-4 mb-2">Resume Data</h3>
@@ -66,7 +66,7 @@ export default function PrivacyPage() {
 
             <h3 className="text-lg font-medium text-gray-900 mt-4 mb-2">Chrome Extension &amp; LinkedIn Data</h3>
             <p className="text-gray-700 mb-4">
-              If you install our optional Chrome extension (&quot;Lattice LinkedIn Helper&quot;), it collects
+              If you install our optional Chrome extension (&quot;Signl LinkedIn Helper&quot;), it collects
               the following information from LinkedIn profiles you visit:
             </p>
             <ul className="list-disc pl-6 text-gray-700 mb-4">

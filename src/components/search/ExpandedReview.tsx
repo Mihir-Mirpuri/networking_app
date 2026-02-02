@@ -671,7 +671,7 @@ export function ExpandedReview({
                 Cancel
               </button>
               <a
-                href="https://chrome.google.com/webstore/detail/lattice-linkedin-helper/YOUR_EXTENSION_ID"
+                href="https://chrome.google.com/webstore/detail/signl-linkedin-helper/YOUR_EXTENSION_ID"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-purple-600 text-white rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500"

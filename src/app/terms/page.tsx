@@ -2,8 +2,8 @@ import { Metadata } from 'next';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
-  title: 'Terms of Service - Lattice',
-  description: 'Terms of Service for Lattice',
+  title: 'Terms of Service - Signl',
+  description: 'Terms of Service for Signl',
 };
 
 export default function TermsPage() {
@@ -24,7 +24,7 @@ export default function TermsPage() {
           <section className="mb-8">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">1. Acceptance of Terms</h2>
             <p className="text-gray-700 mb-4">
-              By accessing or using Lattice (&quot;the Service&quot;), you agree to be bound by these
+              By accessing or using Signl (&quot;the Service&quot;), you agree to be bound by these
               Terms of Service. If you do not agree to these terms, please do not use the Service.
             </p>
           </section>
@@ -32,7 +32,7 @@ export default function TermsPage() {
           <section className="mb-8">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">2. Description of Service</h2>
             <p className="text-gray-700 mb-4">
-              Lattice is a recruiting outreach tool that helps users connect with professionals
+              Signl is a recruiting outreach tool that helps users connect with professionals
               in finance and consulting industries. The Service allows you to:
             </p>
             <ul className="list-disc pl-6 text-gray-700 mb-4">
@@ -145,7 +145,7 @@ export default function TermsPage() {
           <section className="mb-8">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">11. Indemnification</h2>
             <p className="text-gray-700 mb-4">
-              You agree to indemnify and hold harmless Lattice and its operators from any claims,
+              You agree to indemnify and hold harmless Signl and its operators from any claims,
               damages, losses, or expenses arising from your use of the Service, your violation
               of these Terms, or your violation of any rights of a third party.
             </p>

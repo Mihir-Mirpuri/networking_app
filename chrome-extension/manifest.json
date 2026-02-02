@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Lattice LinkedIn Helper",
+  "name": "Signl LinkedIn Helper",
   "version": "1.0.0",
   "description": "Helps personalize outreach emails by reading LinkedIn profile data",
   "permissions": [
@@ -28,11 +28,11 @@
   "externally_connectable": {
     "matches": [
       "http://localhost:3000/*",
-      "https://networking-app-teal.vercel.app/*"
+      "https://signl.to/*"
     ]
   },
   "action": {
-    "default_title": "Lattice LinkedIn Helper",
+    "default_title": "Signl LinkedIn Helper",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",

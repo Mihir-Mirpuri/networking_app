@@ -42,9 +42,9 @@ export default function SignInPage() {
           {/* Logo and Title */}
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-700 shadow-glow mb-6">
-              <span className="text-white font-bold text-2xl">L</span>
+              <span className="text-white font-bold text-2xl">S</span>
             </div>
-            <h1 className="text-2xl font-bold text-surface-900">Welcome to Lattice</h1>
+            <h1 className="text-2xl font-bold text-surface-900">Welcome to Signl</h1>
             <p className="mt-2 text-surface-500">
               Finance & consulting recruiting outreach tool
             </p>

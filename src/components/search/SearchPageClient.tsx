@@ -25,7 +25,7 @@ interface SearchPageClientProps {
 }
 
 // Storage key for sessionStorage
-const STORAGE_KEY = 'lattice_searchState';
+const STORAGE_KEY = 'signl_searchState';
 const STORAGE_VERSION = 1;
 
 // State structure for persistence

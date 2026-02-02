@@ -1,19 +1,19 @@
 // Content script for scraping LinkedIn profiles
 // This runs on linkedin.com/in/* pages
 
-console.log('Lattice LinkedIn Helper: Content script loaded');
+console.log('Signl LinkedIn Helper: Content script loaded');
 
 // Listen for scrape requests from background script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'scrape') {
-    console.log('Lattice LinkedIn Helper: Starting scrape...');
+    console.log('Signl LinkedIn Helper: Starting scrape...');
 
     try {
       const data = scrapeProfile();
-      console.log('Lattice LinkedIn Helper: Scraped data:', data);
+      console.log('Signl LinkedIn Helper: Scraped data:', data);
       sendResponse({ success: true, data });
     } catch (error) {
-      console.error('Lattice LinkedIn Helper: Scrape error:', error);
+      console.error('Signl LinkedIn Helper: Scrape error:', error);
       sendResponse({ success: false, error: error.message });
     }
   }
@@ -182,9 +182,9 @@ function scrapeEducationSection() {
 }
 
 // Inject a marker so the web app can detect the extension is installed
-document.documentElement.setAttribute('data-lattice-extension', 'true');
+document.documentElement.setAttribute('data-signl-extension', 'true');
 
 // Also set it on window load in case the attribute gets removed
 window.addEventListener('load', () => {
-  document.documentElement.setAttribute('data-lattice-extension', 'true');
+  document.documentElement.setAttribute('data-signl-extension', 'true');
 });

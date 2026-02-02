@@ -7,7 +7,7 @@ import { FeedbackButton } from '@/components/feedback/FeedbackButton';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Lattice',
+  title: 'Signl',
   description: 'Finance/consulting recruiting outreach tool',
 };
 

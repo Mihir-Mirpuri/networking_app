@@ -1,9 +1,9 @@
-// Background service worker for Lattice LinkedIn Helper
+// Background service worker for Signl LinkedIn Helper
 
 // Listen for messages from the web app
 chrome.runtime.onMessageExternal.addListener(
   (request, sender, sendResponse) => {
-    console.log('Lattice: Received external message:', request);
+    console.log('Signl: Received external message:', request);
 
     if (request.action === 'ping') {
       // Health check - app uses this to detect if extension is installed
@@ -17,11 +17,11 @@ chrome.runtime.onMessageExternal.addListener(
       // Open LinkedIn profile in a new tab and scrape it
       scrapeLinkedInProfile(linkedinUrl)
         .then(result => {
-          console.log('Lattice: Scrape complete, sending response:', result);
+          console.log('Signl: Scrape complete, sending response:', result);
           sendResponse(result);
         })
         .catch(error => {
-          console.error('Lattice: Scrape error:', error);
+          console.error('Signl: Scrape error:', error);
           sendResponse({ success: false, error: error.message });
         });
 
@@ -55,7 +55,7 @@ async function scrapeLinkedInProfile(linkedinUrl) {
           if (hasResponded) return;
 
           if (chrome.runtime.lastError) {
-            console.log('Lattice: Scrape attempt failed, retrying...', retryCount);
+            console.log('Signl: Scrape attempt failed, retrying...', retryCount);
             retryCount++;
             if (retryCount < maxRetries) {
               // Retry after a short delay
@@ -92,7 +92,7 @@ async function scrapeLinkedInProfile(linkedinUrl) {
 
         // Try scraping on 'interactive' (DOM ready) or 'complete'
         if (changeInfo.status === 'complete') {
-          console.log('Lattice: Page complete, attempting scrape...');
+          console.log('Signl: Page complete, attempting scrape...');
           // Small delay to let React/JS render
           setTimeout(attemptScrape, 800);
         }
@@ -103,7 +103,7 @@ async function scrapeLinkedInProfile(linkedinUrl) {
       // Also try scraping after a fixed delay as backup
       setTimeout(() => {
         if (!hasResponded) {
-          console.log('Lattice: Backup scrape attempt...');
+          console.log('Signl: Backup scrape attempt...');
           attemptScrape();
         }
       }, 3000);

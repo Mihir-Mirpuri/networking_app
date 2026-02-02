@@ -48,7 +48,7 @@ export async function GET(request: Request) {
           const companyInfo = reminder.company ? ` at ${reminder.company}` : '';
 
           const { error } = await resend.emails.send({
-            from: 'Lattice Reminders <reminders@resend.dev>',
+            from: 'Signl Reminders <reminders@resend.dev>',
             to: reminder.userEmail,
             subject: `Reminder: Follow up with ${contactDisplay}`,
             html: `
@@ -74,14 +74,14 @@ export async function GET(request: Request) {
                 </div>
 
                 <p style="color: #6b7280; font-size: 14px;">
-                  <a href="${process.env.NEXTAUTH_URL || 'https://lattice.app'}/history"
+                  <a href="${process.env.NEXTAUTH_URL || 'https://signl.to'}/history"
                      style="color: #3b82f6; text-decoration: none;">
                     View your outreach tracker
                   </a>
                 </p>
 
                 <p style="color: #9ca3af; font-size: 12px; margin-top: 30px; text-align: center;">
-                  Sent from Lattice Outreach Tracker
+                  Sent from Signl Outreach Tracker
                 </p>
               </div>
             `,

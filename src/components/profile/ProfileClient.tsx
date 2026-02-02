@@ -1020,7 +1020,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
       <div className="card p-6">
         <h2 className="text-lg font-semibold text-surface-900 mb-4">Account</h2>
         <p className="text-sm text-surface-500 mb-4">
-          Sign out of your Lattice account. You can always sign back in later.
+          Sign out of your Signl account. You can always sign back in later.
         </p>
         <button
           onClick={handleSignOut}
