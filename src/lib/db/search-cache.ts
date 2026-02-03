@@ -1,7 +1,7 @@
 import prisma from '@/lib/prisma';
 
 const CACHE_TTL_HOURS = 168; // 7 days
-const PERSON_CACHE_TTL_DAYS = 90;
+const PERSON_CACHE_TTL_DAYS = 20; // 20 days - then check for staleness (email bounce)
 
 export interface NormalizedSearchParams {
   name: string | null;
@@ -15,6 +15,7 @@ export interface ApiUsageStats {
   apolloCallsMade: number;
   apolloCacheHits: number;
   cseCallsMade: number;
+  linkedinScraperCalls: number;
 }
 
 /**
@@ -128,6 +129,7 @@ export async function createSearchWithPeople(
       apolloCallsMade: apiStats?.apolloCallsMade ?? 0,
       apolloCacheHits: apiStats?.apolloCacheHits ?? 0,
       cseCallsMade: apiStats?.cseCallsMade ?? 0,
+      linkedinScraperCalls: apiStats?.linkedinScraperCalls ?? 0,
       completedAt: new Date(),
     },
   });
@@ -180,6 +182,7 @@ export async function updateSearchWithPeople(
           apolloCallsMade: apiStats.apolloCallsMade,
           apolloCacheHits: apiStats.apolloCacheHits,
           cseCallsMade: apiStats.cseCallsMade,
+          linkedinScraperCalls: apiStats.linkedinScraperCalls,
         }),
       },
     }),
@@ -187,17 +190,24 @@ export async function updateSearchWithPeople(
 }
 
 /**
- * Checks if a person's Apollo data is stale (older than 30 days)
+ * Checks if a person's data is stale (older than 20 days)
+ * Checks scrapedAt first, falls back to apolloEnrichedAt for legacy data
  */
-export function isPersonStale(apolloEnrichedAt: Date | null): boolean {
-  if (!apolloEnrichedAt) return true;
+export function isPersonStale(scrapedAt: Date | null, apolloEnrichedAt?: Date | null): boolean {
+  const lastUpdated = scrapedAt || apolloEnrichedAt;
+  if (!lastUpdated) return true;
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - PERSON_CACHE_TTL_DAYS);
-  return apolloEnrichedAt < cutoff;
+  return lastUpdated < cutoff;
 }
 
 /**
- * Gets Person IDs that have stale Apollo data (null or older than 30 days)
+ * Gets Person IDs that have stale data (null or older than 20 days)
+ * Checks scrapedAt first, then apolloEnrichedAt for legacy data
+ *
+ * Note: Email bounce detection to be implemented by user later.
+ * When implemented, check email bounce for stale people to detect job changes
+ * instead of immediately re-scraping.
  */
 export async function getStalePersonIds(personIds: string[]): Promise<string[]> {
   if (personIds.length === 0) return [];
@@ -205,12 +215,25 @@ export async function getStalePersonIds(personIds: string[]): Promise<string[]> 
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - PERSON_CACHE_TTL_DAYS);
 
+  // Find people where BOTH scrapedAt AND apolloEnrichedAt are stale or null
+  // If either is recent, the person is not stale
   const stalePersons = await prisma.person.findMany({
     where: {
       id: { in: personIds },
-      OR: [
-        { apolloEnrichedAt: null },
-        { apolloEnrichedAt: { lt: cutoff } },
+      // People are stale if they have no recent scrapedAt AND no recent apolloEnrichedAt
+      AND: [
+        {
+          OR: [
+            { scrapedAt: null },
+            { scrapedAt: { lt: cutoff } },
+          ],
+        },
+        {
+          OR: [
+            { apolloEnrichedAt: null },
+            { apolloEnrichedAt: { lt: cutoff } },
+          ],
+        },
       ],
     },
     select: { id: true },
@@ -235,6 +258,7 @@ export async function getPersonsByIds(personIds: string[]): Promise<
     email: string | null;
     emailStatus: string | null;
     emailConfidence: number | null;
+    scrapedAt: Date | null;
     apolloEnrichedAt: Date | null;
     city: string | null;
     state: string | null;
@@ -269,6 +293,7 @@ export async function getPersonsByIds(personIds: string[]): Promise<
       email: true,
       emailStatus: true,
       emailConfidence: true,
+      scrapedAt: true,
       apolloEnrichedAt: true,
       city: true,
       state: true,

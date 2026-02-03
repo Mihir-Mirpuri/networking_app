@@ -84,8 +84,9 @@ model Person {
   emailStatus      EmailStatus?
   emailConfidence  Float?
   emailLastUpdated DateTime?
-  apolloEnrichedAt DateTime?       // Track when Apollo data was last fetched
-  apolloStatus     ApolloStatus?   // Track the result of the last Apollo call
+  apolloEnrichedAt DateTime?       // Track when Apollo data was last fetched (legacy)
+  apolloStatus     ApolloStatus?   // Track the result of the last Apollo call (legacy)
+  scrapedAt        DateTime?       // Track when LinkedIn data was last scraped
   city             String?
   state            String?
   country          String?
@@ -93,6 +94,7 @@ model Person {
   educationDegree  String?
   educationField   String?
   educationYear    String?
+  schools          Json?             // Array of all schools (normalized)
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
   sourceLinks      SourceLink[]
@@ -102,21 +104,23 @@ model Person {
   @@unique([fullName, company])
   @@index([fullName, company])
   @@index([emailStatus])
-  @@index([apolloEnrichedAt])       // For TTL queries
-  @@index([apolloStatus])           // For filtering by enrichment status
+  @@index([apolloEnrichedAt])       // For TTL queries (legacy)
+  @@index([apolloStatus])           // For filtering by enrichment status (legacy)
+  @@index([scrapedAt])              // For TTL queries - check if data is stale
   @@index([linkedinUrl])            // For cache lookup by LinkedIn URL
 }
 
 model Search {
-  id              String         @id @default(cuid())
-  name            String?
-  company         String?
-  role            String?
-  university      String?
-  location        String?
-  apolloCallsMade Int            @default(0)
-  apolloCacheHits Int            @default(0)
-  cseCallsMade    Int            @default(0)
+  id                    String         @id @default(cuid())
+  name                  String?
+  company               String?
+  role                  String?
+  university            String?
+  location              String?
+  apolloCallsMade       Int            @default(0)
+  apolloCacheHits       Int            @default(0)
+  cseCallsMade          Int            @default(0)
+  linkedinScraperCalls  Int            @default(0)
   completedAt     DateTime?
   createdAt       DateTime       @default(now())
   searchPeople    SearchPerson[]
@@ -454,6 +458,20 @@ model messages {
   @@index([userId, received_at])
   @@index([sender])
   @@index([sendLogId])
+}
+
+model CompanyEmailPattern {
+  id          String   @id @default(cuid())
+  company     String   // normalized company name (lowercase, no punctuation)
+  domain      String   // email domain (e.g., "zs.com")
+  pattern     String   // pattern type: "first.last", "firstlast", "flast", "f.last", "first_last", "first"
+  confidence  Float    // 0-1 based on consistency
+  sampleSize  Int      // number of emails used to determine pattern
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([company, domain])
+  @@index([company])
 }
 
 model OutreachTracker {
