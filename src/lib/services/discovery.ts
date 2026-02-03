@@ -208,7 +208,7 @@ export async function discoverLinkedInProfiles(params: SearchParams): Promise<CS
   }
 
   console.log(`[Discovery] Search query: ${query}`);
-  const pages = [1, 11, 21, 31, 41]; // 5 pages = 50 results max
+  const pages = [1, 11]; // 2 pages = 20 results max
 
   const seenKeys = new Set<string>();
   const candidates: CSEDiscoveryResult[] = [];
@@ -243,35 +243,27 @@ export async function discoverLinkedInProfiles(params: SearchParams): Promise<CS
           continue;
         }
 
-        // Extract name from title
-        const parsed = extractNameFromTitle(result.title);
-        if (!parsed) {
-          console.log(`[Discovery] Could not extract name from title: ${result.title}`);
-          continue;
-        }
-
-        // Basic validation: must have first and last name
-        if (!parsed.firstName || !parsed.lastName) {
-          continue;
-        }
-
         // Check for duplicate URLs
-        const key = normalizeKey(parsed.fullName, result.link);
-        if (seenKeys.has(key)) continue;
-        seenKeys.add(key);
+        if (seenKeys.has(result.link)) continue;
+        seenKeys.add(result.link);
+
+        // Try to extract name from title (optional - scraper will provide accurate name)
+        const parsed = extractNameFromTitle(result.title);
 
         // Check if this person should be excluded (already sent/hidden)
-        // Use company from search params since CSE doesn't provide reliable company
-        const personKey = `${parsed.fullName}_${company || ''}`.toLowerCase();
-        if (excludePersonKeys.has(personKey)) {
-          console.log(`[Discovery] Skipping excluded person: ${parsed.fullName}`);
-          continue;
+        // Only check if we could parse a name
+        if (parsed?.fullName && company) {
+          const personKey = `${parsed.fullName}_${company}`.toLowerCase();
+          if (excludePersonKeys.has(personKey)) {
+            console.log(`[Discovery] Skipping excluded person: ${parsed.fullName}`);
+            continue;
+          }
         }
 
         candidates.push({
-          fullName: parsed.fullName,
-          firstName: parsed.firstName,
-          lastName: parsed.lastName,
+          fullName: parsed?.fullName || '',  // Scraper will provide actual name
+          firstName: parsed?.firstName || null,
+          lastName: parsed?.lastName || null,
           linkedinUrl: result.link,
           sourceTitle: result.title,
           sourceSnippet: result.snippet,

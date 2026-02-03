@@ -2,6 +2,25 @@ import prisma from '@/lib/prisma';
 import { SearchResult } from '@/lib/services/discovery';
 import { EmailResult, EducationInfo, EmploymentInfo } from '@/lib/services/enrichment';
 import { EmailStatus } from '@prisma/client';
+import { ScrapedProfile } from '@/lib/services/linkedin-scraper';
+
+// Personal email domains - emails from these are UNVERIFIED
+const PERSONAL_DOMAINS = new Set([
+  'gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'aol.com',
+  'icloud.com', 'mail.com', 'protonmail.com', 'zoho.com', 'ymail.com',
+  'live.com', 'msn.com', 'me.com', 'mac.com', 'inbox.com'
+]);
+
+/**
+ * Check if email is from a work domain (not personal)
+ * Work emails are considered VERIFIED, personal emails are UNVERIFIED
+ */
+export function getEmailStatus(email: string | null): 'VERIFIED' | 'UNVERIFIED' | 'MISSING' {
+  if (!email) return 'MISSING';
+  const domain = email.split('@')[1]?.toLowerCase();
+  if (!domain) return 'UNVERIFIED';
+  return PERSONAL_DOMAINS.has(domain) ? 'UNVERIFIED' : 'VERIFIED';
+}
 
 export interface PersonData {
   fullName: string;
@@ -538,12 +557,34 @@ export async function findPeopleByFilters(filters: PersonFilters): Promise<
 > {
   const { company, location, role, university, requireEmail = true, excludePersonKeys, limit } = filters;
 
-  // Build where clause
-  const where: Record<string, unknown> = {};
+  // Normalize company name for matching (remove dots, extra spaces)
+  // "L.E.K. Consulting" → "LEK Consulting", "LEK Consulting" → "LEK Consulting"
+  const normalizeCompany = (name: string) =>
+    name.replace(/\./g, '').replace(/\s+/g, ' ').trim().toLowerCase();
 
-  // Company filter (required) - case insensitive contains
+  // Build where clause
+  // Note: Company matching is done post-query for fuzzy matching (L.E.K. = LEK)
+  const where: Record<string, unknown> = {};
+  const normalizedSearchCompany = company ? normalizeCompany(company) : null;
+
+  // Company filter - loose DB filter, then strict post-query filter
+  // Use OR query with first word AND longest word to catch both "ZS" and "ZS Associates"
   if (company && company.trim()) {
-    where.company = { contains: company.trim(), mode: 'insensitive' };
+    const words = company.replace(/[^a-zA-Z0-9\s]/g, '').trim().split(/\s+/).filter(w => w.length >= 2);
+    if (words.length > 0) {
+      const firstWord = words[0];
+      const longestWord = words.reduce((a, b) => (a.length >= b.length ? a : b), '');
+
+      if (firstWord === longestWord) {
+        where.company = { contains: firstWord, mode: 'insensitive' };
+      } else {
+        // Use OR to match either first word or longest word
+        where.OR = [
+          { company: { contains: firstWord, mode: 'insensitive' } },
+          { company: { contains: longestWord, mode: 'insensitive' } },
+        ];
+      }
+    }
   }
 
   // Location filter - city must contain search term
@@ -606,10 +647,20 @@ export async function findPeopleByFilters(filters: PersonFilters): Promise<
     take: limit * 2, // Get extra to allow for exclusions
   });
 
-  // Filter out excluded people
+  // Filter by company (fuzzy match: "LEK" matches "L.E.K.", "ZS" matches "ZS Associates")
+  // Bidirectional: either company can contain the other
   let filtered = people;
-  if (excludePersonKeys && excludePersonKeys.size > 0) {
+  if (normalizedSearchCompany) {
     filtered = people.filter((person) => {
+      const normalizedPersonCompany = normalizeCompany(person.company);
+      return normalizedPersonCompany.includes(normalizedSearchCompany) ||
+             normalizedSearchCompany.includes(normalizedPersonCompany);
+    });
+  }
+
+  // Filter out excluded people
+  if (excludePersonKeys && excludePersonKeys.size > 0) {
+    filtered = filtered.filter((person) => {
       const key = `${person.fullName}_${person.company}`.toLowerCase();
       return !excludePersonKeys.has(key);
     });
@@ -738,6 +789,227 @@ export async function saveDiscoveredPerson(
       educationYear: apolloData.education?.graduationYear,
       apolloEnrichedAt: shouldSetEnrichedAt ? new Date() : null,
       apolloStatus: apolloData.apolloStatus || null,
+    },
+  });
+
+  // Create source link
+  await prisma.sourceLink.create({
+    data: {
+      personId: person.id,
+      kind: 'DISCOVERY',
+      url: sourceUrl,
+      title: sourceTitle,
+      snippet: sourceSnippet,
+      domain: sourceDomain,
+    },
+  });
+
+  return { personId: person.id, isNew: true };
+}
+
+/**
+ * Find existing people by LinkedIn URLs
+ * Returns a Map of linkedinUrl -> person data for fast lookup
+ */
+export async function findPeopleByLinkedInUrls(
+  linkedinUrls: string[]
+): Promise<Map<string, {
+  id: string;
+  fullName: string;
+  firstName: string | null;
+  lastName: string | null;
+  company: string;
+  role: string | null;
+  email: string | null;
+  emailStatus: string | null;
+  emailConfidence: number | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  educationSchool: string | null;
+  educationDegree: string | null;
+  educationField: string | null;
+  educationYear: string | null;
+  linkedinUrl: string | null;
+  scrapedAt: Date | null;
+  sourceLinks: Array<{
+    url: string;
+    title: string;
+    snippet: string | null;
+    domain: string | null;
+  }>;
+}>> {
+  if (linkedinUrls.length === 0) {
+    return new Map();
+  }
+
+  const people = await prisma.person.findMany({
+    where: {
+      linkedinUrl: { in: linkedinUrls },
+    },
+    select: {
+      id: true,
+      fullName: true,
+      firstName: true,
+      lastName: true,
+      company: true,
+      role: true,
+      email: true,
+      emailStatus: true,
+      emailConfidence: true,
+      city: true,
+      state: true,
+      country: true,
+      educationSchool: true,
+      educationDegree: true,
+      educationField: true,
+      educationYear: true,
+      linkedinUrl: true,
+      scrapedAt: true,
+      sourceLinks: {
+        where: { kind: 'DISCOVERY' },
+        orderBy: { createdAt: 'asc' },
+        take: 1,
+        select: {
+          url: true,
+          title: true,
+          snippet: true,
+          domain: true,
+        },
+      },
+    },
+  });
+
+  const map = new Map<string, typeof people[0]>();
+  for (const person of people) {
+    if (person.linkedinUrl) {
+      map.set(person.linkedinUrl, person);
+    }
+  }
+
+  return map;
+}
+
+/**
+ * Save a scraped LinkedIn profile to the database
+ *
+ * Field mapping from LinkedIn Scraper → Person model:
+ * ─────────────────────────────────────────────────────
+ * linkedinUrl       → linkedinUrl
+ * fullName          → fullName
+ * firstName         → firstName
+ * lastName          → lastName
+ * email             → email (emailStatus = UNVERIFIED if present, MISSING if not)
+ * company           → company (from currentPosition or experience)
+ * role              → role (from experience[0].position)
+ * city              → city (from location.parsed or experience location)
+ * state             → state (from location.parsed or experience location)
+ * country           → country (from location.parsed or experience location)
+ * schools           → schools (all schools, normalized and deduplicated)
+ * educationSchool   → educationSchool (primary school = schools[0])
+ */
+export async function saveScrapedProfile(
+  profile: ScrapedProfile,
+  sourceUrl: string,
+  sourceTitle: string,
+  sourceSnippet: string | null,
+  sourceDomain: string | null,
+  searchCompany: string, // Fallback if scraper didn't find company
+  searchUniversity?: string | null // Fallback if scraper didn't find school
+): Promise<{ personId: string; isNew: boolean }> {
+  // Use scraped company or fall back to search company
+  const company = profile.company || searchCompany;
+
+  // Use scraped schools array or fall back to search university
+  const schools = profile.schools.length > 0
+    ? profile.schools
+    : (searchUniversity ? [searchUniversity] : []);
+
+  // Primary school is first in array
+  const educationSchool = schools[0] || null;
+
+  // Check if person already exists by LinkedIn URL
+  const existingByUrl = await prisma.person.findFirst({
+    where: { linkedinUrl: profile.linkedinUrl },
+    select: { id: true },
+  });
+
+  if (existingByUrl) {
+    // Update with fresh scraped data
+    await prisma.person.update({
+      where: { id: existingByUrl.id },
+      data: {
+        fullName: profile.fullName,
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        company,
+        role: profile.role,
+        email: profile.email,
+        emailStatus: getEmailStatus(profile.email),
+        emailConfidence: profile.email ? 50 : 0, // Lower confidence for scraped emails
+        city: profile.city,
+        state: profile.state,
+        country: profile.country,
+        schools: schools.length > 0 ? schools : undefined,
+        educationSchool,
+        scrapedAt: new Date(),
+      },
+    });
+
+    return { personId: existingByUrl.id, isNew: false };
+  }
+
+  // Check if person exists by fullName + company (legacy records without LinkedIn URL)
+  const existingByName = await prisma.person.findUnique({
+    where: {
+      fullName_company: {
+        fullName: profile.fullName,
+        company,
+      },
+    },
+    select: { id: true },
+  });
+
+  if (existingByName) {
+    // Update with LinkedIn URL and fresh data
+    await prisma.person.update({
+      where: { id: existingByName.id },
+      data: {
+        linkedinUrl: profile.linkedinUrl,
+        role: profile.role,
+        email: profile.email || undefined,
+        emailStatus: profile.email ? getEmailStatus(profile.email) : undefined,
+        emailConfidence: profile.email ? 50 : undefined,
+        city: profile.city,
+        state: profile.state,
+        country: profile.country,
+        schools: schools.length > 0 ? schools : undefined,
+        educationSchool: educationSchool || undefined,
+        scrapedAt: new Date(),
+      },
+    });
+
+    return { personId: existingByName.id, isNew: false };
+  }
+
+  // Create new person
+  const person = await prisma.person.create({
+    data: {
+      fullName: profile.fullName,
+      firstName: profile.firstName,
+      lastName: profile.lastName,
+      company,
+      role: profile.role,
+      linkedinUrl: profile.linkedinUrl,
+      email: profile.email,
+      emailStatus: getEmailStatus(profile.email),
+      emailConfidence: profile.email ? 50 : 0,
+      city: profile.city,
+      state: profile.state,
+      country: profile.country,
+      schools: schools.length > 0 ? schools : undefined,
+      educationSchool,
+      scrapedAt: new Date(),
     },
   });
 
