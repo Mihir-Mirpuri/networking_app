@@ -49,6 +49,7 @@ export interface EmailResult {
   email: string | null;
   status: 'VERIFIED' | 'UNVERIFIED' | 'MISSING';
   confidence: number;
+  emailDeliverable: boolean | null;  // true if Apollo verified, null otherwise
   city: string | null;
   state: string | null;
   country: string | null;
@@ -134,6 +135,7 @@ export async function findEmail(params: FindEmailParams): Promise<EmailResult> {
       email: null,
       status: 'MISSING',
       confidence: 0,
+      emailDeliverable: null,
       city: null,
       state: null,
       country: null,
@@ -175,6 +177,7 @@ export async function findEmail(params: FindEmailParams): Promise<EmailResult> {
         email: null,
         status: 'MISSING',
         confidence: 0,
+        emailDeliverable: null,
         city: null,
         state: null,
         country: null,
@@ -205,6 +208,7 @@ export async function findEmail(params: FindEmailParams): Promise<EmailResult> {
         email: person.email || null,
         status: person.email ? (isVerified ? 'VERIFIED' : 'UNVERIFIED') : 'MISSING',
         confidence: person.confidence || 0,
+        emailDeliverable: isVerified ? true : null,
         city: person.city || null,
         state: person.state || null,
         country: person.country || null,
@@ -219,6 +223,7 @@ export async function findEmail(params: FindEmailParams): Promise<EmailResult> {
       email: null,
       status: 'MISSING',
       confidence: 0,
+      emailDeliverable: null,
       city: null,
       state: null,
       country: null,
@@ -232,6 +237,7 @@ export async function findEmail(params: FindEmailParams): Promise<EmailResult> {
       email: null,
       status: 'MISSING',
       confidence: 0,
+      emailDeliverable: null,
       city: null,
       state: null,
       country: null,
@@ -261,6 +267,7 @@ export async function enrichPeople(
         email: null,
         status: 'MISSING',
         confidence: 0,
+        emailDeliverable: null,
         city: null,
         state: null,
         country: null,
