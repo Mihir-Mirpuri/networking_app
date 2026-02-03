@@ -7,7 +7,7 @@ import { ExpandedReview } from './ExpandedReview';
 import { BulkReview } from './BulkReview';
 import { LoadingSpinner } from './LoadingSpinner';
 import { Toast } from '@/components/ui/Toast';
-import { searchPeopleAction, SearchResultWithDraft, hidePersonAction } from '@/app/actions/search';
+import { searchPeopleAction, SearchResultWithDraft, hidePersonAction, refreshSearchAction } from '@/app/actions/search';
 import { sendSingleEmailAction, sendEmailsAction, PersonToSend } from '@/app/actions/send';
 
 // Loading messages that cycle during search
@@ -71,6 +71,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchParams, setSearchParams] = useState<{
     company?: string;
     role?: string;
@@ -227,6 +228,52 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
       } catch (error) {
         console.error('Error saving search params to sessionStorage:', error);
       }
+
+      // If cache missed, trigger background refresh to discover more people
+      if (result.searchMeta.needsRefresh) {
+        setIsRefreshing(true);
+        refreshSearchAction({
+          company: params.company,
+          role: params.role,
+          university: params.university,
+          location: params.location,
+          limit: params.limit,
+        }).then((refreshResult) => {
+          if (refreshResult.success) {
+            console.log(`[Refresh] Complete: ${refreshResult.newPeopleCount} new, ${refreshResult.emailsGenerated} emails`);
+            // Re-fetch results to include newly discovered people
+            searchPeopleAction(params).then((updatedResult) => {
+              if (updatedResult.success) {
+                setResults(updatedResult.results);
+                // Update sessionStorage with new results
+                try {
+                  const updatedState: SearchPageState = {
+                    version: STORAGE_VERSION,
+                    results: updatedResult.results,
+                    expandedIndex: null,
+                    sendStatuses: mapToArray(sendStatuses),
+                    showBulkReview: false,
+                    generatingStatuses: mapToArray(generatingStatuses),
+                    remainingDaily,
+                    searchParams: params,
+                    savedAt: Date.now(),
+                  };
+                  sessionStorage.setItem(STORAGE_KEY, JSON.stringify(updatedState));
+                } catch (e) {
+                  console.error('Error updating sessionStorage after refresh:', e);
+                }
+              }
+              setIsRefreshing(false);
+            });
+          } else {
+            console.error('[Refresh] Failed:', refreshResult.error);
+            setIsRefreshing(false);
+          }
+        }).catch((err) => {
+          console.error('[Refresh] Error:', err);
+          setIsRefreshing(false);
+        });
+      }
     } else {
       setError(result.error);
     }
@@ -343,16 +390,24 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
       )}
 
       {results.length > 0 && expandedIndex === null && !showBulkReview && (
-        <ResultsList
-          results={results}
-          onReviewAndSend={() => setShowBulkReview(true)}
-          onExpand={setExpandedIndex}
-          onHide={handleHidePerson}
-          isSending={isSending}
-          sendingIndex={undefined}
-          sendStatuses={sendStatuses}
-          remainingDaily={remainingDaily}
-        />
+        <>
+          {isRefreshing && (
+            <div className="flex items-center gap-2 mb-4 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm">
+              <LoadingSpinner size="sm" />
+              <span>Discovering more profiles in background...</span>
+            </div>
+          )}
+          <ResultsList
+            results={results}
+            onReviewAndSend={() => setShowBulkReview(true)}
+            onExpand={setExpandedIndex}
+            onHide={handleHidePerson}
+            isSending={isSending}
+            sendingIndex={undefined}
+            sendStatuses={sendStatuses}
+            remainingDaily={remainingDaily}
+          />
+        </>
       )}
 
       {expandedIndex !== null && (

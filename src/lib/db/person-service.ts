@@ -540,6 +540,9 @@ export async function findPeopleByFilters(filters: PersonFilters): Promise<
     email: string | null;
     emailStatus: string | null;
     emailConfidence: number | null;
+    emailDeliverable: boolean | null;
+    emailVerifiedAt: Date | null;
+    emailVerificationReason: string | null;
     city: string | null;
     state: string | null;
     country: string | null;
@@ -602,9 +605,16 @@ export async function findPeopleByFilters(filters: PersonFilters): Promise<
     where.educationSchool = { contains: university.trim(), mode: 'insensitive' };
   }
 
-  // Email filter - must have email
+  // Email filter - must have email AND not be marked as undeliverable
   if (requireEmail) {
     where.email = { not: null };
+    // Exclude people we've verified as undeliverable
+    // emailDeliverable: null (unchecked) or true (verified) are OK
+    // Prisma's { not: false } excludes null, so we use OR to include both true and null
+    if (!where.AND) where.AND = [];
+    (where.AND as unknown[]).push({
+      OR: [{ emailDeliverable: true }, { emailDeliverable: null }]
+    });
   }
 
   // Query the database
@@ -621,6 +631,9 @@ export async function findPeopleByFilters(filters: PersonFilters): Promise<
       email: true,
       emailStatus: true,
       emailConfidence: true,
+      emailDeliverable: true,
+      emailVerifiedAt: true,
+      emailVerificationReason: true,
       city: true,
       state: true,
       country: true,

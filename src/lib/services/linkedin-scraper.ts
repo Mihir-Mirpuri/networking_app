@@ -411,10 +411,16 @@ export async function scrapeLinkedInProfiles(
       // Start all concurrent runs
       const runs = await Promise.all(
         concurrentBatches.map((batch) =>
-          client.actor(ACTOR_ID).call({
-            profileScraperMode: mode,
-            queries: batch,
-          })
+          client.actor(ACTOR_ID).call(
+            {
+              profileScraperMode: mode,
+              queries: batch,
+            },
+            {
+              memory: 256,  // Max memory for this actor
+              timeout: 60,  // 60 seconds max per batch of 10 profiles
+            }
+          )
         )
       );
 
