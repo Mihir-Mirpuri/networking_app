@@ -30,6 +30,7 @@ import {
   getOrLearnPattern,
   generateEmailFromPattern,
   normalizeCompanyName,
+  bootstrapCompanyPattern,
 } from '@/lib/services/email-pattern';
 
 export interface SearchInput {
@@ -600,6 +601,7 @@ export async function refreshSearchAction(
   success: true;
   newPeopleCount: number;
   emailsGenerated: number;
+  apolloCallsMade: number;
   matchingCount: number;
 } | { success: false; error: string }> {
   const session = await getServerSession(authOptions);
@@ -630,7 +632,7 @@ export async function refreshSearchAction(
     console.log(`[Refresh] CSE found ${cseResults.length} LinkedIn profiles`);
 
     if (cseResults.length === 0) {
-      return { success: true, newPeopleCount: 0, emailsGenerated: 0, matchingCount: 0 };
+      return { success: true, newPeopleCount: 0, emailsGenerated: 0, apolloCallsMade: 0, matchingCount: 0 };
     }
 
     // ===== STEP 2: CHECK DATABASE FOR EXISTING PEOPLE =====
@@ -646,6 +648,7 @@ export async function refreshSearchAction(
     // ===== STEP 3: SCRAPE NEW LINKEDIN PROFILES =====
     let newPeopleCount = 0;
     let emailsGenerated = 0;
+    let apolloCallsMade = 0;
     const savedPersonIds: string[] = [];
 
     if (urlsToScrape.length > 0) {
@@ -670,40 +673,7 @@ export async function refreshSearchAction(
           if (isNew) newPeopleCount++;
         }
 
-        // Generate emails from patterns
-        const peopleWithoutEmails = await prisma.person.findMany({
-          where: {
-            id: { in: savedPersonIds },
-            email: null,
-            firstName: { not: null },
-            lastName: { not: null },
-          },
-          select: { id: true, firstName: true, lastName: true, company: true },
-        });
-
-        for (const person of peopleWithoutEmails) {
-          const pattern = await getOrLearnPattern(person.company);
-          if (pattern && pattern.confidence >= 0.8) {
-            const generatedEmail = generateEmailFromPattern(
-              person.firstName!,
-              person.lastName!,
-              pattern.pattern as any,
-              pattern.domain
-            );
-
-            await prisma.person.update({
-              where: { id: person.id },
-              data: {
-                email: generatedEmail,
-                emailStatus: 'UNVERIFIED',
-                emailConfidence: Math.round(pattern.confidence * 100),
-              },
-            });
-            emailsGenerated++;
-          }
-        }
-
-        console.log(`[Refresh] Batch ${batchIndex + 1}: saved ${savedPersonIds.length}, emails ${emailsGenerated}`);
+        console.log(`[Refresh] Batch ${batchIndex + 1}: saved ${profiles.length} profiles`);
       };
 
       await scrapeLinkedInProfiles(urlsToScrape, {
@@ -712,7 +682,99 @@ export async function refreshSearchAction(
       });
     }
 
-    // ===== STEP 4: COUNT MATCHING PEOPLE =====
+    // ===== STEP 4: GENERATE EMAILS (Pattern + Apollo Bootstrap) =====
+    console.log(`[Refresh] Generating emails for ${savedPersonIds.length} people`);
+
+    // Get all people without emails
+    const peopleWithoutEmails = await prisma.person.findMany({
+      where: {
+        id: { in: savedPersonIds },
+        email: null,
+        firstName: { not: null },
+        lastName: { not: null },
+      },
+      select: { id: true, firstName: true, lastName: true, company: true, linkedinUrl: true },
+    });
+
+    // Group by company
+    const byCompany = new Map<string, typeof peopleWithoutEmails>();
+    for (const person of peopleWithoutEmails) {
+      const normalized = normalizeCompanyName(person.company);
+      if (!byCompany.has(normalized)) {
+        byCompany.set(normalized, []);
+      }
+      byCompany.get(normalized)!.push(person);
+    }
+
+    console.log(`[Refresh] ${peopleWithoutEmails.length} people without emails across ${byCompany.size} companies`);
+
+    // Process each company
+    for (const [normalizedCompany, people] of Array.from(byCompany)) {
+      const company = people[0].company; // Use original company name
+
+      // Check if pattern exists
+      let pattern = await getOrLearnPattern(company);
+
+      // If no pattern, try to bootstrap with Apollo
+      if (!pattern) {
+        console.log(`[Refresh] No pattern for "${company}" - bootstrapping with Apollo`);
+        const bootstrapResult = await bootstrapCompanyPattern(company, people);
+
+        // Always count Apollo calls, even if pattern learning failed
+        apolloCallsMade += bootstrapResult.apolloCallsMade;
+        emailsGenerated += bootstrapResult.emailsFound; // Apollo emails already saved
+
+        if (bootstrapResult.success && bootstrapResult.pattern && bootstrapResult.domain) {
+          pattern = {
+            pattern: bootstrapResult.pattern,
+            domain: bootstrapResult.domain,
+            confidence: bootstrapResult.confidence,
+          };
+
+          console.log(
+            `[Refresh] Bootstrapped pattern for "${company}": ${pattern.pattern}@${pattern.domain} ` +
+            `(${bootstrapResult.apolloCallsMade} Apollo calls, ${bootstrapResult.emailsFound} emails)`
+          );
+        } else {
+          console.log(`[Refresh] Could not bootstrap pattern for "${company}" (${bootstrapResult.apolloCallsMade} Apollo calls, ${bootstrapResult.emailsFound} emails found)`);
+          continue; // Skip to next company
+        }
+      }
+
+      // Generate emails for remaining people (those not already enriched by Apollo)
+      const remainingPeople = await prisma.person.findMany({
+        where: {
+          id: { in: people.map(p => p.id) },
+          email: null,
+          firstName: { not: null },
+          lastName: { not: null },
+        },
+        select: { id: true, firstName: true, lastName: true },
+      });
+
+      for (const person of remainingPeople) {
+        const generatedEmail = generateEmailFromPattern(
+          person.firstName!,
+          person.lastName!,
+          pattern.pattern as any,
+          pattern.domain
+        );
+
+        await prisma.person.update({
+          where: { id: person.id },
+          data: {
+            email: generatedEmail,
+            emailStatus: 'UNVERIFIED',
+            emailConfidence: Math.round(pattern.confidence * 100),
+          },
+        });
+        emailsGenerated++;
+      }
+
+      console.log(`[Refresh] Generated ${remainingPeople.length} emails for "${company}" using pattern`);
+    }
+
+    // ===== STEP 5: COUNT MATCHING PEOPLE =====
     const filters: PersonFilters = {
       company: input.company,
       location: input.location,
@@ -724,7 +786,7 @@ export async function refreshSearchAction(
 
     const matchingPeople = await findPeopleByFilters(filters);
 
-    // ===== STEP 5: UPDATE CACHE =====
+    // ===== STEP 6: UPDATE CACHE =====
     if (matchingPeople.length > 0) {
       const normalizedParams = normalizeSearchParams({
         name: input.name,
@@ -736,7 +798,7 @@ export async function refreshSearchAction(
 
       const personIds = matchingPeople.map(p => p.id);
       const apiStats: ApiUsageStats = {
-        apolloCallsMade: 0,
+        apolloCallsMade,
         apolloCacheHits: 0,
         cseCallsMade: 1,
         linkedinScraperCalls: urlsToScrape.length,
@@ -750,12 +812,13 @@ export async function refreshSearchAction(
       }
     }
 
-    console.log(`[Refresh] Complete: ${newPeopleCount} new people, ${emailsGenerated} emails, ${matchingPeople.length} matching`);
+    console.log(`[Refresh] Complete: ${newPeopleCount} new people, ${emailsGenerated} emails, ${apolloCallsMade} Apollo calls, ${matchingPeople.length} matching`);
 
     return {
       success: true,
       newPeopleCount,
       emailsGenerated,
+      apolloCallsMade,
       matchingCount: matchingPeople.length,
     };
   } catch (error) {

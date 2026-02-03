@@ -16,9 +16,13 @@
  */
 
 import prisma from '@/lib/prisma';
+import { findEmail } from './enrichment';
 
 // Minimum emails needed to establish a pattern
 const MIN_SAMPLE_SIZE = 3;
+
+// Maximum people to call Apollo for when bootstrapping a pattern
+const MAX_APOLLO_BOOTSTRAP = 5;
 
 // Pattern types in order of commonness
 const PATTERN_TYPES = [
@@ -362,5 +366,181 @@ export async function generateEmailForPerson(
   return {
     email,
     confidence: pattern.confidence * 100, // Convert to percentage
+  };
+}
+
+/**
+ * Bootstrap a company's email pattern using Apollo API
+ *
+ * For companies without a known pattern, calls Apollo for up to 5 people
+ * to get verified emails, then learns the pattern from those emails.
+ *
+ * @param company - Company name
+ * @param people - Array of people to potentially call Apollo for
+ * @returns Learned pattern or null if not enough emails found
+ */
+export interface BootstrapResult {
+  success: boolean;
+  pattern: PatternType | null;
+  domain: string | null;
+  confidence: number;
+  apolloCallsMade: number;
+  emailsFound: number;
+}
+
+export async function bootstrapCompanyPattern(
+  company: string,
+  people: Array<{
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    linkedinUrl: string | null;
+  }>
+): Promise<BootstrapResult> {
+  // Filter to people with names
+  const validPeople = people.filter(
+    (p): p is typeof p & { firstName: string; lastName: string } =>
+      !!p.firstName && !!p.lastName
+  );
+
+  if (validPeople.length === 0) {
+    console.log(`[EmailPattern] No valid people to bootstrap for ${company}`);
+    return {
+      success: false,
+      pattern: null,
+      domain: null,
+      confidence: 0,
+      apolloCallsMade: 0,
+      emailsFound: 0,
+    };
+  }
+
+  // Take up to MAX_APOLLO_BOOTSTRAP people
+  const toEnrich = validPeople.slice(0, MAX_APOLLO_BOOTSTRAP);
+  console.log(
+    `[EmailPattern] Bootstrapping pattern for "${company}" with ${toEnrich.length} Apollo calls`
+  );
+
+  const apolloEmails: Array<{ email: string; firstName: string; lastName: string }> = [];
+  let apolloCallsMade = 0;
+
+  for (const person of toEnrich) {
+    apolloCallsMade++;
+
+    const result = await findEmail({
+      firstName: person.firstName,
+      lastName: person.lastName,
+      company,
+      linkedinUrl: person.linkedinUrl,
+    });
+
+    // Determine Apollo status to save
+    const apolloStatusToSave = result.apolloStatus === 'SUCCESS' || result.apolloStatus === 'NOT_FOUND'
+      ? result.apolloStatus
+      : 'API_ERROR';
+
+    if (result.email) {
+      // Save email to Person record
+      await prisma.person.update({
+        where: { id: person.id },
+        data: {
+          email: result.email,
+          emailStatus: result.status,
+          emailConfidence: result.confidence,
+          apolloEnrichedAt: new Date(),
+          apolloStatus: apolloStatusToSave,
+          // Also update location if Apollo provided it
+          ...(result.city && { city: result.city }),
+          ...(result.state && { state: result.state }),
+          ...(result.country && { country: result.country }),
+        },
+      });
+
+      apolloEmails.push({
+        email: result.email,
+        firstName: person.firstName,
+        lastName: person.lastName,
+      });
+
+      console.log(
+        `[EmailPattern] Apollo ${apolloCallsMade}/${toEnrich.length}: ${person.firstName} ${person.lastName} → ${result.email}`
+      );
+    } else {
+      // Mark as Apollo-processed even if no email found
+      await prisma.person.update({
+        where: { id: person.id },
+        data: {
+          apolloEnrichedAt: new Date(),
+          apolloStatus: apolloStatusToSave,
+          // Still update location if Apollo provided it
+          ...(result.city && { city: result.city }),
+          ...(result.state && { state: result.state }),
+          ...(result.country && { country: result.country }),
+        },
+      });
+
+      console.log(
+        `[EmailPattern] Apollo ${apolloCallsMade}/${toEnrich.length}: ${person.firstName} ${person.lastName} → no email (${result.apolloStatus})`
+      );
+    }
+
+    // Rate limit: 300ms between calls
+    if (apolloCallsMade < toEnrich.length) {
+      await new Promise((r) => setTimeout(r, 300));
+    }
+  }
+
+  console.log(
+    `[EmailPattern] Apollo complete: ${apolloEmails.length}/${apolloCallsMade} emails found`
+  );
+
+  // Try to learn pattern from the emails we got
+  if (apolloEmails.length >= MIN_SAMPLE_SIZE) {
+    const learned = learnPatternFromEmails(apolloEmails);
+
+    if (learned) {
+      await saveCompanyPattern(
+        company,
+        learned.domain,
+        learned.pattern,
+        learned.confidence,
+        apolloEmails.length
+      );
+
+      return {
+        success: true,
+        pattern: learned.pattern,
+        domain: learned.domain,
+        confidence: learned.confidence,
+        apolloCallsMade,
+        emailsFound: apolloEmails.length,
+      };
+    }
+  }
+
+  // Not enough emails to learn a pattern, but still try learning from DB
+  // (in case there were existing emails we didn't know about)
+  const dbPattern = await learnPatternFromDatabase(company);
+  if (dbPattern) {
+    return {
+      success: true,
+      pattern: dbPattern.pattern,
+      domain: dbPattern.domain,
+      confidence: dbPattern.confidence,
+      apolloCallsMade,
+      emailsFound: apolloEmails.length,
+    };
+  }
+
+  console.log(
+    `[EmailPattern] Could not learn pattern for "${company}" - only ${apolloEmails.length} emails found`
+  );
+  return {
+    success: false,
+    pattern: null,
+    domain: null,
+    confidence: 0,
+    apolloCallsMade,
+    emailsFound: apolloEmails.length,
   };
 }
