@@ -39,8 +39,8 @@ export async function createCheckoutSession() {
     line_items: [{ price: process.env.PRICE_ID!, quantity: 1 }],
     mode: 'subscription',
     payment_method_types: ['card'],
-    success_url: `${process.env.NEXTAUTH_URL}/search?subscription=success`,
-    cancel_url: `${process.env.NEXTAUTH_URL}/search`,
+    success_url: `${process.env.NEXTAUTH_URL}/?subscription=success`,
+    cancel_url: `${process.env.NEXTAUTH_URL}/`,
     allow_promotion_codes: true,
   });
 
@@ -65,7 +65,7 @@ export async function createCustomerPortalSession() {
   const stripe = getStripe();
   const portalSession = await stripe.billingPortal.sessions.create({
     customer: user.stripeCustomerId,
-    return_url: `${process.env.NEXTAUTH_URL}/search`,
+    return_url: `${process.env.NEXTAUTH_URL}/`,
   });
 
   redirect(portalSession.url);
