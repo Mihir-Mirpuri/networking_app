@@ -38,6 +38,7 @@ export async function createCheckoutSession() {
     customer: customerId,
     line_items: [{ price: process.env.PRICE_ID!, quantity: 1 }],
     mode: 'subscription',
+    payment_method_types: ['card'],
     success_url: `${process.env.NEXTAUTH_URL}/search?subscription=success`,
     cancel_url: `${process.env.NEXTAUTH_URL}/search`,
     allow_promotion_codes: true,
