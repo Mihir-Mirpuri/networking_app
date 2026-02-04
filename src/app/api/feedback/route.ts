@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { Resend } from 'resend';
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
-const FEEDBACK_EMAIL = 'wearelattice@gmail.com';
+const FEEDBACK_EMAIL = 'feedback@signl.to';
 
 export async function POST(request: NextRequest) {
   try {
