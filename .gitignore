@@ -44,3 +44,4 @@ prisma/migrations/
 # Claude Code
 .claude/
 .env*.local
+scripts/
