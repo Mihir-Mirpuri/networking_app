@@ -73,24 +73,30 @@ export async function POST(req: NextRequest) {
         break;
       }
 
-      case 'invoice.payment_succeeded': {
+      case 'invoice.payment_succeeded':
+      case 'invoice.paid': {
         const invoice = event.data.object as Stripe.Invoice;
         const subscriptionId = (invoice as unknown as Record<string, string>).subscription;
+        const customerId = typeof invoice.customer === 'string'
+          ? invoice.customer
+          : (invoice.customer as unknown as Record<string, string>)?.id;
 
-        if (subscriptionId) {
+        if (subscriptionId && customerId) {
           const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
             expand: ['items.data'],
           }) as Stripe.Subscription;
 
+          // Update user subscription status
           await prisma.user.update({
-            where: { stripeCustomerId: invoice.customer as string },
+            where: { stripeCustomerId: customerId },
             data: {
+              stripeSubscriptionId: subscription.id,
               stripeCurrentPeriodEnd: getSubscriptionPeriodEnd(subscription),
               subscriptionStatus: subscription.status,
             },
           });
 
-          console.log(`Payment succeeded for customer: ${invoice.customer}`);
+          console.log(`Invoice paid for customer: ${customerId}, subscription: ${subscription.id}`);
         }
         break;
       }
