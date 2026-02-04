@@ -7,6 +7,7 @@ import { ExpandedReview } from './ExpandedReview';
 import { BulkReview } from './BulkReview';
 import { LoadingSpinner } from './LoadingSpinner';
 import { Toast } from '@/components/ui/Toast';
+import { LimitReachedModal, dispatchCreditsChanged } from '@/components/credits';
 import { searchPeopleAction, SearchResultWithDraft, hidePersonAction, refreshSearchAction } from '@/app/actions/search';
 import { sendSingleEmailAction, sendEmailsAction, PersonToSend } from '@/app/actions/send';
 
@@ -66,6 +67,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showLimitModal, setShowLimitModal] = useState(false);
   const [searchParams, setSearchParams] = useState<{
     company?: string;
     role?: string;
@@ -315,8 +317,11 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
     if (result.success) {
       setRemainingDaily((prev) => Math.max(0, prev - 1));
       setToast({ message: 'Email sent successfully!', type: 'success' });
+      dispatchCreditsChanged(); // Update header credits display
+    } else if (result.error === 'LIMIT_REACHED') {
+      setShowLimitModal(true);
     } else {
-      setToast({ message: 'Failed to send email', type: 'error' });
+      setToast({ message: result.error || 'Failed to send email', type: 'error' });
     }
   };
 
@@ -362,6 +367,9 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
 
       const successCount = result.results.filter((r) => r.success).length;
       setRemainingDaily((prev) => Math.max(0, prev - successCount));
+      if (successCount > 0) {
+        dispatchCreditsChanged(); // Update header credits display
+      }
     }
 
     setIsSending(false);
@@ -474,11 +482,10 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
             isSending={isSending}
             sendingIndex={undefined}
             sendStatuses={sendStatuses}
-            remainingDaily={remainingDaily}
           />
 
           {/* Load More Button */}
-          {hasMore && !isSearching && (
+          {hasMore && !isSearching && !isRefreshing && (
             <div className="flex justify-center mt-6">
               <button
                 onClick={handleLoadMore}
@@ -532,6 +539,16 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
           onClose={() => setToast(null)}
         />
       )}
+
+      <LimitReachedModal
+        isOpen={showLimitModal}
+        onClose={() => setShowLimitModal(false)}
+        onCreditsAwarded={(credits) => {
+          setRemainingDaily((prev) => prev + credits);
+          setToast({ message: `+${credits} email credits added!`, type: 'success' });
+          dispatchCreditsChanged(); // Update header credits display
+        }}
+      />
     </div>
   );
 }

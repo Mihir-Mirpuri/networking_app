@@ -57,7 +57,7 @@ export async function sendEmailsAction(
   // Check daily limit for immediate sends
   const { canSend, remaining } = await checkDailyLimit(session.user.id);
   if (!canSend) {
-    return { success: false, error: 'Daily send limit reached (30 emails per day)' };
+    return { success: false, error: 'LIMIT_REACHED' };
   }
 
   // Get user tokens
@@ -267,7 +267,7 @@ export async function scheduleEmailAction(
     return { 
       email: person.email, 
       success: false, 
-      error: 'Daily send limit reached (30 emails per day)' 
+      error: 'LIMIT_REACHED' 
     };
   }
 
@@ -455,7 +455,7 @@ export async function sendFollowUpAction(
     return {
       email: input.toEmail,
       success: false,
-      error: 'Daily send limit reached (30 emails per day)'
+      error: 'LIMIT_REACHED'
     };
   }
 

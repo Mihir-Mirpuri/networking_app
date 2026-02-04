@@ -438,3 +438,11 @@ export type Classification = (typeof CLASSIFICATIONS)[number];
 export type University = (typeof UNIVERSITIES)[number];
 export type Location = (typeof LOCATIONS)[number];
 export type EmailTemplate = (typeof EMAIL_TEMPLATES)[number];
+
+// Email Credit System
+export const EMAIL_LIMITS = {
+  DEFAULT_DAILY_LIMIT: 10,
+  CREDITS_ON_INVITE_SENT: 5,
+  CREDITS_ON_INVITEE_SIGNUP: 5,
+  MAX_CREDITS: 100,
+} as const;

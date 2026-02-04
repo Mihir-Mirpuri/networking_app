@@ -12,6 +12,7 @@ import {
   CalendarDaysIcon,
   UserCircleIcon,
 } from '@heroicons/react/24/outline';
+import { CreditsDisplay } from '@/components/credits';
 
 export function Header() {
   const { data: session, status } = useSession();
@@ -102,14 +103,17 @@ export function Header() {
     <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-subtle border-b border-surface-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          <Link href="/" className="flex items-center gap-2 group">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow">
-              <span className="text-white font-bold text-sm">S</span>
-            </div>
-            <span className="text-xl font-bold text-surface-900 group-hover:text-primary-600 transition-colors">
-              Signl
-            </span>
-          </Link>
+          <div className="flex items-center gap-6">
+            <Link href="/" className="flex items-center gap-2 group">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow">
+                <span className="text-white font-bold text-sm">S</span>
+              </div>
+              <span className="text-xl font-bold text-surface-900 group-hover:text-primary-600 transition-colors">
+                Signl
+              </span>
+            </Link>
+            {session?.user && <CreditsDisplay />}
+          </div>
           {renderNavContent()}
         </div>
       </div>

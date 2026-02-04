@@ -12,7 +12,6 @@ interface ResultsListProps {
   isSending: boolean;
   sendingIndex?: number;
   sendStatuses: Map<string, 'success' | 'failed' | 'pending'>;
-  remainingDaily: number;
 }
 
 export function ResultsList({
@@ -23,7 +22,6 @@ export function ResultsList({
   isSending,
   sendingIndex,
   sendStatuses,
-  remainingDaily,
 }: ResultsListProps) {
   const [linkedinDropdownOpen, setLinkedinDropdownOpen] = useState(false);
   const [openedLinkedins, setOpenedLinkedins] = useState<Set<string>>(new Set());
@@ -115,9 +113,6 @@ export function ResultsList({
               </div>
             )}
           </div>
-          <p className="text-sm text-gray-500">
-            {remainingDaily} emails remaining today
-          </p>
         </div>
         {/* Send All button hidden for now
         <div className="flex gap-2">

@@ -1,7 +1,7 @@
 import prisma from '@/lib/prisma';
 
 const CACHE_TTL_HOURS = 168; // 7 days
-const PERSON_CACHE_TTL_DAYS = 20; // 20 days - then check for staleness (email bounce)
+const PERSON_CACHE_TTL_DAYS = 60; // 60 days - then check for staleness (email bounce)
 
 export interface NormalizedSearchParams {
   name: string | null;
@@ -212,7 +212,7 @@ export async function updateSearchWithPeople(
 }
 
 /**
- * Checks if a person's data is stale (older than 20 days)
+ * Checks if a person's data is stale (older than 60 days)
  * Checks scrapedAt first, falls back to apolloEnrichedAt for legacy data
  */
 export function isPersonStale(scrapedAt: Date | null, apolloEnrichedAt?: Date | null): boolean {
@@ -224,7 +224,7 @@ export function isPersonStale(scrapedAt: Date | null, apolloEnrichedAt?: Date | 
 }
 
 /**
- * Gets Person IDs that have stale data (null or older than 20 days)
+ * Gets Person IDs that have stale data (null or older than 60 days)
  * Checks scrapedAt first, then apolloEnrichedAt for legacy data
  *
  * Note: Email bounce detection to be implemented by user later.

@@ -75,7 +75,7 @@ export async function sendComposedEmailAction(
   // Check daily limit
   const { canSend, remaining } = await checkDailyLimit(session.user.id);
   if (!canSend) {
-    return { success: false, error: 'Daily send limit reached (30 emails per day)' };
+    return { success: false, error: 'LIMIT_REACHED' };
   }
 
   // Validate resumeId belongs to user if provided

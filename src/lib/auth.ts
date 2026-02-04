@@ -5,6 +5,8 @@ import GoogleProvider from 'next-auth/providers/google';
 import prisma from './prisma';
 import { startMailboxWatch } from './gmail/client';
 import { verifyCalendarAccessOnSignIn } from './services/calendar';
+import { awardCredits } from './services/credits';
+import { EMAIL_LIMITS } from './constants';
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma) as Adapter,
@@ -39,8 +41,17 @@ export const authOptions: NextAuthOptions = {
     },
   },
   events: {
-    async signIn({ user }) {
+    async signIn({ user, isNewUser }) {
       if (!user.id) return;
+
+      // Handle referral signup for new users
+      if (isNewUser && user.email) {
+        try {
+          await handleReferralSignup(user.id, user.email);
+        } catch (error) {
+          console.error(`[Auth] Failed to process referral for user ${user.id}:`, error);
+        }
+      }
 
       // Start Gmail watch subscription for push notifications
       const topicName = process.env.GOOGLE_PUBSUB_TOPIC;
@@ -72,3 +83,43 @@ export const authOptions: NextAuthOptions = {
     strategy: 'database',
   },
 };
+
+/**
+ * Handle referral signup - awards credits to referrer when invited user signs up
+ */
+async function handleReferralSignup(userId: string, userEmail: string): Promise<void> {
+  // Find pending invitation for this email
+  const invitation = await prisma.invitation.findFirst({
+    where: {
+      inviteeEmail: userEmail.toLowerCase(),
+      status: 'PENDING',
+    },
+  });
+
+  if (!invitation) {
+    console.log(`[Auth] No pending invitation found for ${userEmail}`);
+    return;
+  }
+
+  console.log(`[Auth] Processing referral signup: ${userEmail} was invited by user ${invitation.referrerId}`);
+
+  // Update invitation status
+  await prisma.invitation.update({
+    where: { id: invitation.id },
+    data: {
+      status: 'SIGNED_UP',
+      signedUpAt: new Date(),
+      creditsAwarded: invitation.creditsAwarded + EMAIL_LIMITS.CREDITS_ON_INVITEE_SIGNUP,
+    },
+  });
+
+  // Link the new user to their referrer
+  await prisma.user.update({
+    where: { id: userId },
+    data: { referredById: invitation.referrerId },
+  });
+
+  // Award bonus credits to referrer for successful conversion
+  const awarded = await awardCredits(invitation.referrerId, EMAIL_LIMITS.CREDITS_ON_INVITEE_SIGNUP);
+  console.log(`[Auth] Awarded ${awarded} credits to referrer ${invitation.referrerId} for referral signup`);
+}

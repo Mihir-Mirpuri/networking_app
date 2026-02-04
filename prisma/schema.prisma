@@ -48,6 +48,12 @@ model User {
   dailySendCount             Int                          @default(0)
   lastSendDate               DateTime?
   calendarConnected          Boolean                      @default(false)
+  // Credit system fields
+  emailCredits               Int                          @default(0)
+  referralCode               String?                      @unique
+  referredById               String?
+  referredBy                 User?                        @relation("Referrals", fields: [referredById], references: [id])
+  referrals                  User[]                       @relation("Referrals")
   createdAt                  DateTime                     @default(now())
   updatedAt                  DateTime                     @updatedAt
   accounts                   Account[]
@@ -63,6 +69,7 @@ model User {
   outreachTrackers           OutreachTracker[]
   ExtractedMeetingSuggestion ExtractedMeetingSuggestion[]
   searchLogs                 SearchLog[]
+  invitations                Invitation[]
 }
 
 model VerificationToken {
@@ -347,6 +354,29 @@ enum ScheduledEmailStatus {
   SENT
   FAILED
   CANCELLED
+}
+
+enum InvitationStatus {
+  PENDING
+  SIGNED_UP
+}
+
+model Invitation {
+  id             String           @id @default(cuid())
+  referrerId     String
+  inviteeEmail   String
+  status         InvitationStatus @default(PENDING)
+  creditsAwarded Int              @default(0)
+  sentAt         DateTime         @default(now())
+  signedUpAt     DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  referrer User @relation(fields: [referrerId], references: [id], onDelete: Cascade)
+
+  @@unique([referrerId, inviteeEmail])
+  @@index([inviteeEmail])
+  @@index([status])
 }
 
 enum OutreachStatus {

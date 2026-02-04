@@ -620,37 +620,17 @@ export async function sendReplyEmail(
 }
 
 export async function checkDailyLimit(userId: string): Promise<{ canSend: boolean; remaining: number }> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { dailySendCount: true, lastSendDate: true },
-  });
-
-  const today = new Date().toDateString();
-  const lastSendDate = user?.lastSendDate?.toDateString();
-
-  // Reset count if new day
-  if (lastSendDate !== today) {
-    return { canSend: true, remaining: 30 };
-  }
-
-  const remaining = 30 - (user?.dailySendCount || 0);
-  return { canSend: remaining > 0, remaining };
+  // Use the new credit system which combines daily limit + bonus credits
+  const { checkEmailCredits } = await import('./credits');
+  const status = await checkEmailCredits(userId);
+  return {
+    canSend: status.canSend,
+    remaining: status.totalRemaining,
+  };
 }
 
 export async function incrementDailyCount(userId: string) {
-  const today = new Date();
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { dailySendCount: true, lastSendDate: true },
-  });
-
-  const isNewDay = user?.lastSendDate?.toDateString() !== today.toDateString();
-
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      dailySendCount: isNewDay ? 1 : (user?.dailySendCount || 0) + 1,
-      lastSendDate: today,
-    },
-  });
+  // Use the new credit system which consumes daily first, then bonus
+  const { consumeEmailCredit } = await import('./credits');
+  await consumeEmailCredit(userId);
 }
