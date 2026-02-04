@@ -89,7 +89,7 @@ This plan addresses two main issues:
 ### 2.1 App-Level Loading (CRITICAL)
 **File:** `src/app/loading.tsx`
 **Current:** Static "Loading..." text
-**Fix:** Replace with branded loading screen with animated spinner and Lattice logo
+**Fix:** Replace with branded loading screen with animated spinner and Signl logo
 
 ### 2.2 Past Emails Sidebar Loading
 **File:** `src/components/sidebar/PastEmailsSidebar.tsx` (Line 109)

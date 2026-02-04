@@ -62,6 +62,7 @@ model User {
   messages                   messages[]
   outreachTrackers           OutreachTracker[]
   ExtractedMeetingSuggestion ExtractedMeetingSuggestion[]
+  searchLogs                 SearchLog[]
 }
 
 model VerificationToken {
@@ -80,11 +81,14 @@ model Person {
   company          String
   role             String?
   linkedinUrl      String?
-  email            String?
-  emailStatus      EmailStatus?
-  emailConfidence  Float?
-  emailLastUpdated DateTime?
-  apolloEnrichedAt DateTime?       // Track when Apollo data was last fetched (legacy)
+  email                   String?
+  emailStatus             EmailStatus?
+  emailConfidence         Float?
+  emailLastUpdated        DateTime?
+  emailDeliverable        Boolean?        // Emailable verification result (null = unchecked)
+  emailVerifiedAt         DateTime?       // When Emailable last verified this email
+  emailVerificationReason String?         // Emailable reason (e.g., "accepted_email", "invalid_domain")
+  apolloEnrichedAt        DateTime?       // Track when Apollo data was last fetched (legacy)
   apolloStatus     ApolloStatus?   // Track the result of the last Apollo call (legacy)
   scrapedAt        DateTime?       // Track when LinkedIn data was last scraped
   city             String?
@@ -461,16 +465,39 @@ model messages {
 }
 
 model CompanyEmailPattern {
-  id          String   @id @default(cuid())
-  company     String   // normalized company name (lowercase, no punctuation)
-  domain      String   // email domain (e.g., "zs.com")
-  pattern     String   // pattern type: "first.last", "firstlast", "flast", "f.last", "first_last", "first"
-  confidence  Float    // 0-1 based on consistency
-  sampleSize  Int      // number of emails used to determine pattern
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                String   @id @default(cuid())
+  company           String   // normalized company name (lowercase, no punctuation)
+  domain            String   // email domain (e.g., "zs.com")
+  pattern           String   // pattern type: "first.last", "firstlast", "flast", "f.last", "first_last", "first"
+  confidence        Float    // 0-1 based on consistency
+  sampleSize        Int      // number of emails used to determine pattern
+  acceptAll         Boolean? // true = catch-all domain (can't verify individual emails), false = can verify, null = unchecked
+  unverifiable      Boolean  @default(false) // true = SMTP blocks verification (unavailable_smtp), trust pattern
+  searchable        Boolean  @default(false) // true = users can search this company
+  useApolloFallback Boolean  @default(false) // true = inconsistent patterns, call Apollo per-person
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   @@unique([company, domain])
+  @@index([company])
+  @@index([searchable])
+}
+
+model SearchLog {
+  id          String   @id @default(cuid())
+  userId      String
+  company     String?
+  role        String?
+  university  String?
+  location    String?
+  resultsCount Int     @default(0)  // How many results were returned
+  fromCache   Boolean  @default(false)
+  searchedAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([searchedAt])
   @@index([company])
 }
 

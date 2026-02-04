@@ -46,7 +46,8 @@ export function PersonCard({
   };
 
   const getEmailStatusBadge = () => {
-    if (person.emailStatus === 'VERIFIED') {
+    // Consider verified if emailStatus is VERIFIED OR emailDeliverable is true (Emailable verified)
+    if (person.emailStatus === 'VERIFIED' || person.emailDeliverable === true) {
       return (
         <span className="badge-success">
           Verified
@@ -160,13 +161,13 @@ export function PersonCard({
           </div>
 
           {/* Education info */}
-          {person.education?.schoolName && (
+          {person.educationSchool && (
             <div className="flex items-center gap-2 mt-1.5">
               <AcademicCapIcon className="w-4 h-4 text-surface-400" />
               <p className="text-sm text-surface-500">
-                {person.education.degree && `${person.education.degree}, `}
-                {person.education.schoolName}
-                {person.education.graduationYear && ` (${person.education.graduationYear})`}
+                {person.educationDegree && `${person.educationDegree}, `}
+                {person.educationSchool}
+                {person.educationYear && ` (${person.educationYear})`}
               </p>
             </div>
           )}

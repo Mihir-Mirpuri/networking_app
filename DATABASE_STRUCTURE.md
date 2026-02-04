@@ -1,7 +1,7 @@
 # Supabase Database Structure Analysis
 
 ## Overview
-This document provides a comprehensive overview of the Supabase database structure for the Lattice networking application, with focus on email-related tables that will be relevant for Gmail conversation tracking.
+This document provides a comprehensive overview of the Supabase database structure for the Signl networking application, with focus on email-related tables that will be relevant for Gmail conversation tracking.
 
 ## Database Schema
 

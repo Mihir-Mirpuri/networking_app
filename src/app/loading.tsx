@@ -4,7 +4,7 @@ export default function Loading() {
       <div className="flex flex-col items-center gap-4">
         {/* Animated Logo */}
         <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shadow-glow animate-pulse-soft">
-          <span className="text-white font-bold text-xl">L</span>
+          <span className="text-white font-bold text-xl">S</span>
         </div>
         {/* Spinner */}
         <div className="flex items-center gap-3 text-surface-500">

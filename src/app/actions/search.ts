@@ -18,7 +18,7 @@ import {
 import {
   normalizeSearchParams,
   findCachedSearch,
-  findStaleSearch,
+  findExistingSearch,
   getCachedPersonIds,
   createSearchWithPeople,
   updateSearchWithPeople,
@@ -32,6 +32,7 @@ import {
   normalizeCompanyName,
   bootstrapCompanyPattern,
 } from '@/lib/services/email-pattern';
+import { verifyEmailsBatch } from '@/lib/services/email-verification';
 
 export interface SearchInput {
   name?: string;
@@ -43,13 +44,6 @@ export interface SearchInput {
   templateId: string;
 }
 
-export interface EducationInfo {
-  schoolName: string | null;
-  degree: string | null;
-  fieldOfStudy: string | null;
-  graduationYear: string | null;
-}
-
 export interface SearchResultWithDraft {
   id: string;
   fullName: string;
@@ -57,274 +51,164 @@ export interface SearchResultWithDraft {
   lastName: string | null;
   company: string;
   role: string | null;
-  university: string;
+  linkedinUrl: string | null;
   email: string | null;
   emailStatus: 'VERIFIED' | 'UNVERIFIED' | 'MISSING';
-  emailConfidence: number;
-  emailSource: 'cache' | 'apollo' | 'none';
+  emailConfidence: number | null;
+  emailDeliverable: boolean | null;
+  emailVerifiedAt: Date | null;
+  emailVerificationReason: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  educationSchool: string | null;
+  educationDegree: string | null;
+  educationField: string | null;
+  educationYear: string | null;
+  sourceUrl: string | null;
+  sourceTitle: string | null;
+  sourceSnippet: string | null;
+  sourceDomain: string | null;
   draftSubject: string;
   draftBody: string;
-  sourceUrl: string;
-  linkedinUrl: string | null;
-  userCandidateId?: string;
-  emailDraftId?: string;
-  resumeId?: string | null;
-  personId?: string;
-  city?: string | null;
-  state?: string | null;
-  country?: string | null;
-  education?: EducationInfo | null;
-  rankingScore?: number;
-  rankingBreakdown?: ScoreBreakdown;
+  userCandidateId: string | null;
+  resumeId: string | null;
+  score?: number;
+  scoreBreakdown?: ScoreBreakdown;
 }
 
-interface UserProfileData {
-  name: string | null;
-  classification: string | null;
-  major: string | null;
-  university: string | null;
-  career: string | null;
+export interface SearchMeta {
+  fromCache: boolean;
+  needsRefresh: boolean;
+  apolloCallsMade: number;
+  apolloCacheHits: number;
+  cseCallsMade: number;
 }
 
-function generateDraft(
-  template: { subject: string; body: string },
-  person: { firstName: string | null; company: string },
-  searchUniversity: string,
-  role: string,
-  userProfile: UserProfileData
-): { subject: string; body: string } {
-  const firstName = person.firstName || 'there';
-  const userName = userProfile.name || 'Your Name';
-  const classification = userProfile.classification || 'student';
-  const major = userProfile.major || 'degree';
-  const university = userProfile.university || searchUniversity;
-  const career = userProfile.career || role;
-
-  const replacePlaceholders = (text: string) =>
-    text
-      .replace(/{first_name}/g, firstName)
-      .replace(/{user_name}/g, userName)
-      .replace(/{company}/g, person.company)
-      .replace(/{university}/g, university)
-      .replace(/{classification}/g, classification)
-      .replace(/{major}/g, major)
-      .replace(/{career}/g, career)
-      .replace(/{role}/g, role);
-
-  return {
-    subject: replacePlaceholders(template.subject),
-    body: replacePlaceholders(template.body),
-  };
-}
-
-// Helper function for controlled concurrency
-async function processWithConcurrency<T, R>(
-  items: T[],
-  concurrency: number,
-  processor: (item: T) => Promise<R>
-): Promise<R[]> {
-  const results: R[] = [];
-  for (let i = 0; i < items.length; i += concurrency) {
-    const batch = items.slice(i, i + concurrency);
-    const batchResults = await Promise.all(batch.map(processor));
-    results.push(...batchResults);
-  }
-  return results;
-}
-
-/**
- * Re-scrape stale people with fresh LinkedIn data
- * Called when cached people have data older than 20 days
- * (Email bounce detection to be implemented later by user)
- */
-async function reScrapeStalePeople(personIds: string[]): Promise<void> {
-  const people = await prisma.person.findMany({
-    where: { id: { in: personIds } },
-    select: { id: true, linkedinUrl: true },
-  });
-
-  // Only re-scrape people with LinkedIn URLs
-  const urlsToScrape = people
-    .filter(p => p.linkedinUrl)
-    .map(p => p.linkedinUrl as string);
-
-  if (urlsToScrape.length === 0) return;
-
-  console.log(`[Search] Re-scraping ${urlsToScrape.length} stale profiles`);
-  const scrapedProfiles = await scrapeLinkedInProfiles(urlsToScrape);
-
-  // Create a map for quick lookup
-  const profileMap = new Map<string, ScrapedProfile>();
-  for (const profile of scrapedProfiles) {
-    profileMap.set(profile.linkedinUrl, profile);
-  }
-
-  // Update each person with fresh data
-  for (const person of people) {
-    if (!person.linkedinUrl) continue;
-    const profile = profileMap.get(person.linkedinUrl);
-    if (!profile) continue;
-
-    await prisma.person.update({
-      where: { id: person.id },
-      data: {
-        fullName: profile.fullName,
-        firstName: profile.firstName,
-        lastName: profile.lastName,
-        company: profile.company || undefined,
-        role: profile.role,
-        email: profile.email,
-        emailStatus: getEmailStatus(profile.email),
-        emailConfidence: profile.email ? 50 : 0,
-        city: profile.city,
-        state: profile.state,
-        country: profile.country,
-        schools: profile.schools.length > 0 ? profile.schools : undefined,
-        educationSchool: profile.educationSchool,
-        scrapedAt: new Date(),
-      },
-    });
-  }
-}
-
-/**
- * Search response with metadata about search state
- */
-export interface SearchResponse {
+export type SearchActionResult = {
   success: true;
   results: SearchResultWithDraft[];
-  searchMeta: {
-    isComplete: boolean;      // true if search is complete (cached or no more to find)
-    isCached: boolean;        // true if results came from cache
-    totalInDb: number;        // total matching people in DB before limit
-    needsRefresh: boolean;    // true if frontend should call refreshSearchAction
-  };
+  searchMeta: SearchMeta;
+  remainingDaily: number;
+} | {
+  success: false;
+  error: string;
+};
+
+// Helper type for ranking
+interface PersonWithSource {
+  id: string;
+  fullName: string;
+  firstName: string | null;
+  lastName: string | null;
+  company: string;
+  role: string | null;
+  linkedinUrl: string | null;
+  email: string | null;
+  emailStatus: string | null;
+  emailConfidence: number | null;
+  emailDeliverable: boolean | null;
+  emailVerifiedAt: Date | null;
+  emailVerificationReason: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  educationSchool: string | null;
+  educationDegree: string | null;
+  educationField: string | null;
+  educationYear: string | null;
+  sourceLinks: Array<{
+    url: string;
+    title: string;
+    snippet: string | null;
+    domain: string | null;
+  }>;
 }
 
 /**
- * Main search action - Instant DB-First Approach
- *
- * Flow:
- * 1. Check cache → if hit, return cached results instantly
- * 2. If miss, query DB for any existing matches → return instantly
- * 3. Set needsRefresh=true so frontend can trigger background scraping
- *
- * This provides instant feedback to users while allowing background population.
+ * Generate email draft using template replacement
+ */
+function generateEmailDraft(
+  templateId: string,
+  person: { firstName: string | null; company: string; role: string | null },
+  user: { name: string | null; university: string | null }
+): { subject: string; body: string } {
+  const template = EMAIL_TEMPLATES.find((t) => t.id === templateId) || EMAIL_TEMPLATES[0];
+
+  // Replace placeholders
+  let subject: string = template.subject;
+  let body: string = template.body;
+
+  const replacements: Record<string, string> = {
+    '{{firstName}}': person.firstName || 'there',
+    '{{company}}': person.company,
+    '{{role}}': person.role || 'your role',
+    '{{yourName}}': user.name || 'A student',
+    '{{university}}': user.university || 'my university',
+  };
+
+  for (const [placeholder, value] of Object.entries(replacements)) {
+    subject = subject.replace(new RegExp(placeholder, 'g'), value);
+    body = body.replace(new RegExp(placeholder, 'g'), value);
+  }
+
+  return { subject, body };
+}
+
+/**
+ * Get template by ID
+ */
+function getTemplate(templateId: string) {
+  return EMAIL_TEMPLATES.find((t) => t.id === templateId) || EMAIL_TEMPLATES[0];
+}
+
+/**
+ * Main search action - returns instant results from cache/DB
+ * If cache miss, returns what we have and signals frontend to call refreshSearchAction
  */
 export async function searchPeopleAction(
   input: SearchInput
-): Promise<SearchResponse | { success: false; error: string }> {
+): Promise<SearchActionResult> {
   const session = await getServerSession(authOptions);
 
   if (!session?.user?.id) {
     return { success: false, error: 'Not authenticated' };
   }
 
-  // Validate required input
   if (!input.company || !input.company.trim()) {
     return { success: false, error: 'Company is required' };
   }
 
-  // Get template
-  let template: { subject: string; body: string; id: string; attachResume: boolean; resumeId: string | null } | null = null;
-  let templateId: string | null = null;
-
   try {
-    const dbTemplate = await prisma.emailTemplate.findFirst({
-      where: {
-        userId: session.user.id,
-        OR: [
-          { id: input.templateId },
-          { isDefault: true },
-        ],
-      },
+    const userId = session.user.id;
+
+    // Get user info for template
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
       select: {
-        id: true,
-        prompt: true,
-        attachResume: true,
-        resumeId: true,
+        name: true,
+        university: true,
+        dailySendCount: true,
+        lastSendDate: true,
       },
     });
 
-    if (dbTemplate) {
-      try {
-        const parsed = JSON.parse(dbTemplate.prompt);
-        template = {
-          id: dbTemplate.id,
-          subject: parsed.subject || '',
-          body: parsed.body || dbTemplate.prompt,
-          attachResume: dbTemplate.attachResume,
-          resumeId: dbTemplate.resumeId,
-        };
-        templateId = dbTemplate.id;
-      } catch {
-        template = {
-          id: dbTemplate.id,
-          subject: `Reaching out from ${input.university}`,
-          body: dbTemplate.prompt,
-          attachResume: dbTemplate.attachResume,
-          resumeId: dbTemplate.resumeId,
-        };
-        templateId = dbTemplate.id;
-      }
+    if (!user) {
+      return { success: false, error: 'User not found' };
     }
-  } catch (error) {
-    console.error('Error fetching template from database:', error);
-  }
 
-  // Fallback to constants if no database template found
-  if (!template) {
-    const constTemplate = EMAIL_TEMPLATES.find((t) => t.id === input.templateId);
-    if (!constTemplate) {
-      return { success: false, error: 'Invalid template' };
-    }
-    template = {
-      id: constTemplate.id,
-      subject: constTemplate.subject,
-      body: constTemplate.body,
-      attachResume: false,
-      resumeId: null,
-    };
-    templateId = null;
-  }
+    // Calculate remaining daily sends
+    const today = new Date().toDateString();
+    const lastSendDay = user.lastSendDate?.toDateString();
+    const dailyLimit = 30;
+    const remainingDaily =
+      lastSendDay === today ? Math.max(0, dailyLimit - user.dailySendCount) : dailyLimit;
 
-  try {
-    // Fetch user profile and excluded keys in parallel
-    const [userProfile, excludedKeys] = await Promise.all([
-      prisma.user.findUnique({
-        where: { id: session.user.id },
-        select: {
-          name: true,
-          classification: true,
-          major: true,
-          university: true,
-          career: true,
-        },
-      }),
-      getExcludedPersonKeys(session.user.id),
-    ]);
+    // Get excluded people (already sent or hidden)
+    const excludedKeys = await getExcludedPersonKeys(userId);
     console.log(`[Search] User has ${excludedKeys.size} excluded people (sent/hidden).`);
 
-    // Determine resume to attach
-    let resumeIdToAttach: string | null = null;
-    let shouldAttachResume = false;
-
-    if (template.attachResume) {
-      shouldAttachResume = true;
-      if (template.resumeId) {
-        resumeIdToAttach = template.resumeId;
-      } else {
-        const activeResume = await prisma.userResume.findFirst({
-          where: { userId: session.user.id, isActive: true },
-          select: { id: true },
-        });
-        if (activeResume) {
-          resumeIdToAttach = activeResume.id;
-        }
-      }
-    }
-
-    // ===== CACHE CHECK =====
+    // Check cache first
     const normalizedParams = normalizeSearchParams({
       name: input.name,
       company: input.company,
@@ -334,213 +218,218 @@ export async function searchPeopleAction(
     });
 
     const cachedSearch = await findCachedSearch(normalizedParams);
-    let matchingPeople: Awaited<ReturnType<typeof findPeopleByFilters>> | Awaited<ReturnType<typeof getPersonsByIds>>;
+
+    let people: PersonWithSource[] = [];
+    let needsRefresh = false;
+    let apolloCallsMade = 0;
+    let apolloCacheHits = 0;
+    let cseCallsMade = 0;
 
     if (cachedSearch) {
-      // ===== CACHE HIT =====
+      // Cache hit - get people from cache
       console.log(`[Search] CACHE HIT - search ${cachedSearch.id} from ${cachedSearch.createdAt}`);
 
-      // Get cached person IDs
       const cachedPersonIds = await getCachedPersonIds(cachedSearch.id);
       console.log(`[Search] Found ${cachedPersonIds.length} cached people`);
 
-      // Check for stale data (>20 days old)
-      // Note: Email bounce detection to be implemented by user later
-      const stalePersonIds = await getStalePersonIds(cachedPersonIds);
-
-      if (stalePersonIds.length > 0) {
-        console.log(`[Search] Re-scraping ${stalePersonIds.length} stale people`);
-        await reScrapeStalePeople(stalePersonIds);
+      if (cachedPersonIds.length > 0) {
+        people = await getPersonsByIds(cachedPersonIds);
+        console.log(`[Search] Retrieved ${people.length} people from cache`);
       }
 
-      // Fetch fresh person data
-      matchingPeople = await getPersonsByIds(cachedPersonIds);
-      console.log(`[Search] Retrieved ${matchingPeople.length} people from cache`);
+      // Check for stale person data that needs refresh
+      const staleIds = await getStalePersonIds(cachedPersonIds);
+      if (staleIds.length > 0) {
+        console.log(`[Search] ${staleIds.length} people have stale data (>20 days old)`);
+        needsRefresh = true;
+      }
     } else {
-      // ===== CACHE MISS - Query DB for existing matches, return immediately =====
-      console.log('[Search] CACHE MISS - querying DB for existing matches');
+      // Cache miss - query DB for matching people
+      console.log(`[Search] CACHE MISS - querying database`);
 
       const filters: PersonFilters = {
         company: input.company,
         location: input.location,
+        role: input.role,
         university: input.university,
-        requireEmail: false,
+        requireEmail: true,
         excludePersonKeys: excludedKeys,
-        limit: input.limit * 3,
+        limit: input.limit,
       };
 
-      matchingPeople = await findPeopleByFilters(filters);
-      console.log(`[Search] DB query returned ${matchingPeople.length} existing matches`);
+      people = await findPeopleByFilters(filters);
+      console.log(`[Search] Found ${people.length} people in database`);
 
+      // Only need refresh if we don't have enough results
+      if (people.length < input.limit) {
+        needsRefresh = true;
+        console.log(`[Search] Need refresh - only ${people.length}/${input.limit} results`);
+      }
+
+      cseCallsMade = 0; // No CSE calls in instant search
     }
 
-    // Track whether we need a refresh (cache miss means we should search for more)
-    const needsRefresh = !cachedSearch;
-    const isCached = !!cachedSearch;
-
-    // ===== FILTER AND RANK RESULTS =====
-    const filteredPeople = matchingPeople.filter(person => {
-      const personKey = `${person.fullName}_${person.company}`.toLowerCase();
-      return !excludedKeys.has(personKey);
+    // Filter out excluded people and those without emails
+    const filteredPeople = people.filter((person) => {
+      const key = `${person.fullName}_${person.company}`.toLowerCase();
+      // Must have email and not be excluded
+      return person.email && !excludedKeys.has(key);
     });
 
-    const totalInDb = filteredPeople.length;
+    console.log(`[Search] ${filteredPeople.length} people after filtering (with emails)`);
 
-    if (filteredPeople.length === 0) {
-      console.log('[Search] No matching people in DB');
-      return {
-        success: true,
-        results: [],
-        searchMeta: {
-          isComplete: isCached,
-          isCached,
-          totalInDb: 0,
-          needsRefresh,
-        },
-      };
-    }
-
-    console.log(`[Search] ${filteredPeople.length} people after filtering`);
-
+    // Rank candidates
     const searchCriteria: SearchCriteria = {
       company: input.company,
       role: input.role,
-      location: input.location,
       university: input.university,
+      location: input.location,
     };
 
+    // Pass filteredPeople directly to rankCandidates with a getData function
     const rankedPeople = rankCandidates(
       searchCriteria,
       filteredPeople,
       (person): CandidateData => ({
         company: person.company,
         role: person.role,
+        email: person.email,
+        emailStatus: (person.emailStatus as 'VERIFIED' | 'UNVERIFIED' | 'MISSING') || 'MISSING',
         city: person.city,
         state: person.state,
         country: person.country,
         educationSchool: person.educationSchool,
-        email: person.email,
-        emailStatus: (person.emailStatus as 'VERIFIED' | 'UNVERIFIED' | 'MISSING') || 'MISSING',
       }),
       input.limit
     );
-
     console.log(`[Search] Ranked top ${rankedPeople.length} candidates`);
 
-    // ===== STEP 5: CREATE USER CANDIDATES & DRAFTS =====
-    // Process all in parallel - these are simple upserts
+    // Build results with drafts
     const results = await Promise.all(
-      rankedPeople.map(
-      async ({ candidate: person, score, breakdown }): Promise<SearchResultWithDraft> => {
-        const placeholderDraft = generateDraft(
-          template,
-          { firstName: person.firstName, company: person.company },
-          input.university || '',
-          input.role || '',
-          userProfile || { name: null, classification: null, major: null, university: null, career: null }
-        );
+      rankedPeople.map(async ({ candidate: person, score, breakdown }) => {
 
-        // Create or update UserCandidate
+        // Get or create UserCandidate
         const userCandidate = await prisma.userCandidate.upsert({
           where: {
             userId_personId: {
-              userId: session.user.id,
+              userId,
               personId: person.id,
             },
           },
           create: {
-            userId: session.user.id,
+            userId,
             personId: person.id,
             email: person.email,
-            emailStatus: (person.emailStatus as 'VERIFIED' | 'UNVERIFIED' | 'MISSING') || 'MISSING',
+            emailStatus: (person.emailStatus as any) || 'MISSING',
             emailConfidence: person.emailConfidence,
-            university: input.university || null,
           },
-          update: {
-            email: person.email || undefined,
-            emailStatus: (person.emailStatus as 'VERIFIED' | 'UNVERIFIED' | 'MISSING') || undefined,
-            emailConfidence: person.emailConfidence || undefined,
-            university: input.university || undefined,
+          update: {},
+          select: {
+            id: true,
           },
         });
 
-        // Create or update EmailDraft
+        // Generate draft
+        const draft = generateEmailDraft(
+          input.templateId,
+          {
+            firstName: person.firstName,
+            company: person.company,
+            role: person.role,
+          },
+          { name: user.name, university: user.university }
+        );
+
+        // Get or create EmailDraft
+        // Only set templateId FK for user-created templates, not hardcoded ones
+        const isHardcodedTemplate = EMAIL_TEMPLATES.some(t => t.id === input.templateId);
         const emailDraft = await prisma.emailDraft.upsert({
-          where: { userCandidateId: userCandidate.id },
+          where: {
+            userCandidateId: userCandidate.id,
+          },
           create: {
             userCandidateId: userCandidate.id,
-            templateId: templateId,
-            subject: placeholderDraft.subject,
-            body: placeholderDraft.body,
-            attachResume: shouldAttachResume,
-            resumeId: resumeIdToAttach,
+            templateId: isHardcodedTemplate ? null : input.templateId,
+            subject: draft.subject,
+            body: draft.body,
             status: 'APPROVED',
           },
-          update: {
-            subject: placeholderDraft.subject,
-            body: placeholderDraft.body,
-            templateId: templateId || undefined,
-            attachResume: shouldAttachResume,
-            resumeId: resumeIdToAttach,
-            status: 'APPROVED',
-          },
+          update: {},
         });
 
         const sourceLink = person.sourceLinks[0];
-        const sourceUrl = sourceLink?.url || '';
 
         return {
-          id: userCandidate.id,
+          id: person.id,
           fullName: person.fullName,
           firstName: person.firstName,
           lastName: person.lastName,
           company: person.company,
           role: person.role,
-          university: input.university || '',
+          linkedinUrl: person.linkedinUrl,
           email: person.email,
           emailStatus: (person.emailStatus as 'VERIFIED' | 'UNVERIFIED' | 'MISSING') || 'MISSING',
-          emailConfidence: person.emailConfidence || 0,
-          emailSource: 'cache',
-          draftSubject: placeholderDraft.subject,
-          draftBody: placeholderDraft.body,
-          sourceUrl,
-          linkedinUrl: person.linkedinUrl,
-          userCandidateId: userCandidate.id,
-          emailDraftId: emailDraft.id,
-          resumeId: shouldAttachResume ? resumeIdToAttach : null,
-          personId: person.id,
+          emailConfidence: person.emailConfidence,
+          emailDeliverable: person.emailDeliverable,
+          emailVerifiedAt: person.emailVerifiedAt,
+          emailVerificationReason: person.emailVerificationReason,
           city: person.city,
           state: person.state,
           country: person.country,
-          education: person.educationSchool ? {
-            schoolName: person.educationSchool,
-            degree: person.educationDegree,
-            fieldOfStudy: person.educationField,
-            graduationYear: person.educationYear,
-          } : null,
-          rankingScore: score,
-          rankingBreakdown: breakdown,
+          educationSchool: person.educationSchool,
+          educationDegree: person.educationDegree,
+          educationField: person.educationField,
+          educationYear: person.educationYear,
+          sourceUrl: sourceLink?.url || null,
+          sourceTitle: sourceLink?.title || null,
+          sourceSnippet: sourceLink?.snippet || null,
+          sourceDomain: sourceLink?.domain || null,
+          draftSubject: emailDraft.subject,
+          draftBody: emailDraft.body,
+          userCandidateId: userCandidate.id,
+          resumeId: null,
+          score,
+          scoreBreakdown: breakdown,
         };
       })
     );
 
-    // Log final results
-    const verifiedCount = results.filter((r) => r.emailStatus === 'VERIFIED').length;
-    const unverifiedCount = results.filter((r) => r.emailStatus === 'UNVERIFIED').length;
+    // Count verified vs unverified
+    const verifiedCount = results.filter(
+      (r) => r.emailStatus === 'VERIFIED' || r.emailDeliverable === true
+    ).length;
+    const unverifiedCount = results.filter(
+      (r) => r.emailStatus === 'UNVERIFIED' && r.emailDeliverable !== true
+    ).length;
 
     console.log(
       `[Search] Returning ${results.length} results: ${verifiedCount} verified, ${unverifiedCount} unverified (needsRefresh: ${needsRefresh})`
     );
 
+    // Log the search for analytics
+    await prisma.searchLog.create({
+      data: {
+        userId,
+        company: input.company || null,
+        role: input.role || null,
+        university: input.university || null,
+        location: input.location || null,
+        resultsCount: results.length,
+        fromCache: !!cachedSearch,
+      },
+    });
+
     return {
       success: true,
       results,
       searchMeta: {
-        isComplete: !needsRefresh,
-        isCached,
-        totalInDb,
+        fromCache: !!cachedSearch,
         needsRefresh,
+        apolloCallsMade,
+        apolloCacheHits,
+        cseCallsMade,
       },
+      remainingDaily,
     };
   } catch (error) {
     console.error('Search error:', error);
@@ -549,7 +438,7 @@ export async function searchPeopleAction(
 }
 
 /**
- * Server action to mark a person as "do not show again"
+ * Hide a person from future searches
  */
 export async function hidePersonAction(
   userCandidateId: string
@@ -561,19 +450,6 @@ export async function hidePersonAction(
   }
 
   try {
-    const userCandidate = await prisma.userCandidate.findUnique({
-      where: { id: userCandidateId },
-      select: { userId: true },
-    });
-
-    if (!userCandidate) {
-      return { success: false, error: 'Person not found' };
-    }
-
-    if (userCandidate.userId !== session.user.id) {
-      return { success: false, error: 'Unauthorized' };
-    }
-
     await prisma.userCandidate.update({
       where: { id: userCandidateId },
       data: { doNotShow: true },
@@ -588,21 +464,232 @@ export async function hidePersonAction(
 }
 
 /**
- * Refresh search action - runs CSE + LinkedIn scraping
+ * Core refresh logic - processes a single batch of CSE results
+ * Used by refreshSearchAction for both batch 1 (immediate) and batch 2 (background)
+ */
+async function processRefreshBatch(
+  input: Omit<SearchInput, 'templateId' | 'limit'> & { limit?: number },
+  excludedKeys: Set<string>,
+  pageStart: number,
+  batchLabel: string
+): Promise<{
+  newPeopleCount: number;
+  emailsGenerated: number;
+  apolloCallsMade: number;
+  savedPersonIds: string[];
+  urlsScraped: number;
+  urlsFromCse: number;  // How many URLs CSE returned (10 = likely more pages)
+}> {
+  let newPeopleCount = 0;
+  let emailsGenerated = 0;
+  let apolloCallsMade = 0;
+  const savedPersonIds: string[] = [];
+
+  // ===== STEP 1: CSE DISCOVERY =====
+  console.log(`[Refresh ${batchLabel}] CSE Discovery for "${input.company}" (page ${pageStart})`);
+
+  const cseResults = await discoverLinkedInProfiles({
+    company: input.company,
+    university: input.university,
+    role: input.role,
+    location: input.location,
+    name: input.name,
+    limit: 10,
+    pageStart,
+  });
+  console.log(`[Refresh ${batchLabel}] CSE found ${cseResults.length} LinkedIn profiles`);
+
+  if (cseResults.length === 0) {
+    return { newPeopleCount: 0, emailsGenerated: 0, apolloCallsMade: 0, savedPersonIds: [], urlsScraped: 0, urlsFromCse: 0 };
+  }
+
+  // ===== STEP 2: CHECK DATABASE FOR EXISTING PEOPLE =====
+  const linkedinUrls = cseResults.map((r) => r.linkedinUrl);
+  const existingPeopleMap = await findPeopleByLinkedInUrls(linkedinUrls);
+  console.log(`[Refresh ${batchLabel}] Found ${existingPeopleMap.size} existing people in database`);
+
+  let urlsToScrape = linkedinUrls.filter((url) => !existingPeopleMap.has(url));
+
+  // Double-check right before scraping to avoid duplicates from concurrent batch 2
+  if (urlsToScrape.length > 0) {
+    const recentlyAdded = await findPeopleByLinkedInUrls(urlsToScrape);
+    if (recentlyAdded.size > 0) {
+      console.log(`[Refresh ${batchLabel}] Filtered out ${recentlyAdded.size} recently added profiles`);
+      urlsToScrape = urlsToScrape.filter((url) => !recentlyAdded.has(url));
+    }
+  }
+
+  const cseResultMap = new Map(cseResults.map((r) => [r.linkedinUrl, r]));
+  console.log(`[Refresh ${batchLabel}] Need to scrape ${urlsToScrape.length} new profiles`);
+
+  // ===== STEP 3: SCRAPE NEW LINKEDIN PROFILES =====
+  if (urlsToScrape.length > 0) {
+    const processBatch = async (profiles: ScrapedProfile[], batchIndex: number, totalBatches: number) => {
+      console.log(`[Refresh ${batchLabel}] Processing scrape batch ${batchIndex + 1}/${totalBatches} (${profiles.length} profiles)`);
+
+      for (const profile of profiles) {
+        const cseResult = cseResultMap.get(profile.linkedinUrl);
+        if (!cseResult) continue;
+
+        const { personId, isNew } = await saveScrapedProfile(
+          profile,
+          cseResult.linkedinUrl,
+          cseResult.sourceTitle,
+          cseResult.sourceSnippet,
+          cseResult.sourceDomain,
+          input.company!,
+          input.university
+        );
+
+        savedPersonIds.push(personId);
+        if (isNew) newPeopleCount++;
+      }
+
+      console.log(`[Refresh ${batchLabel}] Saved ${profiles.length} profiles`);
+    };
+
+    await scrapeLinkedInProfiles(urlsToScrape, {
+      includeEmail: false,
+      onBatchComplete: processBatch,
+    });
+  }
+
+  // ===== STEP 4: GENERATE EMAILS (Pattern + Apollo Bootstrap) =====
+  console.log(`[Refresh ${batchLabel}] Generating emails for ${savedPersonIds.length} people`);
+
+  // Get all people without emails
+  const peopleWithoutEmails = await prisma.person.findMany({
+    where: {
+      id: { in: savedPersonIds },
+      email: null,
+      firstName: { not: null },
+      lastName: { not: null },
+    },
+    select: { id: true, firstName: true, lastName: true, company: true, linkedinUrl: true },
+  });
+
+  // Group by company
+  const byCompany = new Map<string, typeof peopleWithoutEmails>();
+  for (const person of peopleWithoutEmails) {
+    const normalized = normalizeCompanyName(person.company);
+    if (!byCompany.has(normalized)) {
+      byCompany.set(normalized, []);
+    }
+    byCompany.get(normalized)!.push(person);
+  }
+
+  console.log(`[Refresh ${batchLabel}] ${peopleWithoutEmails.length} people without emails across ${byCompany.size} companies`);
+
+  // Process each company
+  for (const [, people] of Array.from(byCompany)) {
+    const company = people[0].company;
+
+    // Check if pattern exists
+    let pattern = await getOrLearnPattern(company);
+
+    // If no pattern, try to bootstrap with Apollo
+    if (!pattern) {
+      console.log(`[Refresh ${batchLabel}] No pattern for "${company}" - bootstrapping with Apollo`);
+      const bootstrapResult = await bootstrapCompanyPattern(company, people);
+
+      apolloCallsMade += bootstrapResult.apolloCallsMade;
+      emailsGenerated += bootstrapResult.emailsFound;
+
+      if (bootstrapResult.success && bootstrapResult.pattern && bootstrapResult.domain) {
+        pattern = {
+          pattern: bootstrapResult.pattern,
+          domain: bootstrapResult.domain,
+          confidence: bootstrapResult.confidence,
+        };
+
+        console.log(
+          `[Refresh ${batchLabel}] Bootstrapped pattern for "${company}": ${pattern.pattern}@${pattern.domain} ` +
+            `(${bootstrapResult.apolloCallsMade} Apollo calls, ${bootstrapResult.emailsFound} emails)`
+        );
+      } else {
+        console.log(
+          `[Refresh ${batchLabel}] Could not bootstrap pattern for "${company}" (${bootstrapResult.apolloCallsMade} Apollo calls, ${bootstrapResult.emailsFound} emails found)`
+        );
+        continue;
+      }
+    }
+
+    // Generate emails for remaining people
+    const remainingPeople = await prisma.person.findMany({
+      where: {
+        id: { in: people.map((p) => p.id) },
+        email: null,
+        firstName: { not: null },
+        lastName: { not: null },
+      },
+      select: { id: true, firstName: true, lastName: true },
+    });
+
+    // Generate all emails first
+    const emailsToVerify: Array<{ personId: string; email: string }> = [];
+    for (const person of remainingPeople) {
+      const generatedEmail = generateEmailFromPattern(
+        person.firstName!,
+        person.lastName!,
+        pattern.pattern as any,
+        pattern.domain
+      );
+      emailsToVerify.push({ personId: person.id, email: generatedEmail });
+    }
+
+    // Verify emails with Emailable
+    if (emailsToVerify.length > 0) {
+      const verificationResults = await verifyEmailsBatch(emailsToVerify.map((e) => e.email));
+
+      let verifiedCount = 0;
+      let undeliverableCount = 0;
+      for (let i = 0; i < emailsToVerify.length; i++) {
+        const { personId, email } = emailsToVerify[i];
+        const verification = verificationResults[i];
+
+        if (verification.deliverable) {
+          await prisma.person.update({
+            where: { id: personId },
+            data: {
+              email,
+              emailStatus: 'UNVERIFIED',
+              emailConfidence: Math.round(pattern.confidence * 100),
+              emailDeliverable: true,
+              emailVerifiedAt: new Date(),
+              emailVerificationReason: verification.reason,
+            },
+          });
+          emailsGenerated++;
+          verifiedCount++;
+        } else {
+          undeliverableCount++;
+        }
+      }
+
+      console.log(`[Refresh ${batchLabel}] Pattern emails for "${company}": ${verifiedCount} verified, ${undeliverableCount} undeliverable`);
+    }
+  }
+
+  return { newPeopleCount, emailsGenerated, apolloCallsMade, savedPersonIds, urlsScraped: urlsToScrape.length, urlsFromCse: cseResults.length };
+}
+
+/**
+ * Refresh search action - runs CSE + LinkedIn scraping for a single page
  *
- * Call this after searchPeopleAction returns needsRefresh: true
- * to populate more results via CSE discovery and LinkedIn scraping.
- *
- * Returns new results found (can be combined with initial results)
+ * Called on initial search (page 1) and on-demand via "Load More" (page 2, 3, etc.)
  */
 export async function refreshSearchAction(
-  input: Omit<SearchInput, 'templateId' | 'limit'> & { limit?: number }
+  input: Omit<SearchInput, 'templateId' | 'limit'> & {
+    limit?: number;
+    pageStart?: number;  // Defaults to 1. For page 2, pass 11; page 3, pass 21, etc.
+  }
 ): Promise<{
   success: true;
   newPeopleCount: number;
   emailsGenerated: number;
   apolloCallsMade: number;
   matchingCount: number;
+  hasMore: boolean;  // true if CSE returned 10 results (more pages likely available)
 } | { success: false; error: string }> {
   const session = await getServerSession(authOptions);
 
@@ -616,165 +703,14 @@ export async function refreshSearchAction(
 
   try {
     const excludedKeys = await getExcludedPersonKeys(session.user.id);
+    const pageStart = input.pageStart ?? 1;
 
-    // ===== STEP 1: CSE DISCOVERY =====
-    const CSE_LIMIT = input.limit || 20;
-    console.log(`[Refresh] CSE Discovery for "${input.company}" + "${input.university || 'any'}"`);
+    // ===== PROCESS SINGLE PAGE =====
+    console.log(`[Refresh] Processing page starting at ${pageStart}`);
+    const batch = await processRefreshBatch(input, excludedKeys, pageStart, `Page${pageStart}`);
+    console.log(`[Refresh] Complete: ${batch.newPeopleCount} new, ${batch.emailsGenerated} emails`);
 
-    const cseResults = await discoverLinkedInProfiles({
-      company: input.company,
-      university: input.university,
-      role: input.role,
-      location: input.location,
-      name: input.name,
-      limit: CSE_LIMIT,
-    });
-    console.log(`[Refresh] CSE found ${cseResults.length} LinkedIn profiles`);
-
-    if (cseResults.length === 0) {
-      return { success: true, newPeopleCount: 0, emailsGenerated: 0, apolloCallsMade: 0, matchingCount: 0 };
-    }
-
-    // ===== STEP 2: CHECK DATABASE FOR EXISTING PEOPLE =====
-    const linkedinUrls = cseResults.map(r => r.linkedinUrl);
-    const existingPeopleMap = await findPeopleByLinkedInUrls(linkedinUrls);
-    console.log(`[Refresh] Found ${existingPeopleMap.size} existing people in database`);
-
-    const urlsToScrape = linkedinUrls.filter(url => !existingPeopleMap.has(url));
-    const cseResultMap = new Map(cseResults.map(r => [r.linkedinUrl, r]));
-
-    console.log(`[Refresh] Need to scrape ${urlsToScrape.length} new profiles`);
-
-    // ===== STEP 3: SCRAPE NEW LINKEDIN PROFILES =====
-    let newPeopleCount = 0;
-    let emailsGenerated = 0;
-    let apolloCallsMade = 0;
-    const savedPersonIds: string[] = [];
-
-    if (urlsToScrape.length > 0) {
-      const processBatch = async (profiles: ScrapedProfile[], batchIndex: number, totalBatches: number) => {
-        console.log(`[Refresh] Processing batch ${batchIndex + 1}/${totalBatches} (${profiles.length} profiles)`);
-
-        for (const profile of profiles) {
-          const cseResult = cseResultMap.get(profile.linkedinUrl);
-          if (!cseResult) continue;
-
-          const { personId, isNew } = await saveScrapedProfile(
-            profile,
-            cseResult.linkedinUrl,
-            cseResult.sourceTitle,
-            cseResult.sourceSnippet,
-            cseResult.sourceDomain,
-            input.company!,
-            input.university
-          );
-
-          savedPersonIds.push(personId);
-          if (isNew) newPeopleCount++;
-        }
-
-        console.log(`[Refresh] Batch ${batchIndex + 1}: saved ${profiles.length} profiles`);
-      };
-
-      await scrapeLinkedInProfiles(urlsToScrape, {
-        includeEmail: false,
-        onBatchComplete: processBatch,
-      });
-    }
-
-    // ===== STEP 4: GENERATE EMAILS (Pattern + Apollo Bootstrap) =====
-    console.log(`[Refresh] Generating emails for ${savedPersonIds.length} people`);
-
-    // Get all people without emails
-    const peopleWithoutEmails = await prisma.person.findMany({
-      where: {
-        id: { in: savedPersonIds },
-        email: null,
-        firstName: { not: null },
-        lastName: { not: null },
-      },
-      select: { id: true, firstName: true, lastName: true, company: true, linkedinUrl: true },
-    });
-
-    // Group by company
-    const byCompany = new Map<string, typeof peopleWithoutEmails>();
-    for (const person of peopleWithoutEmails) {
-      const normalized = normalizeCompanyName(person.company);
-      if (!byCompany.has(normalized)) {
-        byCompany.set(normalized, []);
-      }
-      byCompany.get(normalized)!.push(person);
-    }
-
-    console.log(`[Refresh] ${peopleWithoutEmails.length} people without emails across ${byCompany.size} companies`);
-
-    // Process each company
-    for (const [normalizedCompany, people] of Array.from(byCompany)) {
-      const company = people[0].company; // Use original company name
-
-      // Check if pattern exists
-      let pattern = await getOrLearnPattern(company);
-
-      // If no pattern, try to bootstrap with Apollo
-      if (!pattern) {
-        console.log(`[Refresh] No pattern for "${company}" - bootstrapping with Apollo`);
-        const bootstrapResult = await bootstrapCompanyPattern(company, people);
-
-        // Always count Apollo calls, even if pattern learning failed
-        apolloCallsMade += bootstrapResult.apolloCallsMade;
-        emailsGenerated += bootstrapResult.emailsFound; // Apollo emails already saved
-
-        if (bootstrapResult.success && bootstrapResult.pattern && bootstrapResult.domain) {
-          pattern = {
-            pattern: bootstrapResult.pattern,
-            domain: bootstrapResult.domain,
-            confidence: bootstrapResult.confidence,
-          };
-
-          console.log(
-            `[Refresh] Bootstrapped pattern for "${company}": ${pattern.pattern}@${pattern.domain} ` +
-            `(${bootstrapResult.apolloCallsMade} Apollo calls, ${bootstrapResult.emailsFound} emails)`
-          );
-        } else {
-          console.log(`[Refresh] Could not bootstrap pattern for "${company}" (${bootstrapResult.apolloCallsMade} Apollo calls, ${bootstrapResult.emailsFound} emails found)`);
-          continue; // Skip to next company
-        }
-      }
-
-      // Generate emails for remaining people (those not already enriched by Apollo)
-      const remainingPeople = await prisma.person.findMany({
-        where: {
-          id: { in: people.map(p => p.id) },
-          email: null,
-          firstName: { not: null },
-          lastName: { not: null },
-        },
-        select: { id: true, firstName: true, lastName: true },
-      });
-
-      for (const person of remainingPeople) {
-        const generatedEmail = generateEmailFromPattern(
-          person.firstName!,
-          person.lastName!,
-          pattern.pattern as any,
-          pattern.domain
-        );
-
-        await prisma.person.update({
-          where: { id: person.id },
-          data: {
-            email: generatedEmail,
-            emailStatus: 'UNVERIFIED',
-            emailConfidence: Math.round(pattern.confidence * 100),
-          },
-        });
-        emailsGenerated++;
-      }
-
-      console.log(`[Refresh] Generated ${remainingPeople.length} emails for "${company}" using pattern`);
-    }
-
-    // ===== STEP 5: COUNT MATCHING PEOPLE =====
+    // ===== COUNT MATCHING PEOPLE =====
     const filters: PersonFilters = {
       company: input.company,
       location: input.location,
@@ -786,7 +722,7 @@ export async function refreshSearchAction(
 
     const matchingPeople = await findPeopleByFilters(filters);
 
-    // ===== STEP 6: UPDATE CACHE =====
+    // ===== UPDATE CACHE =====
     if (matchingPeople.length > 0) {
       const normalizedParams = normalizeSearchParams({
         name: input.name,
@@ -796,30 +732,32 @@ export async function refreshSearchAction(
         location: input.location,
       });
 
-      const personIds = matchingPeople.map(p => p.id);
+      const personIds = matchingPeople.map((p) => p.id);
       const apiStats: ApiUsageStats = {
-        apolloCallsMade,
+        apolloCallsMade: batch.apolloCallsMade,
         apolloCacheHits: 0,
         cseCallsMade: 1,
-        linkedinScraperCalls: urlsToScrape.length,
+        linkedinScraperCalls: batch.urlsScraped,
       };
 
-      const staleSearch = await findStaleSearch(normalizedParams);
-      if (staleSearch) {
-        await updateSearchWithPeople(staleSearch.id, personIds, apiStats);
+      const existingSearch = await findExistingSearch(normalizedParams);
+      if (existingSearch) {
+        await updateSearchWithPeople(existingSearch.id, personIds, apiStats);
       } else {
         await createSearchWithPeople(normalizedParams, personIds, apiStats);
       }
     }
 
-    console.log(`[Refresh] Complete: ${newPeopleCount} new people, ${emailsGenerated} emails, ${apolloCallsMade} Apollo calls, ${matchingPeople.length} matching`);
+    // CSE returns 10 results per page; if we got 10, there are likely more pages
+    const hasMore = batch.urlsFromCse === 10;
 
     return {
       success: true,
-      newPeopleCount,
-      emailsGenerated,
-      apolloCallsMade,
+      newPeopleCount: batch.newPeopleCount,
+      emailsGenerated: batch.emailsGenerated,
+      apolloCallsMade: batch.apolloCallsMade,
       matchingCount: matchingPeople.length,
+      hasMore,
     };
   } catch (error) {
     console.error('Refresh search error:', error);

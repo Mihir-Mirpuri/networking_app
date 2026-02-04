@@ -1,0 +1,584 @@
+{
+  "id": "ACoAAA8BYqEBCGLg_vT_ca6mMEqkpp9nVffJ3hc",
+  "publicIdentifier": "williamhgates",
+  "linkedinUrl": "https://www.linkedin.com/in/williamhgates",
+  "firstName": "Bill",
+  "lastName": "Gates",
+  "headline": "Chair, Gates Foundation and Founder, Breakthrough Energy",
+  "websites": [
+    "https://gatesnot.es/tgn"
+  ],
+  "openToWork": false,
+  "hiring": false,
+  "premium": true,
+  "influencer": true,
+  "memorialized": false,
+  "location": {
+    "linkedinText": "Seattle, Washington, United States",
+    "countryCode": "US",
+    "parsed": {
+      "text": "Seattle, WA, United States",
+      "countryCode": "US",
+      "regionCode": null,
+      "country": "United States",
+      "countryFull": "United States of America",
+      "state": "Washington",
+      "city": "Seattle"
+    }
+  },
+  "objectUrn": "251749025",
+  "registeredAt": "2013-05-02T19:09:40.840Z",
+  "topSkills": null,
+  "connectionsCount": 8,
+  "followerCount": 39842209,
+  "verified": false,
+  "about": "Chair of the Gates Foundation. Founder of Breakthrough Energy. Co-founder of Microsoft. Voracious reader. Avid traveler. Active blogger.",
+  "currentPosition": [
+    {
+      "companyId": "8736",
+      "companyLinkedinUrl": "https://www.linkedin.com/company/8736/",
+      "companyName": "Gates Foundation",
+      "dateRange": {
+        "start": {
+          "month": null,
+          "year": 2000,
+          "day": null
+        },
+        "end": null
+      }
+    }
+  ],
+  "profileTopEducation": [
+    {
+      "schoolId": "18483",
+      "companyId": "1646",
+      "schoolLinkedinUrl": "https://www.linkedin.com/company/1646/",
+      "schoolName": "Harvard University"
+    }
+  ],
+  "profileActions": [
+    {
+      "label": "View my newsletter",
+      "url": "https://www.linkedin.com/newsletters/gates-notes-6651495472181637121/",
+      "openExternally": true
+    }
+  ],
+  "profilePicture": {
+    "url": "https://media.licdn.com/dms/image/v2/D5603AQF-RYZP55jmXA/profile-displayphoto-shrink_800_800/B56ZRi8g.aGsAc-/0/1736826818808?e=1771459200&v=beta&t=P96DBxNcHgHwTU0C6z0AJdX0c5UOrWjbsLVoFEHV32o",
+    "sizes": [
+      {
+        "url": "https://media.licdn.com/dms/image/v2/D5603AQF-RYZP55jmXA/profile-displayphoto-shrink_800_800/B56ZRi8g.aGsAc-/0/1736826818808?e=1771459200&v=beta&t=P96DBxNcHgHwTU0C6z0AJdX0c5UOrWjbsLVoFEHV32o",
+        "width": 800,
+        "height": 800,
+        "expiresAt": 1771459200000
+      },
+      {
+        "url": "https://media.licdn.com/dms/image/v2/D5603AQF-RYZP55jmXA/profile-displayphoto-shrink_400_400/B56ZRi8g.aGsAg-/0/1736826818802?e=1771459200&v=beta&t=O3qub9hmx6k5lOIcFAlG79s3Hxe3UrLUoZAdyCqY1JU",
+        "width": 400,
+        "height": 400,
+        "expiresAt": 1771459200000
+      },
+      {
+        "url": "https://media.licdn.com/dms/image/v2/D5603AQF-RYZP55jmXA/profile-displayphoto-shrink_200_200/B56ZRi8g.aGsAY-/0/1736826818802?e=1771459200&v=beta&t=7jGpIRtzGt1U5NPbGi34w8nsXgwv0nz1NOXYkvgK0Vo",
+        "width": 200,
+        "height": 200,
+        "expiresAt": 1771459200000
+      },
+      {
+        "url": "https://media.licdn.com/dms/image/v2/D5603AQF-RYZP55jmXA/profile-displayphoto-shrink_100_100/B56ZRi8g.aGsAU-/0/1736826818802?e=1771459200&v=beta&t=M03tvKR7niSCkQWZKXOUQDODZU08MlL_yoUb-KykuQY",
+        "width": 100,
+        "height": 100,
+        "expiresAt": 1771459200000
+      }
+    ]
+  },
+  "coverPicture": {
+    "url": "https://media.licdn.com/dms/image/v2/D5616AQEjhPbTCeblYg/profile-displaybackgroundimage-shrink_350_1400/B56ZcytR5SGsAg-/0/1748902420393?e=1771459200&v=beta&t=Fs4Uqyv-ppf9x83CW4wwAVsT8eMziluXsIL9zqqfd3E",
+    "sizes": [
+      {
+        "url": "https://media.licdn.com/dms/image/v2/D5616AQEjhPbTCeblYg/profile-displaybackgroundimage-shrink_350_1400/B56ZcytR5SGsAg-/0/1748902420393?e=1771459200&v=beta&t=Fs4Uqyv-ppf9x83CW4wwAVsT8eMziluXsIL9zqqfd3E",
+        "width": 1400,
+        "height": 350,
+        "expiresAt": 1771459200000
+      },
+      {
+        "url": "https://media.licdn.com/dms/image/v2/D5616AQEjhPbTCeblYg/profile-displaybackgroundimage-shrink_200_800/B56ZcytR5SGsAc-/0/1748902420393?e=1771459200&v=beta&t=0sfs4hSardStkKVq5ta4lTdZG9xk5l-rQHoaVj4YgBc",
+        "width": 800,
+        "height": 200,
+        "expiresAt": 1771459200000
+      }
+    ]
+  },
+  "photo": "https://media.licdn.com/dms/image/v2/D5603AQF-RYZP55jmXA/profile-displayphoto-shrink_800_800/B56ZRi8g.aGsAc-/0/1736826818808?e=1771459200&v=beta&t=P96DBxNcHgHwTU0C6z0AJdX0c5UOrWjbsLVoFEHV32o",
+  "services": null,
+  "experience": [
+    {
+      "position": "Co-chair",
+      "location": null,
+      "employmentType": null,
+      "workplaceType": null,
+      "companyName": "Gates Foundation",
+      "companyLinkedinUrl": "https://www.linkedin.com/company/gates-foundation/",
+      "companyId": "8736",
+      "companyUniversalName": "gates-foundation",
+      "duration": "26 yrs 2 mos",
+      "description": null,
+      "skills": null,
+      "startDate": {
+        "year": 2000,
+        "text": "2000"
+      },
+      "endDate": {
+        "text": "Present"
+      },
+      "companyLogo": {
+        "url": "https://media.licdn.com/dms/image/v2/D560BAQEgMqqFTd40Tg/company-logo_400_400/company-logo_400_400/0/1736784969376/bill__melinda_gates_foundation_logo?e=1771459200&v=beta&t=KLDjMQZ9V0LnAo-FqLKv09oq28LJbkUTSCnALpHYYJU",
+        "sizes": [
+          {
+            "url": "https://media.licdn.com/dms/image/v2/D560BAQEgMqqFTd40Tg/company-logo_400_400/company-logo_400_400/0/1736784969376/bill__melinda_gates_foundation_logo?e=1771459200&v=beta&t=KLDjMQZ9V0LnAo-FqLKv09oq28LJbkUTSCnALpHYYJU",
+            "width": 400,
+            "height": 400,
+            "expiresAt": 1771459200000
+          },
+          {
+            "url": "https://media.licdn.com/dms/image/v2/D560BAQEgMqqFTd40Tg/company-logo_200_200/company-logo_200_200/0/1736784969376/bill__melinda_gates_foundation_logo?e=1771459200&v=beta&t=Td-FbRmPyk_fF0WwLqZ_rBUooTljwBvcqkve-qS0Xu8",
+            "width": 200,
+            "height": 200,
+            "expiresAt": 1771459200000
+          },
+          {
+            "url": "https://media.licdn.com/dms/image/v2/D560BAQEgMqqFTd40Tg/company-logo_100_100/company-logo_100_100/0/1736784969376/bill__melinda_gates_foundation_logo?e=1771459200&v=beta&t=VDBWdKZe8KFYq2tmp_3ZWd08ZEuByGxakmaKaJMdhDE",
+            "width": 100,
+            "height": 100,
+            "expiresAt": 1771459200000
+          }
+        ]
+      }
+    },
+    {
+      "position": "Founder",
+      "location": null,
+      "employmentType": null,
+      "workplaceType": null,
+      "companyName": "Breakthrough Energy",
+      "companyLinkedinUrl": "https://www.linkedin.com/company/19141006/",
+      "companyId": "19141006",
+      "duration": "11 yrs 2 mos",
+      "description": null,
+      "skills": null,
+      "startDate": {
+        "year": 2015,
+        "text": "2015"
+      },
+      "endDate": {
+        "text": "Present"
+      },
+      "companyLogo": {
+        "url": "https://media.licdn.com/dms/image/v2/D560BAQFRMYiQN7-2kA/company-logo_400_400/B56ZoI4SGPI0AY-/0/1761085563539/breakthrough_energy_logo?e=1771459200&v=beta&t=m8BHu3IuKjmtEQ9wh2YWI7YPJaLA2v5kOANKG4Cl63M",
+        "sizes": [
+          {
+            "url": "https://media.licdn.com/dms/image/v2/D560BAQFRMYiQN7-2kA/company-logo_400_400/B56ZoI4SGPI0AY-/0/1761085563539/breakthrough_energy_logo?e=1771459200&v=beta&t=m8BHu3IuKjmtEQ9wh2YWI7YPJaLA2v5kOANKG4Cl63M",
+            "width": 400,
+            "height": 400,
+            "expiresAt": 1771459200000
+          },
+          {
+            "url": "https://media.licdn.com/dms/image/v2/D560BAQFRMYiQN7-2kA/company-logo_200_200/B56ZoI4SGPI0AI-/0/1761085563539/breakthrough_energy_logo?e=1771459200&v=beta&t=JHFvB6m6xiZMI7xPmjWTfcL28kj5unZh1CzYwsOatS8",
+            "width": 200,
+            "height": 200,
+            "expiresAt": 1771459200000
+          },
+          {
+            "url": "https://media.licdn.com/dms/image/v2/D560BAQFRMYiQN7-2kA/company-logo_100_100/B56ZoI4SGPI0AQ-/0/1761085563539/breakthrough_energy_logo?e=1771459200&v=beta&t=_FtZpw3k_FZA5GYZ9QAwaInslG0T21SsR-_eW4CipaM",
+            "width": 100,
+            "height": 100,
+            "expiresAt": 1771459200000
+          }
+        ]
+      }
+    },
+    {
+      "position": "Co-founder",
+      "location": null,
+      "employmentType": null,
+      "workplaceType": null,
+      "companyName": "Microsoft",
+      "companyLinkedinUrl": "https://www.linkedin.com/company/1035/",
+      "companyId": "1035",
+      "duration": "51 yrs 2 mos",
+      "description": null,
+      "skills": null,
+      "startDate": {
+        "year": 1975,
+        "text": "1975"
+      },
+      "endDate": {
+        "text": "Present"
+      },
+      "companyLogo": {
+        "url": "https://media.licdn.com/dms/image/v2/D560BAQH32RJQCl3dDQ/company-logo_400_400/B56ZYQ0mrGGoAc-/0/1744038948046/microsoft_logo?e=1771459200&v=beta&t=xcxRvJoMTlWAE6dJH3hgSTnO0c_mUtinr_FtqwuHF6w",
+        "sizes": [
+          {
+            "url": "https://media.licdn.com/dms/image/v2/D560BAQH32RJQCl3dDQ/company-logo_400_400/B56ZYQ0mrGGoAc-/0/1744038948046/microsoft_logo?e=1771459200&v=beta&t=xcxRvJoMTlWAE6dJH3hgSTnO0c_mUtinr_FtqwuHF6w",
+            "width": 400,
+            "height": 400,
+            "expiresAt": 1771459200000
+          },
+          {
+            "url": "https://media.licdn.com/dms/image/v2/D560BAQH32RJQCl3dDQ/company-logo_200_200/B56ZYQ0mrGGoAM-/0/1744038948046/microsoft_logo?e=1771459200&v=beta&t=-jD25cgj1Nyq64vzOd2xJvJWL5WTMH3xXkFuE4TlOGo",
+            "width": 200,
+            "height": 200,
+            "expiresAt": 1771459200000
+          },
+          {
+            "url": "https://media.licdn.com/dms/image/v2/D560BAQH32RJQCl3dDQ/company-logo_100_100/B56ZYQ0mrGGoAU-/0/1744038948046/microsoft_logo?e=1771459200&v=beta&t=i3xP2JZRfjIIKAYBhgIS7r5JrlcNPYOrAGXUy8rnjac",
+            "width": 100,
+            "height": 100,
+            "expiresAt": 1771459200000
+          }
+        ]
+      }
+    }
+  ],
+  "education": [
+    {
+      "schoolName": "Harvard University",
+      "schoolLinkedinUrl": "https://www.linkedin.com/company/1646/",
+      "schoolId": "1646",
+      "degree": null,
+      "fieldOfStudy": null,
+      "skills": [],
+      "startDate": {
+        "year": 1973,
+        "text": "1973"
+      },
+      "endDate": {
+        "year": 1975,
+        "text": "1975"
+      },
+      "period": "1973 - 1975",
+      "schoolLogo": {
+        "url": "https://media.licdn.com/dms/image/v2/C4E0BAQF5t62bcL0e9g/company-logo_400_400/company-logo_400_400/0/1631318058235?e=1771459200&v=beta&t=IsmbRawoJQs3dU1riQGDhDeCwq51NfMTXHMaTDNQ3KQ",
+        "sizes": [
+          {
+            "url": "https://media.licdn.com/dms/image/v2/C4E0BAQF5t62bcL0e9g/company-logo_400_400/company-logo_400_400/0/1631318058235?e=1771459200&v=beta&t=IsmbRawoJQs3dU1riQGDhDeCwq51NfMTXHMaTDNQ3KQ",
+            "width": 400,
+            "height": 400,
+            "expiresAt": 1771459200000
+          },
+          {
+            "url": "https://media.licdn.com/dms/image/v2/C4E0BAQF5t62bcL0e9g/company-logo_200_200/company-logo_200_200/0/1631318058235?e=1771459200&v=beta&t=3FG-sPI7ds6brh2XIK0_GQVFo3DGy1TEnOAOmndcubM",
+            "width": 200,
+            "height": 200,
+            "expiresAt": 1771459200000
+          },
+          {
+            "url": "https://media.licdn.com/dms/image/v2/C4E0BAQF5t62bcL0e9g/company-logo_100_100/company-logo_100_100/0/1631318058235?e=1771459200&v=beta&t=CaHvdfB1U8vLO3HnGRmza4rx0M8ovpEgRs2BO-XZcL8",
+            "width": 100,
+            "height": 100,
+            "expiresAt": 1771459200000
+          }
+        ]
+      }
+    },
+    {
+      "schoolName": "Lakeside School",
+      "schoolLinkedinUrl": "https://www.linkedin.com/company/30288/",
+      "schoolId": "30288",
+      "degree": null,
+      "fieldOfStudy": null,
+      "skills": [],
+      "startDate": null,
+      "endDate": {
+        "text": ""
+      },
+      "schoolLogo": {
+        "url": "https://media.licdn.com/dms/image/v2/D560BAQGFmOQmzpxg9A/company-logo_400_400/company-logo_400_400/0/1683732883164/lakeside_school_logo?e=1771459200&v=beta&t=SoaO6Em8Ehe-BPpoM1xPQ_IWSueX8u3tUTXNystgXO4",
+        "sizes": [
+          {
+            "url": "https://media.licdn.com/dms/image/v2/D560BAQGFmOQmzpxg9A/company-logo_400_400/company-logo_400_400/0/1683732883164/lakeside_school_logo?e=1771459200&v=beta&t=SoaO6Em8Ehe-BPpoM1xPQ_IWSueX8u3tUTXNystgXO4",
+            "width": 400,
+            "height": 400,
+            "expiresAt": 1771459200000
+          },
+          {
+            "url": "https://media.licdn.com/dms/image/v2/D560BAQGFmOQmzpxg9A/company-logo_200_200/company-logo_200_200/0/1683732883164/lakeside_school_logo?e=1771459200&v=beta&t=rwfb4H4SY99jiRE5sleS-SyE4aTanScfc0T5QNj5aoA",
+            "width": 200,
+            "height": 200,
+            "expiresAt": 1771459200000
+          },
+          {
+            "url": "https://media.licdn.com/dms/image/v2/D560BAQGFmOQmzpxg9A/company-logo_100_100/company-logo_100_100/0/1683732883164/lakeside_school_logo?e=1771459200&v=beta&t=HkAKZuM-Ev2p1IQt9eEVK0OHLCBjdxUxX7czKoueaUY",
+            "width": 100,
+            "height": 100,
+            "expiresAt": 1771459200000
+          }
+        ]
+      }
+    }
+  ],
+  "certifications": [],
+  "projects": [],
+  "volunteering": [],
+  "receivedRecommendations": [],
+  "skills": [],
+  "publications": [],
+  "courses": [],
+  "patents": [],
+  "honorsAndAwards": [],
+  "languages": [],
+  "causes": [],
+  "featured": {
+    "images": [
+      "https://media.licdn.com/dms/image/v2/D5612AQE-eZUAKTbmyQ/article-cover_image-shrink_720_1280/B56Zs5D6pMKIAI-/0/1766188887129?e=1771459200&v=beta&t=g5vfrlylovTmdzB10lYrgK-gUVdzP9H3X2oNbrrj1W0"
+    ],
+    "link": "https://www.linkedin.com/feed/update/urn:li:activity:7407934241675608064?updateEntityUrn=urn%3Ali%3Afs_feedUpdate%3A%28V2%2Curn%3Ali%3Aactivity%3A7407934241675608064%29",
+    "title": "What the Gates Foundation hopes to accomplish over the next 20 years",
+    "subtitle": "Bill Gates on LinkedIn • 5 min read",
+    "slides": [
+      {
+        "title": "What the Gates Foundation hopes to accomplish over the next 20 years",
+        "subtitle": "Bill Gates on LinkedIn • 5 min read",
+        "description": null,
+        "url": "https://www.linkedin.com/feed/update/urn:li:activity:7407934241675608064?updateEntityUrn=urn%3Ali%3Afs_feedUpdate%3A%28V2%2Curn%3Ali%3Aactivity%3A7407934241675608064%29",
+        "image": {
+          "url": "https://media.licdn.com/dms/image/v2/D5612AQE-eZUAKTbmyQ/article-cover_image-shrink_720_1280/B56Zs5D6pMKIAI-/0/1766188887129?e=1771459200&v=beta&t=g5vfrlylovTmdzB10lYrgK-gUVdzP9H3X2oNbrrj1W0"
+        }
+      },
+      {
+        "title": "How to get the world back on track and enter a new era of unprecedented progress",
+        "subtitle": "Bill Gates on LinkedIn • 5+ min read",
+        "description": null,
+        "url": "https://www.linkedin.com/feed/update/urn:li:activity:7416559967329103872?updateEntityUrn=urn%3Ali%3Afs_feedUpdate%3A%28V2%2Curn%3Ali%3Aactivity%3A7416559967329103872%29",
+        "image": {
+          "url": "https://media.licdn.com/dms/image/v2/D5612AQEgG5WUmlF97w/videocover-high/B56ZuzdRvxHcBc-/0/1768242356655?e=1771459200&v=beta&t=cY37AUXR307gWntagy-cBMjw7tZ-K0MpWwkgPjVXbEA"
+        }
+      }
+    ]
+  },
+  "moreProfiles": [
+    {
+      "id": "ACoAACe8kMYBRySEWE-R0QpZ3udDVscbSopk3SM",
+      "firstName": "Shradha",
+      "lastName": "Khapra",
+      "publicIdentifier": "shradha-khapra",
+      "linkedinUrl": "https://www.linkedin.com/in/shradha-khapra"
+    },
+    {
+      "id": "ACoAAAMCzYcBj7k8LBrG8tu6vjLRWGWaQ9WFxoc",
+      "firstName": "Anupam",
+      "lastName": "Mittal",
+      "publicIdentifier": "anupammittal007",
+      "linkedinUrl": "https://www.linkedin.com/in/anupammittal007"
+    },
+    {
+      "id": "ACoAAAw4D5sB4ZMefUY22SQECAv5kgQQKM4Cwh4",
+      "firstName": "Stephen",
+      "lastName": "Curry",
+      "publicIdentifier": "stephencurry30",
+      "linkedinUrl": "https://www.linkedin.com/in/stephencurry30"
+    },
+    {
+      "id": "ACoAADib0tEByzvgsS0kMMiPk4liOa1qZs3Q4pE",
+      "firstName": "Ryan",
+      "lastName": "Reynolds",
+      "publicIdentifier": "vancityreynolds",
+      "linkedinUrl": "https://www.linkedin.com/in/vancityreynolds"
+    },
+    {
+      "id": "ACoAADjxI5sB8zh1KYWtStYxnRHjvVa6ckeE8Eo",
+      "firstName": "Nitin",
+      "lastName": "Gadkari",
+      "publicIdentifier": "nitin-gadkari-5b7b2b227",
+      "linkedinUrl": "https://www.linkedin.com/in/nitin-gadkari-5b7b2b227"
+    },
+    {
+      "id": "ACoAAAMkc8kBdWKTLlR2OReZqTQBn4_3fRYgRlY",
+      "firstName": "Aman",
+      "lastName": "Gupta",
+      "publicIdentifier": "aman-gupta-7217a515",
+      "linkedinUrl": "https://www.linkedin.com/in/aman-gupta-7217a515"
+    },
+    {
+      "id": "ACoAAAEkwwAB9KEc2TrQgOLEQ-vzRyZeCDyc6DQ",
+      "firstName": "Satya",
+      "lastName": "Nadella",
+      "publicIdentifier": "satyanadella",
+      "linkedinUrl": "https://www.linkedin.com/in/satyanadella"
+    },
+    {
+      "id": "ACoAAEJAUQEBouU2110ZLhX9BGLPGGP61Wuqsv8",
+      "firstName": "Snoop ",
+      "lastName": "Dogg",
+      "publicIdentifier": "snoopdogg",
+      "linkedinUrl": "https://www.linkedin.com/in/snoopdogg"
+    },
+    {
+      "id": "ACoAADnl1jgBdlHVvRibBu9Fm0M77z4oYsyVQ0k",
+      "firstName": "Jimmy",
+      "lastName": "Donaldson",
+      "publicIdentifier": "mr-beast",
+      "linkedinUrl": "https://www.linkedin.com/in/mr-beast"
+    },
+    {
+      "id": "ACoAADjvys4B4P6r_UT3FF4bR32ZV6PtlR3lDDw",
+      "firstName": "Alakh",
+      "lastName": "Pandey",
+      "publicIdentifier": "alakh-pandey-4baaa8227",
+      "linkedinUrl": "https://www.linkedin.com/in/alakh-pandey-4baaa8227"
+    },
+    {
+      "id": "ACoAAESLOisBWkQOovTCbKFrLZIcSr-k8JP_BMI",
+      "firstName": "Nirmala",
+      "lastName": "Sitharaman",
+      "publicIdentifier": "nsitharaman",
+      "linkedinUrl": "https://www.linkedin.com/in/nsitharaman"
+    },
+    {
+      "id": "ACoAAASlZKcBxJ-rx0394rCDVwXzKMtcpvslgWc",
+      "firstName": "Ritesh",
+      "lastName": "Agarwal",
+      "publicIdentifier": "riteshagar",
+      "linkedinUrl": "https://www.linkedin.com/in/riteshagar"
+    },
+    {
+      "id": "ACoAAE6FVtYBAW4bP82g1IhIHxzu_1J010WU3CQ",
+      "firstName": "Sundar ",
+      "lastName": "Pichai ",
+      "publicIdentifier": "sundarpichai",
+      "linkedinUrl": "https://www.linkedin.com/in/sundarpichai"
+    },
+    {
+      "id": "ACoAAC_m1aoBCuAl3tCOFJZho4TVOR6w9XqnbH4",
+      "firstName": "Rishi",
+      "lastName": "Sunak",
+      "publicIdentifier": "rishi-sunak",
+      "linkedinUrl": "https://www.linkedin.com/in/rishi-sunak"
+    },
+    {
+      "id": "ACoAAA9eyYUBh9JQIB19tmDanxKjRK9p8Nw4FrY",
+      "firstName": "Mustafa",
+      "lastName": "Suleyman",
+      "publicIdentifier": "mustafa-suleyman",
+      "linkedinUrl": "https://www.linkedin.com/in/mustafa-suleyman"
+    },
+    {
+      "id": "ACoAABBhhiABVwqIoiMz90f7wLjjl8xvtPe3u3c",
+      "firstName": "Narendra",
+      "lastName": "Modi",
+      "publicIdentifier": "narendramodi",
+      "linkedinUrl": "https://www.linkedin.com/in/narendramodi"
+    },
+    {
+      "id": "ACoAAAwp1RMBxG26M3Qkhm4klqLNr1bIplo6GhY",
+      "firstName": "Richard",
+      "lastName": "Branson",
+      "publicIdentifier": "rbranson",
+      "linkedinUrl": "https://www.linkedin.com/in/rbranson"
+    },
+    {
+      "id": "ACoAAB8KalABDcw07tqC2Tt9EP4dlEh-EaIjLU8",
+      "firstName": "Shantanu",
+      "lastName": "Naidu",
+      "publicIdentifier": "shantanu-naidu",
+      "linkedinUrl": "https://www.linkedin.com/in/shantanu-naidu"
+    },
+    {
+      "id": "ACoAABMznFkB_XPgkYHnUl33kIHTWt1DtMAV6Pg",
+      "firstName": "Jensen",
+      "lastName": "Huang",
+      "publicIdentifier": "jenhsunhuang",
+      "linkedinUrl": "https://www.linkedin.com/in/jenhsunhuang"
+    },
+    {
+      "id": "ACoAAADJYAkBVZlXjGdC9CSBBU3t6i2ZnSOiQZg",
+      "firstName": "Vineeta",
+      "lastName": "Singh",
+      "publicIdentifier": "vineetasingh",
+      "linkedinUrl": "https://www.linkedin.com/in/vineetasingh"
+    },
+    {
+      "id": "ACoAACWUZqYBLo8paltlroL_Rw2d3KPVoPNjjrs",
+      "firstName": "Fotios",
+      "lastName": "Kapsis",
+      "position": "Construction Site Manager",
+      "publicIdentifier": "fotios-kapsis-746192157",
+      "linkedinUrl": "https://www.linkedin.com/in/fotios-kapsis-746192157"
+    },
+    {
+      "id": "ACoAAC1Pi2UBI3YonOJvRjgW9iO5guiUl88mxOU",
+      "firstName": "Konstantina",
+      "lastName": "Karvouni",
+      "position": "Civil Engineer | MSc Project management",
+      "publicIdentifier": "konstantina-karvouni-571703192",
+      "linkedinUrl": "https://www.linkedin.com/in/konstantina-karvouni-571703192"
+    },
+    {
+      "id": "ACoAADcqw14BCkGGH41tGupbfoV8s5yI2PtZWuI",
+      "firstName": "Artemis",
+      "lastName": "Vasileiadi",
+      "position": "HR Specialist Payroll at Daikin Chemical Europe GmbH",
+      "publicIdentifier": "artemis-vasileiadi-a52b6a219",
+      "linkedinUrl": "https://www.linkedin.com/in/artemis-vasileiadi-a52b6a219"
+    },
+    {
+      "id": "ACoAAD5ptOkBUqpO5qTSR0JuicVdvZ8ewGK9JBA",
+      "firstName": "Aggelos",
+      "lastName": "Ntovas",
+      "position": "Civil Engineer (MEng) | Construction site manager",
+      "publicIdentifier": "aggelosntovas",
+      "linkedinUrl": "https://www.linkedin.com/in/aggelosntovas"
+    },
+    {
+      "id": "ACoAAEFPpD4Bfy-I6puOOSO2i6_Davpwm9KXaG4",
+      "firstName": "Barzan",
+      "lastName": "Faisal",
+      "position": "Augenoptiker | Meister",
+      "publicIdentifier": "barzan-faisal-a7ab63266",
+      "linkedinUrl": "https://www.linkedin.com/in/barzan-faisal-a7ab63266"
+    },
+    {
+      "id": "ACoAAEGlAsMBqz04CWx923AGgTQNbVssOVsxK7M",
+      "firstName": "Konstantinos",
+      "lastName": "Tapatas",
+      "position": "Area Manager - Technical Advisor at Ergatikat GmbH",
+      "publicIdentifier": "konstantinos-tapatas-717a01268",
+      "linkedinUrl": "https://www.linkedin.com/in/konstantinos-tapatas-717a01268"
+    },
+    {
+      "id": "ACoAADM1bFQBNeLlonxcIaMHXE4jXmz3yhUqngo",
+      "firstName": "Steljano",
+      "lastName": "Hoxha",
+      "position": "Project Manager ",
+      "publicIdentifier": "steljano-hoxha-0188831bb",
+      "linkedinUrl": "https://www.linkedin.com/in/steljano-hoxha-0188831bb"
+    },
+    {
+      "id": "ACoAACkceAkB5Eu3g7t2sxhLHmQDYWDN8fzXA3M",
+      "firstName": "Anastasia",
+      "lastName": "Vandorou",
+      "position": "Surveying Engineer | FTTH Design & Planning Coordinator | Experience in Greece & Germany",
+      "publicIdentifier": "anastasia-vandorou-289ba6172",
+      "linkedinUrl": "https://www.linkedin.com/in/anastasia-vandorou-289ba6172"
+    },
+    {
+      "id": "ACoAACyy2uQBVoZA5T4nC7VOqPBVHcwbW2BuknA",
+      "firstName": "Sandra",
+      "lastName": "Lipski",
+      "position": "Augenoptikermeisterin",
+      "publicIdentifier": "sandra-lipski-a5819018b",
+      "linkedinUrl": "https://www.linkedin.com/in/sandra-lipski-a5819018b"
+    },
+    {
+      "id": "ACoAACnn9pIBxSzTzO17Klv9kA6DfyAGn3rA1og",
+      "firstName": "Ioannis",
+      "lastName": "Rokas",
+      "position": "Production and Management Engineer",
+      "publicIdentifier": "ioannisrokas",
+      "linkedinUrl": "https://www.linkedin.com/in/ioannisrokas"
+    }
+  ],
+  "originalQuery": {
+    "query": "https://www.linkedin.com/in/williamhgates"
+  }
+}

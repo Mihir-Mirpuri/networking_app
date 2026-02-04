@@ -10,15 +10,8 @@ import { Toast } from '@/components/ui/Toast';
 import { searchPeopleAction, SearchResultWithDraft, hidePersonAction, refreshSearchAction } from '@/app/actions/search';
 import { sendSingleEmailAction, sendEmailsAction, PersonToSend } from '@/app/actions/send';
 
-// Loading messages that cycle during search
-const LOADING_MESSAGES = [
-  'Searching LinkedIn profiles...',
-  'Finding matching candidates...',
-  'Verifying contact information...',
-  'Enriching with Apollo...',
-  'Processing results...',
-  'Almost there...',
-];
+// Loading message shown during search
+const LOADING_MESSAGE = 'Searching for profiles...';
 
 interface SearchPageClientProps {
   initialRemainingDaily: number;
@@ -45,6 +38,8 @@ interface SearchPageState {
     location?: string;
     templateId: string;
   };
+  currentPage?: number;
+  hasMore?: boolean;
   savedAt: number;
 }
 
@@ -70,7 +65,6 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
   const [generatingStatuses, setGeneratingStatuses] = useState<Map<string, boolean>>(new Map());
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchParams, setSearchParams] = useState<{
     company?: string;
@@ -79,6 +73,11 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
     location?: string;
     templateId: string;
   } | null>(null);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   // Restore state from sessionStorage on mount
   useEffect(() => {
@@ -109,6 +108,13 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
           if (state.searchParams) {
             setSearchParams(state.searchParams);
           }
+          // Restore pagination state
+          if (state.currentPage !== undefined) {
+            setCurrentPage(state.currentPage);
+          }
+          if (state.hasMore !== undefined) {
+            setHasMore(state.hasMore);
+          }
         } else {
           sessionStorage.removeItem(STORAGE_KEY);
         }
@@ -122,20 +128,6 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
       }
     }
   }, []);
-
-  // Cycle through loading messages while searching
-  useEffect(() => {
-    if (!isSearching) {
-      setLoadingMessageIndex(0);
-      return;
-    }
-
-    const interval = setInterval(() => {
-      setLoadingMessageIndex((prev) => (prev + 1) % LOADING_MESSAGES.length);
-    }, 2500); // Change message every 2.5 seconds
-
-    return () => clearInterval(interval);
-  }, [isSearching]);
 
   // Debounced save to sessionStorage
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -171,6 +163,8 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
             generatingStatuses: mapToArray(generatingStatuses),
             remainingDaily,
             searchParams: paramsToSave, // Preserve search params
+            currentPage,
+            hasMore,
             savedAt: Date.now(),
           };
           sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -185,7 +179,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [results, expandedIndex, sendStatuses, showBulkReview, generatingStatuses, remainingDaily, searchParams]);
+  }, [results, expandedIndex, sendStatuses, showBulkReview, generatingStatuses, remainingDaily, searchParams, currentPage, hasMore]);
 
   const handleSearch = async (params: {
     company?: string;
@@ -205,6 +199,9 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
     setError(null);
     setResults([]);
     setSendStatuses(new Map());
+    // Reset pagination on new search
+    setCurrentPage(1);
+    setHasMore(true);
 
     const result = await searchPeopleAction(params);
 
@@ -229,9 +226,18 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
         console.error('Error saving search params to sessionStorage:', error);
       }
 
-      // If cache missed, trigger background refresh to discover more people
+      // If cache missed, trigger refresh to discover more people
       if (result.searchMeta.needsRefresh) {
-        setIsRefreshing(true);
+        const hasInitialResults = result.results.length > 0;
+
+        // Only show as "background" refresh if we have results to display
+        // Otherwise, keep the main search spinner active
+        if (hasInitialResults) {
+          setIsSearching(false);
+          setIsRefreshing(true);
+        }
+        // If no results, isSearching stays true until refresh completes
+
         refreshSearchAction({
           company: params.company,
           role: params.role,
@@ -241,6 +247,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
         }).then((refreshResult) => {
           if (refreshResult.success) {
             console.log(`[Refresh] Complete: ${refreshResult.newPeopleCount} new, ${refreshResult.emailsGenerated} emails`);
+            setHasMore(refreshResult.hasMore);
             // Re-fetch results to include newly discovered people
             searchPeopleAction(params).then((updatedResult) => {
               if (updatedResult.success) {
@@ -263,22 +270,26 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
                   console.error('Error updating sessionStorage after refresh:', e);
                 }
               }
+              setIsSearching(false);
               setIsRefreshing(false);
             });
           } else {
             console.error('[Refresh] Failed:', refreshResult.error);
+            setIsSearching(false);
             setIsRefreshing(false);
           }
         }).catch((err) => {
           console.error('[Refresh] Error:', err);
+          setIsSearching(false);
           setIsRefreshing(false);
         });
+      } else {
+        setIsSearching(false);
       }
     } else {
       setError(result.error);
+      setIsSearching(false);
     }
-
-    setIsSearching(false);
   };
 
   const handleSendFromReview = async (index: number, subject: string, body: string) => {
@@ -366,6 +377,65 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
     }
   };
 
+  const handleLoadMore = async () => {
+    if (!searchParams?.company || isLoadingMore || !hasMore) return;
+
+    setIsLoadingMore(true);
+    const nextPage = currentPage + 1;
+    const pageStart = (nextPage - 1) * 10 + 1; // page 2 → start=11, page 3 → start=21
+
+    try {
+      const result = await refreshSearchAction({
+        company: searchParams.company,
+        role: searchParams.role,
+        university: searchParams.university,
+        location: searchParams.location,
+        pageStart,
+      });
+
+      if (result.success) {
+        setCurrentPage(nextPage);
+        setHasMore(result.hasMore);
+
+        // Re-fetch to get updated results including new people
+        const updatedResult = await searchPeopleAction({
+          ...searchParams,
+          limit: nextPage * 10, // Get all results so far
+        });
+
+        if (updatedResult.success) {
+          setResults(updatedResult.results);
+          // Update sessionStorage with new results
+          try {
+            const updatedState: SearchPageState = {
+              version: STORAGE_VERSION,
+              results: updatedResult.results,
+              expandedIndex,
+              sendStatuses: mapToArray(sendStatuses),
+              showBulkReview,
+              generatingStatuses: mapToArray(generatingStatuses),
+              remainingDaily,
+              searchParams,
+              currentPage: nextPage,
+              hasMore: result.hasMore,
+              savedAt: Date.now(),
+            };
+            sessionStorage.setItem(STORAGE_KEY, JSON.stringify(updatedState));
+          } catch (e) {
+            console.error('Error updating sessionStorage after load more:', e);
+          }
+        }
+      } else {
+        setToast({ message: result.error || 'Failed to load more profiles', type: 'error' });
+      }
+    } catch (err) {
+      console.error('[LoadMore] Error:', err);
+      setToast({ message: 'Failed to load more profiles', type: 'error' });
+    }
+
+    setIsLoadingMore(false);
+  };
+
   return (
     <div className="relative">
       <SearchForm 
@@ -383,20 +453,19 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
       {isSearching && (
         <div className="flex items-center gap-3 py-8 text-gray-600">
           <LoadingSpinner size="md" />
-          <span className="text-base transition-opacity duration-300">
-            {LOADING_MESSAGES[loadingMessageIndex]}
-          </span>
+          <span className="text-base">{LOADING_MESSAGE}</span>
+        </div>
+      )}
+
+      {isRefreshing && !isSearching && expandedIndex === null && !showBulkReview && (
+        <div className="flex items-center gap-2 mb-4 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm">
+          <LoadingSpinner size="sm" />
+          <span>Discovering more profiles in background...</span>
         </div>
       )}
 
       {results.length > 0 && expandedIndex === null && !showBulkReview && (
         <>
-          {isRefreshing && (
-            <div className="flex items-center gap-2 mb-4 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm">
-              <LoadingSpinner size="sm" />
-              <span>Discovering more profiles in background...</span>
-            </div>
-          )}
           <ResultsList
             results={results}
             onReviewAndSend={() => setShowBulkReview(true)}
@@ -407,6 +476,33 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
             sendStatuses={sendStatuses}
             remainingDaily={remainingDaily}
           />
+
+          {/* Load More Button */}
+          {hasMore && !isSearching && (
+            <div className="flex justify-center mt-6">
+              <button
+                onClick={handleLoadMore}
+                disabled={isLoadingMore}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+              >
+                {isLoadingMore ? (
+                  <>
+                    <LoadingSpinner size="sm" />
+                    Loading...
+                  </>
+                ) : (
+                  'Load More Profiles'
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* No More Results Message */}
+          {!hasMore && (
+            <p className="text-center text-gray-500 mt-6">
+              No more profiles available
+            </p>
+          )}
         </>
       )}
 

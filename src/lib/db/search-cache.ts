@@ -74,7 +74,7 @@ export async function findCachedSearch(
 }
 
 /**
- * Finds a stale cached search (> 24 hours old) with matching parameters.
+ * Finds a stale cached search (> 7 days old) with matching parameters.
  * Used for update-in-place strategy.
  */
 export async function findStaleSearch(
@@ -92,6 +92,28 @@ export async function findStaleSearch(
       AND COALESCE("university", '') = COALESCE(${params.university}, '')
       AND COALESCE("location", '') = COALESCE(${params.location}, '')
       AND "createdAt" < ${cutoff}
+    ORDER BY "createdAt" DESC
+    LIMIT 1
+  `;
+
+  return results.length > 0 ? results[0] : null;
+}
+
+/**
+ * Finds any existing search with matching parameters (regardless of age).
+ * Used when we want to update an existing search rather than create a new one.
+ */
+export async function findExistingSearch(
+  params: NormalizedSearchParams
+): Promise<{ id: string; createdAt: Date } | null> {
+  const results = await prisma.$queryRaw<Array<{ id: string; createdAt: Date }>>`
+    SELECT "id", "createdAt"
+    FROM "Search"
+    WHERE COALESCE("name", '') = COALESCE(${params.name}, '')
+      AND COALESCE("company", '') = COALESCE(${params.company}, '')
+      AND COALESCE("role", '') = COALESCE(${params.role}, '')
+      AND COALESCE("university", '') = COALESCE(${params.university}, '')
+      AND COALESCE("location", '') = COALESCE(${params.location}, '')
     ORDER BY "createdAt" DESC
     LIMIT 1
   `;
@@ -258,6 +280,9 @@ export async function getPersonsByIds(personIds: string[]): Promise<
     email: string | null;
     emailStatus: string | null;
     emailConfidence: number | null;
+    emailDeliverable: boolean | null;
+    emailVerifiedAt: Date | null;
+    emailVerificationReason: string | null;
     scrapedAt: Date | null;
     apolloEnrichedAt: Date | null;
     city: string | null;
@@ -293,6 +318,9 @@ export async function getPersonsByIds(personIds: string[]): Promise<
       email: true,
       emailStatus: true,
       emailConfidence: true,
+      emailDeliverable: true,
+      emailVerifiedAt: true,
+      emailVerificationReason: true,
       scrapedAt: true,
       apolloEnrichedAt: true,
       city: true,

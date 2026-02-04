@@ -29,6 +29,7 @@ export interface SearchParams {
   location?: string;
   limit: number;
   excludePersonKeys?: Set<string>; // Set of "fullName_company" keys (lowercase) to exclude
+  pageStart?: number; // CSE start index (1 = first page, 11 = second page)
 }
 
 /**
@@ -186,7 +187,7 @@ function normalizeKey(name: string, url: string): string {
  * 4. Returns basic profile info - Apollo will enrich with all other data
  */
 export async function discoverLinkedInProfiles(params: SearchParams): Promise<CSEDiscoveryResult[]> {
-  const { name, university, company, role, location, limit, excludePersonKeys = new Set() } = params;
+  const { name, university, company, role, location, limit, excludePersonKeys = new Set(), pageStart = 1 } = params;
 
   // Build query for LinkedIn profile search
   // Include company, university, role, and location for targeted results
@@ -207,8 +208,8 @@ export async function discoverLinkedInProfiles(params: SearchParams): Promise<CS
     return [];
   }
 
-  console.log(`[Discovery] Search query: ${query}`);
-  const pages = [1, 11]; // 2 pages = 20 results max
+  console.log(`[Discovery] Search query: ${query} (page start: ${pageStart})`);
+  const pages = [pageStart]; // Single page per call, batch 2 called separately
 
   const seenKeys = new Set<string>();
   const candidates: CSEDiscoveryResult[] = [];

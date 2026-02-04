@@ -52,6 +52,65 @@ export function normalizeCompanyName(company: string): string {
 }
 
 /**
+ * Common credential/degree suffixes to strip from names
+ */
+const CREDENTIAL_SUFFIXES = [
+  // Degrees
+  'mba', 'mha', 'mph', 'mpa', 'mba', 'ms', 'ma', 'phd', 'md', 'jd', 'llm', 'edd', 'dba',
+  'bba', 'bs', 'ba', 'bsc', 'msc',
+  // Certifications
+  'cpa', 'cfa', 'cfe', 'cfp', 'cma', 'pmp', 'pe', 'esq', 'rn', 'cisa', 'cissp',
+  'sphr', 'phr', 'shrm', 'six sigma', 'leed', 'ccna', 'mcse',
+  // Titles
+  'jr', 'sr', 'ii', 'iii', 'iv',
+];
+
+/**
+ * Clean first name for email generation
+ * Removes middle initials (e.g., "Madeline E." → "Madeline")
+ */
+function cleanFirstName(firstName: string): string {
+  if (!firstName) return '';
+
+  // Remove middle initials: single letter optionally followed by period at end
+  // "Madeline E." → "Madeline", "Madeline E" → "Madeline", "David U." → "David"
+  let cleaned = firstName.trim();
+
+  // Handle "FirstName M." or "FirstName M" pattern (middle initial at end)
+  cleaned = cleaned.replace(/\s+[A-Z]\.?$/i, '');
+
+  // Handle parenthetical nicknames like "Theo (Xiaochao)" → "Theo"
+  cleaned = cleaned.replace(/\s*\([^)]+\)\s*/g, ' ').trim();
+
+  // Take only the first word if multiple remain
+  const parts = cleaned.split(/\s+/);
+  return parts[0] || cleaned;
+}
+
+/**
+ * Clean last name for email generation
+ * Removes credential suffixes (e.g., "Baker MHA" → "Baker")
+ */
+function cleanLastName(lastName: string): string {
+  if (!lastName) return '';
+
+  let cleaned = lastName.trim();
+
+  // Remove parenthetical content like "(Qiujun)"
+  cleaned = cleaned.replace(/\s*\([^)]+\)\s*/g, ' ').trim();
+
+  // Split into parts and filter out credentials
+  const parts = cleaned.split(/\s+/);
+  const filteredParts = parts.filter(part => {
+    const lower = part.toLowerCase().replace(/[.,]/g, '');
+    return !CREDENTIAL_SUFFIXES.includes(lower);
+  });
+
+  // Return filtered parts, or original if everything was filtered
+  return filteredParts.length > 0 ? filteredParts.join(' ') : cleaned;
+}
+
+/**
  * Normalize name for email generation
  * Removes accents, special chars, handles hyphens
  */
@@ -72,8 +131,13 @@ export function generateEmailFromPattern(
   pattern: PatternType,
   domain: string
 ): string {
-  const first = normalizeName(firstName);
-  const last = normalizeName(lastName);
+  // Clean names first (remove middle initials, credentials)
+  const cleanedFirst = cleanFirstName(firstName);
+  const cleanedLast = cleanLastName(lastName);
+
+  // Then normalize for email format
+  const first = normalizeName(cleanedFirst);
+  const last = normalizeName(cleanedLast);
   const f = first.charAt(0);
 
   let localPart: string;
@@ -121,8 +185,12 @@ export function detectPattern(
   const [localPart, domain] = email.toLowerCase().split('@');
   if (!localPart || !domain) return null;
 
-  const first = normalizeName(firstName);
-  const last = normalizeName(lastName);
+  // Clean names first (remove middle initials, credentials)
+  const cleanedFirst = cleanFirstName(firstName);
+  const cleanedLast = cleanLastName(lastName);
+
+  const first = normalizeName(cleanedFirst);
+  const last = normalizeName(cleanedLast);
   const f = first.charAt(0);
 
   // Check each pattern
@@ -204,6 +272,7 @@ export function learnPatternFromEmails(
 
 /**
  * Get existing pattern for a company from database
+ * Returns null if company uses Apollo fallback (inconsistent patterns)
  */
 export async function getCompanyPattern(
   company: string
@@ -214,6 +283,12 @@ export async function getCompanyPattern(
     where: { company: normalized },
     orderBy: { confidence: 'desc' },
   });
+
+  // Skip pattern if company needs Apollo fallback
+  if (existing?.useApolloFallback) {
+    console.log(`[EmailPattern] ${company} uses Apollo fallback - skipping pattern`);
+    return null;
+  }
 
   if (existing && existing.confidence >= 0.8) {
     return {
@@ -415,10 +490,23 @@ export async function bootstrapCompanyPattern(
     };
   }
 
-  // Take up to MAX_APOLLO_BOOTSTRAP people
-  const toEnrich = validPeople.slice(0, MAX_APOLLO_BOOTSTRAP);
+  // Check if company uses Apollo fallback (inconsistent patterns)
+  const normalized = normalizeCompanyName(company);
+  const existingPattern = await prisma.companyEmailPattern.findFirst({
+    where: { company: normalized },
+    select: { useApolloFallback: true },
+  });
+
+  const useApolloFallback = existingPattern?.useApolloFallback ?? false;
+
+  // For Apollo fallback companies, call Apollo for ALL people (no pattern learning)
+  // For normal companies, limit to MAX_APOLLO_BOOTSTRAP for pattern learning
+  const toEnrich = useApolloFallback ? validPeople : validPeople.slice(0, MAX_APOLLO_BOOTSTRAP);
+
   console.log(
-    `[EmailPattern] Bootstrapping pattern for "${company}" with ${toEnrich.length} Apollo calls`
+    useApolloFallback
+      ? `[EmailPattern] Apollo fallback for "${company}" - calling Apollo for ${toEnrich.length} people`
+      : `[EmailPattern] Bootstrapping pattern for "${company}" with ${toEnrich.length} Apollo calls`
   );
 
   const apolloEmails: Array<{ email: string; firstName: string; lastName: string }> = [];
@@ -484,6 +572,56 @@ export async function bootstrapCompanyPattern(
       );
     }
 
+    // Early exit: if we have enough emails to learn a pattern, try now
+    // Skip for Apollo fallback companies - they have inconsistent patterns
+    if (!useApolloFallback && apolloEmails.length >= MIN_SAMPLE_SIZE) {
+      const earlyPattern = learnPatternFromEmails(apolloEmails);
+      if (earlyPattern) {
+        const savedCalls = toEnrich.length - apolloCallsMade;
+        console.log(
+          `[EmailPattern] Early exit: learned pattern after ${apolloCallsMade} calls (saved ${savedCalls} API calls)`
+        );
+        await saveCompanyPattern(
+          company,
+          earlyPattern.domain,
+          earlyPattern.pattern,
+          earlyPattern.confidence,
+          apolloEmails.length
+        );
+
+        // Generate emails for remaining people using the learned pattern
+        const remainingPeople = toEnrich.slice(apolloCallsMade);
+        for (const person of remainingPeople) {
+          const generatedEmail = generateEmailFromPattern(
+            person.firstName,
+            person.lastName,
+            earlyPattern.pattern,
+            earlyPattern.domain
+          );
+          await prisma.person.update({
+            where: { id: person.id },
+            data: {
+              email: generatedEmail,
+              emailStatus: 'UNVERIFIED',
+              emailConfidence: earlyPattern.confidence * 100,
+            },
+          });
+          console.log(
+            `[EmailPattern] Generated email for ${person.firstName} ${person.lastName} → ${generatedEmail}`
+          );
+        }
+
+        return {
+          success: true,
+          pattern: earlyPattern.pattern,
+          domain: earlyPattern.domain,
+          confidence: earlyPattern.confidence,
+          apolloCallsMade,
+          emailsFound: apolloEmails.length + remainingPeople.length,
+        };
+      }
+    }
+
     // Rate limit: 300ms between calls
     if (apolloCallsMade < toEnrich.length) {
       await new Promise((r) => setTimeout(r, 300));
@@ -493,6 +631,19 @@ export async function bootstrapCompanyPattern(
   console.log(
     `[EmailPattern] Apollo complete: ${apolloEmails.length}/${apolloCallsMade} emails found`
   );
+
+  // For Apollo fallback companies, skip pattern learning - just return the emails found
+  if (useApolloFallback) {
+    console.log(`[EmailPattern] Apollo fallback complete for "${company}" - ${apolloEmails.length} emails`);
+    return {
+      success: apolloEmails.length > 0,
+      pattern: null,
+      domain: null,
+      confidence: 0,
+      apolloCallsMade,
+      emailsFound: apolloEmails.length,
+    };
+  }
 
   // Try to learn pattern from the emails we got
   if (apolloEmails.length >= MIN_SAMPLE_SIZE) {

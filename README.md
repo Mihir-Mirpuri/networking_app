@@ -1,4 +1,4 @@
-# Lattice
+# Signl
 
 A finance/consulting recruiting outreach tool that helps you discover alumni connections and send personalized outreach emails.
 

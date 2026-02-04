@@ -12,6 +12,39 @@ const PERSONAL_DOMAINS = new Set([
 ]);
 
 /**
+ * Normalize company name for consistent storage
+ *
+ * Handles variations like:
+ * - "Boston Consulting Group (BCG)" → "Boston Consulting Group"
+ * - "The Boston Consulting Group" → "Boston Consulting Group"
+ * - "McKinsey & Company, Inc." → "McKinsey & Company"
+ * - "Deloitte LLP" → "Deloitte"
+ */
+export function normalizeCompanyForStorage(company: string): string {
+  if (!company) return company;
+
+  let normalized = company.trim();
+
+  // Remove leading "The " (case insensitive)
+  normalized = normalized.replace(/^The\s+/i, '');
+
+  // Remove parenthetical suffixes like "(BCG)", "(US)", "(NYSE: XYZ)"
+  normalized = normalized.replace(/\s*\([^)]+\)\s*$/, '');
+
+  // Remove ", Inc." or ", LLC" etc. but keep "& Company"
+  normalized = normalized.replace(/,\s*(Inc\.?|LLC|Ltd\.?|Corp\.?|Corporation)$/i, '');
+
+  // Remove standalone legal suffixes (not preceded by &)
+  normalized = normalized.replace(/\s+(Inc\.?|LLC|LLP|Ltd\.?|Corp\.?|Corporation|Co\.)$/i, '');
+
+  // Clean up extra whitespace and trailing punctuation
+  normalized = normalized.replace(/\s+/g, ' ').trim();
+  normalized = normalized.replace(/[,&]\s*$/, '').trim();
+
+  return normalized;
+}
+
+/**
  * Check if email is from a work domain (not personal)
  * Work emails are considered VERIFIED, personal emails are UNVERIFIED
  */
@@ -715,8 +748,9 @@ export async function saveDiscoveredPerson(
   },
   searchUniversity?: string | null // Fallback university from search params
 ): Promise<{ personId: string; isNew: boolean }> {
-  // Use Apollo's company if available, otherwise fall back to search company
-  const resolvedCompany = apolloData.apolloCompany || apolloData.company;
+  // Use Apollo's company if available, otherwise fall back to search company, then normalize
+  const rawCompany = apolloData.apolloCompany || apolloData.company;
+  const resolvedCompany = normalizeCompanyForStorage(rawCompany);
 
   // Check if person already exists - try resolvedCompany first, then fallback to search company
   // This handles both new records (saved with Apollo company) and legacy records (saved with search company)
@@ -731,12 +765,13 @@ export async function saveDiscoveredPerson(
   });
 
   // Fallback: check if they exist with the search company (legacy data)
-  if (!existing && apolloData.apolloCompany && apolloData.apolloCompany !== apolloData.company) {
+  const normalizedSearchCompany = normalizeCompanyForStorage(apolloData.company);
+  if (!existing && apolloData.apolloCompany && resolvedCompany !== normalizedSearchCompany) {
     existing = await prisma.person.findUnique({
       where: {
         fullName_company: {
           fullName,
-          company: apolloData.company,
+          company: normalizedSearchCompany,
         },
       },
       select: { id: true },
@@ -930,8 +965,9 @@ export async function saveScrapedProfile(
   searchCompany: string, // Fallback if scraper didn't find company
   searchUniversity?: string | null // Fallback if scraper didn't find school
 ): Promise<{ personId: string; isNew: boolean }> {
-  // Use scraped company or fall back to search company
-  const company = profile.company || searchCompany;
+  // Use scraped company or fall back to search company, then normalize
+  const rawCompany = profile.company || searchCompany;
+  const company = normalizeCompanyForStorage(rawCompany);
 
   // Use scraped schools array or fall back to search university
   const schools = profile.schools.length > 0

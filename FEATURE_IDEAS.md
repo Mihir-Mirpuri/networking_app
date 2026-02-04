@@ -251,7 +251,7 @@ interface ParsedResponse {
 - Better workflow
 
 **Features:**
-- "Add to Lattice" button on LinkedIn profiles
+- "Add to Signl" button on LinkedIn profiles
 - Auto-fill search form with profile data
 - Quick email generation from profile
 

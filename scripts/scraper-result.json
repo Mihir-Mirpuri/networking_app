@@ -1,0 +1,485 @@
+[
+  {
+    "linkedinUrl": "https://www.linkedin.com/in/williamhgates",
+    "firstName": "Bill",
+    "lastName": "Gates",
+    "fullName": "Bill Gates",
+    "headline": "Chair, Gates Foundation and Founder, Breakthrough Energy",
+    "connections": 8,
+    "followers": 39841345,
+    "email": "bill.gates@gatesfoundation.org",
+    "mobileNumber": "+18455846030",
+    "jobTitle": "Co-chair",
+    "jobStartedOn": "2000",
+    "jobLocation": null,
+    "jobStillWorking": true,
+    "companyName": "Gates Foundation",
+    "companyIndustry": "Non-profit Organizations",
+    "companyWebsite": "https://www.gatesfoundation.org/about/careers",
+    "companyLinkedin": "https://www.linkedin.com/company/gates-foundation/",
+    "companyFoundedIn": null,
+    "companySize": "1001-5000",
+    "currentJobDuration": null,
+    "currentJobDurationInYrs": null,
+    "topSkillsByEndorsements": null,
+    "addressCountryOnly": "United States",
+    "addressWithCountry": "Seattle, Washington, United States",
+    "addressWithoutCountry": "Seattle, Washington",
+    "profilePic": "https://media.licdn.com/dms/image/v2/D5603AQF-RYZP55jmXA/profile-displayphoto-shrink_800_800/B56ZRi8g.aGsAc-/0/1736826818808?e=1771459200&v=beta&t=P96DBxNcHgHwTU0C6z0AJdX0c5UOrWjbsLVoFEHV32o",
+    "profilePicHighQuality": "https://media.licdn.com/dms/image/v2/D5603AQF-RYZP55jmXA/profile-displayphoto-shrink_800_800/B56ZRi8g.aGsAc-/0/1736826818808?e=1771459200&v=beta&t=P96DBxNcHgHwTU0C6z0AJdX0c5UOrWjbsLVoFEHV32o",
+    "backgroundPic": "https://media.licdn.com/dms/image/v2/D5616AQEjhPbTCeblYg/profile-displaybackgroundimage-shrink_350_1400/B56ZcytR5SGsAg-/0/1748902420393?e=1771459200&v=beta&t=Fs4Uqyv-ppf9x83CW4wwAVsT8eMziluXsIL9zqqfd3E",
+    "linkedinId": "251749025",
+    "isPremium": true,
+    "isVerified": false,
+    "isJobSeeker": false,
+    "isRetired": false,
+    "isCreator": true,
+    "isInfluencer": true,
+    "isCurrentlyEmployed": true,
+    "about": "Chair of the Gates Foundation. Founder of Breakthrough Energy. Co-founder of Microsoft. Voracious reader. Avid traveler. Active blogger.",
+    "publicIdentifier": "williamhgates",
+    "linkedinPublicUrl": "https://linkedin.com/in/williamhgates",
+    "openConnection": false,
+    "urn": "ACoAAA8BYqEBCGLg_vT_ca6mMEqkpp9nVffJ3hc",
+    "totalRecommendationsReceived": 0,
+    "totalRecommendationsGiven": 0,
+    "birthday": {
+      "day": "",
+      "month": "",
+      "year": ""
+    },
+    "associatedHashtag": [],
+    "firstRoleYear": null,
+    "totalExperienceYears": null,
+    "experiencesCount": 3,
+    "experiences": [
+      {
+        "companyId": "8736",
+        "companyUrn": "urn:li:fsd_company:8736",
+        "companyLink1": "https://www.linkedin.com/company/gates-foundation/",
+        "companyName": "Gates Foundation",
+        "companySize": "1001-5000",
+        "companyWebsite": "https://www.gatesfoundation.org/about/careers",
+        "companyIndustry": "Non-profit Organizations",
+        "logo": "https://media.licdn.com/dms/image/v2/D560BAQEgMqqFTd40Tg/company-logo_400_400/company-logo_400_400/0/1736784969376/bill__melinda_gates_foundation_logo?e=1771459200&v=beta&t=KLDjMQZ9V0LnAo-FqLKv09oq28LJbkUTSCnALpHYYJU",
+        "title": "Co-chair",
+        "jobDescription": null,
+        "jobStartedOn": "2000",
+        "jobEndedOn": null,
+        "jobLocation": null,
+        "jobStillWorking": true,
+        "jobLocationCountry": "US",
+        "employmentType": null
+      },
+      {
+        "companyId": "19141006",
+        "companyUrn": "urn:li:fsd_company:19141006",
+        "companyLink1": "https://www.linkedin.com/company/breakthrough-energy/",
+        "companyName": "Breakthrough Energy",
+        "companySize": "51-200",
+        "companyWebsite": "https://www.breakthroughenergy.org/",
+        "companyIndustry": "Strategic Management Services",
+        "logo": "https://media.licdn.com/dms/image/v2/D560BAQFRMYiQN7-2kA/company-logo_400_400/B56ZoI4SGPI0AY-/0/1761085563539/breakthrough_energy_logo?e=1771459200&v=beta&t=m8BHu3IuKjmtEQ9wh2YWI7YPJaLA2v5kOANKG4Cl63M",
+        "title": "Founder",
+        "jobDescription": null,
+        "jobStartedOn": "2015",
+        "jobEndedOn": null,
+        "jobLocation": null,
+        "jobStillWorking": true,
+        "jobLocationCountry": "US",
+        "employmentType": null
+      },
+      {
+        "companyId": "1035",
+        "companyUrn": "urn:li:fsd_company:1035",
+        "companyLink1": "https://www.linkedin.com/company/microsoft/",
+        "companyName": "Microsoft",
+        "companySize": "10001-0",
+        "companyWebsite": "https://news.microsoft.com/",
+        "companyIndustry": "Software Development",
+        "logo": "https://media.licdn.com/dms/image/v2/D560BAQH32RJQCl3dDQ/company-logo_400_400/B56ZYQ0mrGGoAc-/0/1744038948046/microsoft_logo?e=1771459200&v=beta&t=xcxRvJoMTlWAE6dJH3hgSTnO0c_mUtinr_FtqwuHF6w",
+        "title": "Co-founder",
+        "jobDescription": null,
+        "jobStartedOn": "1975",
+        "jobEndedOn": null,
+        "jobLocation": null,
+        "jobStillWorking": true,
+        "jobLocationCountry": "US",
+        "employmentType": null
+      }
+    ],
+    "updates": [
+      {
+        "postText": "Looking ahead to the next 20 years, the Gates Foundation has three major aspirations to guide our work: ​\n​\n1. No mom, child, or baby dies of a preventable cause. ​\n2. The next generation grows up in a world without deadly infectious diseases. ​\n3. Hundreds of millions of people break free from poverty, putting more countries on a path to prosperity. ​\n ​\nI know that with the right commitment of resources, a fairer and healthier future for everyone is just on the horizon.",
+        "image": null,
+        "postLink": "https://www.linkedin.com/feed/update/urn:li:activity:7407934241675608064?updateEntityUrn=urn%3Ali%3Afs_feedUpdate%3A%28V2%2Curn%3Ali%3Aactivity%3A7407934241675608064%29",
+        "subTitle": null,
+        "title": null,
+        "type": "Post"
+      },
+      {
+        "postText": "I have always been an optimist. These days, though, my optimism comes with footnotes. For the first time this century, the world slipped backwards on key measures like childhood mortality in 2025, and if we don’t make the right decisions, this trend will continue.  At the same time, I also believe that, within the next decade, the world will not only get back on track but enter a new era of unprecedented progress. As we start 2026, I’m thinking about how the year ahead will position us for decades to come.",
+        "image": null,
+        "postLink": "https://www.linkedin.com/feed/update/urn:li:activity:7416559967329103872?updateEntityUrn=urn%3Ali%3Afs_feedUpdate%3A%28V2%2Curn%3Ali%3Aactivity%3A7416559967329103872%29",
+        "subTitle": null,
+        "title": null,
+        "type": "Post"
+      }
+    ],
+    "skills": [],
+    "creatorWebsite": [
+      {
+        "category": "BLOG",
+        "url": "https://gatesnot.es/sourcecode-li"
+      }
+    ],
+    "profilePicAllDimensions": [],
+    "educations": [
+      {
+        "companyId": "18483",
+        "companyUrn": "urn:li:fsd_company:18483",
+        "companyLink1": "https://www.linkedin.com/school/harvard-university/",
+        "logo": "https://media.licdn.com/dms/image/v2/C4E0BAQF5t62bcL0e9g/company-logo_200_200/company-logo_200_200/0/1631318058235?e=1771459200&v=beta&t=3FG-sPI7ds6brh2XIK0_GQVFo3DGy1TEnOAOmndcubM",
+        "title": "Harvard University",
+        "subtitle": null,
+        "description": null,
+        "grade": null,
+        "period": {
+          "startedOn": {
+            "year": 1973,
+            "month": 0
+          },
+          "endedOn": {
+            "year": 1975,
+            "month": 0
+          }
+        }
+      },
+      {
+        "companyId": "3164077",
+        "companyUrn": "urn:li:fsd_company:3164077",
+        "companyLink1": "https://www.linkedin.com/school/lakeside-school/",
+        "logo": "https://media.licdn.com/dms/image/v2/D560BAQGFmOQmzpxg9A/company-logo_200_200/company-logo_200_200/0/1683732883164/lakeside_school_logo?e=1771459200&v=beta&t=rwfb4H4SY99jiRE5sleS-SyE4aTanScfc0T5QNj5aoA",
+        "title": "Lakeside School",
+        "subtitle": null,
+        "description": null,
+        "grade": null,
+        "period": {
+          "startedOn": {
+            "year": 0,
+            "month": 0
+          },
+          "endedOn": {
+            "year": 0,
+            "month": 0
+          }
+        }
+      }
+    ],
+    "licenseAndCertificates": [],
+    "honorsAndAwards": [],
+    "languages": [],
+    "volunteerAndAwards": [],
+    "verifications": [],
+    "promos": [],
+    "highlights": [],
+    "projects": [],
+    "publications": [],
+    "patents": [],
+    "courses": [],
+    "testScores": [],
+    "organizations": [],
+    "volunteerCauses": [],
+    "interests": [],
+    "recommendationsReceived": [],
+    "recommendations": [],
+    "peopleAlsoViewed": [
+      {
+        "last_name": "Pichai ",
+        "first_name": "Sundar ",
+        "headline": "CEO at Google",
+        "entity_urn": "urn:li:fsd_profile:ACoAAE6FVtYBAW4bP82g1IhIHxzu_1J010WU3CQ",
+        "public_identifier": "sundarpichai",
+        "premium": true,
+        "profile_picture": "https://media.licdn.com/dms/image/v2/D4E03AQFrmDuWUxQoMg/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1715645354620?e=1771459200&v=beta&t=gHA8osM8itgh7wGdhsj6Pj4zRQd2nUVuRgG2aMNgI2s",
+        "url": "https://linkedin.com/in/ACoAAE6FVtYBAW4bP82g1IhIHxzu_1J010WU3CQ",
+        "follower_count": 3546356
+      },
+      {
+        "last_name": "Modi",
+        "first_name": "Narendra",
+        "headline": "Prime Minister of India",
+        "entity_urn": "urn:li:fsd_profile:ACoAABBhhiABVwqIoiMz90f7wLjjl8xvtPe3u3c",
+        "public_identifier": "narendramodi",
+        "premium": true,
+        "profile_picture": "https://media.licdn.com/dms/image/v2/D4D03AQHElqo2BcNgyw/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1730290871844?e=1771459200&v=beta&t=-PGAKNPvDscMDS0_XScs05b_ic7yUS801m1pZ1PovTs",
+        "url": "https://linkedin.com/in/ACoAABBhhiABVwqIoiMz90f7wLjjl8xvtPe3u3c",
+        "follower_count": 5266958
+      },
+      {
+        "last_name": "Nadella",
+        "first_name": "Satya",
+        "headline": "Chairman and CEO at Microsoft",
+        "entity_urn": "urn:li:fsd_profile:ACoAAAEkwwAB9KEc2TrQgOLEQ-vzRyZeCDyc6DQ",
+        "public_identifier": "satyanadella",
+        "premium": true,
+        "profile_picture": "https://media.licdn.com/dms/image/v2/C5603AQHHUuOSlRVA1w/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1579726625483?e=1771459200&v=beta&t=Ws2RtyXxaIUX2RkdEWK5w_FWHlBXTEdpcNmMQsx2Tsk",
+        "url": "https://linkedin.com/in/ACoAAAEkwwAB9KEc2TrQgOLEQ-vzRyZeCDyc6DQ",
+        "follower_count": 11831650
+      },
+      {
+        "last_name": "Khapra",
+        "first_name": "Shradha",
+        "headline": "Co-Founder, Apna College | 7Million+ YT | Ex-SDE Microsoft | Google SPS’20",
+        "entity_urn": "urn:li:fsd_profile:ACoAACe8kMYBRySEWE-R0QpZ3udDVscbSopk3SM",
+        "public_identifier": "shradha-khapra",
+        "premium": false,
+        "profile_picture": "https://media.licdn.com/dms/image/v2/D5603AQF-INQX5DiLEw/profile-displayphoto-shrink_800_800/B56ZgIDZ_PGUAg-/0/1752481771838?e=1771459200&v=beta&t=eO8QIP_uQc90-9zzZqEyk5n-C-XVhdYoZGOnpXWVCc0",
+        "url": "https://linkedin.com/in/ACoAACe8kMYBRySEWE-R0QpZ3udDVscbSopk3SM",
+        "follower_count": 2198660
+      },
+      {
+        "last_name": "Huang",
+        "first_name": "Jensen",
+        "headline": "Founder and CEO, NVIDIA",
+        "entity_urn": "urn:li:fsd_profile:ACoAABMznFkB_XPgkYHnUl33kIHTWt1DtMAV6Pg",
+        "public_identifier": "jenhsunhuang",
+        "premium": true,
+        "profile_picture": "https://media.licdn.com/dms/image/v2/D5603AQEM7Pb1ndhi0Q/profile-displayphoto-crop_800_800/B56ZsU9UHlI8AM-/0/1765583176551?e=1771459200&v=beta&t=Bg_gPGBPH_UIMRfQ4nAtPNGbL_av9WsHxHe63LBXEWk",
+        "url": "https://linkedin.com/in/ACoAABMznFkB_XPgkYHnUl33kIHTWt1DtMAV6Pg",
+        "follower_count": 612578
+      },
+      {
+        "last_name": "Branson",
+        "first_name": "Richard",
+        "headline": "Founder at Virgin Group",
+        "entity_urn": "urn:li:fsd_profile:ACoAAAwp1RMBxG26M3Qkhm4klqLNr1bIplo6GhY",
+        "public_identifier": "rbranson",
+        "premium": true,
+        "profile_picture": "https://media.licdn.com/dms/image/v2/C4D03AQHh6_Wth5f3rQ/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1625181963183?e=1771459200&v=beta&t=RX10nJc1jbijRSmIWiut1Cl3uHyRjtBjtv50469lvSY",
+        "url": "https://linkedin.com/in/ACoAAAwp1RMBxG26M3Qkhm4klqLNr1bIplo6GhY",
+        "follower_count": 18656360
+      },
+      {
+        "last_name": "Gupta",
+        "first_name": "Aman",
+        "headline": "Co Founder @ boAt Lifestyle\n",
+        "entity_urn": "urn:li:fsd_profile:ACoAAAMkc8kBdWKTLlR2OReZqTQBn4_3fRYgRlY",
+        "public_identifier": "aman-gupta-7217a515",
+        "premium": true,
+        "profile_picture": "https://media.licdn.com/dms/image/v2/D4D03AQFtjMf-BvzBzQ/profile-displayphoto-crop_800_800/B4DZiZHS77GQAI-/0/1754915484573?e=1771459200&v=beta&t=h-xWMtEx1X6MkkMEH2nsG9zuzhppSItiMpCtf7pMd5k",
+        "url": "https://linkedin.com/in/ACoAAAMkc8kBdWKTLlR2OReZqTQBn4_3fRYgRlY",
+        "follower_count": 2985555
+      },
+      {
+        "last_name": "Curry",
+        "first_name": "Stephen",
+        "headline": "NBA Athlete | Producer, Investor, Entrepreneur, Philanthropist, Gold Medalist. NYT Best Selling Author.",
+        "entity_urn": "urn:li:fsd_profile:ACoAAAw4D5sB4ZMefUY22SQECAv5kgQQKM4Cwh4",
+        "public_identifier": "stephencurry30",
+        "premium": true,
+        "profile_picture": "https://media.licdn.com/dms/image/v2/C5603AQFB4ebeyLpzgw/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1568784020966?e=1771459200&v=beta&t=vgCrnDTGQ2Hh-MZt_e2vJYV-VMcLt3uAKX__emiFGXs",
+        "url": "https://linkedin.com/in/ACoAAAw4D5sB4ZMefUY22SQECAv5kgQQKM4Cwh4",
+        "follower_count": 598487
+      },
+      {
+        "last_name": "Donaldson",
+        "first_name": "Jimmy",
+        "headline": "Founder of MrBeast & Feastables",
+        "entity_urn": "urn:li:fsd_profile:ACoAADnl1jgBdlHVvRibBu9Fm0M77z4oYsyVQ0k",
+        "public_identifier": "mr-beast",
+        "premium": true,
+        "profile_picture": "https://media.licdn.com/dms/image/v2/D5603AQGQ-C6lKKb3pQ/profile-displayphoto-crop_800_800/B56Zl0Y1.RHUAI-/0/1758594294085?e=1771459200&v=beta&t=hgLHZEZ0btQBw_8cGCn4u1H-svRJdU76iNzGkAhRgGw",
+        "url": "https://linkedin.com/in/ACoAADnl1jgBdlHVvRibBu9Fm0M77z4oYsyVQ0k",
+        "follower_count": 485706
+      },
+      {
+        "last_name": "Dogg",
+        "first_name": "Snoop ",
+        "headline": "Coach Snoop, Team USA I CEO - Death Row Records | Founder - Death Row Pictures",
+        "entity_urn": "urn:li:fsd_profile:ACoAAEJAUQEBouU2110ZLhX9BGLPGGP61Wuqsv8",
+        "public_identifier": "snoopdogg",
+        "premium": true,
+        "profile_picture": "https://media.licdn.com/dms/image/v2/D5603AQFITWSVmZK_0Q/profile-displayphoto-crop_800_800/B56ZsNulbEJsAI-/0/1765461877085?e=1771459200&v=beta&t=WwMDZ_sjp0KBPN41QPXhkruSYioUR69gb5TecKDgcpQ",
+        "url": "https://linkedin.com/in/ACoAAEJAUQEBouU2110ZLhX9BGLPGGP61Wuqsv8",
+        "follower_count": 676685
+      },
+      {
+        "last_name": "Pandey",
+        "first_name": "Alakh",
+        "headline": "Mission to Empower 25 Crore Youth of BHARAT by 2030",
+        "entity_urn": "urn:li:fsd_profile:ACoAADjvys4B4P6r_UT3FF4bR32ZV6PtlR3lDDw",
+        "public_identifier": "alakh-pandey-4baaa8227",
+        "premium": true,
+        "profile_picture": "https://media.licdn.com/dms/image/v2/D5603AQEfIiFS2FwVNQ/profile-displayphoto-shrink_800_800/B56ZRAdtJeGsAg-/0/1736248317410?e=1771459200&v=beta&t=DErf4MmFCYO1HmcCK2YRyHoaCUd6dPhqSSraE-OB9b8",
+        "url": "https://linkedin.com/in/ACoAADjvys4B4P6r_UT3FF4bR32ZV6PtlR3lDDw",
+        "follower_count": 520624
+      },
+      {
+        "last_name": "Agarwal",
+        "first_name": "Ritesh",
+        "headline": "PRISM Founder & Group CEO | Revolutionizing Hospitality Industry",
+        "entity_urn": "urn:li:fsd_profile:ACoAAASlZKcBxJ-rx0394rCDVwXzKMtcpvslgWc",
+        "public_identifier": "riteshagar",
+        "premium": true,
+        "profile_picture": "https://media.licdn.com/dms/image/v2/C4D03AQEijuEmdjNrqw/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1609836256686?e=1771459200&v=beta&t=XCpMNkzOiDlAa9kyh-IuFFSNNfGd1WidqJsCkhSEt_Y",
+        "url": "https://linkedin.com/in/ACoAAASlZKcBxJ-rx0394rCDVwXzKMtcpvslgWc",
+        "follower_count": 1419162
+      },
+      {
+        "last_name": "Sunak",
+        "first_name": "Rishi",
+        "headline": "MP for Richmond and Northallerton. Former Prime Minister of the United Kingdom.",
+        "entity_urn": "urn:li:fsd_profile:ACoAAC_m1aoBCuAl3tCOFJZho4TVOR6w9XqnbH4",
+        "public_identifier": "rishi-sunak",
+        "premium": true,
+        "profile_picture": "https://media.licdn.com/dms/image/v2/D4E03AQHuaJqlVoEyCQ/profile-displayphoto-crop_800_800/B4EZoXyQrQHgAI-/0/1761335645996?e=1771459200&v=beta&t=vOyDDO56u8fMjOZRRVkxjcJLDyzo_2PqjcGjpJ9q_iw",
+        "url": "https://linkedin.com/in/ACoAAC_m1aoBCuAl3tCOFJZho4TVOR6w9XqnbH4",
+        "follower_count": 2200813
+      },
+      {
+        "last_name": "Gadkari",
+        "first_name": "Nitin",
+        "headline": "Minister of Road Transport & Highways, Government of India at Government of India",
+        "entity_urn": "urn:li:fsd_profile:ACoAADjxI5sB8zh1KYWtStYxnRHjvVa6ckeE8Eo",
+        "public_identifier": "nitin-gadkari-5b7b2b227",
+        "premium": false,
+        "profile_picture": "https://media.licdn.com/dms/image/v2/D4D03AQFuxFsr9M-Xlg/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1723815535181?e=1771459200&v=beta&t=YYfkYQXDyiAxDEVvYdO-HDzChElB0QVsUFOtqf9vCDQ",
+        "url": "https://linkedin.com/in/ACoAADjxI5sB8zh1KYWtStYxnRHjvVa6ckeE8Eo",
+        "follower_count": 2076349
+      },
+      {
+        "last_name": "Mittal",
+        "first_name": "Anupam",
+        "headline": "Founder & CEO @ People Group | Tech & D2C Builder & Investor\n🦈 @Shark Tank India",
+        "entity_urn": "urn:li:fsd_profile:ACoAAAMCzYcBj7k8LBrG8tu6vjLRWGWaQ9WFxoc",
+        "public_identifier": "anupammittal007",
+        "premium": true,
+        "profile_picture": "https://media.licdn.com/dms/image/v2/D4D03AQH-UEtOFzyzKQ/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1684481062551?e=1771459200&v=beta&t=uPRxx7jKIvvvHMmyqVOWHU03iH-YVFYTaqRT6aWP_SY",
+        "url": "https://linkedin.com/in/ACoAAAMCzYcBj7k8LBrG8tu6vjLRWGWaQ9WFxoc",
+        "follower_count": 1598126
+      },
+      {
+        "last_name": "Suleyman",
+        "first_name": "Mustafa",
+        "headline": "CEO, Microsoft AI",
+        "entity_urn": "urn:li:fsd_profile:ACoAAA9eyYUBh9JQIB19tmDanxKjRK9p8Nw4FrY",
+        "public_identifier": "mustafa-suleyman",
+        "premium": true,
+        "profile_picture": "https://media.licdn.com/dms/image/v2/D4E03AQH__Hh7CEcg-A/profile-displayphoto-shrink_800_800/B4EZcSqB4VHsAc-/0/1748364697584?e=1771459200&v=beta&t=0v0c9qpqZmlM58qDNBLAa-RFfEFPiAzm4Ztiez0unRM",
+        "url": "https://linkedin.com/in/ACoAAA9eyYUBh9JQIB19tmDanxKjRK9p8Nw4FrY",
+        "follower_count": 501777
+      },
+      {
+        "last_name": "Reynolds",
+        "first_name": "Ryan",
+        "headline": "Part-Time Actor, Business Owner",
+        "entity_urn": "urn:li:fsd_profile:ACoAADib0tEByzvgsS0kMMiPk4liOa1qZs3Q4pE",
+        "public_identifier": "vancityreynolds",
+        "premium": true,
+        "profile_picture": "https://media.licdn.com/dms/image/v2/C5603AQGOBfXsKX8U5Q/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1636498355197?e=1771459200&v=beta&t=jtLoCGK6norGPFo_03ypP8m-RZ9SQnCKC9tta33qJyg",
+        "url": "https://linkedin.com/in/ACoAADib0tEByzvgsS0kMMiPk4liOa1qZs3Q4pE",
+        "follower_count": 3680738
+      },
+      {
+        "last_name": "Naidu",
+        "first_name": "Shantanu",
+        "headline": "General Manager, Head - Strategic Initiatives, Tata Motors,\n\nFounder, Goodfellows India, Mumbai Bookies\n\nBusiness World 30 under 30, TEDx Sometimes",
+        "entity_urn": "urn:li:fsd_profile:ACoAAB8KalABDcw07tqC2Tt9EP4dlEh-EaIjLU8",
+        "public_identifier": "shantanu-naidu",
+        "premium": true,
+        "profile_picture": "https://media.licdn.com/dms/image/v2/D4D03AQG2Bk6emxOMxA/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1705473995236?e=1771459200&v=beta&t=7SupYQE1AXTdCFYkURTVwhXhcPWkVwoJWN7k5Y427FQ",
+        "url": "https://linkedin.com/in/ACoAAB8KalABDcw07tqC2Tt9EP4dlEh-EaIjLU8",
+        "follower_count": 1054034
+      },
+      {
+        "last_name": "Singh",
+        "first_name": "Vineeta",
+        "headline": "CEO at SUGAR Cosmetics",
+        "entity_urn": "urn:li:fsd_profile:ACoAAADJYAkBVZlXjGdC9CSBBU3t6i2ZnSOiQZg",
+        "public_identifier": "vineetasingh",
+        "premium": true,
+        "profile_picture": "https://media.licdn.com/dms/image/v2/D4D03AQFmnI-8B-Ru7Q/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1730294133952?e=1771459200&v=beta&t=I0r2UYTOOzzWnF29eeorvaLHgqDMECS2RENGz19EX7Q",
+        "url": "https://linkedin.com/in/ACoAAADJYAkBVZlXjGdC9CSBBU3t6i2ZnSOiQZg",
+        "follower_count": 1507506
+      },
+      {
+        "last_name": "Sitharaman",
+        "first_name": "Nirmala",
+        "headline": "Minister of Finance and Corporate Affairs ",
+        "entity_urn": "urn:li:fsd_profile:ACoAAESLOisBWkQOovTCbKFrLZIcSr-k8JP_BMI",
+        "public_identifier": "nsitharaman",
+        "premium": false,
+        "profile_picture": "https://media.licdn.com/dms/image/v2/D5603AQFK4qAD31HkRg/profile-displayphoto-crop_800_800/B56Zlxh1Y5J0AI-/0/1758546319922?e=1771459200&v=beta&t=25P8ySO7anzCdSBe_vcIsLTse-WXk2eJBOrtIQGvtEE",
+        "url": "https://linkedin.com/in/ACoAAESLOisBWkQOovTCbKFrLZIcSr-k8JP_BMI",
+        "follower_count": 321892
+      },
+      {
+        "last_name": "von der Leyen",
+        "first_name": "Ursula",
+        "headline": "President of the European Commission",
+        "entity_urn": "urn:li:fsd_profile:ACoAAC9t7NIBcdtQHhTWVV25CbaB7E6s729cTMQ",
+        "public_identifier": "ursula-von-der-leyen",
+        "premium": true,
+        "profile_picture": "https://media.licdn.com/dms/image/v2/C5603AQGJCqFaKOA9FA/profile-displayphoto-shrink_400_400/profile-displayphoto-shrink_400_400/0/1581949606683?e=1771459200&v=beta&t=3z2AdaFL_BrNhd-yI4JgFw0DFqAbmViKkT79H4KdnDQ",
+        "url": "https://linkedin.com/in/ACoAAC9t7NIBcdtQHhTWVV25CbaB7E6s729cTMQ",
+        "follower_count": 1960761
+      },
+      {
+        "last_name": "Hoffman",
+        "first_name": "Reid",
+        "headline": "Co-Founder, LinkedIn, Manas AI & Inflection AI. Founding Team, PayPal.  Author of Superagency.  Podcaster of Possible and Masters of Scale.  ",
+        "entity_urn": "urn:li:fsd_profile:ACoAAAAABL0B3SGhqeNX998wiOuk_8hYA6ojLwg",
+        "public_identifier": "reidhoffman",
+        "premium": true,
+        "profile_picture": "https://media.licdn.com/dms/image/v2/D5603AQHW7wKzPb3DAg/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1718216236351?e=1771459200&v=beta&t=E4IP5Ct2cmZ_UrR0vW0wSqTNbCq3rF9gbQ74m7wz7pM",
+        "url": "https://linkedin.com/in/ACoAAAAABL0B3SGhqeNX998wiOuk_8hYA6ojLwg",
+        "follower_count": 2748283
+      },
+      {
+        "last_name": "Berkley",
+        "first_name": "Seth",
+        "headline": "Health & Technology Consultant",
+        "entity_urn": "urn:li:fsd_profile:ACoAAABP0AMBxTT-IKvJJmR1hsrWl5SeJjUvi10",
+        "public_identifier": "sethberkley",
+        "premium": true,
+        "profile_picture": "https://media.licdn.com/dms/image/v2/D4E03AQF2mnyMwpNcZA/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1696409610876?e=1771459200&v=beta&t=DzBSDuvOI8Imv1bGdrF7bZDK5m_tM9yRujuRmb6X050",
+        "url": "https://linkedin.com/in/ACoAAABP0AMBxTT-IKvJJmR1hsrWl5SeJjUvi10",
+        "follower_count": 187110
+      },
+      {
+        "last_name": "Habib",
+        "first_name": "Amina",
+        "headline": "Entrepreneure| Fondatrice Women Impact Hub - Incubateur 100% féminin & Women Proactive MR🇲🇷 | Consultante en Entrepreneuriat je t’accompagne sur tes projets| Auteure engagée| 🏆Top#1 LinkedIn Creator Mauritanie🇲🇷\n",
+        "entity_urn": "urn:li:fsd_profile:ACoAACSqCnwBDIudKECF3kRCxpXnYt9Gle92S50",
+        "public_identifier": "amina-habib-364006152",
+        "premium": false,
+        "profile_picture": "https://media.licdn.com/dms/image/v2/D4E03AQGzr8yvIO9Grw/profile-displayphoto-crop_800_800/B4EZl2QH.LHEAI-/0/1758625563857?e=1771459200&v=beta&t=TX1IrHDRNr4Ofah5S9uaJWJJHzK905ctJP_cTJLjeDg",
+        "url": "https://linkedin.com/in/ACoAACSqCnwBDIudKECF3kRCxpXnYt9Gle92S50",
+        "follower_count": 159425
+      },
+      {
+        "last_name": "Trudeau",
+        "first_name": "Justin",
+        "headline": "Prime Minister of Canada | Premier ministre du Canada",
+        "entity_urn": "urn:li:fsd_profile:ACoAAA2CDF8BlyDd8jHcvIujtyUS6YDtx6EOzJ4",
+        "public_identifier": "justintrudeau",
+        "premium": true,
+        "profile_picture": "https://media.licdn.com/dms/image/v2/C4E03AQGD-PJnXZmU8g/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1629053585597?e=1771459200&v=beta&t=pnU6kWAZ1jYYxga-bxeACm-oJ0ThMZX1jvR3RmNBVRs",
+        "url": "https://linkedin.com/in/ACoAAA2CDF8BlyDd8jHcvIujtyUS6YDtx6EOzJ4",
+        "follower_count": 5494630
+      },
+      {
+        "last_name": "Khan",
+        "first_name": "Sal",
+        "headline": "Khan Academy, TED, Schoolhouse.world, Khan Lab School",
+        "entity_urn": "urn:li:fsd_profile:ACoAAAAG7n0BqIWxwKBc4aC0Io6sFM1Rzg3vONI",
+        "public_identifier": "khanacademy",
+        "premium": true,
+        "profile_picture": "https://media.licdn.com/dms/image/v2/C4D03AQGac362dD7snA/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1615325372156?e=1771459200&v=beta&t=OYVpxGvY3gNmR27MdVD5lfm_fwlHWvWiQ2IxK70vmD8",
+        "url": "https://linkedin.com/in/ACoAAAAG7n0BqIWxwKBc4aC0Io6sFM1Rzg3vONI",
+        "follower_count": 450851
+      }
+    ]
+  }
+]

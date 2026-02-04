@@ -1,8 +1,8 @@
-# Lattice - Application Summary
+# Signl - Application Summary
 
 ## What It Does
 
-Lattice is a networking outreach tool designed for students and professionals in finance and consulting. It helps users discover and connect with alumni and professionals at target companies.
+Signl is a networking outreach tool designed for students and professionals in finance and consulting. It helps users discover and connect with alumni and professionals at target companies.
 
 ## Core Features
 
