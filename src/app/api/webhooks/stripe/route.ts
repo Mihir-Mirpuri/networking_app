@@ -76,10 +76,28 @@ export async function POST(req: NextRequest) {
       case 'invoice.payment_succeeded':
       case 'invoice.paid': {
         const invoice = event.data.object as Stripe.Invoice;
-        const subscriptionId = (invoice as unknown as Record<string, string>).subscription;
+
+        // Extract subscription ID - can be at invoice.subscription or invoice.parent.subscription_details.subscription
+        const invoiceAny = invoice as unknown as Record<string, unknown>;
+        let subscriptionId: string | null = null;
+
+        if (typeof invoiceAny.subscription === 'string') {
+          subscriptionId = invoiceAny.subscription;
+        } else if (invoiceAny.parent && typeof invoiceAny.parent === 'object') {
+          const parent = invoiceAny.parent as Record<string, unknown>;
+          if (parent.subscription_details && typeof parent.subscription_details === 'object') {
+            const subDetails = parent.subscription_details as Record<string, unknown>;
+            if (typeof subDetails.subscription === 'string') {
+              subscriptionId = subDetails.subscription;
+            }
+          }
+        }
+
         const customerId = typeof invoice.customer === 'string'
           ? invoice.customer
           : (invoice.customer as unknown as Record<string, string>)?.id;
+
+        console.log(`Processing invoice.paid - customerId: ${customerId}, subscriptionId: ${subscriptionId}`);
 
         if (subscriptionId && customerId) {
           const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
@@ -96,7 +114,9 @@ export async function POST(req: NextRequest) {
             },
           });
 
-          console.log(`Invoice paid for customer: ${customerId}, subscription: ${subscription.id}`);
+          console.log(`Invoice paid - updated user for customer: ${customerId}, subscription: ${subscription.id}, status: ${subscription.status}`);
+        } else {
+          console.log(`Invoice paid - missing data. customerId: ${customerId}, subscriptionId: ${subscriptionId}`);
         }
         break;
       }
