@@ -22,6 +22,7 @@
     "@headlessui/react": "^1.7.19",
     "@heroicons/react": "^2.2.0",
     "@prisma/client": "^5.10.0",
+    "@stripe/stripe-js": "^8.7.0",
     "@supabase/supabase-js": "^2.91.1",
     "apify-client": "^2.22.0",
     "dotenv": "^17.2.3",
@@ -34,6 +35,7 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "resend": "^6.8.0",
+    "stripe": "^20.3.0",
     "zod": "^3.22.4"
   },
   "devDependencies": {

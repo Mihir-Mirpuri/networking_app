@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { sendInviteAction } from '@/app/actions/invitations';
+import { createCheckoutSession } from '@/app/actions/subscription';
 import { EMAIL_LIMITS } from '@/lib/constants';
 
 interface LimitReachedModalProps {
@@ -13,10 +14,22 @@ interface LimitReachedModalProps {
 export function LimitReachedModal({ isOpen, onClose, onCreditsAwarded }: LimitReachedModalProps) {
   const [email, setEmail] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   if (!isOpen) return null;
+
+  const handleSubscribe = async () => {
+    setIsCheckoutLoading(true);
+    setError(null);
+    try {
+      await createCheckoutSession();
+    } catch (err) {
+      setError('Failed to start checkout. Please try again.');
+      setIsCheckoutLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,6 +108,53 @@ export function LimitReachedModal({ isOpen, onClose, onCreditsAwarded }: LimitRe
                   <span className="font-semibold">+{EMAIL_LIMITS.CREDITS_ON_INVITEE_SIGNUP} more</span> when they sign up!
                 </p>
               </div>
+            </div>
+          </div>
+
+          {/* Subscribe Option */}
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 mb-4 border border-blue-100">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M5 2a2 2 0 00-2 2v14l3.5-2 3.5 2 3.5-2 3.5 2V4a2 2 0 00-2-2H5zm2.5 3a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm6.207.293a1 1 0 00-1.414 0l-6 6a1 1 0 101.414 1.414l6-6a1 1 0 000-1.414zM12.5 10a1.5 1.5 0 100 3 1.5 1.5 0 000-3z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-blue-900">Unlimited emails with Pro</p>
+                <p className="text-sm text-blue-700 mt-0.5">Send unlimited outreach emails for $10/month</p>
+              </div>
+            </div>
+            <button
+              onClick={handleSubscribe}
+              disabled={isCheckoutLoading}
+              className="w-full mt-3 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+            >
+              {isCheckoutLoading ? (
+                <>
+                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Loading...
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  Upgrade to Pro - $10/month
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Divider */}
+          <div className="relative my-4">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-200" />
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-white text-gray-500">or get free credits</span>
             </div>
           </div>
 

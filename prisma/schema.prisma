@@ -52,6 +52,11 @@ model User {
   emailCredits               Int                          @default(0)
   referralCode               String?                      @unique
   referredById               String?
+  // Stripe subscription fields
+  stripeCustomerId           String?                      @unique
+  stripeSubscriptionId       String?                      @unique
+  stripeCurrentPeriodEnd     DateTime?
+  subscriptionStatus         String?
   referredBy                 User?                        @relation("Referrals", fields: [referredById], references: [id])
   referrals                  User[]                       @relation("Referrals")
   createdAt                  DateTime                     @default(now())

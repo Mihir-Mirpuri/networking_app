@@ -16,6 +16,7 @@ interface CreditStatus {
   dailyLimit: number;
   bonusCredits: number;
   totalRemaining: number;
+  isSubscribed: boolean;
 }
 
 interface CreditsDisplayProps {
@@ -35,6 +36,7 @@ export function CreditsDisplay({ onStatusChange, refreshTrigger }: CreditsDispla
         dailyLimit: result.dailyLimit,
         bonusCredits: result.bonusCredits,
         totalRemaining: result.totalRemaining,
+        isSubscribed: result.isSubscribed,
       };
       setStatus(newStatus);
       onStatusChange?.(newStatus);
@@ -67,6 +69,21 @@ export function CreditsDisplay({ onStatusChange, refreshTrigger }: CreditsDispla
   }
 
   if (!status) return null;
+
+  // Show Pro badge for subscribers
+  if (status.isSubscribed) {
+    return (
+      <div className="flex items-center gap-2 text-sm">
+        <div className="flex items-center gap-1.5 px-2.5 py-1 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full">
+          <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M5 2a2 2 0 00-2 2v14l3.5-2 3.5 2 3.5-2 3.5 2V4a2 2 0 00-2-2H5zm2.5 3a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm6.207.293a1 1 0 00-1.414 0l-6 6a1 1 0 101.414 1.414l6-6a1 1 0 000-1.414zM12.5 10a1.5 1.5 0 100 3 1.5 1.5 0 000-3z" clipRule="evenodd" />
+          </svg>
+          <span className="font-semibold text-white">Pro</span>
+        </div>
+        <span className="text-gray-500">Unlimited emails</span>
+      </div>
+    );
+  }
 
   const dailyRemaining = status.dailyLimit - status.dailyUsed;
   const isLow = status.totalRemaining <= 3;

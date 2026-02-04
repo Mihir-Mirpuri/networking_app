@@ -7,6 +7,26 @@ export interface CreditStatus {
   dailyLimit: number;
   bonusCredits: number;
   totalRemaining: number;
+  isSubscribed: boolean;
+}
+
+/**
+ * Check if user has an active subscription
+ */
+export async function hasActiveSubscription(userId: string): Promise<boolean> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { subscriptionStatus: true, stripeCurrentPeriodEnd: true },
+  });
+
+  if (!user) return false;
+
+  const isActive = user.subscriptionStatus === 'active';
+  const notExpired = user.stripeCurrentPeriodEnd
+    ? user.stripeCurrentPeriodEnd > new Date()
+    : false;
+
+  return isActive && notExpired;
 }
 
 /**
@@ -19,8 +39,28 @@ export async function checkEmailCredits(userId: string): Promise<CreditStatus> {
       dailySendCount: true,
       lastSendDate: true,
       emailCredits: true,
+      subscriptionStatus: true,
+      stripeCurrentPeriodEnd: true,
     },
   });
+
+  // Check if user has active subscription
+  const isSubscribed =
+    user?.subscriptionStatus === 'active' &&
+    user?.stripeCurrentPeriodEnd &&
+    user.stripeCurrentPeriodEnd > new Date();
+
+  // Subscribers get unlimited emails
+  if (isSubscribed) {
+    return {
+      canSend: true,
+      dailyUsed: user?.dailySendCount || 0,
+      dailyLimit: -1, // -1 indicates unlimited
+      bonusCredits: user?.emailCredits || 0,
+      totalRemaining: -1, // -1 indicates unlimited
+      isSubscribed: true,
+    };
+  }
 
   const today = new Date().toDateString();
   const lastSendDate = user?.lastSendDate?.toDateString();
@@ -40,6 +80,7 @@ export async function checkEmailCredits(userId: string): Promise<CreditStatus> {
     dailyLimit,
     bonusCredits,
     totalRemaining,
+    isSubscribed: false,
   };
 }
 
