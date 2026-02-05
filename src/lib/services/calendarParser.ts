@@ -13,6 +13,7 @@
 
 import { completeJson, GroqJsonParseError, GroqError } from '@/lib/services/groq';
 import { MeetingDetectionResult } from '@/lib/utils/meetingDetector';
+import { fromZonedTime } from 'date-fns-tz';
 
 // ============================================================================
 // Types
@@ -258,8 +259,40 @@ interface DateResolutionResult {
 }
 
 /**
+ * Converts a Date object representing "wall clock time" to UTC.
+ *
+ * The input Date's year/month/day/hour/minute represent what time the user
+ * meant in their local timezone. This function converts that to the equivalent
+ * UTC moment.
+ *
+ * Example: If localDate represents "Feb 6, 2026 6:00 PM" and userTimezone is
+ * "America/Chicago", the result will be the UTC moment that corresponds to
+ * 6 PM Chicago time (which is midnight UTC the next day, since Chicago is UTC-6).
+ */
+function convertLocalTimeToUTC(localDate: Date, userTimezone: string): Date {
+  // Extract the "wall clock" components from the date
+  const year = localDate.getFullYear();
+  const month = String(localDate.getMonth() + 1).padStart(2, '0');
+  const day = String(localDate.getDate()).padStart(2, '0');
+  const hours = String(localDate.getHours()).padStart(2, '0');
+  const minutes = String(localDate.getMinutes()).padStart(2, '0');
+
+  // Create an ISO-like string without timezone info
+  // This represents "what time the user meant" in their local timezone
+  const localTimeStr = `${year}-${month}-${day}T${hours}:${minutes}:00`;
+
+  // Use fromZonedTime to interpret this as a time in the user's timezone
+  // and get the equivalent UTC moment
+  return fromZonedTime(localTimeStr, userTimezone);
+}
+
+/**
  * Attempts to resolve a natural language date/time to a Date object
- * relative to the email's received date
+ * relative to the email's received date.
+ *
+ * If userTimezone is provided, the parsed time is interpreted as being
+ * in that timezone and converted to UTC. This is crucial for correct
+ * calendar event creation.
  */
 function resolveDateTime(
   rawDateTime: string | null,
@@ -272,7 +305,7 @@ function resolveDateTime(
 
   const raw = rawDateTime.toLowerCase().trim();
 
-  // Try parsing as ISO format first
+  // Try parsing as ISO format first (already has timezone info)
   const isoDate = new Date(rawDateTime);
   if (!isNaN(isoDate.getTime())) {
     return { date: isoDate, needsConfirmation: false };
@@ -282,7 +315,7 @@ function resolveDateTime(
   const today = new Date(referenceDate);
   today.setHours(0, 0, 0, 0);
 
-  // Helper to set time on a date
+  // Helper to set time on a date and optionally convert to UTC
   const setTime = (date: Date, timeStr: string): Date | null => {
     const result = new Date(date);
 
@@ -325,24 +358,29 @@ function resolveDateTime(
     return null;
   };
 
+  // Helper to finalize result with timezone conversion
+  const finalizeResult = (date: Date | null, needsConfirmation: boolean): DateResolutionResult => {
+    if (date && userTimezone) {
+      return {
+        date: convertLocalTimeToUTC(date, userTimezone),
+        needsConfirmation
+      };
+    }
+    return { date, needsConfirmation };
+  };
+
   // Handle "today" and "tomorrow"
   if (raw.includes('today')) {
     const result = new Date(today);
     const timeResult = setTime(result, raw);
-    return {
-      date: timeResult || result,
-      needsConfirmation: !timeResult
-    };
+    return finalizeResult(timeResult || result, !timeResult);
   }
 
   if (raw.includes('tomorrow')) {
     const result = new Date(today);
     result.setDate(result.getDate() + 1);
     const timeResult = setTime(result, raw);
-    return {
-      date: timeResult || result,
-      needsConfirmation: !timeResult
-    };
+    return finalizeResult(timeResult || result, !timeResult);
   }
 
   // Handle day of week
@@ -366,10 +404,7 @@ function resolveDateTime(
       const result = new Date(today);
       result.setDate(result.getDate() + daysToAdd);
       const timeResult = setTime(result, raw);
-      return {
-        date: timeResult || result,
-        needsConfirmation: !timeResult
-      };
+      return finalizeResult(timeResult || result, !timeResult);
     }
   }
 
@@ -388,10 +423,7 @@ function resolveDateTime(
       const result = new Date(today);
       result.setDate(result.getDate() + daysToAdd);
       const timeResult = setTime(result, raw);
-      return {
-        date: timeResult || result,
-        needsConfirmation: !timeResult
-      };
+      return finalizeResult(timeResult || result, !timeResult);
     }
   }
 
@@ -399,7 +431,7 @@ function resolveDateTime(
   if (raw.includes('next week')) {
     const result = new Date(today);
     result.setDate(result.getDate() + 7);
-    return { date: result, needsConfirmation: true };
+    return finalizeResult(result, true);
   }
 
   // Handle specific date formats (e.g., "Jan 15", "1/15", "January 15th")
@@ -427,10 +459,7 @@ function resolveDateTime(
       }
 
       const timeResult = setTime(result, raw);
-      return {
-        date: timeResult || result,
-        needsConfirmation: !timeResult
-      };
+      return finalizeResult(timeResult || result, !timeResult);
     }
   }
 
@@ -451,10 +480,7 @@ function resolveDateTime(
     }
 
     const timeResult = setTime(result, raw);
-    return {
-      date: timeResult || result,
-      needsConfirmation: !timeResult
-    };
+    return finalizeResult(timeResult || result, !timeResult);
   }
 
   // If we couldn't parse, return null but don't fail

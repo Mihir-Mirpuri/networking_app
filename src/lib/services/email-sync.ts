@@ -67,10 +67,10 @@ export async function syncUserMailbox(payload: SyncUserMailboxPayload): Promise<
     // 1. Get Gmail client
     const gmail = await getGmailClient(userId);
 
-    // 2. Get user's email address for direction detection
+    // 2. Get user's email address and timezone for direction detection and meeting extraction
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { email: true },
+      select: { email: true, timezone: true },
     });
 
     if (!user?.email) {
@@ -84,6 +84,8 @@ export async function syncUserMailbox(payload: SyncUserMailboxPayload): Promise<
       };
     }
 
+    const userTimezone = user.timezone || undefined;
+
     // 3. Get current sync state
     const syncState = await prisma.gmail_sync_state.findUnique({
       where: { userId },
@@ -96,17 +98,17 @@ export async function syncUserMailbox(payload: SyncUserMailboxPayload): Promise<
     let result: SyncResult;
 
     if (storedHistoryId) {
-      result = await processHistoryChanges(gmail, userId, user.email, storedHistoryId);
+      result = await processHistoryChanges(gmail, userId, user.email, storedHistoryId, userTimezone);
 
       // If history is stale (404/410), fall back to full sync
       if (!result.success && result.error?.includes('historyId')) {
         console.log(`[Email Sync] History stale, falling back to full sync`);
-        result = await performFullSync(gmail, userId, user.email);
+        result = await performFullSync(gmail, userId, user.email, userTimezone);
       }
     } else {
       // No stored historyId, do full sync
       console.log(`[Email Sync] No stored historyId, performing full sync`);
-      result = await performFullSync(gmail, userId, user.email);
+      result = await performFullSync(gmail, userId, user.email, userTimezone);
     }
 
     console.log(`[Email Sync] Sync completed for userId: ${userId}`, result);
@@ -146,7 +148,8 @@ async function processHistoryChanges(
   gmail: gmail_v1.Gmail,
   userId: string,
   userEmail: string,
-  startHistoryId: string
+  startHistoryId: string,
+  userTimezone?: string
 ): Promise<SyncResult> {
   console.log(`[Email Sync] Processing history changes from historyId: ${startHistoryId}`);
 
@@ -200,7 +203,7 @@ async function processHistoryChanges(
           if (!messageId) continue;
 
           try {
-            const processed = await fetchAndProcessMessage(gmail, userId, userEmail, messageId);
+            const processed = await fetchAndProcessMessage(gmail, userId, userEmail, messageId, userTimezone);
             if (processed) {
               messagesProcessed++;
               conversationsUpdated.add(processed.threadId);
@@ -271,7 +274,8 @@ async function processHistoryChanges(
 async function performFullSync(
   gmail: gmail_v1.Gmail,
   userId: string,
-  userEmail: string
+  userEmail: string,
+  userTimezone?: string
 ): Promise<SyncResult> {
   console.log(`[Email Sync] Performing full sync for userId: ${userId}`);
 
@@ -318,7 +322,7 @@ async function performFullSync(
         if (!messageId) continue;
 
         try {
-          const processed = await fetchAndProcessMessage(gmail, userId, userEmail, messageId);
+          const processed = await fetchAndProcessMessage(gmail, userId, userEmail, messageId, userTimezone);
           if (processed) {
             messagesProcessed++;
             conversationsUpdated.add(processed.threadId);
@@ -375,7 +379,8 @@ async function fetchAndProcessMessage(
   gmail: gmail_v1.Gmail,
   userId: string,
   userEmail: string,
-  messageId: string
+  messageId: string,
+  userTimezone?: string
 ): Promise<ProcessedMessage | null> {
   // 1. Check idempotency - skip if message already exists
   const existingMessage = await prisma.messages.findUnique({
@@ -461,7 +466,7 @@ async function fetchAndProcessMessage(
         threadId,
         userId,
         userEmail,
-      });
+      }, { userTimezone });
 
       if (extractionResult.extracted) {
         console.log(`[Email Sync] Meeting suggestion created for thread ${threadId}:`, {

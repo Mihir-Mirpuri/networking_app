@@ -88,6 +88,86 @@ export async function updateProfileAction(
 }
 
 // ============================================================================
+// Timezone Actions
+// ============================================================================
+
+/**
+ * Update user's timezone (only if not already set, to avoid overwriting)
+ * Called silently from client on app load
+ */
+export async function updateTimezoneAction(
+  timezone: string,
+  force: boolean = false
+): Promise<{ success: true; updated: boolean } | { success: false; error: string }> {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.id) {
+    return { success: false, error: 'Not authenticated' };
+  }
+
+  // Validate timezone string (basic check)
+  if (!timezone || typeof timezone !== 'string' || timezone.length > 50) {
+    return { success: false, error: 'Invalid timezone' };
+  }
+
+  try {
+    // Check if user already has a timezone set
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { timezone: true },
+    });
+
+    if (!user) {
+      return { success: false, error: 'User not found' };
+    }
+
+    // Skip if timezone is the same (no change needed)
+    if (user.timezone === timezone) {
+      return { success: true, updated: false };
+    }
+
+    await prisma.user.update({
+      where: { id: session.user.id },
+      data: { timezone },
+    });
+
+    return { success: true, updated: true };
+  } catch (error) {
+    console.error('Error updating timezone:', error);
+    return { success: false, error: 'Failed to update timezone' };
+  }
+}
+
+/**
+ * Get user's stored timezone
+ */
+export async function getTimezoneAction(): Promise<
+  { success: true; timezone: string | null } | { success: false; error: string }
+> {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.id) {
+    return { success: false, error: 'Not authenticated' };
+  }
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { timezone: true },
+    });
+
+    if (!user) {
+      return { success: false, error: 'User not found' };
+    }
+
+    return { success: true, timezone: user.timezone };
+  } catch (error) {
+    console.error('Error fetching timezone:', error);
+    return { success: false, error: 'Failed to fetch timezone' };
+  }
+}
+
+// ============================================================================
 // Template CRUD Actions
 // ============================================================================
 
