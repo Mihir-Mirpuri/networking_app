@@ -32,6 +32,8 @@ export interface SendResult {
 export async function sendEmailsAction(
   people: PersonToSend[]
 ): Promise<{ success: true; results: SendResult[] } | { success: false; error: string }> {
+  console.log('[Send] sendEmailsAction called with', people?.length ?? 0, 'people:', JSON.stringify(people?.map(p => ({ email: p.email, hasSubject: !!p.subject, hasBody: !!p.body, scheduledFor: p.scheduledFor })) ?? []));
+
   const session = await getServerSession(authOptions);
   if (!session?.user?.email || !session.user.id) {
     return { success: false, error: 'Not authenticated' };
@@ -75,7 +77,9 @@ export async function sendEmailsAction(
   }
 
   // Limit to batch size and remaining daily limit (only for immediate sends)
-  const toSend = immediate.slice(0, Math.min(BATCH_LIMIT, remaining));
+  // remaining === -1 indicates unlimited (Pro subscribers), so only apply BATCH_LIMIT
+  const effectiveLimit = remaining === -1 ? BATCH_LIMIT : Math.min(BATCH_LIMIT, remaining);
+  const toSend = immediate.slice(0, effectiveLimit);
   console.log('[Send] Processing', toSend.length, 'emails (batch limit:', BATCH_LIMIT, ', remaining:', remaining, ')');
 
   const results: SendResult[] = [];
