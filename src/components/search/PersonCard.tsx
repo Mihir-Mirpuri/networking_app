@@ -1,7 +1,7 @@
 'use client';
 
 import { SearchResultWithDraft } from '@/app/actions/search';
-import { EnvelopeIcon, AcademicCapIcon, MapPinIcon } from '@heroicons/react/24/outline';
+import { EnvelopeIcon, AcademicCapIcon, MapPinIcon, BuildingOfficeIcon } from '@heroicons/react/24/outline';
 
 interface PersonCardProps {
   person: SearchResultWithDraft;
@@ -45,34 +45,11 @@ export function PersonCard({
     return null;
   };
 
-  const getEmailStatusBadge = () => {
-    // Consider verified if emailStatus is VERIFIED OR emailDeliverable is true (Emailable verified)
-    if (person.emailStatus === 'VERIFIED' || person.emailDeliverable === true) {
-      return (
-        <span className="badge-success">
-          Verified
-        </span>
-      );
-    }
-    if (person.emailStatus === 'UNVERIFIED') {
-      return (
-        <span className="badge-warning">
-          Unverified
-        </span>
-      );
-    }
-    return (
-      <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-medium rounded-full bg-surface-100 text-surface-600">
-        No Email
-      </span>
-    );
-  };
-
   const getScheduledBadge = () => {
     if (!scheduledFor) return null;
     const scheduledDate = new Date(scheduledFor);
     const now = new Date();
-    if (scheduledDate <= now) return null; // Already sent or past
+    if (scheduledDate <= now) return null;
 
     const formattedDate = scheduledDate.toLocaleDateString('en-US', {
       month: 'short',
@@ -83,15 +60,13 @@ export function PersonCard({
 
     return (
       <span
-        className="badge-primary"
+        className="badge-primary text-xs"
         title={`Scheduled for ${scheduledDate.toLocaleString()}`}
       >
         Scheduled: {formattedDate}
       </span>
     );
   };
-
-  const canSend = person.email && !sendStatus;
 
   // Generate initials for avatar
   const initials = person.fullName
@@ -102,7 +77,8 @@ export function PersonCard({
     .toUpperCase();
 
   return (
-    <div className="group relative card-hover p-5 flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+    <div className="group relative card-hover p-5 flex flex-col items-center text-center">
+      {/* Hide button */}
       {onHide && person.userCandidateId && (
         <button
           onClick={onHide}
@@ -125,86 +101,80 @@ export function PersonCard({
         </button>
       )}
 
-      <div className="flex gap-4 flex-1">
-        {/* Avatar */}
-        <div className="flex-shrink-0">
-          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center shadow-sm">
-            <span className="text-white font-semibold text-sm">{initials}</span>
-          </div>
-        </div>
-
-        <div className="flex-1 min-w-0 pr-6">
-          <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <h3 className="font-semibold text-surface-900">{person.fullName}</h3>
-            {getStatusBadge()}
-            {getScheduledBadge()}
-          </div>
-          <p className="text-sm text-surface-600 font-medium">
-            {person.role ? `${person.role} at ` : ''}
-            <span className="text-surface-800">{person.company}</span>
-          </p>
-
-          {/* Email with badge */}
-          <div className="flex items-center gap-2 mt-2">
-            <EnvelopeIcon className="w-4 h-4 text-surface-400" />
-            {person.email ? (
-              <>
-                <p className="text-sm text-primary-600 font-medium">{person.email}</p>
-                {getEmailStatusBadge()}
-              </>
-            ) : (
-              <>
-                <p className="text-sm text-surface-400 italic">No email found</p>
-                {getEmailStatusBadge()}
-              </>
-            )}
-          </div>
-
-          {/* Education info */}
-          {person.educationSchool && (
-            <div className="flex items-center gap-2 mt-1.5">
-              <AcademicCapIcon className="w-4 h-4 text-surface-400" />
-              <p className="text-sm text-surface-500">
-                {person.educationDegree && `${person.educationDegree}, `}
-                {person.educationSchool}
-                {person.educationYear && ` (${person.educationYear})`}
-              </p>
-            </div>
-          )}
-
-          {/* Location info */}
-          {(person.city || person.state) && (
-            <div className="flex items-center gap-2 mt-1.5">
-              <MapPinIcon className="w-4 h-4 text-surface-400" />
-              <p className="text-sm text-surface-500">
-                {[person.city, person.state].filter(Boolean).join(', ')}
-              </p>
-            </div>
-          )}
-
-          {person.linkedinUrl && (
-            <a
-              href={person.linkedinUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 text-xs font-medium text-white bg-[#0A66C2] rounded-lg hover:bg-[#004182] transition-all hover:shadow-md"
-            >
-              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
-              </svg>
-              LinkedIn
-            </a>
-          )}
+      {/* Avatar */}
+      <div className="mb-4">
+        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center shadow-md">
+          <span className="text-white font-semibold text-lg">{initials}</span>
         </div>
       </div>
 
-      <div className="flex gap-2 md:self-center">
+      {/* Name and LinkedIn */}
+      <div className="mb-1 flex items-center gap-2">
+        <h3 className="font-semibold text-surface-900 text-base">{person.fullName}</h3>
+        {person.linkedinUrl && (
+          <a
+            href={person.linkedinUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center w-6 h-6 text-xs font-semibold text-white bg-[#0A66C2] rounded hover:bg-[#004182] transition-all"
+            title="View LinkedIn Profile"
+          >
+            in
+          </a>
+        )}
+      </div>
+
+      {/* Status badges */}
+      {(getStatusBadge() || getScheduledBadge()) && (
+        <div className="flex items-center gap-1.5 mb-2 flex-wrap justify-center">
+          {getStatusBadge()}
+          {getScheduledBadge()}
+        </div>
+      )}
+
+      {/* Role */}
+      <p className="text-sm text-primary-600 font-medium mb-4">
+        {person.role || 'Professional'}
+      </p>
+
+      {/* Info section */}
+      <div className="w-full space-y-2 text-left mb-4">
+        {/* Company */}
+        <div className="flex items-center gap-2">
+          <BuildingOfficeIcon className="w-4 h-4 text-surface-400 flex-shrink-0" />
+          <p className="text-sm text-surface-700 truncate">{person.company}</p>
+        </div>
+
+        {/* University */}
+        {person.educationSchool && (
+          <div className="flex items-center gap-2">
+            <AcademicCapIcon className="w-4 h-4 text-surface-400 flex-shrink-0" />
+            <p className="text-sm text-surface-500 truncate">
+              {person.educationSchool}
+            </p>
+          </div>
+        )}
+
+        {/* Location */}
+        {(person.city || person.state) && (
+          <div className="flex items-center gap-2">
+            <MapPinIcon className="w-4 h-4 text-surface-400 flex-shrink-0" />
+            <p className="text-sm text-surface-500 truncate">
+              {[person.city, person.state].filter(Boolean).join(', ')}
+            </p>
+          </div>
+        )}
+
+      </div>
+
+      {/* Action button */}
+      <div className="w-full mt-auto">
         <button
           onClick={onExpand}
-          className="btn-primary text-sm"
+          className="btn-primary text-sm w-full justify-center"
         >
           <EnvelopeIcon className="w-4 h-4 mr-1.5" />
-          Send
+          Send Email
         </button>
       </div>
     </div>

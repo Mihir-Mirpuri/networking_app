@@ -12,7 +12,6 @@ import {
   CalendarDaysIcon,
   UserCircleIcon,
 } from '@heroicons/react/24/outline';
-import { CreditsDisplay } from '@/components/credits';
 
 export function Header() {
   const { data: session, status } = useSession();
@@ -112,7 +111,6 @@ export function Header() {
                 Signl
               </span>
             </Link>
-            {session?.user && <CreditsDisplay />}
           </div>
           {renderNavContent()}
         </div>

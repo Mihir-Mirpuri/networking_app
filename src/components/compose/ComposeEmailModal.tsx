@@ -562,7 +562,7 @@ export function ComposeEmailModal({
                   value={selectedTemplateId}
                   onChange={(e) => handleTemplateChange(e.target.value)}
                   disabled={isLoadingData}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500/50 disabled:opacity-50"
+                  className="input"
                 >
                   {isLoadingData ? (
                     <option value="">Loading templates...</option>
@@ -702,7 +702,7 @@ export function ComposeEmailModal({
                     <select
                       value={selectedResumeId}
                       onChange={(e) => setSelectedResumeId(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                      className="input"
                     >
                       <option value="">Select a resume...</option>
                       {resumes.map((resume) => (

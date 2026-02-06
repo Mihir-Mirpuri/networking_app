@@ -57,6 +57,11 @@
     @apply card hover:shadow-soft-lg hover:border-surface-300/60 transition-all duration-200;
   }
 
+  /* Card shadow for profile dashboard */
+  .card-shadow {
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  }
+
   /* Primary button style */
   .btn-primary {
     @apply inline-flex items-center justify-center px-4 py-2.5

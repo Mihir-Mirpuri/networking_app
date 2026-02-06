@@ -1,4 +1,32 @@
-export const INDUSTRIES = ['Consulting', 'PM'] as const;
+export const INDUSTRIES = ['Banking', 'Consulting', 'PM'] as const;
+
+// Banking companies
+export const BANKING_COMPANIES = [
+  'Goldman Sachs',
+  'Morgan Stanley',
+  'JPMorgan Chase',
+  'Bank of America',
+  'Citigroup',
+  'Barclays',
+  'Deutsche Bank',
+  'UBS',
+  'Credit Suisse',
+  'Wells Fargo',
+  'Lazard',
+  'Evercore',
+  'Centerview Partners',
+  'Moelis & Company',
+  'PJT Partners',
+  'Perella Weinberg Partners',
+  'Guggenheim Partners',
+  'Houlihan Lokey',
+  'Greenhill & Co',
+  'Rothschild & Co',
+  'Jefferies',
+  'RBC Capital Markets',
+  'HSBC',
+  'BNP Paribas',
+] as const;
 
 // Only companies with verified email patterns
 export const CONSULTING_COMPANIES = [
@@ -33,6 +61,7 @@ export const PM_COMPANIES = [
 ] as const;
 
 export const COMPANIES_BY_INDUSTRY: Record<string, readonly string[]> = {
+  Banking: BANKING_COMPANIES,
   Consulting: CONSULTING_COMPANIES,
   PM: PM_COMPANIES,
 };
@@ -155,9 +184,204 @@ export const ROLES = [
   'Wealth Management',
 ] as const;
 
-// Company-specific roles for consulting firms
+// Company-specific roles
 export const ROLES_BY_COMPANY: Record<string, readonly string[]> = {
+  // Banking Companies
+  'Goldman Sachs': [
+    'Recruiter',
+    'Analyst',
+    'Associate',
+    'Vice President',
+    'Executive Director',
+    'Managing Director',
+  ],
+  'Morgan Stanley': [
+    'Recruiter',
+    'Analyst',
+    'Associate',
+    'Vice President',
+    'Executive Director',
+    'Managing Director',
+  ],
+  'JPMorgan Chase': [
+    'Recruiter',
+    'Analyst',
+    'Associate',
+    'Vice President',
+    'Executive Director',
+    'Managing Director',
+  ],
+  'Bank of America': [
+    'Recruiter',
+    'Analyst',
+    'Associate',
+    'Vice President',
+    'Director',
+    'Managing Director',
+  ],
+  'Citigroup': [
+    'Recruiter',
+    'Analyst',
+    'Associate',
+    'Vice President',
+    'Director',
+    'Managing Director',
+  ],
+  'Barclays': [
+    'Recruiter',
+    'Analyst',
+    'Associate',
+    'Vice President',
+    'Director',
+    'Managing Director',
+  ],
+  'Deutsche Bank': [
+    'Recruiter',
+    'Analyst',
+    'Associate',
+    'Vice President',
+    'Director',
+    'Managing Director',
+  ],
+  'UBS': [
+    'Recruiter',
+    'Analyst',
+    'Associate',
+    'Director',
+    'Executive Director',
+    'Managing Director',
+  ],
+  'Credit Suisse': [
+    'Recruiter',
+    'Analyst',
+    'Associate',
+    'Vice President',
+    'Director',
+    'Managing Director',
+  ],
+  'Wells Fargo': [
+    'Recruiter',
+    'Analyst',
+    'Associate',
+    'Vice President',
+    'Director',
+    'Managing Director',
+  ],
+  'Lazard': [
+    'Recruiter',
+    'Analyst',
+    'Associate',
+    'Vice President',
+    'Director',
+    'Managing Director',
+  ],
+  'Evercore': [
+    'Recruiter',
+    'Analyst',
+    'Associate',
+    'Vice President',
+    'Senior Vice President',
+    'Senior Managing Director',
+  ],
+  'Centerview Partners': [
+    'Recruiter',
+    'Analyst',
+    'Associate',
+    'Vice President',
+    'Principal',
+    'Partner',
+  ],
+  'Moelis & Company': [
+    'Recruiter',
+    'Analyst',
+    'Associate',
+    'Vice President',
+    'Director',
+    'Managing Director',
+  ],
+  'PJT Partners': [
+    'Recruiter',
+    'Analyst',
+    'Associate',
+    'Vice President',
+    'Director',
+    'Partner',
+  ],
+  'Perella Weinberg Partners': [
+    'Recruiter',
+    'Analyst',
+    'Associate',
+    'Vice President',
+    'Director',
+    'Partner',
+  ],
+  'Guggenheim Partners': [
+    'Recruiter',
+    'Analyst',
+    'Associate',
+    'Vice President',
+    'Director',
+    'Managing Director',
+  ],
+  'Houlihan Lokey': [
+    'Recruiter',
+    'Analyst',
+    'Associate',
+    'Vice President',
+    'Director',
+    'Managing Director',
+  ],
+  'Greenhill & Co': [
+    'Recruiter',
+    'Analyst',
+    'Associate',
+    'Vice President',
+    'Director',
+    'Managing Director',
+  ],
+  'Rothschild & Co': [
+    'Recruiter',
+    'Analyst',
+    'Associate',
+    'Vice President',
+    'Director',
+    'Managing Director',
+  ],
+  'Jefferies': [
+    'Recruiter',
+    'Analyst',
+    'Associate',
+    'Vice President',
+    'Director',
+    'Managing Director',
+  ],
+  'RBC Capital Markets': [
+    'Recruiter',
+    'Analyst',
+    'Associate',
+    'Vice President',
+    'Director',
+    'Managing Director',
+  ],
+  'HSBC': [
+    'Recruiter',
+    'Analyst',
+    'Associate',
+    'Vice President',
+    'Director',
+    'Managing Director',
+  ],
+  'BNP Paribas': [
+    'Recruiter',
+    'Analyst',
+    'Associate',
+    'Vice President',
+    'Director',
+    'Managing Director',
+  ],
+  // Consulting Companies
   'McKinsey & Company': [
+    'Recruiter',
     'Business Analyst',
     'Senior Business Analyst',
     'Associate',
@@ -166,6 +390,7 @@ export const ROLES_BY_COMPANY: Record<string, readonly string[]> = {
     'Partner',
   ],
   'Boston Consulting Group': [
+    'Recruiter',
     'Associate',
     'Senior Associate',
     'Consultant',
@@ -175,6 +400,7 @@ export const ROLES_BY_COMPANY: Record<string, readonly string[]> = {
     'Managing Director & Partner',
   ],
   'Bain & Company': [
+    'Recruiter',
     'Associate',
     'Senior Associate',
     'Consultant',
@@ -184,6 +410,7 @@ export const ROLES_BY_COMPANY: Record<string, readonly string[]> = {
     'Partner',
   ],
   'Deloitte': [
+    'Recruiter',
     'Analyst',
     'Consultant',
     'Senior Consultant',
@@ -192,6 +419,7 @@ export const ROLES_BY_COMPANY: Record<string, readonly string[]> = {
     'Partner',
   ],
   'Accenture': [
+    'Recruiter',
     'Analyst',
     'Consultant',
     'Senior Consultant',
@@ -200,6 +428,7 @@ export const ROLES_BY_COMPANY: Record<string, readonly string[]> = {
     'Director',
   ],
   'Strategy&': [
+    'Recruiter',
     'Associate',
     'Senior Associate',
     'Manager',
@@ -207,6 +436,7 @@ export const ROLES_BY_COMPANY: Record<string, readonly string[]> = {
     'Partner',
   ],
   'KPMG': [
+    'Recruiter',
     'Analyst',
     'Consultant',
     'Senior Consultant',
@@ -215,6 +445,7 @@ export const ROLES_BY_COMPANY: Record<string, readonly string[]> = {
     'Partner',
   ],
   'EY': [
+    'Recruiter',
     'Associate Consultant',
     'Senior Consultant',
     'Manager',
@@ -222,6 +453,7 @@ export const ROLES_BY_COMPANY: Record<string, readonly string[]> = {
     'Partner',
   ],
   'LEK Consulting': [
+    'Recruiter',
     'Associate',
     'Consultant',
     'Manager',
@@ -230,6 +462,7 @@ export const ROLES_BY_COMPANY: Record<string, readonly string[]> = {
     'Partner',
   ],
   'PwC': [
+    'Recruiter',
     'Associate',
     'Senior Associate',
     'Manager',
@@ -238,6 +471,7 @@ export const ROLES_BY_COMPANY: Record<string, readonly string[]> = {
     'Partner',
   ],
   'Oliver Wyman': [
+    'Recruiter',
     'Analyst',
     'Senior Consultant',
     'Associate',
@@ -247,6 +481,7 @@ export const ROLES_BY_COMPANY: Record<string, readonly string[]> = {
     'Partner',
   ],
   'Roland Berger': [
+    'Recruiter',
     'Business Analyst',
     'Junior Consultant',
     'Consultant',
@@ -256,6 +491,7 @@ export const ROLES_BY_COMPANY: Record<string, readonly string[]> = {
     'Partner',
   ],
   'Kearney': [
+    'Recruiter',
     'Business Analyst',
     'Senior Business Analyst',
     'Associate',
@@ -265,6 +501,7 @@ export const ROLES_BY_COMPANY: Record<string, readonly string[]> = {
     'Partner',
   ],
   'ZS': [
+    'Recruiter',
     'Associate',
     'Associate Consultant',
     'Consultant',
@@ -273,6 +510,7 @@ export const ROLES_BY_COMPANY: Record<string, readonly string[]> = {
     'Principal',
   ],
   'Huron': [
+    'Recruiter',
     'Analyst',
     'Associate',
     'Manager',
@@ -281,17 +519,17 @@ export const ROLES_BY_COMPANY: Record<string, readonly string[]> = {
     'Managing Director',
   ],
   // PM Companies
-  'Google': ['Associate Product Manager', 'Product Manager'],
-  'NVIDIA': ['Product Manager', 'Senior Product Manager'],
-  'Microsoft': ['Program Manager', 'Product Manager'],
-  'Stripe': ['Product Manager'],
-  'Meta': ['Rotational Product Manager', 'Product Manager'],
-  'Adobe': ['Product Manager', 'Senior Product Manager'],
-  'Amazon': ['Product Manager Technical', 'Product Manager'],
-  'Airbnb': ['Product Manager'],
-  'Slack': ['Associate Product Manager', 'Product Manager'],
-  'Atlassian': ['Associate Product Manager', 'Product Manager'],
-  'Shopify': ['Product Manager'],
+  'Google': ['Recruiter', 'Associate Product Manager', 'Product Manager'],
+  'NVIDIA': ['Recruiter', 'Product Manager', 'Senior Product Manager'],
+  'Microsoft': ['Recruiter', 'Program Manager', 'Product Manager'],
+  'Stripe': ['Recruiter', 'Product Manager'],
+  'Meta': ['Recruiter', 'Rotational Product Manager', 'Product Manager'],
+  'Adobe': ['Recruiter', 'Product Manager', 'Senior Product Manager'],
+  'Amazon': ['Recruiter', 'Product Manager Technical', 'Product Manager'],
+  'Airbnb': ['Recruiter', 'Product Manager'],
+  'Slack': ['Recruiter', 'Associate Product Manager', 'Product Manager'],
+  'Atlassian': ['Recruiter', 'Associate Product Manager', 'Product Manager'],
+  'Shopify': ['Recruiter', 'Product Manager'],
 };
 
 export const CLASSIFICATIONS = [
@@ -419,7 +657,7 @@ export const EMAIL_TEMPLATES = [
   {
     id: 'default',
     name: 'Default',
-    subject: 'Reaching out from {university}',
+    subject: '{university} {classification} interested in {industry} at {company}',
     body: `Hello {first_name},
 
 I hope you are doing well. My name is {user_name} and I am a {classification} pursuing my {major} at {university}. I am interested in {career} and would love to grab 10-15 minutes on the phone with you to hear about your experiences at {company}.

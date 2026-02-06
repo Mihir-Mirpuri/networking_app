@@ -6,6 +6,7 @@ import { INDUSTRIES, COMPANIES_BY_INDUSTRY, ROLES_BY_COMPANY, UNIVERSITIES, LOCA
 import { LoadingSpinner } from './LoadingSpinner';
 import { SearchableCombobox } from './SearchableCombobox';
 import { getTemplatesAction, TemplateData } from '@/app/actions/profile';
+import { CreditsDisplay } from '@/components/credits';
 
 
 interface SearchFormProps {
@@ -31,15 +32,19 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
   const { status } = useSession();
 
   // Initialize with initialParams if available, otherwise empty (user must select)
-  const [industry, setIndustry] = useState<string>(INDUSTRIES[0]); // Default to first industry (Consulting)
+  const [industry, setIndustry] = useState<string>(initialParams?.company ? '' : ''); // Default to Any Industry
   const [company, setCompany] = useState<string>(initialParams?.company || '');
   const [role, setRole] = useState<string>(initialParams?.role || '');
 
-  // Get companies for the selected industry
-  const availableCompanies = industry ? (COMPANIES_BY_INDUSTRY[industry] || []) : [];
+  // Get companies for the selected industry (if no industry selected, show all companies)
+  const availableCompanies = industry
+    ? (COMPANIES_BY_INDUSTRY[industry] || [])
+    : Object.values(COMPANIES_BY_INDUSTRY).flat();
 
-  // Get roles for the selected company
-  const availableRoles = company ? (ROLES_BY_COMPANY[company] || []) : [];
+  // Get roles for the selected company (if no company selected, show all roles)
+  const availableRoles = company
+    ? (ROLES_BY_COMPANY[company] || [])
+    : [...new Set(Object.values(ROLES_BY_COMPANY).flat())];
   const [university, setUniversity] = useState<string>(initialParams?.university || '');
   const [location, setLocation] = useState<string>(initialParams?.location || '');
   const [templateId, setTemplateId] = useState<string>(
@@ -160,32 +165,31 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
 
   return (
     <form onSubmit={handleSubmit} className="card p-6 mb-6">
+      <h2 className="text-xl font-bold text-slate-900 mb-4">Find People</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mb-6">
         {/* Industry */}
-        <div>
-          <label htmlFor="industry" className="block text-sm font-medium text-surface-700 mb-1.5">
-            Industry
-          </label>
-          <select
-            id="industry"
-            value={industry}
-            onChange={(e) => {
-              setIndustry(e.target.value);
-              setCompany(''); // Reset company when industry changes
-            }}
-            className="input"
-          >
-            {INDUSTRIES.map((ind) => (
-              <option key={ind} value={ind}>
-                {ind}
-              </option>
-            ))}
-          </select>
-        </div>
+        <SearchableCombobox
+          options={[
+            { label: 'Any Industry', value: '' },
+            ...INDUSTRIES.map((ind) => ({ label: ind, value: ind })),
+          ]}
+          value={industry}
+          onChange={(val) => {
+            setIndustry(val);
+            setCompany(''); // Reset company when industry changes
+            setRole(''); // Reset role when industry changes
+          }}
+          label="Industry"
+          placeholder="Select an industry..."
+          id="industry"
+        />
 
         {/* Company */}
         <SearchableCombobox
-          options={['', ...availableCompanies]}
+          options={[
+            { label: 'Any Company', value: '' },
+            ...availableCompanies.map((c) => ({ label: c, value: c })),
+          ]}
           value={company}
           onChange={(val) => {
             setCompany(val);
@@ -198,17 +202,23 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
 
         {/* Role */}
         <SearchableCombobox
-          options={['', ...availableRoles]}
+          options={[
+            { label: 'Any Role', value: '' },
+            ...availableRoles.map((r) => ({ label: r, value: r })),
+          ]}
           value={role}
           onChange={setRole}
           label="Role"
-          placeholder={company ? "Select a role..." : "Select a company first..."}
+          placeholder="Select a role..."
           id="role"
         />
 
         {/* University */}
         <SearchableCombobox
-          options={['', ...UNIVERSITIES]}
+          options={[
+            { label: 'Any University', value: '' },
+            ...UNIVERSITIES.map((u) => ({ label: u, value: u })),
+          ]}
           value={university}
           onChange={setUniversity}
           label="University"
@@ -234,47 +244,45 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
 
         {/* Template */}
         <div>
-          <label htmlFor="template" className="block text-sm font-medium text-surface-700 mb-1.5">
-            Email Template
-          </label>
-          <select
-            id="template"
+          <SearchableCombobox
+            options={
+              isLoadingTemplates
+                ? [{ label: 'Loading templates...', value: '' }]
+                : templates.length === 0
+                ? [{ label: EMAIL_TEMPLATES[0].name, value: EMAIL_TEMPLATES[0].id }]
+                : templates.map((t) => ({
+                    label: t.name + (t.isDefault ? ' (Default)' : ''),
+                    value: t.id,
+                  }))
+            }
             value={templateId}
-            onChange={(e) => setTemplateId(e.target.value)}
+            onChange={setTemplateId}
+            label="Email Template"
+            placeholder="Select a template..."
+            id="template"
             disabled={isLoadingTemplates}
-            className="input"
-          >
-            {isLoadingTemplates ? (
-              <option value="">Loading templates...</option>
-            ) : templates.length === 0 ? (
-              <option value={EMAIL_TEMPLATES[0].id}>{EMAIL_TEMPLATES[0].name}</option>
-            ) : (
-              templates.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                  {t.isDefault ? ' (Default)' : ''}
-                </option>
-              ))
-            )}
-          </select>
+          />
           {templateError && <p className="mt-1.5 text-sm text-amber-600">{templateError}</p>}
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
-        <button
-          type="submit"
-          disabled={isLoading || !hasSearchParams}
-          className="btn-primary"
-        >
-          {isLoading && <LoadingSpinner size="sm" />}
-          {isLoading ? 'Searching...' : 'Search Contacts'}
-        </button>
-        {!hasSearchParams && (
-          <p className="text-sm text-surface-500">
-            Fill in at least one field to search
-          </p>
-        )}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <button
+            type="submit"
+            disabled={isLoading || !hasSearchParams}
+            className="btn-primary"
+          >
+            {isLoading && <LoadingSpinner size="sm" />}
+            {isLoading ? 'Searching...' : 'Search'}
+          </button>
+          {!hasSearchParams && (
+            <p className="text-sm text-surface-500">
+              Fill in at least one field to search
+            </p>
+          )}
+        </div>
+        <CreditsDisplay />
       </div>
     </form>
   );
