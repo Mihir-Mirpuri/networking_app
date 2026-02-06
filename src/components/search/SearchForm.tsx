@@ -44,7 +44,7 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
   // Get roles for the selected company (if no company selected, show all roles)
   const availableRoles = company
     ? (ROLES_BY_COMPANY[company] || [])
-    : [...new Set(Object.values(ROLES_BY_COMPANY).flat())];
+    : Array.from(new Set(Object.values(ROLES_BY_COMPANY).flat()));
   const [university, setUniversity] = useState<string>(initialParams?.university || '');
   const [location, setLocation] = useState<string>(initialParams?.location || '');
   const [templateId, setTemplateId] = useState<string>(
