@@ -12,6 +12,223 @@ const PERSONAL_DOMAINS = new Set([
 ]);
 
 /**
+ * Company alias mapping for accurate matching
+ * Maps canonical company key to all valid variations (normalized: lowercase, no dots)
+ *
+ * This prevents false positives like "EY" matching "Kearney" or "McKinsey"
+ * and enables matching variations like "EY" = "Ernst & Young"
+ */
+const COMPANY_ALIASES: Record<string, string[]> = {
+  // Big 4 Accounting
+  'ey': ['ey', 'ernst & young', 'ernst and young', 'ey-parthenon', 'parthenon-ey', 'ey parthenon', 'parthenon ey'],
+  'pwc': ['pwc', 'pricewaterhousecoopers', 'pricewaterhouse coopers', 'price waterhouse coopers', 'pwc strategy&', 'strategy&'],
+  'deloitte': ['deloitte', 'deloitte consulting', 'deloitte & touche', 'deloitte touche'],
+  'kpmg': ['kpmg', 'kpmg consulting'],
+
+  // MBB
+  'mckinsey': ['mckinsey', 'mckinsey & company', 'mckinsey and company'],
+  'bcg': ['bcg', 'boston consulting group'],
+  'bain': ['bain', 'bain & company', 'bain and company', 'bain capital'],
+
+  // Other Top Consulting
+  'kearney': ['kearney', 'at kearney', 'a t kearney', 'at kearney'],
+  'lek': ['lek', 'lek consulting', 'l e k', 'l e k consulting'],
+  'oliverwyman': ['oliver wyman', 'oliverwyman'],
+  'rolandberger': ['roland berger', 'rolandberger'],
+  'simonkucher': ['simon-kucher', 'simon kucher', 'simonkucher', 'simon-kucher & partners', 'simon kucher & partners'],
+  'atkearney': ['at kearney', 'a t kearney', 'kearney'], // Duplicate of kearney for "AT Kearney" searches
+  'accenture': ['accenture', 'accenture strategy', 'accenture consulting'],
+  'capgemini': ['capgemini', 'capgemini invent', 'cap gemini'],
+  'booz': ['booz allen', 'booz allen hamilton', 'booz'],
+  'alixpartners': ['alixpartners', 'alix partners'],
+  'fti': ['fti', 'fti consulting'],
+  'zs': ['zs', 'zs associates'],
+  'iqvia': ['iqvia', 'iqvia consulting'],
+  'parthenon': ['parthenon', 'parthenon-ey', 'ey-parthenon', 'ey parthenon'],
+
+  // Finance / Banking
+  'goldmansachs': ['goldman sachs', 'goldmansachs', 'goldman'],
+  'morganstanley': ['morgan stanley', 'morganstanley', 'morgan stanley private wealth', 'morgan stanley pwm'],
+  'jpmorgan': ['jp morgan', 'jpmorgan', 'j p morgan', 'jpmorgan chase', 'jp morgan chase'],
+  'blackstone': ['blackstone', 'blackstone group'],
+  'kkr': ['kkr', 'kohlberg kravis roberts'],
+  'carlyle': ['carlyle', 'carlyle group'],
+  'apollo': ['apollo', 'apollo global', 'apollo management'],
+  'tpg': ['tpg', 'tpg capital'],
+  'warburg': ['warburg pincus', 'warburg'],
+  'silverlake': ['silver lake', 'silverlake'],
+  'generatl atlantic': ['general atlantic'],
+  'hellman': ['hellman & friedman', 'hellman and friedman', 'h&f'],
+  'vista': ['vista equity', 'vista equity partners'],
+  'thoma': ['thoma bravo'],
+  'evercore': ['evercore'],
+  'lazard': ['lazard'],
+  'centerview': ['centerview', 'centerview partners'],
+  'moelis': ['moelis', 'moelis & company'],
+  'perella': ['perella weinberg', 'perella weinberg partners', 'pwp'],
+  'guggenheim': ['guggenheim', 'guggenheim partners', 'guggenheim securities'],
+  'pjt': ['pjt', 'pjt partners'],
+  'qatalyst': ['qatalyst', 'qatalyst partners'],
+  'greenhill': ['greenhill', 'greenhill & co'],
+  'houlihan': ['houlihan lokey', 'houlihan'],
+  'jefferies': ['jefferies', 'jefferies group'],
+  'williamblaire': ['william blair'],
+  'harrisw': ['harris williams', 'harris williams & co'],
+  'baird': ['baird', 'robert w baird'],
+  'raymond': ['raymond james'],
+  'stifel': ['stifel', 'stifel nicolaus'],
+  'piper': ['piper sandler', 'piper jaffray'],
+  'cowen': ['cowen', 'cowen and company'],
+  'citadel': ['citadel', 'citadel securities', 'citadel llc'],
+  'twosigma': ['two sigma', 'twosigma', '2 sigma'],
+  'jane': ['jane street', 'janestreet'],
+  'hrt': ['hrt', 'hudson river trading'],
+  'deshaw': ['de shaw', 'd e shaw', 'deshaw'],
+  'bridgewater': ['bridgewater', 'bridgewater associates'],
+  'citgroup': ['citi', 'citigroup', 'citibank'],
+  'bofa': ['bank of america', 'bofa', 'merrill lynch', 'bofa securities'],
+  'ubs': ['ubs', 'ubs investment bank'],
+  'barclays': ['barclays', 'barclays capital'],
+  'deutsche': ['deutsche bank', 'db'],
+  'credit': ['credit suisse'],
+  'hsbc': ['hsbc'],
+  'nomura': ['nomura'],
+  'rbc': ['rbc', 'rbc capital markets', 'royal bank of canada'],
+  'wells': ['wells fargo', 'wells fargo securities'],
+
+  // Tech
+  'google': ['google', 'alphabet', 'google cloud'],
+  'meta': ['meta', 'facebook', 'meta platforms'],
+  'amazon': ['amazon', 'aws', 'amazon web services'],
+  'microsoft': ['microsoft', 'msft'],
+  'apple': ['apple'],
+  'netflix': ['netflix'],
+  'salesforce': ['salesforce', 'salesforce consulting'],
+  'oracle': ['oracle', 'oracle consulting'],
+  'ibm': ['ibm', 'ibm consulting'],
+  'sap': ['sap', 'sap consulting'],
+};
+
+/**
+ * Get the canonical company key for a given company name
+ * Checks if the company name matches any alias (exact match or starts with alias)
+ * Returns the key if found, null otherwise
+ */
+function getCompanyKey(normalizedCompany: string): string | null {
+  for (const [key, aliases] of Object.entries(COMPANY_ALIASES)) {
+    for (const alias of aliases) {
+      // Exact match
+      if (normalizedCompany === alias) {
+        return key;
+      }
+      // Person company starts with alias (e.g., "ey parthenon" starts with "ey")
+      // Must be followed by word boundary (space, dash, or end)
+      if (normalizedCompany.startsWith(alias + ' ') ||
+          normalizedCompany.startsWith(alias + '-')) {
+        return key;
+      }
+      // Alias starts with person company (e.g., alias "mckinsey & company" for person "mckinsey")
+      if (alias.startsWith(normalizedCompany + ' ') ||
+          alias.startsWith(normalizedCompany + '-') ||
+          alias.startsWith(normalizedCompany + ' & ')) {
+        return key;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Check if a person's company matches the search company
+ * Uses alias mapping for known companies, falls back to word-boundary matching
+ */
+function companiesMatch(normalizedPersonCompany: string, normalizedSearchCompany: string): boolean {
+  // Get canonical keys for both companies
+  const searchKey = getCompanyKey(normalizedSearchCompany);
+  const personKey = getCompanyKey(normalizedPersonCompany);
+
+  // If both have keys, they must match (same canonical company)
+  if (searchKey && personKey) {
+    return searchKey === personKey;
+  }
+
+  // If only search has a key, person company must also resolve to that key
+  // This means person company doesn't match any known alias → not a match
+  if (searchKey && !personKey) {
+    return false;
+  }
+
+  // If only person has a key (known company) but search doesn't match it → not a match
+  // This prevents unknown search terms from matching known companies by accident
+  if (personKey && !searchKey) {
+    return false;
+  }
+
+  // Neither has a known key - fallback to word-boundary aware matching
+  // For short search terms (<=3 chars), require word boundary match
+  if (normalizedSearchCompany.length <= 3) {
+    const regex = new RegExp(`(^|\\s|-)${escapeRegex(normalizedSearchCompany)}($|\\s|-)`, 'i');
+    return regex.test(normalizedPersonCompany) || normalizedPersonCompany === normalizedSearchCompany;
+  }
+
+  // For longer terms, use bidirectional includes (original logic)
+  return normalizedPersonCompany.includes(normalizedSearchCompany) ||
+         normalizedSearchCompany.includes(normalizedPersonCompany);
+}
+
+/**
+ * Escape special regex characters
+ */
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Search term with match type for precise DB queries
+ */
+type CompanySearchTerm = {
+  term: string;
+  matchType: 'equals' | 'startsWith' | 'contains';
+};
+
+/**
+ * Get all company name variations to search in DB for a given search term
+ * Returns array of terms with match types for precise queries
+ */
+function getCompanySearchTerms(company: string): CompanySearchTerm[] {
+  const normalizeForKey = (name: string) =>
+    name.replace(/\./g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+
+  const normalized = normalizeForKey(company);
+  const key = getCompanyKey(normalized);
+
+  if (key) {
+    // For known companies, use strict matching
+    // Short aliases (<=3 chars) use equals, longer use startsWith
+    return COMPANY_ALIASES[key].map(alias => ({
+      term: alias,
+      matchType: alias.length <= 3 ? 'equals' as const : 'startsWith' as const
+    }));
+  }
+
+  // No alias found, return original terms with appropriate match types
+  const words = company.replace(/[^a-zA-Z0-9\s]/g, '').trim().split(/\s+/).filter(w => w.length >= 2);
+  if (words.length === 0) return [{ term: company, matchType: 'contains' }];
+
+  const firstWord = words[0];
+  const longestWord = words.reduce((a, b) => (a.length >= b.length ? a : b), '');
+
+  // For unknown companies, use contains for flexibility
+  if (firstWord === longestWord) {
+    return [{ term: firstWord, matchType: 'contains' as const }];
+  }
+  return [
+    { term: firstWord, matchType: 'contains' as const },
+    { term: longestWord, matchType: 'contains' as const }
+  ];
+}
+
+/**
  * Normalize company name for consistent storage
  *
  * Handles variations like:
@@ -603,23 +820,30 @@ export async function findPeopleByFilters(filters: PersonFilters): Promise<
   const where: Record<string, unknown> = {};
   const normalizedSearchCompany = company ? normalizeCompany(company) : null;
 
-  // Company filter - loose DB filter, then strict post-query filter
-  // Use OR query with first word AND longest word to catch both "ZS" and "ZS Associates"
+  // Company filter - DB filter using alias mapping with appropriate match types
+  // Uses getCompanySearchTerms to get all valid variations for the search company
   if (company && company.trim()) {
-    const words = company.replace(/[^a-zA-Z0-9\s]/g, '').trim().split(/\s+/).filter(w => w.length >= 2);
-    if (words.length > 0) {
-      const firstWord = words[0];
-      const longestWord = words.reduce((a, b) => (a.length >= b.length ? a : b), '');
+    const searchTerms = getCompanySearchTerms(company);
 
-      if (firstWord === longestWord) {
-        where.company = { contains: firstWord, mode: 'insensitive' };
-      } else {
-        // Use OR to match either first word or longest word
-        where.OR = [
-          { company: { contains: firstWord, mode: 'insensitive' } },
-          { company: { contains: longestWord, mode: 'insensitive' } },
-        ];
+    // Build Prisma filter based on match type
+    const buildCompanyFilter = (term: CompanySearchTerm) => {
+      switch (term.matchType) {
+        case 'equals':
+          return { company: { equals: term.term, mode: 'insensitive' as const } };
+        case 'startsWith':
+          return { company: { startsWith: term.term, mode: 'insensitive' as const } };
+        case 'contains':
+        default:
+          return { company: { contains: term.term, mode: 'insensitive' as const } };
       }
+    };
+
+    if (searchTerms.length === 1) {
+      const filter = buildCompanyFilter(searchTerms[0]);
+      where.company = filter.company;
+    } else if (searchTerms.length > 1) {
+      // Use OR to match any of the alias terms
+      where.OR = searchTerms.map(buildCompanyFilter);
     }
   }
 
@@ -693,14 +917,13 @@ export async function findPeopleByFilters(filters: PersonFilters): Promise<
     take: limit * 2, // Get extra to allow for exclusions
   });
 
-  // Filter by company (fuzzy match: "LEK" matches "L.E.K.", "ZS" matches "ZS Associates")
-  // Bidirectional: either company can contain the other
+  // Filter by company using alias mapping for known companies
+  // Falls back to word-boundary matching for unknown companies
   let filtered = people;
   if (normalizedSearchCompany) {
     filtered = people.filter((person) => {
       const normalizedPersonCompany = normalizeCompany(person.company);
-      return normalizedPersonCompany.includes(normalizedSearchCompany) ||
-             normalizedSearchCompany.includes(normalizedPersonCompany);
+      return companiesMatch(normalizedPersonCompany, normalizedSearchCompany);
     });
   }
 

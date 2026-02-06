@@ -300,16 +300,25 @@ export async function createCalendarEventAction(
   }
 
   try {
+    // Ensure dateTime has seconds (required by Google Calendar API)
+    // datetime-local inputs produce "YYYY-MM-DDTHH:MM" but API needs "YYYY-MM-DDTHH:MM:SS"
+    const normalizeDateTime = (dt: string): string => {
+      // If already has seconds (length > 16), return as-is
+      if (dt.length > 16) return dt;
+      // Add :00 seconds
+      return `${dt}:00`;
+    };
+
     const event: CalendarEvent = {
       summary: input.summary.trim(),
       description: input.description?.trim(),
       location: input.location?.trim(),
       start: {
-        dateTime: input.startDateTime,
+        dateTime: normalizeDateTime(input.startDateTime),
         timeZone: input.timeZone || 'America/New_York',
       },
       end: {
-        dateTime: input.endDateTime,
+        dateTime: normalizeDateTime(input.endDateTime),
         timeZone: input.timeZone || 'America/New_York',
       },
       attendees: input.attendeeEmails?.map((email) => ({ email })),
@@ -365,6 +374,12 @@ export async function updateCalendarEventAction(
   }
 
   try {
+    // Ensure dateTime has seconds (required by Google Calendar API)
+    const normalizeDateTime = (dt: string): string => {
+      if (dt.length > 16) return dt;
+      return `${dt}:00`;
+    };
+
     const updates: Partial<CalendarEvent> = {};
 
     if (input.summary !== undefined) {
@@ -378,13 +393,13 @@ export async function updateCalendarEventAction(
     }
     if (input.startDateTime) {
       updates.start = {
-        dateTime: input.startDateTime,
+        dateTime: normalizeDateTime(input.startDateTime),
         timeZone: input.timeZone || 'America/New_York',
       };
     }
     if (input.endDateTime) {
       updates.end = {
-        dateTime: input.endDateTime,
+        dateTime: normalizeDateTime(input.endDateTime),
         timeZone: input.timeZone || 'America/New_York',
       };
     }
