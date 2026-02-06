@@ -571,6 +571,7 @@ async function processRefreshBatch(
 
     // Check if pattern exists
     let pattern = await getOrLearnPattern(company);
+    const patternWasEstablished = pattern !== null;
 
     // If no pattern, try to bootstrap with Apollo
     if (!pattern) {
@@ -622,36 +623,54 @@ async function processRefreshBatch(
       emailsToVerify.push({ personId: person.id, email: generatedEmail });
     }
 
-    // Verify emails with Emailable
+    // For established patterns, skip verification and save directly.
+    // Only verify emails for newly bootstrapped patterns.
     if (emailsToVerify.length > 0) {
-      const verificationResults = await verifyEmailsBatch(emailsToVerify.map((e) => e.email));
-
-      let verifiedCount = 0;
-      let undeliverableCount = 0;
-      for (let i = 0; i < emailsToVerify.length; i++) {
-        const { personId, email } = emailsToVerify[i];
-        const verification = verificationResults[i];
-
-        if (verification.deliverable) {
+      if (patternWasEstablished) {
+        // Established pattern — trust it, save without verification
+        for (const { personId, email } of emailsToVerify) {
           await prisma.person.update({
             where: { id: personId },
             data: {
               email,
               emailStatus: 'UNVERIFIED',
               emailConfidence: Math.round(pattern.confidence * 100),
-              emailDeliverable: true,
-              emailVerifiedAt: new Date(),
-              emailVerificationReason: verification.reason,
             },
           });
           emailsGenerated++;
-          verifiedCount++;
-        } else {
-          undeliverableCount++;
         }
-      }
+        console.log(`[Refresh ${batchLabel}] Pattern emails for "${company}": ${emailsToVerify.length} saved (established pattern, skipped verification)`);
+      } else {
+        // Newly bootstrapped pattern — verify each email
+        const verificationResults = await verifyEmailsBatch(emailsToVerify.map((e) => e.email));
 
-      console.log(`[Refresh ${batchLabel}] Pattern emails for "${company}": ${verifiedCount} verified, ${undeliverableCount} undeliverable`);
+        let verifiedCount = 0;
+        let undeliverableCount = 0;
+        for (let i = 0; i < emailsToVerify.length; i++) {
+          const { personId, email } = emailsToVerify[i];
+          const verification = verificationResults[i];
+
+          if (verification.deliverable) {
+            await prisma.person.update({
+              where: { id: personId },
+              data: {
+                email,
+                emailStatus: 'UNVERIFIED',
+                emailConfidence: Math.round(pattern.confidence * 100),
+                emailDeliverable: true,
+                emailVerifiedAt: new Date(),
+                emailVerificationReason: verification.reason,
+              },
+            });
+            emailsGenerated++;
+            verifiedCount++;
+          } else {
+            undeliverableCount++;
+          }
+        }
+
+        console.log(`[Refresh ${batchLabel}] Pattern emails for "${company}": ${verifiedCount} verified, ${undeliverableCount} undeliverable`);
+      }
     }
   }
 

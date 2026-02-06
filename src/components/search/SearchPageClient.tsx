@@ -8,7 +8,7 @@ import { BulkReview } from './BulkReview';
 import { LoadingSpinner } from './LoadingSpinner';
 import { Toast } from '@/components/ui/Toast';
 import { LimitReachedModal, dispatchCreditsChanged } from '@/components/credits';
-import { searchPeopleAction, SearchResultWithDraft, hidePersonAction, scrapeNextPageAction, prescrapeAction } from '@/app/actions/search';
+import { searchPeopleAction, SearchResultWithDraft, hidePersonAction, scrapeNextPageAction } from '@/app/actions/search';
 import { sendSingleEmailAction, sendEmailsAction, PersonToSend } from '@/app/actions/send';
 
 // Loading message shown during search
@@ -269,12 +269,17 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
         setIsRefreshing(false);
       }
 
-      // Fire-and-forget: prescrape remaining CSE pages so Load More is instant
-      prescrapeAction({
-        company: params.company!,
-        role: params.role,
-        university: params.university,
-        location: params.location,
+      // Fire-and-forget via API route (not server action) so it doesn't
+      // block subsequent server action calls like searchPeopleAction.
+      fetch('/api/prescrape', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          company: params.company!,
+          role: params.role,
+          university: params.university,
+          location: params.location,
+        }),
       }).catch(err => console.error('[Prescrape] Error:', err));
     } else {
       setError(result.error);
