@@ -762,6 +762,82 @@ export async function getExcludedPersonKeys(
 }
 
 /**
+ * Role alias groups — each group contains equivalent role names (all lowercase).
+ * When searching for any term in a group, all terms are used for DB filtering.
+ * Follows the same pattern as COMPANY_ALIASES above.
+ */
+const ROLE_ALIAS_GROUPS: string[][] = [
+  // Finance — seniority levels
+  ['vice president', 'vp'],
+  ['senior vice president', 'svp', 'senior vp', 'sr vice president', 'sr. vice president'],
+  ['executive vice president', 'evp', 'executive vp'],
+  ['assistant vice president', 'avp', 'assistant vp'],
+  ['managing director', 'md'],
+  ['managing director & partner', 'md & partner', 'managing director and partner'],
+
+  // Finance — divisions
+  ['investment banking', 'ib', 'ibd', 'investment banking division'],
+  ['private equity', 'pe'],
+  ['asset management', 'am', 'asset mgmt'],
+  ['sales & trading', 'sales and trading', 's&t'],
+  ['wealth management', 'wm', 'private wealth management', 'pwm'],
+  ['research analyst', 'research associate'],
+
+  // Consulting — firm-specific titles
+  ['business analyst', 'ba'],
+  ['senior business analyst', 'sba', 'sr business analyst', 'sr. business analyst'],
+  ['engagement manager', 'em'],
+  ['case team leader', 'ctl'],
+  ['project leader', 'pl'],
+  ['associate principal', 'ap'],
+  ['associate consultant', 'assoc consultant', 'assoc. consultant'],
+
+  // Consulting — seniority variations (sr/senior/jr/junior)
+  ['junior consultant', 'jr consultant', 'jr. consultant'],
+  ['senior consultant', 'sr consultant', 'sr. consultant'],
+  ['senior manager', 'sr manager', 'sr. manager'],
+  ['senior director', 'sr director', 'sr. director'],
+  ['senior analyst', 'sr analyst', 'sr. analyst'],
+  ['senior associate', 'sr associate', 'sr. associate'],
+  ['associate partner', 'assoc partner', 'assoc. partner'],
+
+  // Product/Tech
+  ['product manager', 'pm', 'product mgr'],
+  ['associate product manager', 'apm', 'assoc product manager', 'assoc. product manager'],
+  ['senior product manager', 'sr product manager', 'sr. product manager', 'senior pm', 'sr pm', 'sr. pm'],
+  ['product manager technical', 'technical product manager', 'tpm', 'technical pm'],
+  ['program manager', 'pgm', 'program mgr'],
+  ['rotational product manager', 'rpm', 'rotational pm'],
+  ['project manager', 'project mgr'],
+];
+
+// Build reverse lookup: normalized term → all terms in its group
+const _roleAliasLookup = new Map<string, string[]>();
+for (const group of ROLE_ALIAS_GROUPS) {
+  for (const term of group) {
+    _roleAliasLookup.set(term, group);
+  }
+}
+
+/**
+ * Get all equivalent role terms for DB filtering.
+ * Returns the alias group if the role matches one, otherwise just the original term.
+ */
+export function getRoleSearchTerms(role: string): string[] {
+  const normalized = role.trim().toLowerCase();
+  return _roleAliasLookup.get(normalized) || [normalized];
+}
+
+/**
+ * Check if two normalized role strings are aliases of each other.
+ */
+export function areRolesAliased(role1: string, role2: string): boolean {
+  const group = _roleAliasLookup.get(role1);
+  if (!group) return false;
+  return group.includes(role2);
+}
+
+/**
  * Filter criteria for querying Person table
  */
 export interface PersonFilters {
@@ -818,9 +894,19 @@ function buildPersonWhereClause(filters: Omit<PersonFilters, 'limit' | 'offset'>
     where.city = { contains: location.trim(), mode: 'insensitive' };
   }
 
-  // Role filter
+  // Role filter — expand with aliases (e.g., "Vice President" also matches "VP")
   if (role && role.trim()) {
-    where.role = { contains: role.trim(), mode: 'insensitive' };
+    const roleTerms = getRoleSearchTerms(role);
+    if (roleTerms.length === 1) {
+      where.role = { contains: roleTerms[0], mode: 'insensitive' };
+    } else {
+      if (!where.AND) where.AND = [];
+      (where.AND as unknown[]).push({
+        OR: roleTerms.map(term => ({
+          role: { contains: term, mode: 'insensitive' as const }
+        }))
+      });
+    }
   }
 
   // University filter
