@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { INDUSTRIES, COMPANIES_BY_INDUSTRY, ROLES_BY_COMPANY, UNIVERSITIES, LOCATIONS, EMAIL_TEMPLATES } from '@/lib/constants';
+import { INDUSTRIES, COMPANIES_BY_INDUSTRY, ROLES_BY_COMPANY, LOCATIONS, EMAIL_TEMPLATES } from '@/lib/constants';
 import { LoadingSpinner } from './LoadingSpinner';
 import { SearchableCombobox } from './SearchableCombobox';
 import { getTemplatesAction, TemplateData } from '@/app/actions/profile';
@@ -207,14 +207,20 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
         />
 
         {/* University */}
-        <SearchableCombobox
-          options={['', ...UNIVERSITIES]}
-          value={university}
-          onChange={setUniversity}
-          label="University"
-          placeholder="Select a university..."
-          id="university"
-        />
+        <div>
+          <label htmlFor="university" className="block text-sm font-medium text-surface-700 mb-1.5">
+            University
+          </label>
+          <select
+            id="university"
+            value={university}
+            onChange={(e) => setUniversity(e.target.value)}
+            className="input"
+          >
+            <option value="">Any Location</option>
+            <option value="University of Texas at Austin">University of Texas at Austin</option>
+          </select>
+        </div>
 
         {/* Office Location */}
         <SearchableCombobox

@@ -772,60 +772,27 @@ export interface PersonFilters {
   requireEmail?: boolean;    // Default true - only return people with emails
   excludePersonKeys?: Set<string>; // Set of "fullName_company" keys to exclude
   limit: number;
+  offset?: number;           // For pagination (default 0)
 }
 
+// Normalize company name for matching (remove dots, extra spaces)
+// "L.E.K. Consulting" → "LEK Consulting", "LEK Consulting" → "LEK Consulting"
+const normalizeCompanyForMatch = (name: string) =>
+  name.replace(/\./g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+
 /**
- * Find people in the database matching the given filters
- * This is the main query function for the database-first search approach
+ * Build Prisma where clause from PersonFilters.
+ * Shared between findPeopleByFilters and countPeopleByFilters.
  */
-export async function findPeopleByFilters(filters: PersonFilters): Promise<
-  Array<{
-    id: string;
-    fullName: string;
-    firstName: string | null;
-    lastName: string | null;
-    company: string;
-    role: string | null;
-    linkedinUrl: string | null;
-    email: string | null;
-    emailStatus: string | null;
-    emailConfidence: number | null;
-    emailDeliverable: boolean | null;
-    emailVerifiedAt: Date | null;
-    emailVerificationReason: string | null;
-    city: string | null;
-    state: string | null;
-    country: string | null;
-    educationSchool: string | null;
-    educationDegree: string | null;
-    educationField: string | null;
-    educationYear: string | null;
-    sourceLinks: Array<{
-      url: string;
-      title: string;
-      snippet: string | null;
-      domain: string | null;
-    }>;
-  }>
-> {
-  const { company, location, role, university, requireEmail = true, excludePersonKeys, limit } = filters;
+function buildPersonWhereClause(filters: Omit<PersonFilters, 'limit' | 'offset'>): Record<string, unknown> {
+  const { company, location, role, university, requireEmail = true } = filters;
 
-  // Normalize company name for matching (remove dots, extra spaces)
-  // "L.E.K. Consulting" → "LEK Consulting", "LEK Consulting" → "LEK Consulting"
-  const normalizeCompany = (name: string) =>
-    name.replace(/\./g, '').replace(/\s+/g, ' ').trim().toLowerCase();
-
-  // Build where clause
-  // Note: Company matching is done post-query for fuzzy matching (L.E.K. = LEK)
   const where: Record<string, unknown> = {};
-  const normalizedSearchCompany = company ? normalizeCompany(company) : null;
 
   // Company filter - DB filter using alias mapping with appropriate match types
-  // Uses getCompanySearchTerms to get all valid variations for the search company
   if (company && company.trim()) {
     const searchTerms = getCompanySearchTerms(company);
 
-    // Build Prisma filter based on match type
     const buildCompanyFilter = (term: CompanySearchTerm) => {
       switch (term.matchType) {
         case 'equals':
@@ -842,22 +809,21 @@ export async function findPeopleByFilters(filters: PersonFilters): Promise<
       const filter = buildCompanyFilter(searchTerms[0]);
       where.company = filter.company;
     } else if (searchTerms.length > 1) {
-      // Use OR to match any of the alias terms
       where.OR = searchTerms.map(buildCompanyFilter);
     }
   }
 
-  // Location filter - city must contain search term
+  // Location filter
   if (location && location.trim()) {
     where.city = { contains: location.trim(), mode: 'insensitive' };
   }
 
-  // Role filter - role must contain search term
+  // Role filter
   if (role && role.trim()) {
     where.role = { contains: role.trim(), mode: 'insensitive' };
   }
 
-  // University filter - educationSchool must contain search term
+  // University filter
   if (university && university.trim()) {
     where.educationSchool = { contains: university.trim(), mode: 'insensitive' };
   }
@@ -865,16 +831,88 @@ export async function findPeopleByFilters(filters: PersonFilters): Promise<
   // Email filter - must have email AND not be marked as undeliverable
   if (requireEmail) {
     where.email = { not: null };
-    // Exclude people we've verified as undeliverable
-    // emailDeliverable: null (unchecked) or true (verified) are OK
-    // Prisma's { not: false } excludes null, so we use OR to include both true and null
     if (!where.AND) where.AND = [];
     (where.AND as unknown[]).push({
       OR: [{ emailDeliverable: true }, { emailDeliverable: null }]
     });
   }
 
-  // Query the database
+  return where;
+}
+
+/**
+ * Apply post-query filtering: company fuzzy match + exclusion keys.
+ * Shared logic for filtering results after DB query.
+ */
+function applyPostQueryFilters<T extends { fullName: string; company: string }>(
+  people: T[],
+  searchCompany: string | undefined,
+  excludePersonKeys: Set<string> | undefined
+): T[] {
+  let filtered = people;
+
+  // Filter by company using alias mapping for known companies
+  const normalizedSearchCompany = searchCompany ? normalizeCompanyForMatch(searchCompany) : null;
+  if (normalizedSearchCompany) {
+    filtered = filtered.filter((person) => {
+      const normalizedPersonCompany = normalizeCompanyForMatch(person.company);
+      return companiesMatch(normalizedPersonCompany, normalizedSearchCompany);
+    });
+  }
+
+  // Filter out excluded people
+  if (excludePersonKeys && excludePersonKeys.size > 0) {
+    filtered = filtered.filter((person) => {
+      const key = `${person.fullName}_${person.company}`.toLowerCase();
+      return !excludePersonKeys.has(key);
+    });
+  }
+
+  return filtered;
+}
+
+/**
+ * Find people in the database matching the given filters.
+ * Supports offset-based pagination with stable sorting for consistent results.
+ */
+export type PersonResult = {
+  id: string;
+  fullName: string;
+  firstName: string | null;
+  lastName: string | null;
+  company: string;
+  role: string | null;
+  linkedinUrl: string | null;
+  email: string | null;
+  emailStatus: string | null;
+  emailConfidence: number | null;
+  emailDeliverable: boolean | null;
+  emailVerifiedAt: Date | null;
+  emailVerificationReason: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  educationSchool: string | null;
+  educationDegree: string | null;
+  educationField: string | null;
+  educationYear: string | null;
+  sourceLinks: Array<{
+    url: string;
+    title: string;
+    snippet: string | null;
+    domain: string | null;
+  }>;
+};
+
+export async function findPeopleByFilters(filters: PersonFilters): Promise<{
+  results: PersonResult[];
+  /** Number of DB rows consumed (pre-filter). Use for correct pagination offset. */
+  dbRowsFetched: number;
+}> {
+  const { company, excludePersonKeys, limit, offset = 0 } = filters;
+  const where = buildPersonWhereClause(filters);
+
+  // Query the database with offset-based pagination
   const people = await prisma.person.findMany({
     where,
     select: {
@@ -911,31 +949,36 @@ export async function findPeopleByFilters(filters: PersonFilters): Promise<
       },
     },
     orderBy: [
-      { emailStatus: 'asc' }, // VERIFIED first
+      { emailStatus: 'asc' },       // VERIFIED first
       { emailConfidence: 'desc' },
+      { createdAt: 'asc' },          // Stable sort — new people go to end
     ],
-    take: limit * 2, // Get extra to allow for exclusions
+    skip: offset,
+    take: limit * 2, // Overfetch to compensate for post-query filtering
   });
 
-  // Filter by company using alias mapping for known companies
-  // Falls back to word-boundary matching for unknown companies
-  let filtered = people;
-  if (normalizedSearchCompany) {
-    filtered = people.filter((person) => {
-      const normalizedPersonCompany = normalizeCompany(person.company);
-      return companiesMatch(normalizedPersonCompany, normalizedSearchCompany);
-    });
-  }
+  const filtered = applyPostQueryFilters(people, company, excludePersonKeys);
+  return {
+    results: filtered.slice(0, limit),
+    dbRowsFetched: people.length,
+  };
+}
 
-  // Filter out excluded people
-  if (excludePersonKeys && excludePersonKeys.size > 0) {
-    filtered = filtered.filter((person) => {
-      const key = `${person.fullName}_${person.company}`.toLowerCase();
-      return !excludePersonKeys.has(key);
-    });
-  }
-
-  return filtered.slice(0, limit);
+/**
+ * Count people matching filters (approximate — pre-app-layer filtering).
+ * Used for hasMore calculation in pagination.
+ *
+ * Note: This count is approximate because company fuzzy matching and
+ * exclusion filtering happen in the application layer. The DB count may
+ * be slightly higher than the actual filtered count. This is acceptable
+ * for hasMore calculation (worst case: user clicks Load More and gets
+ * fewer results than expected, but never misses data).
+ */
+export async function countPeopleByFilters(
+  filters: Omit<PersonFilters, 'limit' | 'offset'>
+): Promise<number> {
+  const where = buildPersonWhereClause(filters);
+  return prisma.person.count({ where });
 }
 
 /**

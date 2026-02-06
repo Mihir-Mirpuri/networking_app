@@ -49,6 +49,16 @@ export default async function HomePage() {
     redirect('/auth/signin');
   }
 
+  // Check if user has completed onboarding
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { onboardingCompleted: true },
+  });
+
+  if (!user?.onboardingCompleted) {
+    redirect('/onboarding');
+  }
+
   const remainingDaily = await getRemainingDailyLimit(session.user.id);
 
   return (

@@ -13,17 +13,14 @@ import {
   findPeopleByLinkedInUrls,
   saveScrapedProfile,
   getEmailStatus,
-  PersonFilters
+  PersonFilters,
+  PersonResult,
 } from '@/lib/db/person-service';
 import {
   normalizeSearchParams,
-  findCachedSearch,
-  findExistingSearch,
-  getCachedPersonIds,
-  createSearchWithPeople,
-  updateSearchWithPeople,
-  getStalePersonIds,
-  getPersonsByIds,
+  findOrCreateScrapeProgress,
+  updateScrapeProgress,
+  getNextCsePageStart,
   ApiUsageStats,
 } from '@/lib/db/search-cache';
 import {
@@ -42,6 +39,7 @@ export interface SearchInput {
   location?: string;
   limit: number;
   templateId: string;
+  offset?: number; // For pagination (default 0)
 }
 
 export interface SearchResultWithDraft {
@@ -78,8 +76,10 @@ export interface SearchResultWithDraft {
 }
 
 export interface SearchMeta {
-  fromCache: boolean;
-  needsRefresh: boolean;
+  hasMore: boolean;
+  /** DB-level offset for the next page. Pass this back as `offset` on Load More. */
+  nextOffset: number;
+  backgroundScrapeNeeded: boolean;
   apolloCallsMade: number;
   apolloCacheHits: number;
   cseCallsMade: number;
@@ -162,9 +162,17 @@ function getTemplate(templateId: string) {
   return EMAIL_TEMPLATES.find((t) => t.id === templateId) || EMAIL_TEMPLATES[0];
 }
 
+// Minimum results before considering a scrape. Below this, we either
+// block on scrape (0 results) or flag for background scrape (1-4 results).
+const SCRAPE_THRESHOLD = 5;
+
 /**
- * Main search action - returns instant results from cache/DB
- * If cache miss, returns what we have and signals frontend to call refreshSearchAction
+ * Main search action — always queries DB directly with offset pagination.
+ *
+ * Three-path UX based on DB result count:
+ *   Path A (0 results):   Block, scrape synchronously, return results
+ *   Path B (1-4 results): Return immediately, flag backgroundScrapeNeeded
+ *   Path C (5+ results):  Return instantly, no scraping
  */
 export async function searchPeopleAction(
   input: SearchInput
@@ -181,6 +189,7 @@ export async function searchPeopleAction(
 
   try {
     const userId = session.user.id;
+    const offset = input.offset ?? 0;
 
     // Get user info for template
     const user = await prisma.user.findUnique({
@@ -208,7 +217,6 @@ export async function searchPeopleAction(
     const excludedKeys = await getExcludedPersonKeys(userId);
     console.log(`[Search] User has ${excludedKeys.size} excluded people (sent/hidden).`);
 
-    // Check cache first
     const normalizedParams = normalizeSearchParams({
       name: input.name,
       company: input.company,
@@ -217,68 +225,63 @@ export async function searchPeopleAction(
       location: input.location,
     });
 
-    const cachedSearch = await findCachedSearch(normalizedParams);
+    // ===== STEP 1: Query DB directly =====
+    const filters: PersonFilters = {
+      company: input.company,
+      location: input.location,
+      role: input.role,
+      university: input.university,
+      requireEmail: true,
+      excludePersonKeys: excludedKeys,
+      limit: input.limit,
+      offset,
+    };
 
-    let people: PersonWithSource[] = [];
-    let needsRefresh = false;
+    let { results: people, dbRowsFetched } = await findPeopleByFilters(filters);
+    // Track DB-level offset: where the next page should start in DB terms
+    let dbOffset = offset + dbRowsFetched;
+    console.log(`[Search] Found ${people.length} people in DB (offset=${offset}, dbRowsFetched=${dbRowsFetched})`);
+
+    let backgroundScrapeNeeded = false;
     let apolloCallsMade = 0;
     let apolloCacheHits = 0;
     let cseCallsMade = 0;
 
-    if (cachedSearch) {
-      // Cache hit - get people from cache
-      console.log(`[Search] CACHE HIT - search ${cachedSearch.id} from ${cachedSearch.createdAt}`);
+    // ===== STEP 2: Three-path logic based on result count =====
+    if (people.length < SCRAPE_THRESHOLD) {
+      const progress = await findOrCreateScrapeProgress(normalizedParams);
+      const nextPage = getNextCsePageStart(progress.lastCsePageScraped, progress.cseExhausted);
 
-      const cachedPersonIds = await getCachedPersonIds(cachedSearch.id);
-      console.log(`[Search] Found ${cachedPersonIds.length} cached people`);
+      if (nextPage !== null) {
+        if (people.length === 0) {
+          // PATH A: 0 results → scrape synchronously (user expects to wait)
+          console.log(`[Search] PATH A: 0 results, scraping CSE page ${nextPage} synchronously`);
+          const batch = await processRefreshBatch(input, excludedKeys, nextPage, 'SyncScrape');
+          cseCallsMade = 1;
+          apolloCallsMade = batch.apolloCallsMade;
 
-      if (cachedPersonIds.length > 0) {
-        people = await getPersonsByIds(cachedPersonIds);
-        console.log(`[Search] Retrieved ${people.length} people from cache`);
+          await updateScrapeProgress(progress.id, nextPage, batch.urlsFromCse, {
+            cseCallsMade: 1,
+            linkedinScraperCalls: batch.urlsScraped,
+            apolloCallsMade: batch.apolloCallsMade,
+          });
+
+          // Re-query DB after scraping added new people (reset offset to 0)
+          const fresh = await findPeopleByFilters({ ...filters, offset: 0 });
+          people = fresh.results;
+          dbOffset = fresh.dbRowsFetched;
+          console.log(`[Search] After scrape: ${people.length} results`);
+        } else {
+          // PATH B: 1-4 results → return immediately, scrape in background
+          console.log(`[Search] PATH B: ${people.length} results, flagging for background scrape`);
+          backgroundScrapeNeeded = true;
+        }
       }
-
-      // Check for stale person data that needs refresh
-      const staleIds = await getStalePersonIds(cachedPersonIds);
-      if (staleIds.length > 0) {
-        console.log(`[Search] ${staleIds.length} people have stale data (>20 days old)`);
-        needsRefresh = true;
-      }
-    } else {
-      // Cache miss - query DB for matching people
-      console.log(`[Search] CACHE MISS - querying database`);
-
-      const filters: PersonFilters = {
-        company: input.company,
-        location: input.location,
-        role: input.role,
-        university: input.university,
-        requireEmail: true,
-        excludePersonKeys: excludedKeys,
-        limit: input.limit,
-      };
-
-      people = await findPeopleByFilters(filters);
-      console.log(`[Search] Found ${people.length} people in database`);
-
-      // Only need refresh if we don't have enough results
-      if (people.length < input.limit) {
-        needsRefresh = true;
-        console.log(`[Search] Need refresh - only ${people.length}/${input.limit} results`);
-      }
-
-      cseCallsMade = 0; // No CSE calls in instant search
+      // If nextPage is null (CSE exhausted), just return whatever we have
     }
+    // PATH C: 5+ results → return as-is (implicit, no special handling needed)
 
-    // Filter out excluded people and those without emails
-    const filteredPeople = people.filter((person) => {
-      const key = `${person.fullName}_${person.company}`.toLowerCase();
-      // Must have email and not be excluded
-      return person.email && !excludedKeys.has(key);
-    });
-
-    console.log(`[Search] ${filteredPeople.length} people after filtering (with emails)`);
-
-    // Rank candidates
+    // ===== STEP 3: Rank candidates =====
     const searchCriteria: SearchCriteria = {
       company: input.company,
       role: input.role,
@@ -286,10 +289,9 @@ export async function searchPeopleAction(
       location: input.location,
     };
 
-    // Pass filteredPeople directly to rankCandidates with a getData function
     const rankedPeople = rankCandidates(
       searchCriteria,
-      filteredPeople,
+      people,
       (person): CandidateData => ({
         company: person.company,
         role: person.role,
@@ -304,17 +306,12 @@ export async function searchPeopleAction(
     );
     console.log(`[Search] Ranked top ${rankedPeople.length} candidates`);
 
-    // Build results with drafts
+    // ===== STEP 4: Build results with drafts =====
     const results = await Promise.all(
       rankedPeople.map(async ({ candidate: person, score, breakdown }) => {
-
-        // Get or create UserCandidate
         const userCandidate = await prisma.userCandidate.upsert({
           where: {
-            userId_personId: {
-              userId,
-              personId: person.id,
-            },
+            userId_personId: { userId, personId: person.id },
           },
           create: {
             userId,
@@ -324,29 +321,18 @@ export async function searchPeopleAction(
             emailConfidence: person.emailConfidence,
           },
           update: {},
-          select: {
-            id: true,
-          },
+          select: { id: true },
         });
 
-        // Generate draft
         const draft = generateEmailDraft(
           input.templateId,
-          {
-            firstName: person.firstName,
-            company: person.company,
-            role: person.role,
-          },
+          { firstName: person.firstName, company: person.company, role: person.role },
           { name: user.name, university: user.university }
         );
 
-        // Get or create EmailDraft
-        // Only set templateId FK for user-created templates, not hardcoded ones
         const isHardcodedTemplate = EMAIL_TEMPLATES.some(t => t.id === input.templateId);
         const emailDraft = await prisma.emailDraft.upsert({
-          where: {
-            userCandidateId: userCandidate.id,
-          },
+          where: { userCandidateId: userCandidate.id },
           create: {
             userCandidateId: userCandidate.id,
             templateId: isHardcodedTemplate ? null : input.templateId,
@@ -394,16 +380,14 @@ export async function searchPeopleAction(
       })
     );
 
-    // Count verified vs unverified
-    const verifiedCount = results.filter(
-      (r) => r.emailStatus === 'VERIFIED' || r.emailDeliverable === true
-    ).length;
-    const unverifiedCount = results.filter(
-      (r) => r.emailStatus === 'UNVERIFIED' && r.emailDeliverable !== true
-    ).length;
+    // ===== STEP 5: Compute hasMore =====
+    // Pure DB heuristic: got a full page means probably more rows.
+    // CSE status is NOT factored in — Load More stays fast (DB-only).
+    // Background prescraping (future) will populate DB ahead of time.
+    const hasMore = people.length >= input.limit;
 
     console.log(
-      `[Search] Returning ${results.length} results: ${verifiedCount} verified, ${unverifiedCount} unverified (needsRefresh: ${needsRefresh})`
+      `[Search] Returning ${results.length} results (hasMore=${hasMore}, bgScrape=${backgroundScrapeNeeded})`
     );
 
     // Log the search for analytics
@@ -415,7 +399,7 @@ export async function searchPeopleAction(
         university: input.university || null,
         location: input.location || null,
         resultsCount: results.length,
-        fromCache: !!cachedSearch,
+        fromCache: false, // No longer using cache — kept for schema compatibility
       },
     });
 
@@ -423,8 +407,9 @@ export async function searchPeopleAction(
       success: true,
       results,
       searchMeta: {
-        fromCache: !!cachedSearch,
-        needsRefresh,
+        hasMore,
+        nextOffset: dbOffset,
+        backgroundScrapeNeeded,
         apolloCallsMade,
         apolloCacheHits,
         cseCallsMade,
@@ -674,22 +659,24 @@ async function processRefreshBatch(
 }
 
 /**
- * Refresh search action - runs CSE + LinkedIn scraping for a single page
+ * Scrape the next CSE page for given search params.
+ * Called by the frontend when backgroundScrapeNeeded is true.
  *
- * Called on initial search (page 1) and on-demand via "Load More" (page 2, 3, etc.)
+ * Lightweight: scrapes one CSE page and returns metadata.
+ * Does NOT return search results — frontend calls searchPeopleAction after.
  */
-export async function refreshSearchAction(
-  input: Omit<SearchInput, 'templateId' | 'limit'> & {
-    limit?: number;
-    pageStart?: number;  // Defaults to 1. For page 2, pass 11; page 3, pass 21, etc.
+export async function scrapeNextPageAction(
+  input: {
+    company: string;
+    role?: string;
+    university?: string;
+    location?: string;
+    name?: string;
   }
 ): Promise<{
   success: true;
   newPeopleCount: number;
-  emailsGenerated: number;
-  apolloCallsMade: number;
-  matchingCount: number;
-  hasMore: boolean;  // true if CSE returned 10 results (more pages likely available)
+  hasMoreCsePages: boolean;
 } | { success: false; error: string }> {
   const session = await getServerSession(authOptions);
 
@@ -703,64 +690,117 @@ export async function refreshSearchAction(
 
   try {
     const excludedKeys = await getExcludedPersonKeys(session.user.id);
-    const pageStart = input.pageStart ?? 1;
 
-    // ===== PROCESS SINGLE PAGE =====
-    console.log(`[Refresh] Processing page starting at ${pageStart}`);
-    const batch = await processRefreshBatch(input, excludedKeys, pageStart, `Page${pageStart}`);
-    console.log(`[Refresh] Complete: ${batch.newPeopleCount} new, ${batch.emailsGenerated} emails`);
-
-    // ===== COUNT MATCHING PEOPLE =====
-    const filters: PersonFilters = {
+    const normalizedParams = normalizeSearchParams({
+      name: input.name,
       company: input.company,
-      location: input.location,
+      role: input.role,
       university: input.university,
-      requireEmail: false,
-      excludePersonKeys: excludedKeys,
-      limit: 100,
-    };
+      location: input.location,
+    });
 
-    const matchingPeople = await findPeopleByFilters(filters);
+    const progress = await findOrCreateScrapeProgress(normalizedParams);
+    const nextPage = getNextCsePageStart(progress.lastCsePageScraped, progress.cseExhausted);
 
-    // ===== UPDATE CACHE =====
-    if (matchingPeople.length > 0) {
-      const normalizedParams = normalizeSearchParams({
-        name: input.name,
-        company: input.company,
-        role: input.role,
-        university: input.university,
-        location: input.location,
-      });
-
-      const personIds = matchingPeople.map((p) => p.id);
-      const apiStats: ApiUsageStats = {
-        apolloCallsMade: batch.apolloCallsMade,
-        apolloCacheHits: 0,
-        cseCallsMade: 1,
-        linkedinScraperCalls: batch.urlsScraped,
-      };
-
-      const existingSearch = await findExistingSearch(normalizedParams);
-      if (existingSearch) {
-        await updateSearchWithPeople(existingSearch.id, personIds, apiStats);
-      } else {
-        await createSearchWithPeople(normalizedParams, personIds, apiStats);
-      }
+    if (nextPage === null) {
+      console.log(`[ScrapeNextPage] CSE exhausted for "${input.company}", nothing to scrape`);
+      return { success: true, newPeopleCount: 0, hasMoreCsePages: false };
     }
 
-    // CSE returns 10 results per page; if we got 10, there are likely more pages
-    const hasMore = batch.urlsFromCse === 10;
+    console.log(`[ScrapeNextPage] Scraping CSE page ${nextPage} for "${input.company}"`);
+    const batch = await processRefreshBatch(input, excludedKeys, nextPage, 'Background');
+
+    await updateScrapeProgress(progress.id, nextPage, batch.urlsFromCse, {
+      cseCallsMade: 1,
+      linkedinScraperCalls: batch.urlsScraped,
+      apolloCallsMade: batch.apolloCallsMade,
+    });
+
+    const hasMoreCsePages = batch.urlsFromCse >= 5; // Matches CSE_EXHAUSTED_THRESHOLD
+    console.log(`[ScrapeNextPage] Done: ${batch.newPeopleCount} new people, hasMore=${hasMoreCsePages}`);
 
     return {
       success: true,
       newPeopleCount: batch.newPeopleCount,
-      emailsGenerated: batch.emailsGenerated,
-      apolloCallsMade: batch.apolloCallsMade,
-      matchingCount: matchingPeople.length,
-      hasMore,
+      hasMoreCsePages,
     };
   } catch (error) {
-    console.error('Refresh search error:', error);
-    return { success: false, error: 'Refresh failed. Please try again.' };
+    console.error('Scrape next page error:', error);
+    return { success: false, error: 'Scraping failed. Please try again.' };
+  }
+}
+
+const MAX_PRESCRAPE_PAGES = 3;
+
+/**
+ * Background prescrape: scrape all remaining CSE pages (up to 4 total) for a search.
+ * Fire-and-forget from the frontend — populates the Person table so future
+ * Load More clicks are instant DB reads.
+ */
+export async function prescrapeAction(
+  input: {
+    company: string;
+    role?: string;
+    university?: string;
+    location?: string;
+    name?: string;
+  }
+): Promise<{ success: true; pagesScraped: number } | { success: false; error: string }> {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.id) {
+    return { success: false, error: 'Not authenticated' };
+  }
+
+  if (!input.company || !input.company.trim()) {
+    return { success: false, error: 'Company is required' };
+  }
+
+  try {
+    const excludedKeys = await getExcludedPersonKeys(session.user.id);
+
+    const normalizedParams = normalizeSearchParams({
+      name: input.name,
+      company: input.company,
+      role: input.role,
+      university: input.university,
+      location: input.location,
+    });
+
+    let pagesScraped = 0;
+
+    while (pagesScraped < MAX_PRESCRAPE_PAGES) {
+      // Re-fetch progress each iteration (updated by previous iteration)
+      const progress = await findOrCreateScrapeProgress(normalizedParams);
+      const nextPage = getNextCsePageStart(progress.lastCsePageScraped, progress.cseExhausted);
+
+      if (nextPage === null) {
+        console.log(`[Prescrape] CSE exhausted after ${pagesScraped} pages for "${input.company}"`);
+        break;
+      }
+
+      console.log(`[Prescrape] Scraping CSE page ${nextPage} for "${input.company}" (${pagesScraped + 1}/${MAX_PRESCRAPE_PAGES})`);
+      const batch = await processRefreshBatch(input, excludedKeys, nextPage, `Prescrape-${pagesScraped + 1}`);
+
+      await updateScrapeProgress(progress.id, nextPage, batch.urlsFromCse, {
+        cseCallsMade: 1,
+        linkedinScraperCalls: batch.urlsScraped,
+        apolloCallsMade: batch.apolloCallsMade,
+      });
+
+      pagesScraped++;
+
+      // CSE returned fewer than threshold — no more pages
+      if (batch.urlsFromCse < 5) {
+        console.log(`[Prescrape] CSE exhausted (${batch.urlsFromCse} URLs) after ${pagesScraped} pages`);
+        break;
+      }
+    }
+
+    console.log(`[Prescrape] Done: scraped ${pagesScraped} pages for "${input.company}"`);
+    return { success: true, pagesScraped };
+  } catch (error) {
+    console.error('Prescrape error:', error);
+    return { success: false, error: 'Prescraping failed.' };
   }
 }

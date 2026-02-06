@@ -135,16 +135,22 @@ model Search {
   role                  String?
   university            String?
   location              String?
+  // Scrape progress tracking
+  lastCsePageScraped    Int            @default(0)     // 0=none, 1=page1, 11=page2, 21=page3
+  cseExhausted          Boolean        @default(false)  // true when CSE returned <5 valid profiles
+  // API usage stats (analytics)
   apolloCallsMade       Int            @default(0)
   apolloCacheHits       Int            @default(0)
   cseCallsMade          Int            @default(0)
   linkedinScraperCalls  Int            @default(0)
   completedAt     DateTime?
   createdAt       DateTime       @default(now())
-  searchPeople    SearchPerson[]
+  updatedAt       DateTime       @default(now()) @updatedAt
+  searchPeople    SearchPerson[] // Kept for production compatibility — no longer used by new code
 
   @@index([createdAt])
   @@index([completedAt])
+  @@index([company, name, role, university, location]) // Composite for param lookup
 }
 
 model SearchPerson {
