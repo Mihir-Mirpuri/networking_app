@@ -809,6 +809,15 @@ const ROLE_ALIAS_GROUPS: string[][] = [
   ['program manager', 'pgm', 'program mgr'],
   ['rotational product manager', 'rpm', 'rotational pm'],
   ['project manager', 'project mgr'],
+
+  // Recruiting/Talent Acquisition — single group so "Recruiter" dropdown matches all variations
+  ['recruiter', 'recruiting', 'talent acquisition', 'talent acquisition specialist',
+   'campus recruiter', 'university recruiter', 'campus recruiting', 'university recruiting',
+   'university relations', 'early careers recruiter', 'senior recruiter', 'sr recruiter',
+   'sr. recruiter', 'lead recruiter', 'recruiting manager', 'talent acquisition manager',
+   'recruiting lead', 'head of recruiting', 'head of talent acquisition',
+   'recruiting coordinator', 'talent acquisition coordinator',
+   'technical recruiter', 'tech recruiter', 'executive recruiter', 'executive search'],
 ];
 
 // Build reverse lookup: normalized term → all terms in its group

@@ -12,7 +12,7 @@ import { searchPeopleAction, SearchResultWithDraft, hidePersonAction, scrapeNext
 import { sendSingleEmailAction, sendEmailsAction, PersonToSend } from '@/app/actions/send';
 
 // Loading message shown during search
-const LOADING_MESSAGE = 'Searching for profiles...';
+const LOADING_MESSAGE = 'Searching for profiles — this can take up to 30 seconds...';
 
 interface SearchPageClientProps {
   initialRemainingDaily: number;
