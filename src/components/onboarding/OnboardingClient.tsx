@@ -53,7 +53,7 @@ export function OnboardingClient({ userName }: OnboardingClientProps) {
             Welcome to Signl
           </h1>
           <p className="text-surface-600">
-            Let's set up your profile so your outreach emails are personalized.
+            Let&apos;s set up your profile so your outreach emails are personalized.
           </p>
         </div>
 
