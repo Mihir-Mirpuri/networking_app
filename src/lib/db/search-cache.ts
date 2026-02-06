@@ -2,6 +2,8 @@ import prisma from '@/lib/prisma';
 
 const CACHE_TTL_HOURS = 168; // 7 days
 const PERSON_CACHE_TTL_DAYS = 60; // 60 days - then check for staleness (email bounce)
+const SCRAPE_PROGRESS_TTL_DAYS = 7; // After 7 days, allow re-scraping from page 1
+const CSE_EXHAUSTED_THRESHOLD = 5; // CSE is exhausted when it returns fewer than this many valid profiles
 
 export interface NormalizedSearchParams {
   name: string | null;
@@ -348,4 +350,139 @@ export async function getPersonsByIds(personIds: string[]): Promise<
   // Return in order of input IDs
   const personMap = new Map(persons.map((p) => [p.id, p]));
   return personIds.map((id) => personMap.get(id)!).filter(Boolean);
+}
+
+// ===== SCRAPE PROGRESS TRACKING =====
+// These functions replace the cache-based result retrieval with a simpler
+// scrape progress tracker. Instead of caching which people belong to a search,
+// we track which CSE pages have been scraped for a given set of search params.
+
+export interface ScrapeProgress {
+  id: string;
+  lastCsePageScraped: number;
+  cseExhausted: boolean;
+}
+
+/**
+ * Compute the next CSE page start value based on scrape progress.
+ * Returns null if CSE is exhausted (no more pages to scrape).
+ *
+ * CSE pagination: page 1 = start 1, page 2 = start 11, page 3 = start 21, etc.
+ */
+export function getNextCsePageStart(
+  lastCsePageScraped: number,
+  cseExhausted: boolean
+): number | null {
+  if (cseExhausted) return null;
+  if (lastCsePageScraped === 0) return 1;
+  return lastCsePageScraped + 10;
+}
+
+/**
+ * Determine if CSE is exhausted based on how many valid profiles were returned.
+ * Uses a threshold of 5 because CSE can return non-profile URLs (e.g. linkedin.com/company/)
+ * that get filtered out, so a raw page of 10 may yield fewer valid profiles.
+ */
+export function isCsePageExhausted(validProfileCount: number): boolean {
+  return validProfileCount < CSE_EXHAUSTED_THRESHOLD;
+}
+
+/**
+ * Find or create a scrape progress record for the given search params.
+ * If the existing record is older than 7 days, resets progress to allow re-scraping.
+ */
+export async function findOrCreateScrapeProgress(
+  params: NormalizedSearchParams
+): Promise<ScrapeProgress> {
+  // Look for any existing search with matching params (using COALESCE for NULL-safe comparison)
+  const existing = await prisma.$queryRaw<
+    Array<{
+      id: string;
+      lastCsePageScraped: number;
+      cseExhausted: boolean;
+      updatedAt: Date;
+    }>
+  >`
+    SELECT "id", "lastCsePageScraped", "cseExhausted", "updatedAt"
+    FROM "Search"
+    WHERE COALESCE("name", '') = COALESCE(${params.name}, '')
+      AND COALESCE("company", '') = COALESCE(${params.company}, '')
+      AND COALESCE("role", '') = COALESCE(${params.role}, '')
+      AND COALESCE("university", '') = COALESCE(${params.university}, '')
+      AND COALESCE("location", '') = COALESCE(${params.location}, '')
+    ORDER BY "updatedAt" DESC
+    LIMIT 1
+  `;
+
+  if (existing.length > 0) {
+    const record = existing[0];
+
+    // Check if stale (> 7 days) — reset progress to allow fresh scraping
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - SCRAPE_PROGRESS_TTL_DAYS);
+
+    if (record.updatedAt < cutoff) {
+      await prisma.search.update({
+        where: { id: record.id },
+        data: { lastCsePageScraped: 0, cseExhausted: false },
+      });
+      return { id: record.id, lastCsePageScraped: 0, cseExhausted: false };
+    }
+
+    return {
+      id: record.id,
+      lastCsePageScraped: record.lastCsePageScraped,
+      cseExhausted: record.cseExhausted,
+    };
+  }
+
+  // No existing record — create new
+  const created = await prisma.search.create({
+    data: {
+      name: params.name,
+      company: params.company,
+      role: params.role,
+      university: params.university,
+      location: params.location,
+      lastCsePageScraped: 0,
+      cseExhausted: false,
+    },
+  });
+
+  return {
+    id: created.id,
+    lastCsePageScraped: 0,
+    cseExhausted: false,
+  };
+}
+
+/**
+ * Update scrape progress after a CSE page has been scraped.
+ */
+export async function updateScrapeProgress(
+  searchId: string,
+  pageScraped: number,
+  cseReturnedCount: number,
+  apiStats?: Partial<ApiUsageStats>
+): Promise<void> {
+  await prisma.search.update({
+    where: { id: searchId },
+    data: {
+      lastCsePageScraped: pageScraped,
+      cseExhausted: isCsePageExhausted(cseReturnedCount),
+      completedAt: new Date(),
+      ...(apiStats?.cseCallsMade !== undefined && {
+        cseCallsMade: { increment: apiStats.cseCallsMade },
+      }),
+      ...(apiStats?.linkedinScraperCalls !== undefined && {
+        linkedinScraperCalls: { increment: apiStats.linkedinScraperCalls },
+      }),
+      ...(apiStats?.apolloCallsMade !== undefined && {
+        apolloCallsMade: { increment: apiStats.apolloCallsMade },
+      }),
+      ...(apiStats?.apolloCacheHits !== undefined && {
+        apolloCacheHits: { increment: apiStats.apolloCacheHits },
+      }),
+    },
+  });
 }

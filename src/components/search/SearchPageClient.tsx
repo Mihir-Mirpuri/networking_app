@@ -8,7 +8,7 @@ import { BulkReview } from './BulkReview';
 import { LoadingSpinner } from './LoadingSpinner';
 import { Toast } from '@/components/ui/Toast';
 import { LimitReachedModal, dispatchCreditsChanged } from '@/components/credits';
-import { searchPeopleAction, SearchResultWithDraft, hidePersonAction, refreshSearchAction } from '@/app/actions/search';
+import { searchPeopleAction, SearchResultWithDraft, hidePersonAction, scrapeNextPageAction, prescrapeAction } from '@/app/actions/search';
 import { sendSingleEmailAction, sendEmailsAction, PersonToSend } from '@/app/actions/send';
 
 // Loading message shown during search
@@ -31,15 +31,16 @@ interface SearchPageState {
   showBulkReview: boolean;
   generatingStatuses: Array<[string, boolean]>;
   remainingDaily?: number;
-  // NEW: Add search parameters
   searchParams?: {
     company?: string;
     role?: string;
     university?: string;
     location?: string;
+    limit: number;
     templateId: string;
   };
-  currentPage?: number;
+  totalLoaded?: number;
+  nextOffset?: number;
   hasMore?: boolean;
   savedAt: number;
 }
@@ -73,11 +74,13 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
     role?: string;
     university?: string;
     location?: string;
+    limit: number;
     templateId: string;
   } | null>(null);
 
   // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
+  const [totalLoaded, setTotalLoaded] = useState(0);
+  const [nextOffset, setNextOffset] = useState(0); // DB-level offset for next page
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
@@ -106,13 +109,15 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
           if (state.generatingStatuses) {
             setGeneratingStatuses(arrayToMap(state.generatingStatuses));
           }
-          // NEW: Restore search parameters
           if (state.searchParams) {
             setSearchParams(state.searchParams);
           }
           // Restore pagination state
-          if (state.currentPage !== undefined) {
-            setCurrentPage(state.currentPage);
+          if (state.totalLoaded !== undefined) {
+            setTotalLoaded(state.totalLoaded);
+          }
+          if (state.nextOffset !== undefined) {
+            setNextOffset(state.nextOffset);
           }
           if (state.hasMore !== undefined) {
             setHasMore(state.hasMore);
@@ -164,8 +169,9 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
             showBulkReview,
             generatingStatuses: mapToArray(generatingStatuses),
             remainingDaily,
-            searchParams: paramsToSave, // Preserve search params
-            currentPage,
+            searchParams: paramsToSave,
+            totalLoaded,
+            nextOffset,
             hasMore,
             savedAt: Date.now(),
           };
@@ -181,7 +187,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [results, expandedIndex, sendStatuses, showBulkReview, generatingStatuses, remainingDaily, searchParams, currentPage, hasMore]);
+  }, [results, expandedIndex, sendStatuses, showBulkReview, generatingStatuses, remainingDaily, searchParams, totalLoaded, nextOffset, hasMore]);
 
   const handleSearch = async (params: {
     company?: string;
@@ -201,15 +207,21 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
     setError(null);
     setResults([]);
     setSendStatuses(new Map());
-    // Reset pagination on new search
-    setCurrentPage(1);
+    setTotalLoaded(0);
+    setNextOffset(0);
     setHasMore(true);
 
-    const result = await searchPeopleAction(params);
+    const result = await searchPeopleAction({ ...params, offset: 0 });
 
     if (result.success) {
       setResults(result.results);
-      // Save search parameters immediately after successful search
+      setTotalLoaded(result.results.length);
+      setNextOffset(result.searchMeta.nextOffset);
+      setHasMore(result.searchMeta.hasMore);
+      setSearchParams(params);
+      setIsSearching(false);
+
+      // Save to sessionStorage
       try {
         const state: SearchPageState = {
           version: STORAGE_VERSION,
@@ -219,75 +231,51 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
           showBulkReview: false,
           generatingStatuses: [],
           remainingDaily,
-          searchParams: params, // Save search parameters
+          searchParams: params,
+          totalLoaded: result.results.length,
+          nextOffset: result.searchMeta.nextOffset,
+          hasMore: result.searchMeta.hasMore,
           savedAt: Date.now(),
         };
         sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-        setSearchParams(params); // Also update state
-      } catch (error) {
-        console.error('Error saving search params to sessionStorage:', error);
+      } catch (e) {
+        console.error('Error saving search params to sessionStorage:', e);
       }
 
-      // If cache missed, trigger refresh to discover more people
-      if (result.searchMeta.needsRefresh) {
-        const hasInitialResults = result.results.length > 0;
+      // Path B: background scrape needed (1-4 results from DB)
+      if (result.searchMeta.backgroundScrapeNeeded) {
+        setIsRefreshing(true);
 
-        // Only show as "background" refresh if we have results to display
-        // Otherwise, keep the main search spinner active
-        if (hasInitialResults) {
-          setIsSearching(false);
-          setIsRefreshing(true);
-        }
-        // If no results, isSearching stays true until refresh completes
+        try {
+          await scrapeNextPageAction({
+            company: params.company!,
+            role: params.role,
+            university: params.university,
+            location: params.location,
+          });
 
-        refreshSearchAction({
-          company: params.company,
-          role: params.role,
-          university: params.university,
-          location: params.location,
-          limit: params.limit,
-        }).then((refreshResult) => {
-          if (refreshResult.success) {
-            console.log(`[Refresh] Complete: ${refreshResult.newPeopleCount} new, ${refreshResult.emailsGenerated} emails`);
-            setHasMore(refreshResult.hasMore);
-            // Re-fetch results to include newly discovered people
-            searchPeopleAction(params).then((updatedResult) => {
-              if (updatedResult.success) {
-                setResults(updatedResult.results);
-                // Update sessionStorage with new results
-                try {
-                  const updatedState: SearchPageState = {
-                    version: STORAGE_VERSION,
-                    results: updatedResult.results,
-                    expandedIndex: null,
-                    sendStatuses: mapToArray(sendStatuses),
-                    showBulkReview: false,
-                    generatingStatuses: mapToArray(generatingStatuses),
-                    remainingDaily,
-                    searchParams: params,
-                    savedAt: Date.now(),
-                  };
-                  sessionStorage.setItem(STORAGE_KEY, JSON.stringify(updatedState));
-                } catch (e) {
-                  console.error('Error updating sessionStorage after refresh:', e);
-                }
-              }
-              setIsSearching(false);
-              setIsRefreshing(false);
-            });
-          } else {
-            console.error('[Refresh] Failed:', refreshResult.error);
-            setIsSearching(false);
-            setIsRefreshing(false);
+          // Re-fetch page 1 to include newly scraped people
+          const freshResult = await searchPeopleAction({ ...params, offset: 0 });
+          if (freshResult.success) {
+            setResults(freshResult.results);
+            setTotalLoaded(freshResult.results.length);
+            setNextOffset(freshResult.searchMeta.nextOffset);
+            setHasMore(freshResult.searchMeta.hasMore);
           }
-        }).catch((err) => {
-          console.error('[Refresh] Error:', err);
-          setIsSearching(false);
-          setIsRefreshing(false);
-        });
-      } else {
-        setIsSearching(false);
+        } catch (err) {
+          console.error('[BackgroundScrape] Error:', err);
+        }
+
+        setIsRefreshing(false);
       }
+
+      // Fire-and-forget: prescrape remaining CSE pages so Load More is instant
+      prescrapeAction({
+        company: params.company!,
+        role: params.role,
+        university: params.university,
+        location: params.location,
+      }).catch(err => console.error('[Prescrape] Error:', err));
     } else {
       setError(result.error);
       setIsSearching(false);
@@ -389,48 +377,47 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
     if (!searchParams?.company || isLoadingMore || !hasMore) return;
 
     setIsLoadingMore(true);
-    const nextPage = currentPage + 1;
-    const pageStart = (nextPage - 1) * 10 + 1; // page 2 → start=11, page 3 → start=21
+    const savedNextOffset = nextOffset;
+    const savedResultCount = results.length;
 
     try {
-      const result = await refreshSearchAction({
-        company: searchParams.company,
-        role: searchParams.role,
-        university: searchParams.university,
-        location: searchParams.location,
-        pageStart,
+      const result = await searchPeopleAction({
+        ...searchParams,
+        offset: nextOffset, // Use DB-level offset, not filtered result count
       });
 
       if (result.success) {
-        setCurrentPage(nextPage);
-        setHasMore(result.hasMore);
+        // Append new results
+        setResults(prev => [...prev, ...result.results]);
+        setTotalLoaded(prev => prev + result.results.length);
+        setNextOffset(result.searchMeta.nextOffset);
+        setHasMore(result.searchMeta.hasMore);
 
-        // Re-fetch to get updated results including new people
-        const updatedResult = await searchPeopleAction({
-          ...searchParams,
-          limit: nextPage * 10, // Get all results so far
-        });
-
-        if (updatedResult.success) {
-          setResults(updatedResult.results);
-          // Update sessionStorage with new results
+        // Path B for load more: background scrape needed
+        if (result.searchMeta.backgroundScrapeNeeded) {
           try {
-            const updatedState: SearchPageState = {
-              version: STORAGE_VERSION,
-              results: updatedResult.results,
-              expandedIndex,
-              sendStatuses: mapToArray(sendStatuses),
-              showBulkReview,
-              generatingStatuses: mapToArray(generatingStatuses),
-              remainingDaily,
-              searchParams,
-              currentPage: nextPage,
-              hasMore: result.hasMore,
-              savedAt: Date.now(),
-            };
-            sessionStorage.setItem(STORAGE_KEY, JSON.stringify(updatedState));
-          } catch (e) {
-            console.error('Error updating sessionStorage after load more:', e);
+            await scrapeNextPageAction({
+              company: searchParams.company!,
+              role: searchParams.role,
+              university: searchParams.university,
+              location: searchParams.location,
+            });
+
+            // Re-fetch from the same DB offset to pick up newly scraped people
+            const freshResult = await searchPeopleAction({
+              ...searchParams,
+              offset: savedNextOffset,
+            });
+
+            if (freshResult.success) {
+              // Replace the last page portion with fresh results
+              setResults(prev => [...prev.slice(0, savedResultCount), ...freshResult.results]);
+              setTotalLoaded(savedResultCount + freshResult.results.length);
+              setNextOffset(freshResult.searchMeta.nextOffset);
+              setHasMore(freshResult.searchMeta.hasMore);
+            }
+          } catch (err) {
+            console.error('[LoadMore BackgroundScrape] Error:', err);
           }
         }
       } else {
