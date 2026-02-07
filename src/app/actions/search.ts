@@ -40,6 +40,7 @@ export interface SearchInput {
   limit: number;
   templateId: string;
   offset?: number; // For pagination (default 0)
+  excludePersonIds?: string[]; // IDs of people already displayed (prevents duplicates on Load More)
 }
 
 export interface SearchResultWithDraft {
@@ -233,6 +234,7 @@ export async function searchPeopleAction(
       university: input.university,
       requireEmail: true,
       excludePersonKeys: excludedKeys,
+      excludePersonIds: input.excludePersonIds,
       limit: input.limit,
       offset,
     };

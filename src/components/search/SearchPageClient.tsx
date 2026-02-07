@@ -389,6 +389,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
       const result = await searchPeopleAction({
         ...searchParams,
         offset: nextOffset, // Use DB-level offset, not filtered result count
+        excludePersonIds: results.map(r => r.id),
       });
 
       if (result.success) {
@@ -412,6 +413,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
             const freshResult = await searchPeopleAction({
               ...searchParams,
               offset: savedNextOffset,
+              excludePersonIds: results.slice(0, savedResultCount).map(r => r.id),
             });
 
             if (freshResult.success) {

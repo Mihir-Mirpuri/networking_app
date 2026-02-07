@@ -856,6 +856,7 @@ export interface PersonFilters {
   university?: string;       // Optional - educationSchool ILIKE match
   requireEmail?: boolean;    // Default true - only return people with emails
   excludePersonKeys?: Set<string>; // Set of "fullName_company" keys to exclude
+  excludePersonIds?: string[]; // Person IDs already displayed (prevents duplicates on Load More)
   limit: number;
   offset?: number;           // For pagination (default 0)
 }
@@ -869,10 +870,15 @@ const normalizeCompanyForMatch = (name: string) =>
  * Build Prisma where clause from PersonFilters.
  * Shared between findPeopleByFilters and countPeopleByFilters.
  */
-function buildPersonWhereClause(filters: Omit<PersonFilters, 'limit' | 'offset'>): Record<string, unknown> {
-  const { company, location, role, university, requireEmail = true } = filters;
+export function buildPersonWhereClause(filters: Omit<PersonFilters, 'limit' | 'offset'>): Record<string, unknown> {
+  const { company, location, role, university, requireEmail = true, excludePersonIds } = filters;
 
   const where: Record<string, unknown> = {};
+
+  // Exclude already-displayed people (prevents duplicates when prescrape shifts offset positions)
+  if (excludePersonIds && excludePersonIds.length > 0) {
+    where.id = { notIn: excludePersonIds };
+  }
 
   // Company filter - DB filter using alias mapping with appropriate match types
   if (company && company.trim()) {
