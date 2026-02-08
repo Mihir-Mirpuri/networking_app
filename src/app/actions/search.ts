@@ -8,7 +8,7 @@ import { rankCandidates, SearchCriteria, CandidateData, ScoreBreakdown } from '@
 import { EMAIL_TEMPLATES } from '@/lib/constants';
 import prisma from '@/lib/prisma';
 import {
-  getExcludedPersonKeys,
+  getExcludedPersonIds,
   findPeopleByFilters,
   findPeopleByLinkedInUrls,
   saveScrapedProfile,
@@ -39,7 +39,6 @@ export interface SearchInput {
   location?: string;
   limit: number;
   templateId: string;
-  offset?: number; // For pagination (default 0)
   excludePersonIds?: string[]; // IDs of people already displayed (prevents duplicates on Load More)
 }
 
@@ -78,8 +77,6 @@ export interface SearchResultWithDraft {
 
 export interface SearchMeta {
   hasMore: boolean;
-  /** DB-level offset for the next page. Pass this back as `offset` on Load More. */
-  nextOffset: number;
   backgroundScrapeNeeded: boolean;
   apolloCallsMade: number;
   apolloCacheHits: number;
@@ -190,7 +187,6 @@ export async function searchPeopleAction(
 
   try {
     const userId = session.user.id;
-    const offset = input.offset ?? 0;
 
     // Get user info for template
     const user = await prisma.user.findUnique({
@@ -215,8 +211,13 @@ export async function searchPeopleAction(
       lastSendDay === today ? Math.max(0, dailyLimit - user.dailySendCount) : dailyLimit;
 
     // Get excluded people (already sent or hidden)
-    const excludedKeys = await getExcludedPersonKeys(userId);
-    console.log(`[Search] User has ${excludedKeys.size} excluded people (sent/hidden).`);
+    const excludedIds = await getExcludedPersonIds(userId);
+    console.log(`[Search] User has ${excludedIds.length} excluded people (sent/hidden).`);
+
+    // Merge sent/hidden IDs with already-displayed IDs for a single DB-level NOT IN
+    const allExcludedIds = input.excludePersonIds
+      ? [...excludedIds, ...input.excludePersonIds]
+      : excludedIds;
 
     const normalizedParams = normalizeSearchParams({
       name: input.name,
@@ -233,16 +234,12 @@ export async function searchPeopleAction(
       role: input.role,
       university: input.university,
       requireEmail: true,
-      excludePersonKeys: excludedKeys,
-      excludePersonIds: input.excludePersonIds,
+      excludePersonIds: allExcludedIds,
       limit: input.limit,
-      offset,
     };
 
-    let { results: people, dbRowsFetched } = await findPeopleByFilters(filters);
-    // Track DB-level offset: where the next page should start in DB terms
-    let dbOffset = offset + dbRowsFetched;
-    console.log(`[Search] Found ${people.length} people in DB (offset=${offset}, dbRowsFetched=${dbRowsFetched})`);
+    let people = await findPeopleByFilters(filters);
+    console.log(`[Search] Found ${people.length} people in DB`);
 
     let backgroundScrapeNeeded = false;
     let apolloCallsMade = 0;
@@ -258,7 +255,7 @@ export async function searchPeopleAction(
         if (people.length === 0) {
           // PATH A: 0 results → scrape synchronously (user expects to wait)
           console.log(`[Search] PATH A: 0 results, scraping CSE page ${nextPage} synchronously`);
-          const batch = await processRefreshBatch(input, excludedKeys, nextPage, 'SyncScrape');
+          const batch = await processRefreshBatch(input, nextPage, 'SyncScrape');
           cseCallsMade = 1;
           apolloCallsMade = batch.apolloCallsMade;
 
@@ -268,10 +265,8 @@ export async function searchPeopleAction(
             apolloCallsMade: batch.apolloCallsMade,
           });
 
-          // Re-query DB after scraping added new people (reset offset to 0)
-          const fresh = await findPeopleByFilters({ ...filters, offset: 0 });
-          people = fresh.results;
-          dbOffset = fresh.dbRowsFetched;
+          // Re-query DB after scraping added new people
+          people = await findPeopleByFilters(filters);
           console.log(`[Search] After scrape: ${people.length} results`);
         } else {
           // PATH B: 1-4 results → return immediately, scrape in background
@@ -410,7 +405,6 @@ export async function searchPeopleAction(
       results,
       searchMeta: {
         hasMore,
-        nextOffset: dbOffset,
         backgroundScrapeNeeded,
         apolloCallsMade,
         apolloCacheHits,
@@ -456,7 +450,6 @@ export async function hidePersonAction(
  */
 async function processRefreshBatch(
   input: Omit<SearchInput, 'templateId' | 'limit'> & { limit?: number },
-  excludedKeys: Set<string>,
   pageStart: number,
   batchLabel: string
 ): Promise<{
@@ -710,8 +703,6 @@ export async function scrapeNextPageAction(
   }
 
   try {
-    const excludedKeys = await getExcludedPersonKeys(session.user.id);
-
     const normalizedParams = normalizeSearchParams({
       name: input.name,
       company: input.company,
@@ -729,7 +720,7 @@ export async function scrapeNextPageAction(
     }
 
     console.log(`[ScrapeNextPage] Scraping CSE page ${nextPage} for "${input.company}"`);
-    const batch = await processRefreshBatch(input, excludedKeys, nextPage, 'Background');
+    const batch = await processRefreshBatch(input, nextPage, 'Background');
 
     await updateScrapeProgress(progress.id, nextPage, batch.urlsFromCse, {
       cseCallsMade: 1,
@@ -778,8 +769,6 @@ export async function prescrapeAction(
   }
 
   try {
-    const excludedKeys = await getExcludedPersonKeys(session.user.id);
-
     const normalizedParams = normalizeSearchParams({
       name: input.name,
       company: input.company,
@@ -801,7 +790,7 @@ export async function prescrapeAction(
       }
 
       console.log(`[Prescrape] Scraping CSE page ${nextPage} for "${input.company}" (${pagesScraped + 1}/${MAX_PRESCRAPE_PAGES})`);
-      const batch = await processRefreshBatch(input, excludedKeys, nextPage, `Prescrape-${pagesScraped + 1}`);
+      const batch = await processRefreshBatch(input, nextPage, `Prescrape-${pagesScraped + 1}`);
 
       await updateScrapeProgress(progress.id, nextPage, batch.urlsFromCse, {
         cseCallsMade: 1,

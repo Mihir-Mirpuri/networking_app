@@ -40,7 +40,6 @@ interface SearchPageState {
     templateId: string;
   };
   totalLoaded?: number;
-  nextOffset?: number;
   hasMore?: boolean;
   savedAt: number;
 }
@@ -80,7 +79,6 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
 
   // Pagination state
   const [totalLoaded, setTotalLoaded] = useState(0);
-  const [nextOffset, setNextOffset] = useState(0); // DB-level offset for next page
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
@@ -115,9 +113,6 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
           // Restore pagination state
           if (state.totalLoaded !== undefined) {
             setTotalLoaded(state.totalLoaded);
-          }
-          if (state.nextOffset !== undefined) {
-            setNextOffset(state.nextOffset);
           }
           if (state.hasMore !== undefined) {
             setHasMore(state.hasMore);
@@ -171,7 +166,6 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
             remainingDaily,
             searchParams: paramsToSave,
             totalLoaded,
-            nextOffset,
             hasMore,
             savedAt: Date.now(),
           };
@@ -187,7 +181,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [results, expandedIndex, sendStatuses, showBulkReview, generatingStatuses, remainingDaily, searchParams, totalLoaded, nextOffset, hasMore]);
+  }, [results, expandedIndex, sendStatuses, showBulkReview, generatingStatuses, remainingDaily, searchParams, totalLoaded, hasMore]);
 
   const handleSearch = async (params: {
     company?: string;
@@ -208,15 +202,13 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
     setResults([]);
     setSendStatuses(new Map());
     setTotalLoaded(0);
-    setNextOffset(0);
     setHasMore(true);
 
-    const result = await searchPeopleAction({ ...params, offset: 0 });
+    const result = await searchPeopleAction({ ...params });
 
     if (result.success) {
       setResults(result.results);
       setTotalLoaded(result.results.length);
-      setNextOffset(result.searchMeta.nextOffset);
       setHasMore(result.searchMeta.hasMore);
       setSearchParams(params);
       setIsSearching(false);
@@ -233,7 +225,6 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
           remainingDaily,
           searchParams: params,
           totalLoaded: result.results.length,
-          nextOffset: result.searchMeta.nextOffset,
           hasMore: result.searchMeta.hasMore,
           savedAt: Date.now(),
         };
@@ -254,12 +245,11 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
             location: params.location,
           });
 
-          // Re-fetch page 1 to include newly scraped people
-          const freshResult = await searchPeopleAction({ ...params, offset: 0 });
+          // Re-fetch to include newly scraped people
+          const freshResult = await searchPeopleAction({ ...params });
           if (freshResult.success) {
             setResults(freshResult.results);
             setTotalLoaded(freshResult.results.length);
-            setNextOffset(freshResult.searchMeta.nextOffset);
             setHasMore(freshResult.searchMeta.hasMore);
           }
         } catch (err) {
@@ -382,13 +372,11 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
     if (!searchParams?.company || isLoadingMore || !hasMore) return;
 
     setIsLoadingMore(true);
-    const savedNextOffset = nextOffset;
     const savedResultCount = results.length;
 
     try {
       const result = await searchPeopleAction({
         ...searchParams,
-        offset: nextOffset, // Use DB-level offset, not filtered result count
         excludePersonIds: results.map(r => r.id),
       });
 
@@ -396,7 +384,6 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
         // Append new results
         setResults(prev => [...prev, ...result.results]);
         setTotalLoaded(prev => prev + result.results.length);
-        setNextOffset(result.searchMeta.nextOffset);
         setHasMore(result.searchMeta.hasMore);
 
         // Path B for load more: background scrape needed
@@ -409,18 +396,17 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
               location: searchParams.location,
             });
 
-            // Re-fetch from the same DB offset to pick up newly scraped people
+            // Re-fetch to pick up newly scraped people (exclude all currently shown)
+            const allShownIds = results.slice(0, savedResultCount).map(r => r.id);
             const freshResult = await searchPeopleAction({
               ...searchParams,
-              offset: savedNextOffset,
-              excludePersonIds: results.slice(0, savedResultCount).map(r => r.id),
+              excludePersonIds: allShownIds,
             });
 
             if (freshResult.success) {
               // Replace the last page portion with fresh results
               setResults(prev => [...prev.slice(0, savedResultCount), ...freshResult.results]);
               setTotalLoaded(savedResultCount + freshResult.results.length);
-              setNextOffset(freshResult.searchMeta.nextOffset);
               setHasMore(freshResult.searchMeta.hasMore);
             }
           } catch (err) {
