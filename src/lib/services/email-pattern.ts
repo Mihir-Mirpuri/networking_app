@@ -535,6 +535,7 @@ export async function bootstrapCompanyPattern(
           email: result.email,
           emailStatus: result.status,
           emailConfidence: result.confidence,
+          emailDeliverable: result.emailDeliverable,
           apolloEnrichedAt: new Date(),
           apolloStatus: apolloStatusToSave,
           // Also update location if Apollo provided it
