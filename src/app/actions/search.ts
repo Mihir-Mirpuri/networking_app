@@ -15,6 +15,10 @@ import {
   getEmailStatus,
   PersonFilters,
   PersonResult,
+  buildPersonWhereClause,
+  applyPostQueryFilters,
+  getCompanyKey,
+  normalizeCompanyForMatch,
 } from '@/lib/db/person-service';
 import {
   normalizeSearchParams,
@@ -24,12 +28,10 @@ import {
   ApiUsageStats,
 } from '@/lib/db/search-cache';
 import {
-  getOrLearnPattern,
+  getCompanyPattern,
   generateEmailFromPattern,
-  normalizeCompanyName,
-  bootstrapCompanyPattern,
 } from '@/lib/services/email-pattern';
-import { verifyEmailsBatch } from '@/lib/services/email-verification';
+import { findEmail } from '@/lib/services/enrichment';
 
 export interface SearchInput {
   name?: string;
@@ -164,6 +166,134 @@ function getTemplate(templateId: string) {
 const SCRAPE_THRESHOLD = 5;
 
 /**
+ * On-demand enrichment: find people matching filters who lack emails,
+ * then apply existing patterns or call Apollo directly (no pattern learning).
+ */
+async function enrichPeopleOnDemand(
+  filters: PersonFilters,
+  searchCompany: string,
+  maxApolloCalls: number = 10
+): Promise<{ apolloCallsMade: number; emailsGenerated: number }> {
+  // Build where clause for people WITHOUT emails who haven't been tried with Apollo
+  const baseWhere = buildPersonWhereClause({ ...filters, requireEmail: false });
+  const where = {
+    ...baseWhere,
+    email: null,
+    apolloEnrichedAt: null,
+    firstName: { not: null },
+    lastName: { not: null },
+  };
+
+  const candidates = await prisma.person.findMany({
+    where,
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      company: true,
+      linkedinUrl: true,
+    },
+    orderBy: { createdAt: 'asc' },
+    take: maxApolloCalls * 3, // Overfetch to compensate for post-query company filtering
+  });
+
+  // Apply company fuzzy matching (same filter as findPeopleByFilters)
+  const matched = applyPostQueryFilters(candidates, searchCompany);
+
+  let apolloCallsMade = 0;
+  let emailsGenerated = 0;
+
+  for (const person of matched) {
+    // Try existing pattern first (free — no Apollo call)
+    const normalizedCompany = normalizeCompanyForMatch(person.company);
+    const companyKey = getCompanyKey(normalizedCompany);
+
+    // Try pattern lookup: canonical key first, then exact normalized name
+    let pattern = companyKey
+      ? await getCompanyPattern(companyKey)
+      : null;
+    if (!pattern) {
+      pattern = await getCompanyPattern(person.company);
+    }
+
+    if (pattern) {
+      const generatedEmail = generateEmailFromPattern(
+        person.firstName!,
+        person.lastName!,
+        pattern.pattern as any,
+        pattern.domain
+      );
+      await prisma.person.update({
+        where: { id: person.id },
+        data: {
+          email: generatedEmail,
+          emailStatus: 'UNVERIFIED',
+          emailConfidence: Math.round(pattern.confidence * 100),
+        },
+      });
+      emailsGenerated++;
+      console.log(`[Enrich] Pattern → ${person.firstName} ${person.lastName} → ${generatedEmail}`);
+      continue;
+    }
+
+    // No pattern — call Apollo directly (counts toward cap)
+    if (apolloCallsMade >= maxApolloCalls) {
+      break;
+    }
+
+    const result = await findEmail({
+      firstName: person.firstName!,
+      lastName: person.lastName!,
+      company: person.company,
+      linkedinUrl: person.linkedinUrl,
+    });
+    apolloCallsMade++;
+
+    if (result.email) {
+      await prisma.person.update({
+        where: { id: person.id },
+        data: {
+          email: result.email,
+          emailStatus: result.status,
+          emailConfidence: result.confidence,
+          emailDeliverable: result.emailDeliverable,
+          apolloEnrichedAt: new Date(),
+          apolloStatus: result.apolloStatus === 'SUCCESS' || result.apolloStatus === 'NOT_FOUND'
+            ? result.apolloStatus : 'API_ERROR',
+          ...(result.city && { city: result.city }),
+          ...(result.state && { state: result.state }),
+          ...(result.country && { country: result.country }),
+        },
+      });
+      emailsGenerated++;
+      console.log(`[Enrich] Apollo → ${person.firstName} ${person.lastName} → ${result.email}`);
+    } else {
+      // Mark as attempted so we don't retry
+      await prisma.person.update({
+        where: { id: person.id },
+        data: {
+          apolloEnrichedAt: new Date(),
+          apolloStatus: result.apolloStatus === 'SUCCESS' || result.apolloStatus === 'NOT_FOUND'
+            ? result.apolloStatus : 'API_ERROR',
+          ...(result.city && { city: result.city }),
+          ...(result.state && { state: result.state }),
+          ...(result.country && { country: result.country }),
+        },
+      });
+      console.log(`[Enrich] Apollo → ${person.firstName} ${person.lastName} → no email (${result.apolloStatus})`);
+    }
+
+    // Rate limit between Apollo calls
+    if (apolloCallsMade < maxApolloCalls) {
+      await new Promise((r) => setTimeout(r, 300));
+    }
+  }
+
+  console.log(`[Enrich] Done: ${emailsGenerated} emails generated, ${apolloCallsMade} Apollo calls`);
+  return { apolloCallsMade, emailsGenerated };
+}
+
+/**
  * Main search action — always queries DB directly with offset pagination.
  *
  * Two-path UX based on DB result count:
@@ -227,7 +357,7 @@ export async function searchPeopleAction(
       location: input.location,
     });
 
-    // ===== STEP 1: Query DB directly =====
+    // ===== STEP 1: On-demand enrichment + Query DB =====
     const filters: PersonFilters = {
       company: input.company,
       location: input.location,
@@ -238,10 +368,13 @@ export async function searchPeopleAction(
       limit: input.limit,
     };
 
+    // Enrich people without emails before querying (patterns + Apollo)
+    const enrichResult = await enrichPeopleOnDemand(filters, input.company);
+
     let people = await findPeopleByFilters(filters);
     console.log(`[Search] Found ${people.length} people in DB`);
 
-    let apolloCallsMade = 0;
+    let apolloCallsMade = enrichResult.apolloCallsMade;
     let apolloCacheHits = 0;
     let cseCallsMade = 0;
     let cseHasMorePages = false;
@@ -259,17 +392,20 @@ export async function searchPeopleAction(
           console.log(`[Search] PATH A: 0 results, scraping CSE page ${nextPage} synchronously`);
           const batch = await processRefreshBatch(input, nextPage, 'SyncScrape');
           cseCallsMade = 1;
-          apolloCallsMade = batch.apolloCallsMade;
 
           await updateScrapeProgress(progress.id, nextPage, batch.urlsFromCse, {
             cseCallsMade: 1,
             linkedinScraperCalls: batch.urlsScraped,
-            apolloCallsMade: batch.apolloCallsMade,
+            apolloCallsMade: 0,
           });
 
-          // Re-query DB after scraping added new people
+          // Enrich newly scraped people before re-querying
+          const enrichResult2 = await enrichPeopleOnDemand(filters, input.company);
+          apolloCallsMade += enrichResult2.apolloCallsMade;
+
+          // Re-query DB after scraping + enrichment added new people
           people = await findPeopleByFilters(filters);
-          console.log(`[Search] After scrape: ${people.length} results`);
+          console.log(`[Search] After scrape+enrich: ${people.length} results`);
         }
         // 1+ results: return as-is, prescrape will populate DB
       }
@@ -458,8 +594,6 @@ async function processRefreshBatch(
   urlsFromCse: number;  // How many URLs CSE returned (10 = likely more pages)
 }> {
   let newPeopleCount = 0;
-  let emailsGenerated = 0;
-  let apolloCallsMade = 0;
   const savedPersonIds: string[] = [];
 
   // ===== STEP 1: CSE DISCOVERY =====
@@ -531,142 +665,8 @@ async function processRefreshBatch(
     });
   }
 
-  // ===== STEP 4: GENERATE EMAILS (Pattern + Apollo Bootstrap) =====
-  console.log(`[Refresh ${batchLabel}] Generating emails for ${savedPersonIds.length} people`);
-
-  // Get all people without emails
-  const peopleWithoutEmails = await prisma.person.findMany({
-    where: {
-      id: { in: savedPersonIds },
-      email: null,
-      firstName: { not: null },
-      lastName: { not: null },
-    },
-    select: { id: true, firstName: true, lastName: true, company: true, linkedinUrl: true },
-  });
-
-  // Group by company
-  const byCompany = new Map<string, typeof peopleWithoutEmails>();
-  for (const person of peopleWithoutEmails) {
-    const normalized = normalizeCompanyName(person.company);
-    if (!byCompany.has(normalized)) {
-      byCompany.set(normalized, []);
-    }
-    byCompany.get(normalized)!.push(person);
-  }
-
-  console.log(`[Refresh ${batchLabel}] ${peopleWithoutEmails.length} people without emails across ${byCompany.size} companies`);
-
-  // Process each company
-  for (const [, people] of Array.from(byCompany)) {
-    const company = people[0].company;
-
-    // Check if pattern exists
-    let pattern = await getOrLearnPattern(company);
-    const patternWasEstablished = pattern !== null;
-
-    // If no pattern, try to bootstrap with Apollo
-    if (!pattern) {
-      console.log(`[Refresh ${batchLabel}] No pattern for "${company}" - bootstrapping with Apollo`);
-      const bootstrapResult = await bootstrapCompanyPattern(company, people);
-
-      apolloCallsMade += bootstrapResult.apolloCallsMade;
-      emailsGenerated += bootstrapResult.emailsFound;
-
-      if (bootstrapResult.success && bootstrapResult.pattern && bootstrapResult.domain) {
-        pattern = {
-          pattern: bootstrapResult.pattern,
-          domain: bootstrapResult.domain,
-          confidence: bootstrapResult.confidence,
-        };
-
-        console.log(
-          `[Refresh ${batchLabel}] Bootstrapped pattern for "${company}": ${pattern.pattern}@${pattern.domain} ` +
-            `(${bootstrapResult.apolloCallsMade} Apollo calls, ${bootstrapResult.emailsFound} emails)`
-        );
-      } else {
-        console.log(
-          `[Refresh ${batchLabel}] Could not bootstrap pattern for "${company}" (${bootstrapResult.apolloCallsMade} Apollo calls, ${bootstrapResult.emailsFound} emails found)`
-        );
-        continue;
-      }
-    }
-
-    // Generate emails for remaining people
-    const remainingPeople = await prisma.person.findMany({
-      where: {
-        id: { in: people.map((p) => p.id) },
-        email: null,
-        firstName: { not: null },
-        lastName: { not: null },
-      },
-      select: { id: true, firstName: true, lastName: true },
-    });
-
-    // Generate all emails first
-    const emailsToVerify: Array<{ personId: string; email: string }> = [];
-    for (const person of remainingPeople) {
-      const generatedEmail = generateEmailFromPattern(
-        person.firstName!,
-        person.lastName!,
-        pattern.pattern as any,
-        pattern.domain
-      );
-      emailsToVerify.push({ personId: person.id, email: generatedEmail });
-    }
-
-    // For established patterns, skip verification and save directly.
-    // Only verify emails for newly bootstrapped patterns.
-    if (emailsToVerify.length > 0) {
-      if (patternWasEstablished) {
-        // Established pattern — trust it, save without verification
-        for (const { personId, email } of emailsToVerify) {
-          await prisma.person.update({
-            where: { id: personId },
-            data: {
-              email,
-              emailStatus: 'UNVERIFIED',
-              emailConfidence: Math.round(pattern.confidence * 100),
-            },
-          });
-          emailsGenerated++;
-        }
-        console.log(`[Refresh ${batchLabel}] Pattern emails for "${company}": ${emailsToVerify.length} saved (established pattern, skipped verification)`);
-      } else {
-        // Newly bootstrapped pattern — verify each email
-        const verificationResults = await verifyEmailsBatch(emailsToVerify.map((e) => e.email));
-
-        let verifiedCount = 0;
-        let undeliverableCount = 0;
-        for (let i = 0; i < emailsToVerify.length; i++) {
-          const { personId, email } = emailsToVerify[i];
-          const verification = verificationResults[i];
-
-          if (verification.deliverable) {
-            await prisma.person.update({
-              where: { id: personId },
-              data: {
-                email,
-                emailStatus: 'UNVERIFIED',
-                emailConfidence: Math.round(pattern.confidence * 100),
-                emailDeliverable: true,
-                emailVerifiedAt: new Date(),
-                emailVerificationReason: verification.reason,
-              },
-            });
-            emailsGenerated++;
-            verifiedCount++;
-          } else {
-            undeliverableCount++;
-          }
-        }
-
-        console.log(`[Refresh ${batchLabel}] Pattern emails for "${company}": ${verifiedCount} verified, ${undeliverableCount} undeliverable`);
-      }
-    }
-  }
-
-  return { newPeopleCount, emailsGenerated, apolloCallsMade, savedPersonIds, urlsScraped: urlsToScrape.length, urlsFromCse: cseResults.length };
+  // Email enrichment is now handled on-demand in searchPeopleAction via enrichPeopleOnDemand()
+  return { newPeopleCount, emailsGenerated: 0, apolloCallsMade: 0, savedPersonIds, urlsScraped: urlsToScrape.length, urlsFromCse: cseResults.length };
 }
 
 const MAX_PRESCRAPE_PAGES = 3;

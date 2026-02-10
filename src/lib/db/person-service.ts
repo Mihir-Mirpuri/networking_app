@@ -114,7 +114,7 @@ const COMPANY_ALIASES: Record<string, string[]> = {
  * Checks if the company name matches any alias (exact match or starts with alias)
  * Returns the key if found, null otherwise
  */
-function getCompanyKey(normalizedCompany: string): string | null {
+export function getCompanyKey(normalizedCompany: string): string | null {
   for (const [key, aliases] of Object.entries(COMPANY_ALIASES)) {
     for (const alias of aliases) {
       // Exact match
@@ -850,7 +850,7 @@ export interface PersonFilters {
 
 // Normalize company name for matching (remove dots, extra spaces)
 // "L.E.K. Consulting" → "LEK Consulting", "LEK Consulting" → "LEK Consulting"
-const normalizeCompanyForMatch = (name: string) =>
+export const normalizeCompanyForMatch = (name: string) =>
   name.replace(/\./g, '').replace(/\s+/g, ' ').trim().toLowerCase();
 
 /**
@@ -932,7 +932,7 @@ export function buildPersonWhereClause(filters: Omit<PersonFilters, 'limit'>): R
  * Apply post-query filtering: company fuzzy match.
  * Person exclusions (sent/hidden) are handled at the DB level via excludePersonIds.
  */
-function applyPostQueryFilters<T extends { company: string }>(
+export function applyPostQueryFilters<T extends { company: string }>(
   people: T[],
   searchCompany: string | undefined
 ): T[] {
