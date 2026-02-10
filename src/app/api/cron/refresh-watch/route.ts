@@ -11,6 +11,12 @@ export async function POST(request: NextRequest) {
 }
 
 async function handleCronRequest(request: NextRequest) {
+  // TEMPORARILY DISABLED: gmail.readonly scope removed for Google verification
+  // All code below is preserved intact for easy restoration
+  if (true as boolean) {
+    return NextResponse.json({ renewed: 0, message: 'Watch refresh temporarily disabled' }, { status: 200 });
+  }
+
   try {
     // Authenticate using CRON_SECRET
     const authHeader = request.headers.get('authorization');

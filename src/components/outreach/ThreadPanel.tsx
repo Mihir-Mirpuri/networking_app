@@ -2,8 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { OutreachTrackerEntry, ThreadMessage, getThreadMessages } from '@/app/actions/outreach';
-import { sendFollowUpAction } from '@/app/actions/send';
-
 interface ThreadPanelProps {
   tracker: OutreachTrackerEntry;
   isOpen: boolean;
@@ -14,13 +12,6 @@ export function ThreadPanel({ tracker, isOpen, onClose }: ThreadPanelProps) {
   const [messages, setMessages] = useState<ThreadMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Compose state
-  const [showCompose, setShowCompose] = useState(false);
-  const [subject, setSubject] = useState('');
-  const [body, setBody] = useState('');
-  const [isSending, setIsSending] = useState(false);
-  const [sendError, setSendError] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -44,41 +35,10 @@ export function ThreadPanel({ tracker, isOpen, onClose }: ThreadPanelProps) {
     const result = await getThreadMessages(tracker.gmailThreadId);
     if (result.success) {
       setMessages(result.messages);
-      // Pre-fill subject from last message
-      if (result.messages.length > 0) {
-        const lastSubject = result.messages[result.messages.length - 1].subject || '';
-        setSubject(lastSubject.startsWith('Re:') ? lastSubject : `Re: ${lastSubject}`);
-      }
     } else {
       setError(result.error);
     }
     setIsLoading(false);
-  };
-
-  const handleSend = async () => {
-    if (!body.trim() || !tracker.gmailThreadId) return;
-
-    setIsSending(true);
-    setSendError(null);
-
-    const result = await sendFollowUpAction({
-      toEmail: tracker.contactEmail,
-      subject,
-      body,
-      threadId: tracker.gmailThreadId,
-      originalMessageId: messages.length > 0 ? messages[messages.length - 1].messageId : undefined,
-      userCandidateId: tracker.userCandidateId || '',
-    });
-
-    if (result.success) {
-      setBody('');
-      setShowCompose(false);
-      // Refresh messages to show the sent email
-      await fetchMessages();
-    } else {
-      setSendError(result.error || 'Failed to send email');
-    }
-    setIsSending(false);
   };
 
   const formatDate = (date: Date) => {
@@ -206,58 +166,6 @@ export function ThreadPanel({ tracker, isOpen, onClose }: ThreadPanelProps) {
           )}
         </div>
 
-        {/* Compose Area */}
-        <div className="border-t border-surface-200 px-6 py-4">
-          {showCompose ? (
-            <div className="space-y-3">
-              <input
-                type="text"
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                placeholder="Subject"
-                className="input text-sm"
-              />
-              <textarea
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-                placeholder="Write your message..."
-                rows={4}
-                className="input text-sm resize-none"
-              />
-              {sendError && (
-                <p className="text-sm text-red-600">{sendError}</p>
-              )}
-              <div className="flex items-center justify-end gap-3">
-                <button
-                  onClick={() => {
-                    setShowCompose(false);
-                    setBody('');
-                    setSendError(null);
-                  }}
-                  disabled={isSending}
-                  className="btn-ghost text-sm"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSend}
-                  disabled={isSending || !body.trim()}
-                  className="btn-primary text-sm"
-                >
-                  {isSending ? 'Sending...' : 'Send'}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <button
-              onClick={() => setShowCompose(true)}
-              disabled={!tracker.gmailThreadId}
-              className="w-full px-4 py-3 text-sm font-medium text-primary-600 border border-primary-300 rounded-lg hover:bg-primary-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {tracker.gmailThreadId ? 'Reply to this thread' : 'No thread available'}
-            </button>
-          )}
-        </div>
       </div>
     </>
   );
