@@ -294,6 +294,90 @@ async function enrichPeopleOnDemand(
 }
 
 /**
+ * Shared helper: build SearchResultWithDraft[] from ranked candidates.
+ * Upserts UserCandidate, generates email drafts, and maps to result objects.
+ */
+async function buildResultsWithDrafts(
+  rankedPeople: Array<{ candidate: PersonWithSource; score: number; breakdown: ScoreBreakdown }>,
+  userId: string,
+  templateId: string,
+  user: { name: string | null; university: string | null }
+): Promise<SearchResultWithDraft[]> {
+  return Promise.all(
+    rankedPeople.map(async ({ candidate: person, score, breakdown }) => {
+      const userCandidate = await prisma.userCandidate.upsert({
+        where: {
+          userId_personId: { userId, personId: person.id },
+        },
+        create: {
+          userId,
+          personId: person.id,
+          email: person.email,
+          emailStatus: (person.emailStatus as any) || 'MISSING',
+          emailConfidence: person.emailConfidence,
+        },
+        update: {},
+        select: { id: true },
+      });
+
+      const draft = generateEmailDraft(
+        templateId,
+        { firstName: person.firstName, company: person.company, role: person.role },
+        { name: user.name, university: user.university }
+      );
+
+      const isHardcodedTemplate = EMAIL_TEMPLATES.some(t => t.id === templateId);
+      const emailDraft = await prisma.emailDraft.upsert({
+        where: { userCandidateId: userCandidate.id },
+        create: {
+          userCandidateId: userCandidate.id,
+          templateId: isHardcodedTemplate ? null : templateId,
+          subject: draft.subject,
+          body: draft.body,
+          status: 'APPROVED',
+        },
+        update: {},
+      });
+
+      const sourceLink = person.sourceLinks[0];
+
+      return {
+        id: person.id,
+        fullName: person.fullName,
+        firstName: person.firstName,
+        lastName: person.lastName,
+        company: person.company,
+        role: person.role,
+        linkedinUrl: person.linkedinUrl,
+        email: person.email,
+        emailStatus: (person.emailStatus as 'VERIFIED' | 'UNVERIFIED' | 'MISSING') || 'MISSING',
+        emailConfidence: person.emailConfidence,
+        emailDeliverable: person.emailDeliverable,
+        emailVerifiedAt: person.emailVerifiedAt,
+        emailVerificationReason: person.emailVerificationReason,
+        city: person.city,
+        state: person.state,
+        country: person.country,
+        educationSchool: person.educationSchool,
+        educationDegree: person.educationDegree,
+        educationField: person.educationField,
+        educationYear: person.educationYear,
+        sourceUrl: sourceLink?.url || null,
+        sourceTitle: sourceLink?.title || null,
+        sourceSnippet: sourceLink?.snippet || null,
+        sourceDomain: sourceLink?.domain || null,
+        draftSubject: emailDraft.subject,
+        draftBody: emailDraft.body,
+        userCandidateId: userCandidate.id,
+        resumeId: null,
+        score,
+        scoreBreakdown: breakdown,
+      };
+    })
+  );
+}
+
+/**
  * Main search action — always queries DB directly with offset pagination.
  *
  * Two-path UX based on DB result count:
@@ -439,78 +523,7 @@ export async function searchPeopleAction(
     console.log(`[Search] Ranked top ${rankedPeople.length} candidates`);
 
     // ===== STEP 4: Build results with drafts =====
-    const results = await Promise.all(
-      rankedPeople.map(async ({ candidate: person, score, breakdown }) => {
-        const userCandidate = await prisma.userCandidate.upsert({
-          where: {
-            userId_personId: { userId, personId: person.id },
-          },
-          create: {
-            userId,
-            personId: person.id,
-            email: person.email,
-            emailStatus: (person.emailStatus as any) || 'MISSING',
-            emailConfidence: person.emailConfidence,
-          },
-          update: {},
-          select: { id: true },
-        });
-
-        const draft = generateEmailDraft(
-          input.templateId,
-          { firstName: person.firstName, company: person.company, role: person.role },
-          { name: user.name, university: user.university }
-        );
-
-        const isHardcodedTemplate = EMAIL_TEMPLATES.some(t => t.id === input.templateId);
-        const emailDraft = await prisma.emailDraft.upsert({
-          where: { userCandidateId: userCandidate.id },
-          create: {
-            userCandidateId: userCandidate.id,
-            templateId: isHardcodedTemplate ? null : input.templateId,
-            subject: draft.subject,
-            body: draft.body,
-            status: 'APPROVED',
-          },
-          update: {},
-        });
-
-        const sourceLink = person.sourceLinks[0];
-
-        return {
-          id: person.id,
-          fullName: person.fullName,
-          firstName: person.firstName,
-          lastName: person.lastName,
-          company: person.company,
-          role: person.role,
-          linkedinUrl: person.linkedinUrl,
-          email: person.email,
-          emailStatus: (person.emailStatus as 'VERIFIED' | 'UNVERIFIED' | 'MISSING') || 'MISSING',
-          emailConfidence: person.emailConfidence,
-          emailDeliverable: person.emailDeliverable,
-          emailVerifiedAt: person.emailVerifiedAt,
-          emailVerificationReason: person.emailVerificationReason,
-          city: person.city,
-          state: person.state,
-          country: person.country,
-          educationSchool: person.educationSchool,
-          educationDegree: person.educationDegree,
-          educationField: person.educationField,
-          educationYear: person.educationYear,
-          sourceUrl: sourceLink?.url || null,
-          sourceTitle: sourceLink?.title || null,
-          sourceSnippet: sourceLink?.snippet || null,
-          sourceDomain: sourceLink?.domain || null,
-          draftSubject: emailDraft.subject,
-          draftBody: emailDraft.body,
-          userCandidateId: userCandidate.id,
-          resumeId: null,
-          score,
-          scoreBreakdown: breakdown,
-        };
-      })
-    );
+    const results = await buildResultsWithDrafts(rankedPeople, userId, input.templateId, user);
 
     // ===== STEP 5: Compute hasMore =====
     // Full page from DB means probably more rows; CSE having more pages
@@ -565,7 +578,7 @@ export async function hidePersonAction(
 
   try {
     await prisma.userCandidate.update({
-      where: { id: userCandidateId },
+      where: { id: userCandidateId, userId: session.user.id },
       data: { doNotShow: true },
     });
 
@@ -574,6 +587,139 @@ export async function hidePersonAction(
   } catch (error) {
     console.error('Error hiding person:', error);
     return { success: false, error: 'Failed to hide person' };
+  }
+}
+
+// ===== LOAD MORE (pure DB read + enrichment, no scraping) =====
+
+export interface LoadMoreInput {
+  company: string;
+  role?: string;
+  university?: string;
+  location?: string;
+  name?: string;
+  limit: number;
+  templateId: string;
+  excludePersonIds: string[];
+}
+
+export interface LoadMoreMeta {
+  hasMore: boolean;
+  prescrapeRunning: boolean;
+}
+
+export type LoadMoreActionResult = {
+  success: true;
+  results: SearchResultWithDraft[];
+  loadMoreMeta: LoadMoreMeta;
+} | {
+  success: false;
+  error: string;
+};
+
+/**
+ * Load More action — pure DB read + on-demand enrichment.
+ * No scraping, no Path A/B logic, no SearchLog creation.
+ */
+export async function loadMorePeopleAction(
+  input: LoadMoreInput
+): Promise<LoadMoreActionResult> {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.id) {
+    return { success: false, error: 'Not authenticated' };
+  }
+
+  if (!input.company || !input.company.trim()) {
+    return { success: false, error: 'Company is required' };
+  }
+
+  try {
+    const userId = session.user.id;
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true, university: true },
+    });
+
+    if (!user) {
+      return { success: false, error: 'User not found' };
+    }
+
+    // Merge sent/hidden IDs with already-displayed IDs
+    const excludedIds = await getExcludedPersonIds(userId);
+    const allExcludedIds = [...excludedIds, ...input.excludePersonIds];
+
+    const filters: PersonFilters = {
+      company: input.company,
+      location: input.location,
+      role: input.role,
+      university: input.university,
+      requireEmail: true,
+      excludePersonIds: allExcludedIds,
+      limit: input.limit,
+    };
+
+    // Enrich people without emails before querying (patterns + Apollo)
+    await enrichPeopleOnDemand(filters, input.company);
+
+    // Pure DB read
+    const people = await findPeopleByFilters(filters);
+    console.log(`[LoadMore] Found ${people.length} people in DB`);
+
+    // Rank candidates
+    const searchCriteria: SearchCriteria = {
+      company: input.company,
+      role: input.role,
+      university: input.university,
+      location: input.location,
+    };
+
+    const rankedPeople = rankCandidates(
+      searchCriteria,
+      people,
+      (person): CandidateData => ({
+        company: person.company,
+        role: person.role,
+        email: person.email,
+        emailStatus: (person.emailStatus as 'VERIFIED' | 'UNVERIFIED' | 'MISSING') || 'MISSING',
+        city: person.city,
+        state: person.state,
+        country: person.country,
+        educationSchool: person.educationSchool,
+      }),
+      input.limit
+    );
+
+    // Build results with drafts
+    const results = await buildResultsWithDrafts(rankedPeople, userId, input.templateId, user);
+
+    // Check prescrape status
+    const normalizedParams = normalizeSearchParams({
+      name: input.name,
+      company: input.company,
+      role: input.role,
+      university: input.university,
+      location: input.location,
+    });
+    const progress = await findOrCreateScrapeProgress(normalizedParams);
+    const prescrapeRunning = progress.prescrapeStatus === 'RUNNING';
+
+    // hasMore = got a full page (probably more in DB) OR prescrape still running (more may appear)
+    const hasMore = people.length >= input.limit || prescrapeRunning;
+
+    console.log(
+      `[LoadMore] Returning ${results.length} results (hasMore=${hasMore}, prescrapeRunning=${prescrapeRunning})`
+    );
+
+    return {
+      success: true,
+      results,
+      loadMoreMeta: { hasMore, prescrapeRunning },
+    };
+  } catch (error) {
+    console.error('LoadMore error:', error);
+    return { success: false, error: 'Failed to load more profiles.' };
   }
 }
 
@@ -669,7 +815,7 @@ async function processRefreshBatch(
   return { newPeopleCount, emailsGenerated: 0, apolloCallsMade: 0, savedPersonIds, urlsScraped: urlsToScrape.length, urlsFromCse: cseResults.length };
 }
 
-const MAX_PRESCRAPE_PAGES = 3;
+const MAX_PRESCRAPE_PAGES = 4;
 
 /**
  * Background prescrape: scrape all remaining CSE pages (up to 4 total) for a search.
@@ -706,6 +852,13 @@ export async function prescrapeAction(
 
     let pagesScraped = 0;
 
+    // Mark prescrape as running so frontend knows results may still be arriving
+    const initialProgress = await findOrCreateScrapeProgress(normalizedParams);
+    await prisma.search.update({
+      where: { id: initialProgress.id },
+      data: { prescrapeStatus: 'RUNNING' },
+    });
+
     while (pagesScraped < MAX_PRESCRAPE_PAGES) {
       // Re-fetch progress each iteration (updated by previous iteration)
       const progress = await findOrCreateScrapeProgress(normalizedParams);
@@ -734,10 +887,32 @@ export async function prescrapeAction(
       }
     }
 
+    // Mark prescrape as done
+    await prisma.search.update({
+      where: { id: initialProgress.id },
+      data: { prescrapeStatus: 'DONE' },
+    });
+
     console.log(`[Prescrape] Done: scraped ${pagesScraped} pages for "${input.company}"`);
     return { success: true, pagesScraped };
   } catch (error) {
     console.error('Prescrape error:', error);
+    // Mark as DONE even on error to prevent permanently stuck RUNNING state
+    try {
+      const progress = await findOrCreateScrapeProgress(normalizeSearchParams({
+        name: input.name,
+        company: input.company,
+        role: input.role,
+        university: input.university,
+        location: input.location,
+      }));
+      await prisma.search.update({
+        where: { id: progress.id },
+        data: { prescrapeStatus: 'DONE' },
+      });
+    } catch (e) {
+      console.error('Failed to mark prescrape as DONE after error:', e);
+    }
     return { success: false, error: 'Prescraping failed.' };
   }
 }

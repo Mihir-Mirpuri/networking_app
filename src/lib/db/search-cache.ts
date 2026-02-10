@@ -361,11 +361,15 @@ export interface ScrapeProgress {
   id: string;
   lastCsePageScraped: number;
   cseExhausted: boolean;
+  prescrapeStatus: string | null;
 }
+
+// Hard cap: 5 total pages (1 sync + 4 prescrape). Page 5 = start 41.
+const MAX_CSE_PAGE_START = 41;
 
 /**
  * Compute the next CSE page start value based on scrape progress.
- * Returns null if CSE is exhausted (no more pages to scrape).
+ * Returns null if CSE is exhausted or the 5-page cap has been reached.
  *
  * CSE pagination: page 1 = start 1, page 2 = start 11, page 3 = start 21, etc.
  */
@@ -374,6 +378,7 @@ export function getNextCsePageStart(
   cseExhausted: boolean
 ): number | null {
   if (cseExhausted) return null;
+  if (lastCsePageScraped >= MAX_CSE_PAGE_START) return null;
   if (lastCsePageScraped === 0) return 1;
   return lastCsePageScraped + 10;
 }
@@ -400,10 +405,11 @@ export async function findOrCreateScrapeProgress(
       id: string;
       lastCsePageScraped: number;
       cseExhausted: boolean;
+      prescrapeStatus: string | null;
       updatedAt: Date;
     }>
   >`
-    SELECT "id", "lastCsePageScraped", "cseExhausted", "updatedAt"
+    SELECT "id", "lastCsePageScraped", "cseExhausted", "prescrapeStatus", "updatedAt"
     FROM "Search"
     WHERE COALESCE("name", '') = COALESCE(${params.name}, '')
       AND COALESCE("company", '') = COALESCE(${params.company}, '')
@@ -426,13 +432,14 @@ export async function findOrCreateScrapeProgress(
         where: { id: record.id },
         data: { lastCsePageScraped: 0, cseExhausted: false },
       });
-      return { id: record.id, lastCsePageScraped: 0, cseExhausted: false };
+      return { id: record.id, lastCsePageScraped: 0, cseExhausted: false, prescrapeStatus: null };
     }
 
     return {
       id: record.id,
       lastCsePageScraped: record.lastCsePageScraped,
       cseExhausted: record.cseExhausted,
+      prescrapeStatus: record.prescrapeStatus,
     };
   }
 
@@ -453,6 +460,7 @@ export async function findOrCreateScrapeProgress(
     id: created.id,
     lastCsePageScraped: 0,
     cseExhausted: false,
+    prescrapeStatus: null,
   };
 }
 

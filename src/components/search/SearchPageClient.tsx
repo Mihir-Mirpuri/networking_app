@@ -8,7 +8,7 @@ import { BulkReview } from './BulkReview';
 import { LoadingSpinner } from './LoadingSpinner';
 import { Toast } from '@/components/ui/Toast';
 import { LimitReachedModal, dispatchCreditsChanged } from '@/components/credits';
-import { searchPeopleAction, SearchResultWithDraft, hidePersonAction } from '@/app/actions/search';
+import { searchPeopleAction, SearchResultWithDraft, hidePersonAction, loadMorePeopleAction } from '@/app/actions/search';
 import { sendSingleEmailAction, sendEmailsAction, PersonToSend } from '@/app/actions/send';
 
 // Loading message shown during search
@@ -80,6 +80,10 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
   const [totalLoaded, setTotalLoaded] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
+  const retryTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const retryCountRef = useRef(0);
+  const MAX_RETRIES = 5;
 
   // Restore state from sessionStorage on mount
   useEffect(() => {
@@ -181,6 +185,15 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
       }
     };
   }, [results, expandedIndex, sendStatuses, showBulkReview, generatingStatuses, remainingDaily, searchParams, totalLoaded, hasMore]);
+
+  // Cleanup retry timer on unmount
+  useEffect(() => {
+    return () => {
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleSearch = async (params: {
     company?: string;
@@ -341,21 +354,44 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
     }
   };
 
-  const handleLoadMore = async () => {
+  const handleLoadMore = useCallback(async () => {
     if (!searchParams?.company || isLoadingMore || !hasMore) return;
 
     setIsLoadingMore(true);
+    setIsRetrying(false);
     try {
-      const result = await searchPeopleAction({
-        ...searchParams,
+      const result = await loadMorePeopleAction({
+        company: searchParams.company,
+        role: searchParams.role,
+        university: searchParams.university,
+        location: searchParams.location,
+        limit: searchParams.limit,
+        templateId: searchParams.templateId,
         excludePersonIds: results.map(r => r.id),
       });
 
       if (result.success) {
-        // Append new results
-        setResults(prev => [...prev, ...result.results]);
-        setTotalLoaded(prev => prev + result.results.length);
-        setHasMore(result.searchMeta.hasMore);
+        if (result.results.length > 0) {
+          // Got results — append and reset retry count
+          setResults(prev => [...prev, ...result.results]);
+          setTotalLoaded(prev => prev + result.results.length);
+          setHasMore(result.loadMoreMeta.hasMore);
+          retryCountRef.current = 0;
+        } else if (result.loadMoreMeta.prescrapeRunning && retryCountRef.current < MAX_RETRIES) {
+          // 0 results but prescrape still running — auto-retry after delay
+          retryCountRef.current++;
+          setIsRetrying(true);
+          setIsLoadingMore(false);
+          console.log(`[LoadMore] Prescrape running, retrying in 3s (attempt ${retryCountRef.current}/${MAX_RETRIES})`);
+          retryTimerRef.current = setTimeout(() => {
+            handleLoadMore();
+          }, 3000);
+          return; // Don't clear isLoadingMore below — the retry will handle it
+        } else {
+          // No results and prescrape done (or retries exhausted)
+          setHasMore(false);
+          retryCountRef.current = 0;
+        }
       } else {
         setToast({ message: result.error || 'Failed to load more profiles', type: 'error' });
       }
@@ -364,8 +400,9 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
       setToast({ message: 'Failed to load more profiles', type: 'error' });
     }
 
+    setIsRetrying(false);
     setIsLoadingMore(false);
-  };
+  }, [searchParams, isLoadingMore, hasMore, results]);
 
   return (
     <div className="relative">
@@ -412,21 +449,26 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
 
           {/* Load More Button */}
           {hasMore && !isSearching && (
-            <div className="flex justify-center mt-6">
+            <div className="flex flex-col items-center mt-6 gap-1">
               <button
                 onClick={handleLoadMore}
-                disabled={isLoadingMore}
+                disabled={isLoadingMore || isRetrying}
                 className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
               >
-                {isLoadingMore ? (
+                {isLoadingMore || isRetrying ? (
                   <>
                     <LoadingSpinner size="sm" />
-                    Loading...
+                    {isRetrying ? 'Still searching for profiles...' : 'Loading...'}
                   </>
                 ) : (
                   'Load More Profiles'
                 )}
               </button>
+              {isRetrying && (
+                <p className="text-sm text-gray-500">
+                  Background search is still finding profiles. Retrying automatically...
+                </p>
+              )}
             </div>
           )}
 
