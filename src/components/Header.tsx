@@ -34,10 +34,11 @@ export function Header() {
     }
   }, [pathname, refetch]);
 
-  const tabs = [
+  const tabs: { name: string; href: string; icon: typeof PaperAirplaneIcon; badge?: number }[] = [
     { name: 'Send Emails', href: '/', icon: PaperAirplaneIcon },
     { name: 'History', href: '/history', icon: ClockIcon },
-    { name: 'Calendar', href: '/calendar', icon: CalendarDaysIcon, badge: pendingSuggestionsCount ?? 0 },
+    // TEMPORARILY DISABLED: gmail.readonly scope removed — Calendar has no utility without it
+    // { name: 'Calendar', href: '/calendar', icon: CalendarDaysIcon, badge: pendingSuggestionsCount ?? 0 },
     { name: 'Profile', href: '/profile', icon: UserCircleIcon },
   ];
 
@@ -46,7 +47,7 @@ export function Header() {
     if (status === 'loading') {
       return (
         <nav className="flex items-center gap-1" aria-label="Loading navigation">
-          {[1, 2, 3, 4].map((i) => (
+          {[1, 2, 3].map((i) => (
             <div
               key={i}
               className="px-4 py-2 w-28 h-10 bg-surface-200 rounded-lg animate-pulse"

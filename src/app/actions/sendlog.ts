@@ -115,22 +115,20 @@ export async function getSendLogs(
       orderBy: { scheduledFor: 'asc' },
     });
 
-    // Get all unique thread IDs to check for responses
-    const threadIds = logs
-      .map((log) => log.gmailThreadId)
-      .filter((id): id is string => id !== null);
-
-    // Query messages table to find threads with RECEIVED messages
-    const threadsWithResponses = await prisma.messages.groupBy({
-      by: ['threadId'],
-      where: {
-        threadId: { in: threadIds },
-        userId: session.user.id,
-        direction: 'RECEIVED',
-      },
-    });
-
-    const threadIdsWithResponses = new Set(threadsWithResponses.map((t) => t.threadId));
+    // TEMPORARILY DISABLED: gmail.readonly scope removed — messages table won't receive new data
+    // const threadIds = logs
+    //   .map((log) => log.gmailThreadId)
+    //   .filter((id): id is string => id !== null);
+    // const threadsWithResponses = await prisma.messages.groupBy({
+    //   by: ['threadId'],
+    //   where: {
+    //     threadId: { in: threadIds },
+    //     userId: session.user.id,
+    //     direction: 'RECEIVED',
+    //   },
+    // });
+    // const threadIdsWithResponses = new Set(threadsWithResponses.map((t) => t.threadId));
+    const threadIdsWithResponses = new Set<string>();
 
     // Transform send logs
     const transformedLogs: SendLogEntry[] = logs.map((log) => ({
@@ -218,22 +216,20 @@ export async function getInitialSendLogs(userId: string): Promise<GetSendLogsRes
       orderBy: { scheduledFor: 'asc' },
     });
 
-    // Get all unique thread IDs to check for responses
-    const threadIds = logs
-      .map((log) => log.gmailThreadId)
-      .filter((id): id is string => id !== null);
-
-    // Query messages table to find threads with RECEIVED messages
-    const threadsWithResponses = await prisma.messages.groupBy({
-      by: ['threadId'],
-      where: {
-        threadId: { in: threadIds },
-        userId: userId,
-        direction: 'RECEIVED',
-      },
-    });
-
-    const threadIdsWithResponses = new Set(threadsWithResponses.map((t) => t.threadId));
+    // TEMPORARILY DISABLED: gmail.readonly scope removed — messages table won't receive new data
+    // const threadIds = logs
+    //   .map((log) => log.gmailThreadId)
+    //   .filter((id): id is string => id !== null);
+    // const threadsWithResponses = await prisma.messages.groupBy({
+    //   by: ['threadId'],
+    //   where: {
+    //     threadId: { in: threadIds },
+    //     userId: userId,
+    //     direction: 'RECEIVED',
+    //   },
+    // });
+    // const threadIdsWithResponses = new Set(threadsWithResponses.map((t) => t.threadId));
+    const threadIdsWithResponses = new Set<string>();
 
     // Transform send logs
     const transformedLogs: SendLogEntry[] = logs.map((log) => ({

@@ -61,16 +61,16 @@ export function OutreachFilters({
         value={searchQuery}
         onChange={(e) => onSearchChange(e.target.value)}
         onKeyDown={handleKeyDown}
-        className="flex-1 min-w-[200px] px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+        className="input flex-1 min-w-[200px]"
       />
 
       <div className="relative">
         <button
           onClick={() => setShowStatusDropdown(!showStatusDropdown)}
-          className={`px-4 py-2 border rounded-md flex items-center gap-2 ${
+          className={`px-4 py-2 border rounded-xl flex items-center gap-2 transition-colors ${
             statusFilter.length > 0
               ? 'border-primary-500 bg-primary-50 text-primary-700'
-              : 'border-gray-300 bg-white text-gray-700'
+              : 'border-surface-300 bg-white text-surface-700'
           }`}
         >
           <span>Status</span>
@@ -85,28 +85,28 @@ export function OutreachFilters({
         </button>
 
         {showStatusDropdown && (
-          <div className="absolute right-0 z-50 mt-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 py-1">
+          <div className="absolute right-0 z-50 mt-1 w-48 bg-white rounded-xl shadow-lg border border-surface-200 py-1">
             {STATUS_OPTIONS.map((option) => (
               <label
                 key={option.value}
-                className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer"
+                className="flex items-center px-3 py-2 hover:bg-surface-50 cursor-pointer"
               >
                 <input
                   type="checkbox"
                   checked={statusFilter.includes(option.value)}
                   onChange={() => toggleStatus(option.value)}
-                  className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                  className="w-4 h-4 text-primary-600 border-surface-300 rounded focus:ring-primary-500"
                 />
-                <span className="ml-2 text-sm text-gray-700">{option.label}</span>
+                <span className="ml-2 text-sm text-surface-700">{option.label}</span>
               </label>
             ))}
-            <div className="border-t border-gray-200 mt-1 pt-1">
+            <div className="border-t border-surface-200 mt-1 pt-1">
               <button
                 onClick={() => {
                   onStatusFilterChange([]);
                   setShowStatusDropdown(false);
                 }}
-                className="w-full text-left px-3 py-2 text-sm text-gray-500 hover:bg-gray-50"
+                className="w-full text-left px-3 py-2 text-sm text-surface-500 hover:bg-surface-50"
               >
                 Clear all
               </button>
@@ -118,7 +118,7 @@ export function OutreachFilters({
       <button
         onClick={onSearch}
         disabled={isLoading}
-        className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
+        className="btn-primary"
       >
         {isLoading ? 'Searching...' : 'Search'}
       </button>
@@ -127,7 +127,7 @@ export function OutreachFilters({
         <button
           onClick={clearFilters}
           disabled={isLoading}
-          className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50"
+          className="btn-secondary"
         >
           Clear
         </button>

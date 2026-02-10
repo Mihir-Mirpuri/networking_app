@@ -77,7 +77,6 @@ export interface SearchResultWithDraft {
 
 export interface SearchMeta {
   hasMore: boolean;
-  backgroundScrapeNeeded: boolean;
   apolloCallsMade: number;
   apolloCacheHits: number;
   cseCallsMade: number;
@@ -160,17 +159,18 @@ function getTemplate(templateId: string) {
   return EMAIL_TEMPLATES.find((t) => t.id === templateId) || EMAIL_TEMPLATES[0];
 }
 
-// Minimum results before considering a scrape. Below this, we either
-// block on scrape (0 results) or flag for background scrape (1-4 results).
+// Minimum DB results before checking CSE for more pages.
+// At 0, we block on a synchronous scrape (Path A).
 const SCRAPE_THRESHOLD = 5;
 
 /**
  * Main search action — always queries DB directly with offset pagination.
  *
- * Three-path UX based on DB result count:
- *   Path A (0 results):   Block, scrape synchronously, return results
- *   Path B (1-4 results): Return immediately, flag backgroundScrapeNeeded
- *   Path C (5+ results):  Return instantly, no scraping
+ * Two-path UX based on DB result count:
+ *   Path A (0 results):  Block, scrape synchronously, return results
+ *   Path B (1+ results): Return immediately (prescrape populates DB in background)
+ *
+ * hasMore = got a full page from DB OR CSE has more pages to scrape.
  */
 export async function searchPeopleAction(
   input: SearchInput
@@ -241,17 +241,19 @@ export async function searchPeopleAction(
     let people = await findPeopleByFilters(filters);
     console.log(`[Search] Found ${people.length} people in DB`);
 
-    let backgroundScrapeNeeded = false;
     let apolloCallsMade = 0;
     let apolloCacheHits = 0;
     let cseCallsMade = 0;
+    let cseHasMorePages = false;
 
-    // ===== STEP 2: Three-path logic based on result count =====
+    // ===== STEP 2: Check CSE state + sync scrape if 0 results =====
     if (people.length < SCRAPE_THRESHOLD) {
       const progress = await findOrCreateScrapeProgress(normalizedParams);
       const nextPage = getNextCsePageStart(progress.lastCsePageScraped, progress.cseExhausted);
 
       if (nextPage !== null) {
+        cseHasMorePages = true;
+
         if (people.length === 0) {
           // PATH A: 0 results → scrape synchronously (user expects to wait)
           console.log(`[Search] PATH A: 0 results, scraping CSE page ${nextPage} synchronously`);
@@ -268,15 +270,12 @@ export async function searchPeopleAction(
           // Re-query DB after scraping added new people
           people = await findPeopleByFilters(filters);
           console.log(`[Search] After scrape: ${people.length} results`);
-        } else {
-          // PATH B: 1-4 results → return immediately, scrape in background
-          console.log(`[Search] PATH B: ${people.length} results, flagging for background scrape`);
-          backgroundScrapeNeeded = true;
         }
+        // 1+ results: return as-is, prescrape will populate DB
       }
       // If nextPage is null (CSE exhausted), just return whatever we have
     }
-    // PATH C: 5+ results → return as-is (implicit, no special handling needed)
+    // 5+ results: return as-is (implicit, no special handling needed)
 
     // ===== STEP 3: Rank candidates =====
     const searchCriteria: SearchCriteria = {
@@ -378,13 +377,12 @@ export async function searchPeopleAction(
     );
 
     // ===== STEP 5: Compute hasMore =====
-    // Pure DB heuristic: got a full page means probably more rows.
-    // CSE status is NOT factored in — Load More stays fast (DB-only).
-    // Background prescraping (future) will populate DB ahead of time.
-    const hasMore = people.length >= input.limit;
+    // Full page from DB means probably more rows; CSE having more pages
+    // means prescrape will populate DB for future Load More clicks.
+    const hasMore = people.length >= input.limit || cseHasMorePages;
 
     console.log(
-      `[Search] Returning ${results.length} results (hasMore=${hasMore}, bgScrape=${backgroundScrapeNeeded})`
+      `[Search] Returning ${results.length} results (hasMore=${hasMore}, cseHasMore=${cseHasMorePages})`
     );
 
     // Log the search for analytics
@@ -405,7 +403,6 @@ export async function searchPeopleAction(
       results,
       searchMeta: {
         hasMore,
-        backgroundScrapeNeeded,
         apolloCallsMade,
         apolloCacheHits,
         cseCallsMade,
@@ -670,76 +667,6 @@ async function processRefreshBatch(
   }
 
   return { newPeopleCount, emailsGenerated, apolloCallsMade, savedPersonIds, urlsScraped: urlsToScrape.length, urlsFromCse: cseResults.length };
-}
-
-/**
- * Scrape the next CSE page for given search params.
- * Called by the frontend when backgroundScrapeNeeded is true.
- *
- * Lightweight: scrapes one CSE page and returns metadata.
- * Does NOT return search results — frontend calls searchPeopleAction after.
- */
-export async function scrapeNextPageAction(
-  input: {
-    company: string;
-    role?: string;
-    university?: string;
-    location?: string;
-    name?: string;
-  }
-): Promise<{
-  success: true;
-  newPeopleCount: number;
-  hasMoreCsePages: boolean;
-} | { success: false; error: string }> {
-  const session = await getServerSession(authOptions);
-
-  if (!session?.user?.id) {
-    return { success: false, error: 'Not authenticated' };
-  }
-
-  if (!input.company || !input.company.trim()) {
-    return { success: false, error: 'Company is required' };
-  }
-
-  try {
-    const normalizedParams = normalizeSearchParams({
-      name: input.name,
-      company: input.company,
-      role: input.role,
-      university: input.university,
-      location: input.location,
-    });
-
-    const progress = await findOrCreateScrapeProgress(normalizedParams);
-    const nextPage = getNextCsePageStart(progress.lastCsePageScraped, progress.cseExhausted);
-
-    if (nextPage === null) {
-      console.log(`[ScrapeNextPage] CSE exhausted for "${input.company}", nothing to scrape`);
-      return { success: true, newPeopleCount: 0, hasMoreCsePages: false };
-    }
-
-    console.log(`[ScrapeNextPage] Scraping CSE page ${nextPage} for "${input.company}"`);
-    const batch = await processRefreshBatch(input, nextPage, 'Background');
-
-    await updateScrapeProgress(progress.id, nextPage, batch.urlsFromCse, {
-      cseCallsMade: 1,
-      linkedinScraperCalls: batch.urlsScraped,
-      apolloCallsMade: batch.apolloCallsMade,
-    });
-
-    const hasMoreCsePages = batch.urlsFromCse >= 5; // Matches CSE_EXHAUSTED_THRESHOLD
-    console.log(`[ScrapeNextPage] Done: ${batch.newPeopleCount} new people, hasMore=${hasMoreCsePages}`);
-
-    return {
-      success: true,
-      newPeopleCount: batch.newPeopleCount,
-      hasMoreCsePages,
-    };
-  } catch (error) {
-    console.error('Scrape next page error:', error);
-    return { success: false, error: 'Scraping failed. Please try again.' };
-  }
 }
 
 const MAX_PRESCRAPE_PAGES = 3;
