@@ -8,7 +8,7 @@ import { BulkReview } from './BulkReview';
 import { LoadingSpinner } from './LoadingSpinner';
 import { Toast } from '@/components/ui/Toast';
 import { LimitReachedModal, dispatchCreditsChanged } from '@/components/credits';
-import { searchPeopleAction, SearchResultWithDraft, hidePersonAction, scrapeNextPageAction } from '@/app/actions/search';
+import { searchPeopleAction, SearchResultWithDraft, hidePersonAction } from '@/app/actions/search';
 import { sendSingleEmailAction, sendEmailsAction, PersonToSend } from '@/app/actions/send';
 
 // Loading message shown during search
@@ -66,7 +66,6 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
   const [generatingStatuses, setGeneratingStatuses] = useState<Map<string, boolean>>(new Map());
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [showLimitModal, setShowLimitModal] = useState(false);
   const [searchParams, setSearchParams] = useState<{
     company?: string;
@@ -233,32 +232,6 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
         console.error('Error saving search params to sessionStorage:', e);
       }
 
-      // Path B: background scrape needed (1-4 results from DB)
-      if (result.searchMeta.backgroundScrapeNeeded) {
-        setIsRefreshing(true);
-
-        try {
-          await scrapeNextPageAction({
-            company: params.company!,
-            role: params.role,
-            university: params.university,
-            location: params.location,
-          });
-
-          // Re-fetch to include newly scraped people
-          const freshResult = await searchPeopleAction({ ...params });
-          if (freshResult.success) {
-            setResults(freshResult.results);
-            setTotalLoaded(freshResult.results.length);
-            setHasMore(freshResult.searchMeta.hasMore);
-          }
-        } catch (err) {
-          console.error('[BackgroundScrape] Error:', err);
-        }
-
-        setIsRefreshing(false);
-      }
-
       // Fire-and-forget via API route (not server action) so it doesn't
       // block subsequent server action calls like searchPeopleAction.
       fetch('/api/prescrape', {
@@ -372,8 +345,6 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
     if (!searchParams?.company || isLoadingMore || !hasMore) return;
 
     setIsLoadingMore(true);
-    const savedResultCount = results.length;
-
     try {
       const result = await searchPeopleAction({
         ...searchParams,
@@ -385,34 +356,6 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
         setResults(prev => [...prev, ...result.results]);
         setTotalLoaded(prev => prev + result.results.length);
         setHasMore(result.searchMeta.hasMore);
-
-        // Path B for load more: background scrape needed
-        if (result.searchMeta.backgroundScrapeNeeded) {
-          try {
-            await scrapeNextPageAction({
-              company: searchParams.company!,
-              role: searchParams.role,
-              university: searchParams.university,
-              location: searchParams.location,
-            });
-
-            // Re-fetch to pick up newly scraped people (exclude all currently shown)
-            const allShownIds = results.slice(0, savedResultCount).map(r => r.id);
-            const freshResult = await searchPeopleAction({
-              ...searchParams,
-              excludePersonIds: allShownIds,
-            });
-
-            if (freshResult.success) {
-              // Replace the last page portion with fresh results
-              setResults(prev => [...prev.slice(0, savedResultCount), ...freshResult.results]);
-              setTotalLoaded(savedResultCount + freshResult.results.length);
-              setHasMore(freshResult.searchMeta.hasMore);
-            }
-          } catch (err) {
-            console.error('[LoadMore BackgroundScrape] Error:', err);
-          }
-        }
       } else {
         setToast({ message: result.error || 'Failed to load more profiles', type: 'error' });
       }
@@ -445,13 +388,6 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
         </div>
       )}
 
-      {isRefreshing && !isSearching && expandedIndex === null && !showBulkReview && (
-        <div className="flex items-center gap-2 mb-4 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm">
-          <LoadingSpinner size="sm" />
-          <span>Discovering more profiles in background...</span>
-        </div>
-      )}
-
       {results.length > 0 && expandedIndex === null && !showBulkReview && (
         <>
           <ResultsList
@@ -465,7 +401,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
           />
 
           {/* Load More Button */}
-          {hasMore && !isSearching && !isRefreshing && (
+          {hasMore && !isSearching && (
             <div className="flex justify-center mt-6">
               <button
                 onClick={handleLoadMore}

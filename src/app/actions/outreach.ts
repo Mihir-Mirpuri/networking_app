@@ -126,19 +126,21 @@ export async function getOutreachTrackers(
       .map((t) => t.gmailThreadId)
       .filter((id): id is string => id !== null);
 
+    // TEMPORARILY DISABLED: querying SendLog instead of messages table (gmail.readonly removed)
     const messageCounts = threadIds.length > 0
-      ? await prisma.messages.groupBy({
-          by: ['threadId'],
+      ? await prisma.sendLog.groupBy({
+          by: ['gmailThreadId'],
           where: {
-            threadId: { in: threadIds },
+            gmailThreadId: { in: threadIds },
             userId: session.user.id,
+            status: 'SUCCESS',
           },
-          _count: { messageId: true },
+          _count: { id: true },
         })
       : [];
 
     const messageCountMap = new Map(
-      messageCounts.map((mc) => [mc.threadId, mc._count.messageId])
+      messageCounts.map((mc) => [mc.gmailThreadId!, mc._count.id])
     );
 
     return {
@@ -202,19 +204,21 @@ export async function getInitialOutreachTrackers(userId: string): Promise<{
       .map((t) => t.gmailThreadId)
       .filter((id): id is string => id !== null);
 
+    // TEMPORARILY DISABLED: querying SendLog instead of messages table (gmail.readonly removed)
     const messageCounts = threadIds.length > 0
-      ? await prisma.messages.groupBy({
-          by: ['threadId'],
+      ? await prisma.sendLog.groupBy({
+          by: ['gmailThreadId'],
           where: {
-            threadId: { in: threadIds },
+            gmailThreadId: { in: threadIds },
             userId,
+            status: 'SUCCESS',
           },
-          _count: { messageId: true },
+          _count: { id: true },
         })
       : [];
 
     const messageCountMap = new Map(
-      messageCounts.map((mc) => [mc.threadId, mc._count.messageId])
+      messageCounts.map((mc) => [mc.gmailThreadId!, mc._count.id])
     );
 
     return {
@@ -303,12 +307,13 @@ export async function updateOutreachTracker(
       data,
     });
 
-    // Get message count for the thread
+    // TEMPORARILY DISABLED: querying SendLog instead of messages table (gmail.readonly removed)
     const messageCount = updated.gmailThreadId
-      ? await prisma.messages.count({
+      ? await prisma.sendLog.count({
           where: {
-            threadId: updated.gmailThreadId,
+            gmailThreadId: updated.gmailThreadId,
             userId: session.user.id,
+            status: 'SUCCESS',
           },
         })
       : 0;
@@ -681,26 +686,30 @@ export async function getThreadMessages(threadId: string): Promise<{
   }
 
   try {
-    const messages = await prisma.messages.findMany({
+    // TEMPORARILY DISABLED: gmail.readonly scope removed for Google verification
+    // Querying SendLog instead of messages table (which won't receive new data)
+    const sendLogs = await prisma.sendLog.findMany({
       where: {
-        threadId,
+        gmailThreadId: threadId,
         userId: session.user.id,
+        status: 'SUCCESS',
       },
-      orderBy: { received_at: 'asc' },
+      orderBy: { sentAt: 'asc' },
+      include: { user: { select: { email: true } } },
     });
 
     return {
       success: true,
-      messages: messages.map((m) => ({
-        messageId: m.messageId,
-        threadId: m.threadId,
-        direction: m.direction as 'SENT' | 'RECEIVED',
-        sender: m.sender,
-        recipients: (m.recipient_list as string[]) || [],
-        subject: m.subject,
-        bodyHtml: m.body_html,
-        bodyText: m.body_text,
-        receivedAt: m.received_at,
+      messages: sendLogs.map((sl) => ({
+        messageId: sl.gmailMessageId || sl.id,
+        threadId: sl.gmailThreadId!,
+        direction: 'SENT' as const,
+        sender: sl.user.email || '',
+        recipients: [sl.toEmail],
+        subject: sl.subject,
+        bodyHtml: null,
+        bodyText: sl.body,
+        receivedAt: sl.sentAt,
       })),
     };
   } catch (error) {

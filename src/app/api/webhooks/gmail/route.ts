@@ -117,6 +117,12 @@ async function processSync(userId: string): Promise<void> {
  * POST handler for Gmail Pub/Sub webhook
  */
 export async function POST(request: NextRequest) {
+  // TEMPORARILY DISABLED: gmail.readonly scope removed for Google verification
+  // All code below is preserved intact for easy restoration
+  if (true as boolean) {
+    return NextResponse.json({ acknowledged: true, message: 'Gmail webhook temporarily disabled' }, { status: 200 });
+  }
+
   try {
     console.log('[Gmail Webhook] Received webhook request');
 
