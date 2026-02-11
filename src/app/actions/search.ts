@@ -845,8 +845,13 @@ export async function prescrapeAction(
 
     let pagesScraped = 0;
 
-    // Mark prescrape as running so frontend knows results may still be arriving
+    // Bail out if a prescrape is already running for these params
     const initialProgress = await findOrCreateScrapeProgress(normalizedParams);
+    if (initialProgress.prescrapeStatus === 'RUNNING') {
+      console.log(`[Prescrape] Already running for "${input.company}", skipping`);
+      return { success: true, pagesScraped: 0 };
+    }
+
     await prisma.search.update({
       where: { id: initialProgress.id },
       data: { prescrapeStatus: 'RUNNING' },
