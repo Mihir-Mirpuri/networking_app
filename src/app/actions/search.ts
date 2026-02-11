@@ -161,9 +161,6 @@ function getTemplate(templateId: string) {
   return EMAIL_TEMPLATES.find((t) => t.id === templateId) || EMAIL_TEMPLATES[0];
 }
 
-// Minimum DB results before checking CSE for more pages.
-// At 0, we block on a synchronous scrape (Path A).
-const SCRAPE_THRESHOLD = 5;
 
 /**
  * On-demand enrichment: find people matching filters who lack emails,
@@ -380,9 +377,9 @@ async function buildResultsWithDrafts(
 /**
  * Main search action — always queries DB directly with offset pagination.
  *
- * Two-path UX based on DB result count:
- *   Path A (0 results):  Block, scrape synchronously, return results
- *   Path B (1+ results): Return immediately (prescrape populates DB in background)
+ * Two-path UX:
+ *   0 results + not scraped:  Block, scrape synchronously, return results
+ *   1+ results or already scraped: Return immediately (prescrape populates DB in background)
  *
  * hasMore = got a full page from DB OR CSE has more pages to scrape.
  */
@@ -464,38 +461,34 @@ export async function searchPeopleAction(
     let cseHasMorePages = false;
 
     // ===== STEP 2: Check CSE state + sync scrape if 0 results =====
-    if (people.length < SCRAPE_THRESHOLD) {
-      const progress = await findOrCreateScrapeProgress(normalizedParams);
-      const nextPage = getNextCsePageStart(progress.lastCsePageScraped, progress.cseExhausted);
+    const progress = await findOrCreateScrapeProgress(normalizedParams);
+    const nextPage = getNextCsePageStart(progress.lastCsePageScraped, progress.cseExhausted);
 
-      if (nextPage !== null) {
-        cseHasMorePages = true;
+    if (nextPage !== null) {
+      cseHasMorePages = true;
 
-        if (people.length === 0) {
-          // PATH A: 0 results → scrape synchronously (user expects to wait)
-          console.log(`[Search] PATH A: 0 results, scraping CSE page ${nextPage} synchronously`);
-          const batch = await processRefreshBatch(input, nextPage, 'SyncScrape');
-          cseCallsMade = 1;
+      if (people.length === 0) {
+        // 0 results → scrape synchronously (user expects to wait)
+        console.log(`[Search] 0 results, scraping CSE page ${nextPage} synchronously`);
+        const batch = await processRefreshBatch(input, nextPage, 'SyncScrape');
+        cseCallsMade = 1;
 
-          await updateScrapeProgress(progress.id, nextPage, batch.urlsFromCse, {
-            cseCallsMade: 1,
-            linkedinScraperCalls: batch.urlsScraped,
-            apolloCallsMade: 0,
-          });
+        await updateScrapeProgress(progress.id, nextPage, batch.urlsFromCse, {
+          cseCallsMade: 1,
+          linkedinScraperCalls: batch.urlsScraped,
+          apolloCallsMade: 0,
+        });
 
-          // Enrich newly scraped people before re-querying
-          const enrichResult2 = await enrichPeopleOnDemand(filters, input.company);
-          apolloCallsMade += enrichResult2.apolloCallsMade;
+        // Enrich newly scraped people before re-querying
+        const enrichResult2 = await enrichPeopleOnDemand(filters, input.company);
+        apolloCallsMade += enrichResult2.apolloCallsMade;
 
-          // Re-query DB after scraping + enrichment added new people
-          people = await findPeopleByFilters(filters);
-          console.log(`[Search] After scrape+enrich: ${people.length} results`);
-        }
-        // 1+ results: return as-is, prescrape will populate DB
+        // Re-query DB after scraping + enrichment added new people
+        people = await findPeopleByFilters(filters);
+        console.log(`[Search] After scrape+enrich: ${people.length} results`);
       }
-      // If nextPage is null (CSE exhausted), just return whatever we have
+      // 1+ results: return as-is, prescrape will populate DB in background
     }
-    // 5+ results: return as-is (implicit, no special handling needed)
 
     // ===== STEP 3: Rank candidates =====
     const searchCriteria: SearchCriteria = {
