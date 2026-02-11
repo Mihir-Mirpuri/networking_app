@@ -18,6 +18,8 @@ export interface ApiUsageStats {
   apolloCacheHits: number;
   cseCallsMade: number;
   linkedinScraperCalls: number;
+  profilesAdded: number;
+  profilesMatchedSearch: number;
 }
 
 /**
@@ -490,6 +492,12 @@ export async function updateScrapeProgress(
       }),
       ...(apiStats?.apolloCacheHits !== undefined && {
         apolloCacheHits: { increment: apiStats.apolloCacheHits },
+      }),
+      ...(apiStats?.profilesAdded !== undefined && {
+        profilesAdded: { increment: apiStats.profilesAdded },
+      }),
+      ...(apiStats?.profilesMatchedSearch !== undefined && {
+        profilesMatchedSearch: { increment: apiStats.profilesMatchedSearch },
       }),
     },
   });

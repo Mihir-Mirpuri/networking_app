@@ -477,6 +477,8 @@ export async function searchPeopleAction(
           cseCallsMade: 1,
           linkedinScraperCalls: batch.urlsScraped,
           apolloCallsMade: 0,
+          profilesAdded: batch.newPeopleCount,
+          profilesMatchedSearch: batch.matchedCount,
         });
 
         // Enrich newly scraped people before re-querying
@@ -726,6 +728,7 @@ async function processRefreshBatch(
   batchLabel: string
 ): Promise<{
   newPeopleCount: number;
+  matchedCount: number;
   emailsGenerated: number;
   apolloCallsMade: number;
   savedPersonIds: string[];
@@ -733,6 +736,7 @@ async function processRefreshBatch(
   urlsFromCse: number;  // How many URLs CSE returned (10 = likely more pages)
 }> {
   let newPeopleCount = 0;
+  let matchedCount = 0;
   const savedPersonIds: string[] = [];
 
   // ===== STEP 1: CSE DISCOVERY =====
@@ -750,7 +754,7 @@ async function processRefreshBatch(
   console.log(`[Refresh ${batchLabel}] CSE found ${cseResults.length} LinkedIn profiles`);
 
   if (cseResults.length === 0) {
-    return { newPeopleCount: 0, emailsGenerated: 0, apolloCallsMade: 0, savedPersonIds: [], urlsScraped: 0, urlsFromCse: 0 };
+    return { newPeopleCount: 0, matchedCount: 0, emailsGenerated: 0, apolloCallsMade: 0, savedPersonIds: [], urlsScraped: 0, urlsFromCse: 0 };
   }
 
   // ===== STEP 2: CHECK DATABASE FOR EXISTING PEOPLE =====
@@ -792,7 +796,17 @@ async function processRefreshBatch(
         );
 
         savedPersonIds.push(personId);
-        if (isNew) newPeopleCount++;
+        if (isNew) {
+          newPeopleCount++;
+          // Check if this profile matches the user's search filters
+          const roleMatch = !input.role || (profile.role || '').toLowerCase().includes(input.role.toLowerCase());
+          const uniMatch = !input.university || (profile.schools || []).some(
+            (s) => s.toLowerCase().includes(input.university!.toLowerCase())
+          );
+          const locMatch = !input.location || [profile.city, profile.state, profile.country]
+            .filter(Boolean).some((v) => v!.toLowerCase().includes(input.location!.toLowerCase()));
+          if (roleMatch && uniMatch && locMatch) matchedCount++;
+        }
       }
 
       console.log(`[Refresh ${batchLabel}] Saved ${profiles.length} profiles`);
@@ -805,7 +819,7 @@ async function processRefreshBatch(
   }
 
   // Email enrichment is now handled on-demand in searchPeopleAction via enrichPeopleOnDemand()
-  return { newPeopleCount, emailsGenerated: 0, apolloCallsMade: 0, savedPersonIds, urlsScraped: urlsToScrape.length, urlsFromCse: cseResults.length };
+  return { newPeopleCount, matchedCount, emailsGenerated: 0, apolloCallsMade: 0, savedPersonIds, urlsScraped: urlsToScrape.length, urlsFromCse: cseResults.length };
 }
 
 const MAX_PRESCRAPE_PAGES = 4;
@@ -874,6 +888,8 @@ export async function prescrapeAction(
         cseCallsMade: 1,
         linkedinScraperCalls: batch.urlsScraped,
         apolloCallsMade: batch.apolloCallsMade,
+        profilesAdded: batch.newPeopleCount,
+        profilesMatchedSearch: batch.matchedCount,
       });
 
       pagesScraped++;

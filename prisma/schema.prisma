@@ -143,6 +143,8 @@ model Search {
   apolloCacheHits       Int            @default(0)
   cseCallsMade          Int            @default(0)
   linkedinScraperCalls  Int            @default(0)
+  profilesAdded         Int            @default(0)      // New Person records created
+  profilesMatchedSearch Int            @default(0)      // Of those added, how many matched role/uni/location filters
   prescrapeStatus       String?          // null=not started, 'RUNNING'=in progress, 'DONE'=completed
   completedAt     DateTime?
   createdAt       DateTime       @default(now())
