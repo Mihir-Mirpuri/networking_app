@@ -6,13 +6,11 @@ import { ResultsList } from './ResultsList';
 import { ExpandedReview } from './ExpandedReview';
 import { BulkReview } from './BulkReview';
 import { LoadingSpinner } from './LoadingSpinner';
+import { SearchLoadingState } from './SearchLoadingState';
 import { Toast } from '@/components/ui/Toast';
 import { LimitReachedModal, dispatchCreditsChanged } from '@/components/credits';
 import { searchPeopleAction, SearchResultWithDraft, hidePersonAction, loadMorePeopleAction } from '@/app/actions/search';
 import { sendSingleEmailAction, sendEmailsAction, PersonToSend } from '@/app/actions/send';
-
-// Loading message shown during search
-const LOADING_MESSAGE = 'Searching for profiles — this can take up to 30 seconds...';
 
 interface SearchPageClientProps {
   initialRemainingDaily: number;
@@ -418,12 +416,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
         </div>
       )}
 
-      {isSearching && (
-        <div className="flex items-center gap-3 py-8 text-gray-600">
-          <LoadingSpinner size="md" />
-          <span className="text-base">{LOADING_MESSAGE}</span>
-        </div>
-      )}
+      {isSearching && <SearchLoadingState />}
 
       {!isSearching && !error && results.length === 0 && searchParams && (
         <div className="flex flex-col items-center justify-center py-16 text-gray-500">
