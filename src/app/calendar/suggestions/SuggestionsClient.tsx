@@ -11,6 +11,7 @@ import { MeetingSuggestionWithMessage } from '@/lib/types/meetingSuggestion';
 import { CreateEventInput } from '@/components/calendar/types';
 import Link from 'next/link';
 import { usePolling } from '@/hooks/usePolling';
+import { LoadingSpinner } from '@/components/search/LoadingSpinner';
 
 export function SuggestionsClient() {
   const [suggestions, setSuggestions] = useState<MeetingSuggestionWithMessage[]>([]);
@@ -81,7 +82,7 @@ export function SuggestionsClient() {
   if (initialLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-16">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
+        <LoadingSpinner size="lg" className="mb-4" />
         <p className="text-gray-600">Loading suggestions...</p>
       </div>
     );
