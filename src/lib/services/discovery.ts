@@ -268,20 +268,16 @@ export async function expandCompanyName(company: string): Promise<string[]> {
 
 /**
  * Build the company portion of a CSE query.
- * Returns `("Goldman Sachs" OR "GS")` when alternatives exist,
- * or plain `"Goldman Sachs"` when none.
+ * Currently just quotes the company name. LLM expansion (expandCompanyName)
+ * is available but disabled — all current UI inputs are constrained dropdowns
+ * that already provide canonical names. Re-enable when natural language
+ * or freetext company input is added.
  */
 export async function buildCompanyQueryPart(company: string): Promise<string> {
   const trimmed = company.trim();
   if (!trimmed) return '';
 
-  const alternatives = await expandCompanyName(trimmed);
-  if (alternatives.length === 0) {
-    return `"${trimmed}"`;
-  }
-
-  const parts = [`"${trimmed}"`, ...alternatives.map(a => `"${a}"`)];
-  return `(${parts.join(' OR ')})`;
+  return `"${trimmed}"`;
 }
 
 /**
