@@ -2,7 +2,7 @@
 
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { discoverLinkedInProfiles } from '@/lib/services/discovery';
+import { discoverLinkedInProfiles, lookupByName } from '@/lib/services/discovery';
 import { scrapeLinkedInProfiles, ScrapedProfile } from '@/lib/services/linkedin-scraper';
 import { rankCandidates, SearchCriteria, CandidateData, ScoreBreakdown } from '@/lib/services/ranking';
 import { EMAIL_TEMPLATES } from '@/lib/constants';
@@ -11,6 +11,7 @@ import {
   getExcludedPersonIds,
   findPeopleByFilters,
   findPeopleByLinkedInUrls,
+  findPeopleByName,
   saveScrapedProfile,
   getEmailStatus,
   PersonFilters,
@@ -19,6 +20,7 @@ import {
   applyPostQueryFilters,
   getCompanyKey,
   normalizeCompanyForMatch,
+  companiesMatch,
 } from '@/lib/db/person-service';
 import {
   normalizeSearchParams,
@@ -130,7 +132,7 @@ interface PersonWithSource {
 function generateEmailDraft(
   templateId: string,
   person: { firstName: string | null; company: string; role: string | null },
-  user: { name: string | null; university: string | null }
+  user: { name: string | null; university: string | null; classification: string | null; major: string | null; career: string | null }
 ): { subject: string; body: string } {
   const template = EMAIL_TEMPLATES.find((t) => t.id === templateId) || EMAIL_TEMPLATES[0];
 
@@ -139,16 +141,20 @@ function generateEmailDraft(
   let body: string = template.body;
 
   const replacements: Record<string, string> = {
-    '{{firstName}}': person.firstName || 'there',
-    '{{company}}': person.company,
-    '{{role}}': person.role || 'your role',
-    '{{yourName}}': user.name || 'A student',
-    '{{university}}': user.university || 'my university',
+    '{first_name}': person.firstName || 'there',
+    '{company}': person.company,
+    '{role}': person.role || 'your role',
+    '{user_name}': user.name || 'A student',
+    '{university}': user.university || 'my university',
+    '{classification}': user.classification || 'student',
+    '{major}': user.major || 'my major',
+    '{career}': user.career || 'your industry',
+    '{industry}': user.career || 'your industry',
   };
 
   for (const [placeholder, value] of Object.entries(replacements)) {
-    subject = subject.replace(new RegExp(placeholder, 'g'), value);
-    body = body.replace(new RegExp(placeholder, 'g'), value);
+    subject = subject.replaceAll(placeholder, value);
+    body = body.replaceAll(placeholder, value);
   }
 
   return { subject, body };
@@ -298,7 +304,7 @@ async function buildResultsWithDrafts(
   rankedPeople: Array<{ candidate: PersonWithSource; score: number; breakdown: ScoreBreakdown }>,
   userId: string,
   templateId: string,
-  user: { name: string | null; university: string | null }
+  user: { name: string | null; university: string | null; classification: string | null; major: string | null; career: string | null }
 ): Promise<SearchResultWithDraft[]> {
   return Promise.all(
     rankedPeople.map(async ({ candidate: person, score, breakdown }) => {
@@ -320,7 +326,7 @@ async function buildResultsWithDrafts(
       const draft = generateEmailDraft(
         templateId,
         { firstName: person.firstName, company: person.company, role: person.role },
-        { name: user.name, university: user.university }
+        user
       );
 
       const isHardcodedTemplate = EMAIL_TEMPLATES.some(t => t.id === templateId);
@@ -405,6 +411,9 @@ export async function searchPeopleAction(
       select: {
         name: true,
         university: true,
+        classification: true,
+        major: true,
+        career: true,
         dailySendCount: true,
         lastSendDate: true,
       },
@@ -634,7 +643,7 @@ export async function loadMorePeopleAction(
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { name: true, university: true },
+      select: { name: true, university: true, classification: true, major: true, career: true },
     });
 
     if (!user) {
@@ -734,6 +743,7 @@ async function processRefreshBatch(
   savedPersonIds: string[];
   urlsScraped: number;
   urlsFromCse: number;  // How many URLs CSE returned (10 = likely more pages)
+  csePrefiltered: number; // How many profiles skipped by CSE company pre-filter
 }> {
   let newPeopleCount = 0;
   let matchedCount = 0;
@@ -754,7 +764,7 @@ async function processRefreshBatch(
   console.log(`[Refresh ${batchLabel}] CSE found ${cseResults.length} LinkedIn profiles`);
 
   if (cseResults.length === 0) {
-    return { newPeopleCount: 0, matchedCount: 0, emailsGenerated: 0, apolloCallsMade: 0, savedPersonIds: [], urlsScraped: 0, urlsFromCse: 0 };
+    return { newPeopleCount: 0, matchedCount: 0, emailsGenerated: 0, apolloCallsMade: 0, savedPersonIds: [], urlsScraped: 0, urlsFromCse: 0, csePrefiltered: 0 };
   }
 
   // ===== STEP 2: CHECK DATABASE FOR EXISTING PEOPLE =====
@@ -774,6 +784,28 @@ async function processRefreshBatch(
   }
 
   const cseResultMap = new Map(cseResults.map((r) => [r.linkedinUrl, r]));
+
+  // ===== STEP 2.5: PRE-FILTER BY CSE COMPANY METATAG =====
+  let csePrefiltered = 0;
+  if (input.company) {
+    const normalizedSearchCompany = normalizeCompanyForMatch(input.company);
+    const beforeCount = urlsToScrape.length;
+    urlsToScrape = urlsToScrape.filter((url) => {
+      const cseResult = cseResultMap.get(url);
+      if (!cseResult?.cseCompany) return true; // Keep if no metatag (conservative)
+      const normalizedCseCompany = normalizeCompanyForMatch(cseResult.cseCompany);
+      const matches = companiesMatch(normalizedCseCompany, normalizedSearchCompany);
+      if (!matches) {
+        console.log(`[Refresh ${batchLabel}] Pre-filtered: "${cseResult.cseFirstName} ${cseResult.cseLastName}" — CSE company "${cseResult.cseCompany}" doesn't match "${input.company}"`);
+      }
+      return matches;
+    });
+    csePrefiltered = beforeCount - urlsToScrape.length;
+    if (csePrefiltered > 0) {
+      console.log(`[Refresh ${batchLabel}] Pre-filtered ${csePrefiltered}/${beforeCount} profiles by CSE company mismatch`);
+    }
+  }
+
   console.log(`[Refresh ${batchLabel}] Need to scrape ${urlsToScrape.length} new profiles`);
 
   // ===== STEP 3: SCRAPE NEW LINKEDIN PROFILES =====
@@ -798,14 +830,18 @@ async function processRefreshBatch(
         savedPersonIds.push(personId);
         if (isNew) {
           newPeopleCount++;
-          // Check if this profile matches the user's search filters
+          // Check if this profile matches the user's full search criteria
+          const companyMatch = !input.company || companiesMatch(
+            normalizeCompanyForMatch(profile.company || ''),
+            normalizeCompanyForMatch(input.company)
+          );
           const roleMatch = !input.role || (profile.role || '').toLowerCase().includes(input.role.toLowerCase());
           const uniMatch = !input.university || (profile.schools || []).some(
             (s) => s.toLowerCase().includes(input.university!.toLowerCase())
           );
           const locMatch = !input.location || [profile.city, profile.state, profile.country]
             .filter(Boolean).some((v) => v!.toLowerCase().includes(input.location!.toLowerCase()));
-          if (roleMatch && uniMatch && locMatch) matchedCount++;
+          if (companyMatch && roleMatch && uniMatch && locMatch) matchedCount++;
         }
       }
 
@@ -819,7 +855,7 @@ async function processRefreshBatch(
   }
 
   // Email enrichment is now handled on-demand in searchPeopleAction via enrichPeopleOnDemand()
-  return { newPeopleCount, matchedCount, emailsGenerated: 0, apolloCallsMade: 0, savedPersonIds, urlsScraped: urlsToScrape.length, urlsFromCse: cseResults.length };
+  return { newPeopleCount, matchedCount, emailsGenerated: 0, apolloCallsMade: 0, savedPersonIds, urlsScraped: urlsToScrape.length, urlsFromCse: cseResults.length, csePrefiltered };
 }
 
 const MAX_PRESCRAPE_PAGES = 4;
@@ -928,5 +964,291 @@ export async function prescrapeAction(
       console.error('Failed to mark prescrape as DONE after error:', e);
     }
     return { success: false, error: 'Prescraping failed.' };
+  }
+}
+
+// ===== PERSON LOOKUP (by name) =====
+
+export interface LookupInput {
+  name: string;
+  company?: string;
+  templateId: string;
+}
+
+export type LookupActionResult = {
+  success: true;
+  results: SearchResultWithDraft[];
+} | {
+  success: false;
+  error: string;
+};
+
+/**
+ * Look up a specific person by name.
+ *
+ * Flow:
+ * 1. Check DB for existing people matching the name
+ * 2. If few DB results, also query CSE (two-pass: name+company, then name-only)
+ * 3. Save new CSE profiles → enrich with patterns/Apollo → generate drafts
+ * 4. Merge + deduplicate, return top 5 as SearchResultWithDraft[]
+ */
+export async function lookupPersonAction(
+  input: LookupInput
+): Promise<LookupActionResult> {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.id) {
+    return { success: false, error: 'Not authenticated' };
+  }
+
+  if (!input.name || input.name.trim().length < 2) {
+    return { success: false, error: 'Name must be at least 2 characters' };
+  }
+
+  try {
+    const userId = session.user.id;
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        name: true,
+        university: true,
+        classification: true,
+        major: true,
+        career: true,
+      },
+    });
+
+    if (!user) {
+      return { success: false, error: 'User not found' };
+    }
+
+    const cleanName = input.name.replace(/,.*$/, '').trim();
+
+    // ===== STEP 1: Check DB first =====
+    const dbPeople = await findPeopleByName({
+      name: cleanName,
+      company: input.company,
+      limit: 5,
+    });
+    console.log(`[Lookup] DB found ${dbPeople.length} people for "${cleanName}"`);
+
+    // Track which LinkedIn URLs we already have from DB
+    const dbLinkedInUrls = new Set(
+      dbPeople.filter((p) => p.linkedinUrl).map((p) => p.linkedinUrl!)
+    );
+
+    // ===== STEP 2: CSE lookup (unless DB already has plenty) =====
+    let csePeople: PersonResult[] = [];
+    const dbHasEnough = dbPeople.filter((p) => p.email).length >= 3;
+
+    if (!dbHasEnough) {
+      console.log('[Lookup] DB results insufficient, querying CSE');
+      const cseResults = await lookupByName({
+        name: cleanName,
+        company: input.company,
+      });
+
+      if (cseResults.length > 0) {
+        // Check which CSE results already exist in DB
+        const cseUrls = cseResults.map((r) => r.linkedinUrl);
+        const existingMap = await findPeopleByLinkedInUrls(cseUrls);
+
+        for (const cseResult of cseResults) {
+          if (dbLinkedInUrls.has(cseResult.linkedinUrl)) continue; // Already in DB results
+
+          const existing = existingMap.get(cseResult.linkedinUrl);
+          if (existing) {
+            // Already in DB but wasn't found by name search — add it
+            csePeople.push({
+              ...existing,
+              emailDeliverable: null,
+              emailVerifiedAt: null,
+              emailVerificationReason: null,
+            });
+            dbLinkedInUrls.add(cseResult.linkedinUrl);
+          } else {
+            // New person — save to DB
+            const { personId } = await saveScrapedProfile(
+              {
+                linkedinUrl: cseResult.linkedinUrl,
+                fullName: cseResult.fullName || '',
+                firstName: cseResult.firstName || '',
+                lastName: cseResult.lastName || '',
+                company: cseResult.cseCompany || input.company || null,
+                role: null,
+                email: null,
+                city: null,
+                state: null,
+                country: null,
+                schools: [],
+                educationSchool: null,
+              },
+              cseResult.linkedinUrl,
+              cseResult.sourceTitle,
+              cseResult.sourceSnippet,
+              cseResult.sourceDomain,
+              input.company || cseResult.cseCompany || '',
+              undefined
+            );
+
+            // Fetch the saved record to get the full PersonResult shape
+            const saved = await prisma.person.findUnique({
+              where: { id: personId },
+              select: {
+                id: true,
+                fullName: true,
+                firstName: true,
+                lastName: true,
+                company: true,
+                role: true,
+                linkedinUrl: true,
+                email: true,
+                emailStatus: true,
+                emailConfidence: true,
+                emailDeliverable: true,
+                emailVerifiedAt: true,
+                emailVerificationReason: true,
+                city: true,
+                state: true,
+                country: true,
+                educationSchool: true,
+                educationDegree: true,
+                educationField: true,
+                educationYear: true,
+                sourceLinks: {
+                  where: { kind: 'DISCOVERY' },
+                  orderBy: { createdAt: 'asc' as const },
+                  take: 1,
+                  select: { url: true, title: true, snippet: true, domain: true },
+                },
+              },
+            });
+            if (saved) {
+              csePeople.push(saved);
+              dbLinkedInUrls.add(cseResult.linkedinUrl);
+            }
+          }
+        }
+        console.log(`[Lookup] CSE added ${csePeople.length} new people`);
+      }
+    }
+
+    // ===== STEP 3: Merge + deduplicate =====
+    const allPeople = [...dbPeople, ...csePeople];
+
+    // Deduplicate by person ID
+    const seen = new Set<string>();
+    const uniquePeople = allPeople.filter((p) => {
+      if (seen.has(p.id)) return false;
+      seen.add(p.id);
+      return true;
+    });
+
+    // Sort: has email first, then VERIFIED > UNVERIFIED > MISSING
+    uniquePeople.sort((a, b) => {
+      const aHasEmail = a.email ? 0 : 1;
+      const bHasEmail = b.email ? 0 : 1;
+      if (aHasEmail !== bHasEmail) return aHasEmail - bHasEmail;
+
+      const statusOrder: Record<string, number> = { VERIFIED: 0, UNVERIFIED: 1, MISSING: 2 };
+      const aStatus = statusOrder[a.emailStatus || 'MISSING'] ?? 2;
+      const bStatus = statusOrder[b.emailStatus || 'MISSING'] ?? 2;
+      return aStatus - bStatus;
+    });
+
+    const top = uniquePeople.slice(0, 5);
+
+    if (top.length === 0) {
+      return { success: true, results: [] };
+    }
+
+    // ===== STEP 4: Enrich people without emails =====
+    for (const person of top) {
+      if (person.email || !person.firstName || !person.lastName) continue;
+
+      // Try pattern first
+      const companyKey = getCompanyKey(normalizeCompanyForMatch(person.company));
+      let pattern = companyKey ? await getCompanyPattern(companyKey) : null;
+      if (!pattern) pattern = await getCompanyPattern(person.company);
+
+      if (pattern) {
+        const generatedEmail = generateEmailFromPattern(
+          person.firstName,
+          person.lastName,
+          pattern.pattern as any,
+          pattern.domain
+        );
+        await prisma.person.update({
+          where: { id: person.id },
+          data: {
+            email: generatedEmail,
+            emailStatus: 'UNVERIFIED',
+            emailConfidence: Math.round(pattern.confidence * 100),
+          },
+        });
+        person.email = generatedEmail;
+        person.emailStatus = 'UNVERIFIED';
+        person.emailConfidence = Math.round(pattern.confidence * 100);
+        console.log(`[Lookup] Pattern → ${person.fullName} → ${generatedEmail}`);
+        continue;
+      }
+
+      // Apollo fallback
+      const result = await findEmail({
+        firstName: person.firstName,
+        lastName: person.lastName,
+        company: person.company,
+        linkedinUrl: person.linkedinUrl,
+      });
+
+      await prisma.person.update({
+        where: { id: person.id },
+        data: {
+          email: result.email,
+          emailStatus: result.email ? result.status : 'MISSING',
+          emailConfidence: result.confidence,
+          emailDeliverable: result.emailDeliverable,
+          apolloEnrichedAt: new Date(),
+          apolloStatus: result.apolloStatus === 'SUCCESS' || result.apolloStatus === 'NOT_FOUND'
+            ? result.apolloStatus : 'API_ERROR',
+          ...(result.city && { city: result.city }),
+          ...(result.state && { state: result.state }),
+          ...(result.country && { country: result.country }),
+          ...(result.education?.schoolName && { educationSchool: result.education.schoolName }),
+          ...(result.employment?.title && { role: result.employment.title }),
+        },
+      });
+
+      if (result.email) {
+        person.email = result.email;
+        person.emailStatus = result.status;
+        person.emailConfidence = result.confidence;
+        person.emailDeliverable = result.emailDeliverable;
+      }
+      if (result.city) person.city = result.city;
+      if (result.state) person.state = result.state;
+      if (result.education?.schoolName) person.educationSchool = result.education.schoolName;
+      if (result.employment?.title) person.role = result.employment.title;
+
+      console.log(`[Lookup] Apollo → ${person.fullName} → ${result.email || 'no email'}`);
+      await new Promise((r) => setTimeout(r, 300)); // Rate limit
+    }
+
+    // ===== STEP 5: Build results with drafts =====
+    // Wrap in the format buildResultsWithDrafts expects
+    const ranked = top.map((person) => ({
+      candidate: person as PersonWithSource,
+      score: 100,
+      breakdown: {} as ScoreBreakdown,
+    }));
+
+    const results = await buildResultsWithDrafts(ranked, userId, input.templateId, user);
+
+    console.log(`[Lookup] Returning ${results.length} results for "${cleanName}"`);
+    return { success: true, results };
+  } catch (error) {
+    console.error('Lookup error:', error);
+    return { success: false, error: 'Lookup failed. Please try again.' };
   }
 }

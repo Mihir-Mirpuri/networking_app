@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { sendComposedEmailAction, FileAttachmentInput } from '@/app/actions/compose';
 import { personalizeEmailAction, applyFoundInfoAction } from '@/app/actions/personalize';
-import { getTemplatesAction, TemplateData } from '@/app/actions/profile';
+import { getProfileAction, getTemplatesAction, TemplateData, UserProfile } from '@/app/actions/profile';
 import { getResumesAction, ResumeData } from '@/app/actions/resume';
 import { EMAIL_TEMPLATES } from '@/lib/constants';
 import { LoadingSpinner } from '@/components/search/LoadingSpinner';
@@ -46,6 +46,7 @@ export function ComposeEmailModal({
 
   const [templates, setTemplates] = useState<TemplateData[]>([]);
   const [resumes, setResumes] = useState<ResumeData[]>([]);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -106,13 +107,28 @@ export function ComposeEmailModal({
     }
   }, [isOpen]);
 
+  const applyProfileToTemplate = (text: string, profile: UserProfile | null): string => {
+    if (!profile) return text;
+    return text
+      .replaceAll('{user_name}', profile.name || '')
+      .replaceAll('{university}', profile.university || '')
+      .replaceAll('{classification}', profile.classification || '')
+      .replaceAll('{major}', profile.major || '')
+      .replaceAll('{career}', profile.career || '')
+      .replaceAll('{industry}', profile.career || '');
+  };
+
   const loadData = async () => {
     setIsLoadingData(true);
     try {
-      const [templatesResult, resumesResult] = await Promise.all([
+      const [templatesResult, resumesResult, profileResult] = await Promise.all([
         getTemplatesAction(),
         getResumesAction(),
+        getProfileAction(),
       ]);
+
+      const profile = profileResult.success ? profileResult.profile : null;
+      setUserProfile(profile);
 
       const hardcodedDefault = EMAIL_TEMPLATES[0];
 
@@ -180,8 +196,8 @@ export function ComposeEmailModal({
     if (templateId) {
       const template = templates.find((t) => t.id === templateId);
       if (template) {
-        setSubject(template.subject);
-        setBody(template.body);
+        setSubject(applyProfileToTemplate(template.subject, userProfile));
+        setBody(applyProfileToTemplate(template.body, userProfile));
         setAttachResume(template.attachResume);
         if (template.resumeId) {
           setSelectedResumeId(template.resumeId);
@@ -194,13 +210,13 @@ export function ComposeEmailModal({
     if (!selectedTemplateId || templates.length === 0) return;
     const template = templates.find((t) => t.id === selectedTemplateId);
     if (!template) return;
-    setSubject(template.subject);
-    setBody(template.body);
+    setSubject(applyProfileToTemplate(template.subject, userProfile));
+    setBody(applyProfileToTemplate(template.body, userProfile));
     setAttachResume(template.attachResume);
     if (template.resumeId) {
       setSelectedResumeId(template.resumeId);
     }
-  }, [selectedTemplateId, templates]);
+  }, [selectedTemplateId, templates, userProfile]);
 
   // Validate email format
   const validateEmail = (email: string): boolean => {

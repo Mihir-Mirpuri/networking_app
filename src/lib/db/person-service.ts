@@ -142,7 +142,7 @@ export function getCompanyKey(normalizedCompany: string): string | null {
  * Check if a person's company matches the search company
  * Uses alias mapping for known companies, falls back to word-boundary matching
  */
-function companiesMatch(normalizedPersonCompany: string, normalizedSearchCompany: string): boolean {
+export function companiesMatch(normalizedPersonCompany: string, normalizedSearchCompany: string): boolean {
   // Get canonical keys for both companies
   const searchKey = getCompanyKey(normalizedSearchCompany);
   const personKey = getCompanyKey(normalizedPersonCompany);
@@ -1029,6 +1029,73 @@ export async function findPeopleByFilters(filters: PersonFilters): Promise<Perso
 
   const filtered = applyPostQueryFilters(people, company);
   return filtered.slice(0, limit);
+}
+
+/**
+ * Look up people by name (ILIKE) with optional company filter.
+ * Used by the Person Lookup feature — different from findPeopleByFilters
+ * which requires company as the primary filter.
+ */
+export async function findPeopleByName(params: {
+  name: string;
+  company?: string;
+  limit?: number;
+}): Promise<PersonResult[]> {
+  const { name, company, limit = 5 } = params;
+
+  const where: any = {
+    fullName: { contains: name, mode: 'insensitive' },
+  };
+
+  // If company provided, add a loose ILIKE filter — post-query fuzzy match refines it
+  if (company && company.trim()) {
+    where.company = { contains: company.trim(), mode: 'insensitive' };
+  }
+
+  const people = await prisma.person.findMany({
+    where,
+    select: {
+      id: true,
+      fullName: true,
+      firstName: true,
+      lastName: true,
+      company: true,
+      role: true,
+      linkedinUrl: true,
+      email: true,
+      emailStatus: true,
+      emailConfidence: true,
+      emailDeliverable: true,
+      emailVerifiedAt: true,
+      emailVerificationReason: true,
+      city: true,
+      state: true,
+      country: true,
+      educationSchool: true,
+      educationDegree: true,
+      educationField: true,
+      educationYear: true,
+      sourceLinks: {
+        where: { kind: 'DISCOVERY' },
+        orderBy: { createdAt: 'asc' as const },
+        take: 1,
+        select: {
+          url: true,
+          title: true,
+          snippet: true,
+          domain: true,
+        },
+      },
+    },
+    orderBy: [
+      { emailStatus: 'asc' },       // VERIFIED first
+      { emailConfidence: 'desc' },
+      { createdAt: 'asc' },
+    ],
+    take: limit,
+  });
+
+  return people;
 }
 
 /**
