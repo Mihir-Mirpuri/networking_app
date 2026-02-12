@@ -7,6 +7,9 @@
  * - Ranking service scores and returns top candidates
  */
 
+import { completeJson } from '@/lib/services/groq';
+import { getCompanyKey, getCompanyAliases } from '@/lib/db/person-service';
+
 const CSE_API_KEY = process.env.GOOGLE_CSE_API_KEY;
 const CSE_CX = process.env.GOOGLE_CSE_CX || 'bf53ffdb484f145c5';
 
@@ -202,6 +205,85 @@ function parseExperienceCompany(ogDescription: string | undefined): string | nul
   return match[1].trim() || null;
 }
 
+// ── Company name expansion for CSE queries ──────────────────────────────
+// Two-tier: COMPANY_ALIASES (instant) → Groq LLM fallback (~200-400ms)
+// Cached in-memory so pagination / repeat searches skip expansion entirely.
+
+const companyExpansionCache = new Map<string, string[]>();
+
+/**
+ * Expand a company name into well-known abbreviations / alternate names
+ * suitable for CSE OR-queries.
+ *
+ * Tier 1: Check COMPANY_ALIASES (0 ms, no API call)
+ * Tier 2: Ask Groq llama-3.1-8b-instant for abbreviations (~200-400 ms)
+ * Returns an array of alternate names (may be empty).
+ */
+export async function expandCompanyName(company: string): Promise<string[]> {
+  const normalized = company.trim().toLowerCase();
+  if (!normalized) return [];
+
+  // Check cache first
+  const cached = companyExpansionCache.get(normalized);
+  if (cached !== undefined) return cached;
+
+  try {
+    // Tier 1 – alias map
+    const key = getCompanyKey(normalized);
+    if (key) {
+      const aliases = getCompanyAliases(key);
+      // Filter out the original company name (case-insensitive) and take up to 3
+      const alternatives = aliases
+        .filter(a => a.toLowerCase() !== normalized)
+        .slice(0, 3);
+      companyExpansionCache.set(normalized, alternatives);
+      console.log(`[Discovery] Company expansion (alias): "${company}" → ${JSON.stringify(alternatives)}`);
+      return alternatives;
+    }
+
+    // Tier 2 – LLM fallback
+    interface ExpansionResponse { alternatives: string[] }
+    const response = await completeJson<ExpansionResponse>({
+      systemPrompt:
+        'You are a company name abbreviation expert. Given a company name, return a JSON object with an "alternatives" array containing 1-3 widely-recognized abbreviations or short-form names used on LinkedIn profiles. Only include abbreviations that are well-known and unambiguous (e.g. "GS" for Goldman Sachs, "JPM" for JPMorgan, "BCG" for Boston Consulting Group). Do NOT include divisions, subsidiaries, or parent companies. If the company has no well-known abbreviations, return {"alternatives": []}.',
+      userPrompt: company.trim(),
+      options: {
+        model: 'llama-3.1-8b-instant',
+        temperature: 0.1,
+        maxTokens: 150,
+      },
+    });
+
+    const alternatives = (response.content.alternatives || []).slice(0, 3);
+    companyExpansionCache.set(normalized, alternatives);
+    console.log(`[Discovery] Company expansion (LLM): "${company}" → ${JSON.stringify(alternatives)}`);
+    return alternatives;
+  } catch (error) {
+    // On any failure, cache empty array so we don't retry
+    console.warn(`[Discovery] Company expansion failed for "${company}":`, error);
+    companyExpansionCache.set(normalized, []);
+    return [];
+  }
+}
+
+/**
+ * Build the company portion of a CSE query.
+ * Returns `("Goldman Sachs" OR "GS")` when alternatives exist,
+ * or plain `"Goldman Sachs"` when none.
+ */
+export async function buildCompanyQueryPart(company: string): Promise<string> {
+  const trimmed = company.trim();
+  if (!trimmed) return '';
+
+  const alternatives = await expandCompanyName(trimmed);
+  if (alternatives.length === 0) {
+    return `"${trimmed}"`;
+  }
+
+  const parts = [`"${trimmed}"`, ...alternatives.map(a => `"${a}"`)];
+  return `(${parts.join(' OR ')})`;
+}
+
 /**
  * Discover LinkedIn profiles via Google Custom Search
  *
@@ -217,7 +299,7 @@ export async function discoverLinkedInProfiles(params: SearchParams): Promise<CS
   // Build query for LinkedIn profile search
   // Include company, university, role, and location for targeted results
   const queryParts: string[] = [];
-  if (company && company.trim()) queryParts.push(`"${company.trim()}"`);
+  if (company && company.trim()) queryParts.push(await buildCompanyQueryPart(company));
   // Omit university if "any" is selected (case-insensitive)
   if (university && university.trim() && university.trim().toLowerCase() !== 'any') {
     queryParts.push(`"${university.trim()}"`);
@@ -399,7 +481,8 @@ export async function lookupByName(params: {
 
   // Pass 1: name + company (if company provided)
   if (company && company.trim()) {
-    const query = `site:linkedin.com/in "${cleanName}" ${company.trim()}`;
+    const companyPart = await buildCompanyQueryPart(company);
+    const query = `site:linkedin.com/in "${cleanName}" ${companyPart}`;
     console.log(`[Lookup] Pass 1 query: ${query}`);
     const results = await searchCSE(query);
     const candidates = processResults(results);

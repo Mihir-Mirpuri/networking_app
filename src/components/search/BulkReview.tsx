@@ -85,23 +85,23 @@ export function BulkReview({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 bg-surface-900/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-soft-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b">
+        <div className="flex items-center justify-between p-4 border-b border-surface-200">
           <div>
-            <h2 className="text-lg font-semibold">Review Emails</h2>
-            <p className="text-sm text-gray-600">
+            <h2 className="text-lg font-semibold text-surface-900">Review Emails</h2>
+            <p className="text-sm text-surface-600">
               {sendableCount} of {sendableResults.length} emails ready to send
             </p>
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-full"
+            className="p-2 hover:bg-surface-100 rounded-full transition-colors"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5"
+              className="h-5 w-5 text-surface-500"
               viewBox="0 0 20 20"
               fill="currentColor"
             >
@@ -120,18 +120,18 @@ export function BulkReview({
             const draft = drafts.get(index) || { subject: '', body: '' };
 
             return (
-              <div key={result.id} className="border rounded-lg p-4 bg-gray-50">
+              <div key={result.id} className="border border-surface-200 rounded-lg p-4 bg-surface-50">
                 {/* Person Info */}
-                <div className="mb-3 pb-3 border-b">
-                  <h3 className="font-semibold text-gray-900">{result.fullName}</h3>
-                  <p className="text-sm text-gray-600">
+                <div className="mb-3 pb-3 border-b border-surface-200">
+                  <h3 className="font-semibold text-surface-900">{result.fullName}</h3>
+                  <p className="text-sm text-surface-600">
                     {result.role ? `${result.role} at ` : ''}{result.company}
                   </p>
                   <p className="text-sm text-primary-600">{result.email}</p>
                   {result.resumeId && (
-                    <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-1 bg-green-50 border border-green-200 rounded-md">
+                    <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-1 bg-emerald-50 border border-emerald-200 rounded-md">
                       <svg
-                        className="w-4 h-4 text-green-800"
+                        className="w-4 h-4 text-emerald-700"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -144,7 +144,7 @@ export function BulkReview({
                           d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
                         />
                       </svg>
-                      <span className="text-xs font-medium text-green-800">
+                      <span className="text-xs font-medium text-emerald-700">
                         Resume attached
                       </span>
                     </div>
@@ -153,27 +153,27 @@ export function BulkReview({
 
                 {/* Subject */}
                 <div className="mb-3">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-surface-700 mb-1">
                     Subject
                   </label>
                   <input
                     type="text"
                     value={draft.subject}
                     onChange={(e) => handleSubjectChange(index, e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                    className="input text-sm"
                   />
                 </div>
 
                 {/* Body */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-surface-700 mb-1">
                     Body
                   </label>
                   <textarea
                     value={draft.body}
                     onChange={(e) => handleBodyChange(index, e.target.value)}
                     rows={6}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none text-sm"
+                    className="input resize-none text-sm"
                   />
                 </div>
               </div>
@@ -182,10 +182,10 @@ export function BulkReview({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t bg-gray-50 flex justify-end items-center">
+        <div className="p-4 border-t border-surface-200 bg-surface-50 flex justify-end items-center">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500"
+            className="btn-secondary text-sm"
           >
             Close
           </button>
@@ -193,7 +193,7 @@ export function BulkReview({
           <button
             onClick={handleSendAll}
             disabled={isSending || sendableCount === 0}
-            className="px-6 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn-primary text-sm"
           >
             {isSending ? 'Sending...' : `Send All (${sendableCount})`}
           </button>

@@ -3,6 +3,8 @@ import { SearchResult } from '@/lib/services/discovery';
 import { EmailResult, EducationInfo, EmploymentInfo } from '@/lib/services/enrichment';
 import { EmailStatus } from '@prisma/client';
 import { ScrapedProfile } from '@/lib/services/linkedin-scraper';
+import { updatePersonRoleEmbedding, getSearchRoleEmbedding } from '@/lib/services/embeddings';
+import { Prisma } from '@prisma/client';
 
 // Personal email domains - emails from these are UNVERIFIED
 const PERSONAL_DOMAINS = new Set([
@@ -108,6 +110,13 @@ const COMPANY_ALIASES: Record<string, string[]> = {
   'ibm': ['ibm', 'ibm consulting'],
   'sap': ['sap', 'sap consulting'],
 };
+
+/**
+ * Get all aliases for a given canonical company key
+ */
+export function getCompanyAliases(key: string): string[] {
+  return COMPANY_ALIASES[key] || [];
+}
 
 /**
  * Get the canonical company key for a given company name
@@ -978,8 +987,26 @@ export type PersonResult = {
   }>;
 };
 
+/**
+ * Check if vector-based role matching is enabled.
+ * Requires OPENAI_API_KEY to be set and USE_VECTOR_ROLE_MATCHING !== 'false'.
+ */
+export function isVectorRoleMatchingEnabled(): boolean {
+  return process.env.USE_VECTOR_ROLE_MATCHING !== 'false' && !!process.env.OPENAI_API_KEY;
+}
+
 export async function findPeopleByFilters(filters: PersonFilters): Promise<PersonResult[]> {
-  const { company, limit } = filters;
+  const { company, role, limit } = filters;
+
+  // Dispatch to vector path if role provided and vector matching is enabled
+  if (role && role.trim() && isVectorRoleMatchingEnabled()) {
+    const searchEmbedding = await getSearchRoleEmbedding(role);
+    if (searchEmbedding) {
+      return findPeopleByFiltersVector(filters, searchEmbedding);
+    }
+  }
+
+  // Fallback: existing Prisma path
   const where = buildPersonWhereClause(filters);
 
   // excludePersonIds (NOT IN) handles pagination at the DB level,
@@ -1029,6 +1056,166 @@ export async function findPeopleByFilters(filters: PersonFilters): Promise<Perso
 
   const filtered = applyPostQueryFilters(people, company);
   return filtered.slice(0, limit);
+}
+
+/**
+ * Vector-based role matching: uses pgvector cosine distance for semantic role similarity.
+ * Hard filters (company, location, university, email, excludes) remain as SQL WHERE clauses.
+ * Role matching is done via ORDER BY embedding distance + threshold filter.
+ * Records with null embeddings are included with a penalty distance of 1.0 (appear at end).
+ */
+async function findPeopleByFiltersVector(
+  filters: PersonFilters,
+  searchEmbedding: number[]
+): Promise<PersonResult[]> {
+  const { company, location, university, requireEmail = true, excludePersonIds, limit } = filters;
+  const vectorString = `[${searchEmbedding.join(',')}]`;
+
+  // Build WHERE conditions as Prisma.sql fragments
+  const conditions: Prisma.Sql[] = [Prisma.sql`1=1`];
+
+  // Company filter — mirror the alias-based logic from buildPersonWhereClause
+  if (company && company.trim()) {
+    const searchTerms = getCompanySearchTerms(company);
+    const companyConditions = searchTerms.map(term => {
+      switch (term.matchType) {
+        case 'equals':
+          return Prisma.sql`p.company ILIKE ${term.term}`;
+        case 'startsWith':
+          return Prisma.sql`p.company ILIKE ${term.term + '%'}`;
+        case 'contains':
+        default:
+          return Prisma.sql`p.company ILIKE ${'%' + term.term + '%'}`;
+      }
+    });
+    conditions.push(Prisma.sql`(${Prisma.join(companyConditions, ' OR ')})`);
+  }
+
+  // Location filter
+  if (location && location.trim()) {
+    conditions.push(Prisma.sql`p.city ILIKE ${'%' + location.trim() + '%'}`);
+  }
+
+  // University filter
+  if (university && university.trim()) {
+    conditions.push(Prisma.sql`p."educationSchool" ILIKE ${'%' + university.trim() + '%'}`);
+  }
+
+  // Email filter
+  if (requireEmail) {
+    conditions.push(Prisma.sql`p.email IS NOT NULL`);
+    conditions.push(Prisma.sql`(p."emailDeliverable" = true OR p."emailDeliverable" IS NULL)`);
+  }
+
+  // Exclude filter
+  if (excludePersonIds && excludePersonIds.length > 0) {
+    conditions.push(Prisma.sql`p.id NOT IN (${Prisma.join(excludePersonIds)})`);
+  }
+
+  // Vector similarity threshold: include null embeddings (penalty), exclude far embeddings
+  conditions.push(Prisma.sql`(
+    p.role_embedding IS NULL
+    OR (p.role_embedding <=> ${vectorString}::vector) <= 0.35
+  )`);
+
+  const whereClause = Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}`;
+  const fetchLimit = limit * 2; // Overfetch for post-query company filtering
+
+  const rows = await prisma.$queryRaw<Array<{
+    id: string;
+    fullName: string;
+    firstName: string | null;
+    lastName: string | null;
+    company: string;
+    role: string | null;
+    linkedinUrl: string | null;
+    email: string | null;
+    emailStatus: string | null;
+    emailConfidence: number | null;
+    emailDeliverable: boolean | null;
+    emailVerifiedAt: Date | null;
+    emailVerificationReason: string | null;
+    city: string | null;
+    state: string | null;
+    country: string | null;
+    educationSchool: string | null;
+    educationDegree: string | null;
+    educationField: string | null;
+    educationYear: string | null;
+    role_distance: number;
+  }>>(Prisma.sql`
+    SELECT
+      p.id,
+      p."fullName",
+      p."firstName",
+      p."lastName",
+      p.company,
+      p.role,
+      p."linkedinUrl",
+      p.email,
+      p."emailStatus"::text,
+      p."emailConfidence",
+      p."emailDeliverable",
+      p."emailVerifiedAt",
+      p."emailVerificationReason",
+      p.city,
+      p.state,
+      p.country,
+      p."educationSchool",
+      p."educationDegree",
+      p."educationField",
+      p."educationYear",
+      CASE
+        WHEN p.role_embedding IS NOT NULL
+        THEN (p.role_embedding <=> ${vectorString}::vector)
+        ELSE 1.0
+      END as role_distance
+    FROM "Person" p
+    ${whereClause}
+    ORDER BY role_distance ASC, p."emailStatus" ASC, p."emailConfidence" DESC NULLS LAST
+    LIMIT ${fetchLimit}
+  `);
+
+  // Post-query company fuzzy matching (unchanged from Prisma path)
+  const filtered = applyPostQueryFilters(rows, company);
+  const limited = filtered.slice(0, limit);
+
+  if (limited.length === 0) return [];
+
+  // Fetch source links (raw SQL can't do nested selects)
+  const personIds = limited.map(p => p.id);
+  const sourceLinks = await prisma.sourceLink.findMany({
+    where: {
+      personId: { in: personIds },
+      kind: 'DISCOVERY',
+    },
+    orderBy: { createdAt: 'asc' },
+    select: {
+      personId: true,
+      url: true,
+      title: true,
+      snippet: true,
+      domain: true,
+    },
+  });
+
+  // Group by personId (first link per person)
+  const sourceLinkMap = new Map<string, (typeof sourceLinks)[0]>();
+  for (const sl of sourceLinks) {
+    if (!sourceLinkMap.has(sl.personId)) {
+      sourceLinkMap.set(sl.personId, sl);
+    }
+  }
+
+  return limited.map(row => {
+    const sl = sourceLinkMap.get(row.id);
+    return {
+      ...row,
+      sourceLinks: sl
+        ? [{ url: sl.url, title: sl.title, snippet: sl.snippet, domain: sl.domain }]
+        : [],
+    };
+  });
 }
 
 /**
@@ -1207,6 +1394,12 @@ export async function saveDiscoveredPerson(
       },
     });
 
+    // Fire-and-forget: generate role embedding
+    if (apolloData.role) {
+      updatePersonRoleEmbedding(existing.id, apolloData.role)
+        .catch(err => console.error('[Embedding] Error:', err));
+    }
+
     return { personId: existing.id, isNew: false };
   }
 
@@ -1251,6 +1444,12 @@ export async function saveDiscoveredPerson(
       domain: sourceDomain,
     },
   });
+
+  // Fire-and-forget: generate role embedding
+  if (apolloData.role) {
+    updatePersonRoleEmbedding(person.id, apolloData.role)
+      .catch(err => console.error('[Embedding] Error:', err));
+  }
 
   return { personId: person.id, isNew: true };
 }
@@ -1405,6 +1604,12 @@ export async function saveScrapedProfile(
       },
     });
 
+    // Fire-and-forget: generate role embedding
+    if (profile.role) {
+      updatePersonRoleEmbedding(existingByUrl.id, profile.role)
+        .catch(err => console.error('[Embedding] Error:', err));
+    }
+
     return { personId: existingByUrl.id, isNew: false };
   }
 
@@ -1437,6 +1642,12 @@ export async function saveScrapedProfile(
         scrapedAt: new Date(),
       },
     });
+
+    // Fire-and-forget: generate role embedding
+    if (profile.role) {
+      updatePersonRoleEmbedding(existingByName.id, profile.role)
+        .catch(err => console.error('[Embedding] Error:', err));
+    }
 
     return { personId: existingByName.id, isNew: false };
   }
@@ -1473,6 +1684,12 @@ export async function saveScrapedProfile(
       domain: sourceDomain,
     },
   });
+
+  // Fire-and-forget: generate role embedding
+  if (profile.role) {
+    updatePersonRoleEmbedding(person.id, profile.role)
+      .catch(err => console.error('[Embedding] Error:', err));
+  }
 
   return { personId: person.id, isNew: true };
 }

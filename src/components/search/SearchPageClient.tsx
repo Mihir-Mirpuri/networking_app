@@ -419,11 +419,11 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
       {isSearching && <SearchLoadingState />}
 
       {!isSearching && !error && results.length === 0 && searchParams && (
-        <div className="flex flex-col items-center justify-center py-16 text-gray-500">
-          <svg className="w-12 h-12 mb-4 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <div className="flex flex-col items-center justify-center py-16 text-surface-500">
+          <svg className="w-12 h-12 mb-4 text-surface-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
           </svg>
-          <p className="text-base font-medium text-gray-600 mb-1">No profiles found</p>
+          <p className="text-base font-medium text-surface-600 mb-1">No profiles found</p>
           <p className="text-sm">Try adjusting your search filters or broadening your criteria.</p>
         </div>
       )}
@@ -446,7 +446,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
               <button
                 onClick={handleLoadMore}
                 disabled={isLoadingMore || isRetrying}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+                className="btn-secondary flex items-center gap-2"
               >
                 {isLoadingMore || isRetrying ? (
                   <>
@@ -458,7 +458,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
                 )}
               </button>
               {isRetrying && (
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-surface-500">
                   Background search is still finding profiles. Retrying automatically...
                 </p>
               )}
@@ -467,7 +467,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
 
           {/* No More Results Message */}
           {!hasMore && (
-            <p className="text-center text-gray-500 mt-6">
+            <p className="text-center text-surface-500 mt-6">
               No more profiles available
             </p>
           )}
