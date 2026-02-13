@@ -21,6 +21,7 @@ import {
   getCompanyKey,
   normalizeCompanyForMatch,
   companiesMatch,
+  isVectorRoleMatchingEnabled,
 } from '@/lib/db/person-service';
 import {
   normalizeSearchParams,
@@ -175,7 +176,7 @@ function getTemplate(templateId: string) {
 async function enrichPeopleOnDemand(
   filters: PersonFilters,
   searchCompany: string,
-  maxApolloCalls: number = 10
+  maxApolloCalls: number = 5
 ): Promise<{ apolloCallsMade: number; emailsGenerated: number }> {
   // Build where clause for people WITHOUT emails who haven't been tried with Apollo
   const baseWhere = buildPersonWhereClause({ ...filters, requireEmail: false });
@@ -447,7 +448,7 @@ export async function searchPeopleAction(
       location: input.location,
     });
 
-    // ===== STEP 1: On-demand enrichment + Query DB =====
+    // ===== STEP 1: Query DB, enrich only if needed =====
     const filters: PersonFilters = {
       company: input.company,
       location: input.location,
@@ -458,13 +459,20 @@ export async function searchPeopleAction(
       limit: input.limit,
     };
 
-    // Enrich people without emails before querying (patterns + Apollo)
-    const enrichResult = await enrichPeopleOnDemand(filters, input.company);
-
+    // Query DB first — skip enrichment if we already have enough results
     let people = await findPeopleByFilters(filters);
-    console.log(`[Search] Found ${people.length} people in DB`);
+    console.log(`[Search] Found ${people.length} people in DB (need ${input.limit})`);
 
-    let apolloCallsMade = enrichResult.apolloCallsMade;
+    let apolloCallsMade = 0;
+
+    if (people.length < input.limit) {
+      // Not enough results — enrich people without emails, then re-query
+      console.log(`[Search] Under limit, enriching to find more emails`);
+      const enrichResult = await enrichPeopleOnDemand(filters, input.company);
+      apolloCallsMade = enrichResult.apolloCallsMade;
+      people = await findPeopleByFilters(filters);
+      console.log(`[Search] After enrichment: ${people.length} people`);
+    }
     let apolloCacheHits = 0;
     let cseCallsMade = 0;
     let cseHasMorePages = false;
@@ -502,29 +510,50 @@ export async function searchPeopleAction(
     }
 
     // ===== STEP 3: Rank candidates =====
-    const searchCriteria: SearchCriteria = {
-      company: input.company,
-      role: input.role,
-      university: input.university,
-      location: input.location,
-    };
+    const vectorActive = isVectorRoleMatchingEnabled() && !!input.role;
 
-    const rankedPeople = rankCandidates(
-      searchCriteria,
-      people,
-      (person): CandidateData => ({
-        company: person.company,
-        role: person.role,
-        email: person.email,
-        emailStatus: (person.emailStatus as 'VERIFIED' | 'UNVERIFIED' | 'MISSING') || 'MISSING',
-        city: person.city,
-        state: person.state,
-        country: person.country,
-        educationSchool: person.educationSchool,
-      }),
-      input.limit
-    );
-    console.log(`[Search] Ranked top ${rankedPeople.length} candidates`);
+    let rankedPeople: Array<{ candidate: PersonWithSource; score: number; breakdown: ScoreBreakdown }>;
+
+    if (vectorActive) {
+      // Vector mode: DB already returned results ordered by cosine distance + email tiebreaker.
+      // Skip rankCandidates to preserve that semantic ordering.
+      rankedPeople = people.map((person) => ({
+        candidate: person as PersonWithSource,
+        score: person.roleDistance != null ? Math.round((1 - person.roleDistance) * 100) : 0,
+        breakdown: {} as ScoreBreakdown,
+      }));
+      console.log(`[Search] Vector mode: using DB ordering for ${rankedPeople.length} candidates`);
+      if (rankedPeople.length > 0) {
+        const first = people[0];
+        const last = people[people.length - 1];
+        console.log(`[Search] Distance range: ${first.roleDistance?.toFixed(4)} (${first.role}) → ${last.roleDistance?.toFixed(4)} (${last.role})`);
+      }
+    } else {
+      // Fallback: keyword-based ranking
+      const searchCriteria: SearchCriteria = {
+        company: input.company,
+        role: input.role,
+        university: input.university,
+        location: input.location,
+      };
+
+      rankedPeople = rankCandidates(
+        searchCriteria,
+        people,
+        (person): CandidateData => ({
+          company: person.company,
+          role: person.role,
+          email: person.email,
+          emailStatus: (person.emailStatus as 'VERIFIED' | 'UNVERIFIED' | 'MISSING') || 'MISSING',
+          city: person.city,
+          state: person.state,
+          country: person.country,
+          educationSchool: person.educationSchool,
+        }),
+        input.limit
+      );
+      console.log(`[Search] Fallback mode: ranked top ${rankedPeople.length} candidates`);
+    }
 
     // ===== STEP 4: Build results with drafts =====
     const results = await buildResultsWithDrafts(rankedPeople, userId, input.templateId, user);
@@ -664,36 +693,57 @@ export async function loadMorePeopleAction(
       limit: input.limit,
     };
 
-    // Enrich people without emails before querying (patterns + Apollo)
-    await enrichPeopleOnDemand(filters, input.company);
+    // Query DB first — skip enrichment if we already have enough results
+    let people = await findPeopleByFilters(filters);
+    console.log(`[LoadMore] Found ${people.length} people in DB (need ${input.limit})`);
 
-    // Pure DB read
-    const people = await findPeopleByFilters(filters);
-    console.log(`[LoadMore] Found ${people.length} people in DB`);
+    if (people.length < input.limit) {
+      // Not enough results — enrich people without emails, then re-query
+      console.log(`[LoadMore] Under limit, enriching to find more emails`);
+      await enrichPeopleOnDemand(filters, input.company);
+      people = await findPeopleByFilters(filters);
+      console.log(`[LoadMore] After enrichment: ${people.length} people`);
+    }
 
     // Rank candidates
-    const searchCriteria: SearchCriteria = {
-      company: input.company,
-      role: input.role,
-      university: input.university,
-      location: input.location,
-    };
+    const vectorActive = isVectorRoleMatchingEnabled() && !!input.role;
 
-    const rankedPeople = rankCandidates(
-      searchCriteria,
-      people,
-      (person): CandidateData => ({
-        company: person.company,
-        role: person.role,
-        email: person.email,
-        emailStatus: (person.emailStatus as 'VERIFIED' | 'UNVERIFIED' | 'MISSING') || 'MISSING',
-        city: person.city,
-        state: person.state,
-        country: person.country,
-        educationSchool: person.educationSchool,
-      }),
-      input.limit
-    );
+    let rankedPeople: Array<{ candidate: PersonWithSource; score: number; breakdown: ScoreBreakdown }>;
+
+    if (vectorActive) {
+      // Vector mode: DB already returned results ordered by cosine distance.
+      rankedPeople = people.map((person) => ({
+        candidate: person as PersonWithSource,
+        score: person.roleDistance != null ? Math.round((1 - person.roleDistance) * 100) : 0,
+        breakdown: {} as ScoreBreakdown,
+      }));
+      console.log(`[LoadMore] Vector mode: using DB ordering for ${rankedPeople.length} candidates`);
+    } else {
+      // Fallback: keyword-based ranking
+      const searchCriteria: SearchCriteria = {
+        company: input.company,
+        role: input.role,
+        university: input.university,
+        location: input.location,
+      };
+
+      rankedPeople = rankCandidates(
+        searchCriteria,
+        people,
+        (person): CandidateData => ({
+          company: person.company,
+          role: person.role,
+          email: person.email,
+          emailStatus: (person.emailStatus as 'VERIFIED' | 'UNVERIFIED' | 'MISSING') || 'MISSING',
+          city: person.city,
+          state: person.state,
+          country: person.country,
+          educationSchool: person.educationSchool,
+        }),
+        input.limit
+      );
+      console.log(`[LoadMore] Fallback mode: ranked top ${rankedPeople.length} candidates`);
+    }
 
     // Build results with drafts
     const results = await buildResultsWithDrafts(rankedPeople, userId, input.templateId, user);

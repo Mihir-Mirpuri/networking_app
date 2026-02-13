@@ -2,7 +2,7 @@ import prisma from '@/lib/prisma';
 
 const CACHE_TTL_HOURS = 168; // 7 days
 const PERSON_CACHE_TTL_DAYS = 60; // 60 days - then check for staleness (email bounce)
-const SCRAPE_PROGRESS_TTL_DAYS = 7; // After 7 days, allow re-scraping from page 1
+const SCRAPE_PROGRESS_TTL_DAYS = 30; // After 30 days, allow re-scraping from page 1
 const CSE_EXHAUSTED_THRESHOLD = 5; // CSE is exhausted when it returns fewer than this many valid profiles
 
 export interface NormalizedSearchParams {
