@@ -4,7 +4,6 @@ import { Adapter } from 'next-auth/adapters';
 import GoogleProvider from 'next-auth/providers/google';
 import prisma from './prisma';
 import { startMailboxWatch } from './gmail/client';
-import { verifyCalendarAccessOnSignIn } from './services/calendar';
 import { awardCredits } from './services/credits';
 import { EMAIL_LIMITS } from './constants';
 
@@ -18,7 +17,7 @@ export const authOptions: NextAuthOptions = {
       allowDangerousEmailAccountLinking: true,
       authorization: {
         params: {
-          scope: 'openid email profile https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/calendar',
+          scope: 'openid email profile https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.readonly',
           access_type: 'offline',
           prompt: 'consent',
         },
@@ -65,15 +64,6 @@ export const authOptions: NextAuthOptions = {
         }
       }
 
-      // Verify and mark calendar access
-      // This runs after OAuth so tokens should be available
-      try {
-        await verifyCalendarAccessOnSignIn(user.id);
-        console.log(`[Auth] Calendar access verified for user ${user.id}`);
-      } catch (error) {
-        // Log but don't block sign-in if calendar verification fails
-        console.error(`[Auth] Failed to verify calendar access for user ${user.id}:`, error);
-      }
     },
   },
   pages: {
