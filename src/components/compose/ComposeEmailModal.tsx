@@ -339,6 +339,18 @@ export function ComposeEmailModal({
     onClose();
   };
 
+  // ESC to close (modal variant only)
+  useEffect(() => {
+    if (!isOpen || variant === 'embedded') return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        handleClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, variant]);
+
   if (!isOpen) return null;
 
   const isEmbedded = variant === 'embedded';
@@ -355,14 +367,15 @@ export function ComposeEmailModal({
       className={
         isEmbedded
           ? 'bg-white rounded-lg shadow max-w-3xl w-full overflow-hidden flex flex-col'
-          : 'fixed inset-0 bg-surface-900/50 flex items-center justify-center z-50 p-4'
+          : 'fixed inset-0 bg-surface-900/50 flex items-center justify-center z-50 p-4 animate-fade-in'
       }
+      onClick={!isEmbedded ? (e) => { if (e.target === e.currentTarget) handleClose(); } : undefined}
     >
       <div
         className={
           isEmbedded
             ? 'flex flex-col'
-            : 'bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col'
+            : 'bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-scale-in'
         }
       >
         {/* Header */}

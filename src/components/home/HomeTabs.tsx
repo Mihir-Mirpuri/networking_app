@@ -16,7 +16,7 @@ interface HomeTabsProps {
 const TABS: { id: HomeTabId; label: string; icon: typeof MagnifyingGlassIcon }[] = [
   { id: 'find', label: 'Find Connections', icon: MagnifyingGlassIcon },
   { id: 'lookup', label: 'Look Up', icon: UserIcon },
-  { id: 'quick', label: 'Quick Send', icon: PaperAirplaneIcon },
+  // { id: 'quick', label: 'Quick Send', icon: PaperAirplaneIcon }, // Hidden — may be removed
 ];
 
 export function HomeTabs({ initialRemainingDaily }: HomeTabsProps) {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { sendInviteAction } from '@/app/actions/invitations';
 import { createCheckoutSession } from '@/app/actions/subscription';
 import { EMAIL_LIMITS } from '@/lib/constants';
@@ -18,6 +18,16 @@ export function LimitReachedModal({ isOpen, onClose, onCreditsAwarded }: LimitRe
   const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // ESC to close
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') handleClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -59,8 +69,8 @@ export function LimitReachedModal({ isOpen, onClose, onCreditsAwarded }: LimitRe
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl max-w-md w-full overflow-hidden">
+    <div className="fixed inset-0 bg-surface-900/50 flex items-center justify-center z-50 p-4 animate-fade-in" onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}>
+      <div className="bg-white rounded-xl shadow-xl max-w-md w-full overflow-hidden animate-scale-in">
         {/* Header */}
         <div className="bg-gradient-to-r from-amber-50 to-orange-50 px-6 py-5 border-b border-amber-100">
           <div className="flex items-start gap-4">
@@ -80,8 +90,8 @@ export function LimitReachedModal({ isOpen, onClose, onCreditsAwarded }: LimitRe
               </svg>
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Daily Limit Reached</h3>
-              <p className="text-sm text-gray-600 mt-1">
+              <h3 className="text-lg font-semibold text-surface-900">Daily Limit Reached</h3>
+              <p className="text-sm text-surface-600 mt-1">
                 You&apos;ve used all {EMAIL_LIMITS.DEFAULT_DAILY_LIMIT} emails for today.
               </p>
             </div>
@@ -149,10 +159,10 @@ export function LimitReachedModal({ isOpen, onClose, onCreditsAwarded }: LimitRe
           {/* Divider */}
           <div className="relative my-4">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-200" />
+              <div className="w-full border-t border-surface-200" />
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-gray-500">or get free credits</span>
+              <span className="px-2 bg-white text-surface-500">or get free credits</span>
             </div>
           </div>
 
@@ -175,7 +185,7 @@ export function LimitReachedModal({ isOpen, onClose, onCreditsAwarded }: LimitRe
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label htmlFor="invite-email" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="invite-email" className="block text-sm font-medium text-surface-700 mb-1">
                   Friend&apos;s Email Address
                 </label>
                 <input
@@ -184,7 +194,7 @@ export function LimitReachedModal({ isOpen, onClose, onCreditsAwarded }: LimitRe
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="friend@example.com"
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                  className="w-full px-3 py-2.5 border border-surface-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
                   required
                   disabled={isSending}
                 />
@@ -225,11 +235,11 @@ export function LimitReachedModal({ isOpen, onClose, onCreditsAwarded }: LimitRe
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 bg-gray-50 border-t flex justify-between items-center">
-          <p className="text-xs text-gray-500">Limits reset daily at midnight</p>
+        <div className="px-6 py-4 bg-surface-50 border-t flex justify-between items-center">
+          <p className="text-xs text-surface-500">Limits reset daily at midnight</p>
           <button
             onClick={handleClose}
-            className="text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors"
+            className="text-sm font-medium text-surface-600 hover:text-surface-800 transition-colors"
           >
             {successMessage ? 'Continue' : 'Close'}
           </button>

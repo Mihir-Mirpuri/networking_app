@@ -48,6 +48,20 @@ const WEIGHTS = {
   email: 0.15,
 };
 
+// When vector role matching is active, the DB already handled role similarity
+// via pgvector cosine distance ordering, so role weight drops to 0.
+const VECTOR_WEIGHTS = {
+  company: 0.00,
+  role: 0.00,
+  location: 0.00,
+  university: 0.00,
+  email: 1.00,
+};
+
+export interface RankingOptions {
+  vectorRoleMatching?: boolean;
+}
+
 /**
  * Normalize string for comparison: lowercase, trim, remove extra whitespace
  */
@@ -303,8 +317,11 @@ export function scoreEmailQuality(email: string | null, status: 'VERIFIED' | 'UN
  */
 export function scoreCandidate(
   criteria: SearchCriteria,
-  candidate: CandidateData
+  candidate: CandidateData,
+  options?: RankingOptions
 ): { score: number; breakdown: ScoreBreakdown } {
+  const weights = options?.vectorRoleMatching ? VECTOR_WEIGHTS : WEIGHTS;
+
   const breakdown: ScoreBreakdown = {
     company: scoreCompanyMatch(criteria.company, candidate.company),
     role: scoreRoleMatch(criteria.role, candidate.role),
@@ -315,11 +332,11 @@ export function scoreCandidate(
 
   // Calculate weighted score
   const score =
-    breakdown.company * WEIGHTS.company +
-    breakdown.role * WEIGHTS.role +
-    breakdown.location * WEIGHTS.location +
-    breakdown.university * WEIGHTS.university +
-    breakdown.email * WEIGHTS.email;
+    breakdown.company * weights.company +
+    breakdown.role * weights.role +
+    breakdown.location * weights.location +
+    breakdown.university * weights.university +
+    breakdown.email * weights.email;
 
   return { score, breakdown };
 }
@@ -332,17 +349,19 @@ export function scoreCandidate(
  * @param candidates - Array of candidates with their data
  * @param getData - Function to extract CandidateData from each candidate
  * @param limit - Maximum number of results to return
+ * @param options - Optional ranking options (e.g., vectorRoleMatching)
  */
 export function rankCandidates<T>(
   criteria: SearchCriteria,
   candidates: T[],
   getData: (candidate: T) => CandidateData,
-  limit: number
+  limit: number,
+  options?: RankingOptions
 ): RankedCandidate<T>[] {
   // Score all candidates
   const scored = candidates.map(candidate => {
     const data = getData(candidate);
-    const { score, breakdown } = scoreCandidate(criteria, data);
+    const { score, breakdown } = scoreCandidate(criteria, data, options);
     return { candidate, score, breakdown };
   });
 

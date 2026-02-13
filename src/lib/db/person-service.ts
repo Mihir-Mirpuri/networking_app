@@ -979,6 +979,7 @@ export type PersonResult = {
   educationDegree: string | null;
   educationField: string | null;
   educationYear: string | null;
+  roleDistance?: number;
   sourceLinks: Array<{
     url: string;
     title: string;
@@ -1172,7 +1173,15 @@ async function findPeopleByFiltersVector(
       END as role_distance
     FROM "Person" p
     ${whereClause}
-    ORDER BY role_distance ASC, p."emailStatus" ASC, p."emailConfidence" DESC NULLS LAST
+    ORDER BY
+      role_distance ASC,
+      CASE p."emailStatus"::text
+        WHEN 'VERIFIED' THEN 0
+        WHEN 'MANUAL'   THEN 1
+        WHEN 'UNVERIFIED' THEN 2
+        ELSE 3
+      END ASC,
+      p."emailConfidence" DESC NULLS LAST
     LIMIT ${fetchLimit}
   `);
 
@@ -1211,6 +1220,7 @@ async function findPeopleByFiltersVector(
     const sl = sourceLinkMap.get(row.id);
     return {
       ...row,
+      roleDistance: row.role_distance,
       sourceLinks: sl
         ? [{ url: sl.url, title: sl.title, snippet: sl.snippet, domain: sl.domain }]
         : [],

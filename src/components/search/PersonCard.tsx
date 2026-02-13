@@ -77,7 +77,10 @@ export function PersonCard({
     .toUpperCase();
 
   return (
-    <div className="group relative card-hover p-5 flex flex-col items-center text-center">
+    <div className={`group relative card-hover p-5 flex flex-col items-center text-center ${
+      person.emailStatus === 'VERIFIED' ? 'border-l-2 border-l-emerald-400' :
+      person.emailStatus === 'UNVERIFIED' ? 'border-l-2 border-l-amber-300' : ''
+    }`}>
       {/* Hide button */}
       {onHide && person.userCandidateId && (
         <button
@@ -103,8 +106,20 @@ export function PersonCard({
 
       {/* Avatar */}
       <div className="mb-4">
-        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center shadow-md">
-          <span className="text-white font-semibold text-lg">{initials}</span>
+        <div className="relative">
+          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center shadow-md">
+            <span className="text-white font-semibold text-lg">{initials}</span>
+          </div>
+          {/* Email status dot */}
+          <span className={`absolute bottom-0 right-0 w-4 h-4 rounded-full border-2 border-white ${
+            person.emailStatus === 'VERIFIED' ? 'bg-emerald-400' :
+            person.emailStatus === 'UNVERIFIED' ? 'bg-amber-400' :
+            'bg-surface-300'
+          }`} title={
+            person.emailStatus === 'VERIFIED' ? 'Verified email' :
+            person.emailStatus === 'UNVERIFIED' ? 'Unverified email' :
+            'No email'
+          } />
         </div>
       </div>
 
@@ -171,10 +186,12 @@ export function PersonCard({
       <div className="w-full mt-auto">
         <button
           onClick={onExpand}
-          className="btn-primary text-sm w-full justify-center"
+          className={`text-sm w-full justify-center ${
+            person.email ? 'btn-primary' : 'btn-secondary opacity-60'
+          }`}
         >
           <EnvelopeIcon className="w-4 h-4 mr-1.5" />
-          Send Email
+          {person.email ? 'Send Email' : 'No Email'}
         </button>
       </div>
     </div>

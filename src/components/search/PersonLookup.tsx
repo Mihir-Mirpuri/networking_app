@@ -324,8 +324,8 @@ function EmptyState({ name, company }: { name: string; company: string }) {
         No results for &ldquo;{name}&rdquo;{company ? ` at ${company}` : ''}
       </p>
       <p className="text-sm text-surface-500 max-w-sm mx-auto">
-        We couldn&apos;t find this person yet. Try checking the spelling, adding
-        a company name, or use Quick Send if you already have their email.
+        We couldn&apos;t find this person yet. Try checking the spelling or adding
+        a company name.
       </p>
     </div>
   );

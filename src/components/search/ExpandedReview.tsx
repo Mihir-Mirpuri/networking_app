@@ -33,6 +33,8 @@ export function ExpandedReview({
   const currentPerson = results[internalIndex];
   const status = currentPerson ? sendStatuses.get(currentPerson.id) : undefined;
 
+  const [researchCollapsed, setResearchCollapsed] = useState(false);
+
   // Update subject/body when currentPerson changes
   useEffect(() => {
     if (currentPerson) {
@@ -40,6 +42,29 @@ export function ExpandedReview({
       setBody(currentPerson.draftBody);
     }
   }, [internalIndex, currentPerson]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showScheduleModal) {
+          setShowScheduleModal(false);
+          setScheduledDateTime('');
+          setScheduleError(null);
+        } else {
+          onClose();
+        }
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        e.preventDefault();
+        if (currentPerson?.email && !status && !isSending) {
+          handleSend();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showScheduleModal, currentPerson, status, isSending, onClose]);
 
 
   const handleSend = async () => {
@@ -167,8 +192,8 @@ export function ExpandedReview({
   const canSend = currentPerson.email && !status;
 
   return (
-    <div className="fixed inset-0 bg-surface-900/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-soft-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 bg-surface-900/50 flex items-center justify-center z-50 p-4 animate-fade-in" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="bg-white rounded-lg shadow-soft-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-scale-in">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b">
           <div>
@@ -259,14 +284,33 @@ export function ExpandedReview({
         <div className="flex-1 overflow-y-auto p-4">
           {/* Company Research */}
           {currentPerson.company && (
-            <CompanyResearchPanel
-              key={internalIndex}
-              company={currentPerson.company}
-              role={currentPerson.role}
-              personName={currentPerson.fullName}
-              body={body}
-              onUseTalkingPoint={handleUseTalkingPoint}
-            />
+            <div className="mb-4">
+              <button
+                type="button"
+                onClick={() => setResearchCollapsed(!researchCollapsed)}
+                className="flex items-center gap-2 text-sm font-medium text-surface-700 hover:text-surface-900 mb-2"
+              >
+                <svg
+                  className={`w-4 h-4 transition-transform ${researchCollapsed ? '' : 'rotate-90'}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+                Company Research
+              </button>
+              {!researchCollapsed && (
+                <CompanyResearchPanel
+                  key={internalIndex}
+                  company={currentPerson.company}
+                  role={currentPerson.role}
+                  personName={currentPerson.fullName}
+                  body={body}
+                  onUseTalkingPoint={handleUseTalkingPoint}
+                />
+              )}
+            </div>
           )}
 
           <div className="mb-4">
@@ -317,39 +361,42 @@ export function ExpandedReview({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between p-4 border-t bg-surface-50">
-          <div className="flex gap-2">
-            <button
-              onClick={handlePrevious}
-              disabled={internalIndex === 0}
-              className="btn-secondary text-sm"
-            >
-              Previous
-            </button>
-            <button
-              onClick={handleNext}
-              disabled={internalIndex === results.length - 1}
-              className="btn-secondary text-sm"
-            >
-              Next
-            </button>
+        <div className="border-t bg-surface-50">
+          <div className="flex items-center justify-between p-4">
+            <div className="flex gap-2">
+              <button
+                onClick={handlePrevious}
+                disabled={internalIndex === 0}
+                className="btn-secondary text-sm"
+              >
+                Previous
+              </button>
+              <button
+                onClick={handleNext}
+                disabled={internalIndex === results.length - 1}
+                className="btn-secondary text-sm"
+              >
+                Next
+              </button>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowScheduleModal(true)}
+                disabled={!canSend || isSending}
+                className="px-4 py-2 text-sm border border-primary-600 text-primary-600 rounded-md hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Schedule
+              </button>
+              <button
+                onClick={handleSend}
+                disabled={!canSend || isSending}
+                className="btn-primary text-sm"
+              >
+                {isSending ? 'Sending...' : 'Send & Next'}
+              </button>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setShowScheduleModal(true)}
-              disabled={!canSend || isSending}
-              className="px-4 py-2 text-sm border border-primary-600 text-primary-600 rounded-md hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Schedule
-            </button>
-            <button
-              onClick={handleSend}
-              disabled={!canSend || isSending}
-              className="btn-primary text-sm"
-            >
-              {isSending ? 'Sending...' : 'Send & Next'}
-            </button>
-          </div>
+          <p className="text-xs text-surface-400 text-center pb-3">Esc to close · Cmd/Ctrl+Enter to send</p>
         </div>
       </div>
 

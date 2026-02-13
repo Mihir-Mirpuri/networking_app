@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { getSendLogs, SendLogEntry } from '@/app/actions/sendlog';
 import { updateScheduledEmailAction, cancelScheduledEmailAction, sendFollowUpAction } from '@/app/actions/send';
 import { generateFollowUpAction } from '@/app/actions/personalize';
 import { Toast } from '@/components/ui/Toast';
+import { LoadingSpinner } from '@/components/search/LoadingSpinner';
 
 interface GroupedLogs {
   [date: string]: SendLogEntry[];
@@ -71,6 +72,26 @@ export function EmailHistoryClient({
   const [isSendingFollowUp, setIsSendingFollowUp] = useState(false);
   const [followUpError, setFollowUpError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  // ESC to close modals
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (followUpData) {
+          setFollowUpData(null);
+          setFollowUpError(null);
+        } else if (editingScheduleId) {
+          setEditingScheduleId(null);
+          setEditScheduledDateTime('');
+          setEditScheduleError(null);
+        }
+      }
+    };
+    if (followUpData || editingScheduleId) {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [followUpData, editingScheduleId]);
 
   const handleSearch = async () => {
     setIsLoading(true);
@@ -353,51 +374,57 @@ export function EmailHistoryClient({
         <h1 className="text-2xl font-bold text-surface-900 mb-4">Email History</h1>
 
         {/* Tabs */}
-        <div className="flex border-b border-surface-300 mb-4">
+        <nav className="inline-flex p-1 bg-surface-100 rounded-xl mb-4" aria-label="Email history tabs">
           <button
             onClick={() => setActiveTab('all')}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            className={`flex items-center gap-1.5 px-5 py-2.5 text-sm font-medium rounded-lg transition-all ${
               activeTab === 'all'
-                ? 'border-primary-600 text-primary-600'
-                : 'border-transparent text-surface-500 hover:text-surface-700 hover:border-surface-300'
+                ? 'bg-white text-primary-700 shadow-soft'
+                : 'text-surface-600 hover:text-surface-900'
             }`}
           >
             Sent
-            <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-surface-100 text-surface-600">
+            <span className={`px-2 py-0.5 text-xs rounded-full ${
+              activeTab === 'all' ? 'bg-primary-100 text-primary-700' : 'bg-surface-200 text-surface-600'
+            }`}>
               {timeFilteredLogs.length}
             </span>
           </button>
           <button
             onClick={() => setActiveTab('ongoing')}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            className={`flex items-center gap-1.5 px-5 py-2.5 text-sm font-medium rounded-lg transition-all ${
               activeTab === 'ongoing'
-                ? 'border-primary-600 text-primary-600'
-                : 'border-transparent text-surface-500 hover:text-surface-700 hover:border-surface-300'
+                ? 'bg-white text-primary-700 shadow-soft'
+                : 'text-surface-600 hover:text-surface-900'
             }`}
           >
-            Ongoing Conversations
+            Ongoing
             {ongoingCount > 0 && (
-              <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-700">
+              <span className={`px-2 py-0.5 text-xs rounded-full ${
+                activeTab === 'ongoing' ? 'bg-green-100 text-green-700' : 'bg-surface-200 text-surface-600'
+              }`}>
                 {ongoingCount}
               </span>
             )}
           </button>
           <button
             onClick={() => setActiveTab('no-response')}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            className={`flex items-center gap-1.5 px-5 py-2.5 text-sm font-medium rounded-lg transition-all ${
               activeTab === 'no-response'
-                ? 'border-primary-600 text-primary-600'
-                : 'border-transparent text-surface-500 hover:text-surface-700 hover:border-surface-300'
+                ? 'bg-white text-primary-700 shadow-soft'
+                : 'text-surface-600 hover:text-surface-900'
             }`}
           >
             No Response
             {noResponseCount > 0 && (
-              <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-orange-100 text-orange-700">
+              <span className={`px-2 py-0.5 text-xs rounded-full ${
+                activeTab === 'no-response' ? 'bg-orange-100 text-orange-700' : 'bg-surface-200 text-surface-600'
+              }`}>
                 {noResponseCount}
               </span>
             )}
           </button>
-        </div>
+        </nav>
 
         <div className="flex gap-2 flex-wrap">
           <input
@@ -507,22 +534,53 @@ export function EmailHistoryClient({
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center h-64">
-          <p className="text-surface-500">Loading...</p>
+        <div className="flex flex-col items-center justify-center h-64 gap-3">
+          <LoadingSpinner size="lg" />
+          <p className="text-sm text-surface-500">Loading email history...</p>
         </div>
       ) : filteredLogs.length === 0 ? (
-        <div className="flex items-center justify-center h-64">
-          <p className="text-surface-500">
-            {isSearchMode
-              ? 'No emails found'
-              : timeFilter !== 'all'
-              ? `No emails in the ${getTimeFilterLabel().toLowerCase()}`
-              : activeTab === 'ongoing'
-              ? 'No ongoing conversations yet'
-              : activeTab === 'no-response'
-              ? 'No emails awaiting response'
-              : 'No emails sent yet'}
-          </p>
+        <div className="flex flex-col items-center justify-center h-64 gap-3">
+          {isSearchMode ? (
+            <>
+              <svg className="w-12 h-12 text-surface-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+              </svg>
+              <p className="text-base font-medium text-surface-600">No matching emails</p>
+              <p className="text-sm text-surface-500">Try a different search term or clear the filter</p>
+            </>
+          ) : timeFilter !== 'all' ? (
+            <>
+              <svg className="w-12 h-12 text-surface-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-base font-medium text-surface-600">No emails in this period</p>
+              <p className="text-sm text-surface-500">No emails found in the {getTimeFilterLabel().toLowerCase()}</p>
+            </>
+          ) : activeTab === 'ongoing' ? (
+            <>
+              <svg className="w-12 h-12 text-surface-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3-3c-1.354 0-2.694-.055-4.02-.163a2.115 2.115 0 01-.825-.242m9.345-8.334a2.126 2.126 0 00-.476-.095 48.64 48.64 0 00-8.048 0c-1.131.094-1.976 1.057-1.976 2.192v4.286c0 .837.46 1.58 1.155 1.951m9.345-8.334V6.637c0-1.621-1.152-3.026-2.76-3.235A48.455 48.455 0 0011.25 3c-2.115 0-4.198.137-6.24.402-1.608.209-2.76 1.614-2.76 3.235v6.226c0 1.621 1.152 3.026 2.76 3.235.577.075 1.157.14 1.74.194V21l4.155-4.155" />
+              </svg>
+              <p className="text-base font-medium text-surface-600">No ongoing conversations yet</p>
+              <p className="text-sm text-surface-500">Conversations will appear here when contacts reply</p>
+            </>
+          ) : activeTab === 'no-response' ? (
+            <>
+              <svg className="w-12 h-12 text-surface-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+              </svg>
+              <p className="text-base font-medium text-surface-600">No emails awaiting response</p>
+              <p className="text-sm text-surface-500">All sent emails have been responded to</p>
+            </>
+          ) : (
+            <>
+              <svg className="w-12 h-12 text-surface-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+              </svg>
+              <p className="text-base font-medium text-surface-600">No emails sent yet</p>
+              <p className="text-sm text-surface-500">Start by finding contacts and sending your first outreach</p>
+            </>
+          )}
         </div>
       ) : (
         <>
@@ -681,8 +739,8 @@ export function EmailHistoryClient({
 
       {/* Edit Schedule Modal */}
       {editingScheduleId && (
-        <div className="fixed inset-0 bg-surface-900/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-soft-xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-surface-900/50 flex items-center justify-center z-50 p-4 animate-fade-in" onClick={(e) => { if (e.target === e.currentTarget) { setEditingScheduleId(null); setEditScheduledDateTime(''); setEditScheduleError(null); } }}>
+          <div className="bg-white rounded-lg shadow-soft-xl max-w-md w-full p-6 animate-scale-in">
             <h3 className="text-lg font-semibold mb-4">Edit Scheduled Time</h3>
 
             <div className="mb-4">
@@ -736,8 +794,8 @@ export function EmailHistoryClient({
 
       {/* Follow Up Modal */}
       {followUpData && (
-        <div className="fixed inset-0 bg-surface-900/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-soft-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-surface-900/50 flex items-center justify-center z-50 p-4 animate-fade-in" onClick={(e) => { if (e.target === e.currentTarget) { setFollowUpData(null); setFollowUpError(null); } }}>
+          <div className="bg-white rounded-lg shadow-soft-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto animate-scale-in">
             <h3 className="text-lg font-semibold mb-4">Follow Up Email</h3>
 
             <div className="mb-4">

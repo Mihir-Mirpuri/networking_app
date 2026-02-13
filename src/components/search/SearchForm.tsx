@@ -165,7 +165,7 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
 
   return (
     <form onSubmit={handleSubmit} className="card p-6 mb-6">
-      <h2 className="text-xl font-bold text-slate-900 mb-4">Find People</h2>
+      <h2 className="text-xl font-bold text-surface-900 mb-4">Find People</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mb-6">
         {/* Industry */}
         <SearchableCombobox
@@ -224,7 +224,7 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
             onChange={(e) => setUniversity(e.target.value)}
             className="input"
           >
-            <option value="">Any Location</option>
+            <option value="">Any University</option>
             <option value="University of Texas at Austin">University of Texas at Austin</option>
           </select>
         </div>
