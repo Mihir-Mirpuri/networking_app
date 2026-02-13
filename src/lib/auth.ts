@@ -3,13 +3,12 @@ import { NextAuthOptions } from 'next-auth';
 import { Adapter } from 'next-auth/adapters';
 import GoogleProvider from 'next-auth/providers/google';
 import prisma from './prisma';
-import { startMailboxWatch } from './gmail/client';
 import { awardCredits } from './services/credits';
 import { EMAIL_LIMITS } from './constants';
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma) as Adapter,
-  debug: true,
+  debug: process.env.NODE_ENV === 'development',
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -17,7 +16,7 @@ export const authOptions: NextAuthOptions = {
       allowDangerousEmailAccountLinking: true,
       authorization: {
         params: {
-          scope: 'openid email profile https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.readonly',
+          scope: 'openid email profile https://www.googleapis.com/auth/gmail.send',
           access_type: 'offline',
           prompt: 'consent',
         },
@@ -52,17 +51,8 @@ export const authOptions: NextAuthOptions = {
         }
       }
 
-      // Start Gmail watch subscription for push notifications
-      const topicName = process.env.GOOGLE_PUBSUB_TOPIC;
-      if (topicName) {
-        try {
-          await startMailboxWatch(user.id, topicName);
-          console.log(`[Auth] Gmail watch started for user ${user.id}`);
-        } catch (error) {
-          // Log but don't block sign-in if watch fails
-          console.error(`[Auth] Failed to start Gmail watch for user ${user.id}:`, error);
-        }
-      }
+      // TEMPORARILY DISABLED: gmail.readonly scope removed for Google verification
+      // startMailboxWatch call removed — watches expire naturally after 7 days
 
     },
   },

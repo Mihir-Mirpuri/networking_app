@@ -3,6 +3,8 @@ import { SearchResult } from '@/lib/services/discovery';
 import { EmailResult, EducationInfo, EmploymentInfo } from '@/lib/services/enrichment';
 import { EmailStatus } from '@prisma/client';
 import { ScrapedProfile } from '@/lib/services/linkedin-scraper';
+import { updatePersonRoleEmbedding, getSearchRoleEmbedding } from '@/lib/services/embeddings';
+import { Prisma } from '@prisma/client';
 
 // Personal email domains - emails from these are UNVERIFIED
 const PERSONAL_DOMAINS = new Set([
@@ -110,11 +112,18 @@ const COMPANY_ALIASES: Record<string, string[]> = {
 };
 
 /**
+ * Get all aliases for a given canonical company key
+ */
+export function getCompanyAliases(key: string): string[] {
+  return COMPANY_ALIASES[key] || [];
+}
+
+/**
  * Get the canonical company key for a given company name
  * Checks if the company name matches any alias (exact match or starts with alias)
  * Returns the key if found, null otherwise
  */
-function getCompanyKey(normalizedCompany: string): string | null {
+export function getCompanyKey(normalizedCompany: string): string | null {
   for (const [key, aliases] of Object.entries(COMPANY_ALIASES)) {
     for (const alias of aliases) {
       // Exact match
@@ -142,7 +151,7 @@ function getCompanyKey(normalizedCompany: string): string | null {
  * Check if a person's company matches the search company
  * Uses alias mapping for known companies, falls back to word-boundary matching
  */
-function companiesMatch(normalizedPersonCompany: string, normalizedSearchCompany: string): boolean {
+export function companiesMatch(normalizedPersonCompany: string, normalizedSearchCompany: string): boolean {
   // Get canonical keys for both companies
   const searchKey = getCompanyKey(normalizedSearchCompany);
   const personKey = getCompanyKey(normalizedPersonCompany);
@@ -203,11 +212,11 @@ function getCompanySearchTerms(company: string): CompanySearchTerm[] {
   const key = getCompanyKey(normalized);
 
   if (key) {
-    // For known companies, use strict matching
-    // Short aliases (<=3 chars) use equals, longer use startsWith
+    // For known companies, use startsWith for all aliases.
+    // companiesMatch handles false positives in the post-query filter.
     return COMPANY_ALIASES[key].map(alias => ({
       term: alias,
-      matchType: alias.length <= 3 ? 'equals' as const : 'startsWith' as const
+      matchType: 'startsWith' as const
     }));
   }
 
@@ -725,9 +734,9 @@ export async function getDiscoveredPersonKeys(
  * 
  * Returns a Set of keys in format: "fullName_company" (lowercase) for fast lookup
  */
-export async function getExcludedPersonKeys(
+export async function getExcludedPersonIds(
   userId: string
-): Promise<Set<string>> {
+): Promise<string[]> {
   const userCandidates = await prisma.userCandidate.findMany({
     where: {
       userId,
@@ -743,22 +752,96 @@ export async function getExcludedPersonKeys(
       ],
     },
     select: {
-      person: {
-        select: {
-          fullName: true,
-          company: true,
-        },
-      },
+      personId: true,
     },
   });
 
-  const keys = new Set<string>();
-  for (const uc of userCandidates) {
-    const key = `${uc.person.fullName}_${uc.person.company}`.toLowerCase();
-    keys.add(key);
-  }
+  return userCandidates.map(uc => uc.personId);
+}
 
-  return keys;
+/**
+ * Role alias groups — each group contains equivalent role names (all lowercase).
+ * When searching for any term in a group, all terms are used for DB filtering.
+ * Follows the same pattern as COMPANY_ALIASES above.
+ */
+const ROLE_ALIAS_GROUPS: string[][] = [
+  // Finance — seniority levels
+  ['vice president', 'vp'],
+  ['senior vice president', 'svp', 'senior vp', 'sr vice president', 'sr. vice president'],
+  ['executive vice president', 'evp', 'executive vp'],
+  ['assistant vice president', 'avp', 'assistant vp'],
+  ['managing director', 'md'],
+  ['managing director & partner', 'md & partner', 'managing director and partner'],
+
+  // Finance — divisions
+  ['investment banking', 'ib', 'ibd', 'investment banking division'],
+  ['private equity', 'pe'],
+  ['asset management', 'am', 'asset mgmt'],
+  ['sales & trading', 'sales and trading', 's&t'],
+  ['wealth management', 'wm', 'private wealth management', 'pwm'],
+  ['research analyst', 'research associate'],
+
+  // Consulting — firm-specific titles
+  ['business analyst', 'ba'],
+  ['senior business analyst', 'sba', 'sr business analyst', 'sr. business analyst'],
+  ['engagement manager', 'em'],
+  ['case team leader', 'ctl'],
+  ['project leader', 'pl'],
+  ['associate principal', 'ap'],
+  ['associate consultant', 'assoc consultant', 'assoc. consultant'],
+
+  // Consulting — seniority variations (sr/senior/jr/junior)
+  ['junior consultant', 'jr consultant', 'jr. consultant'],
+  ['senior consultant', 'sr consultant', 'sr. consultant'],
+  ['senior manager', 'sr manager', 'sr. manager'],
+  ['senior director', 'sr director', 'sr. director'],
+  ['senior analyst', 'sr analyst', 'sr. analyst'],
+  ['senior associate', 'sr associate', 'sr. associate'],
+  ['associate partner', 'assoc partner', 'assoc. partner'],
+
+  // Product/Tech
+  ['product manager', 'pm', 'product mgr'],
+  ['associate product manager', 'apm', 'assoc product manager', 'assoc. product manager'],
+  ['senior product manager', 'sr product manager', 'sr. product manager', 'senior pm', 'sr pm', 'sr. pm'],
+  ['product manager technical', 'technical product manager', 'tpm', 'technical pm'],
+  ['program manager', 'pgm', 'program mgr'],
+  ['rotational product manager', 'rpm', 'rotational pm'],
+  ['project manager', 'project mgr'],
+
+  // Recruiting/Talent Acquisition — single group so "Recruiter" dropdown matches all variations
+  ['recruiter', 'recruiting', 'talent acquisition', 'talent acquisition specialist',
+   'campus recruiter', 'university recruiter', 'campus recruiting', 'university recruiting',
+   'university relations', 'early careers recruiter', 'senior recruiter', 'sr recruiter',
+   'sr. recruiter', 'lead recruiter', 'recruiting manager', 'talent acquisition manager',
+   'recruiting lead', 'head of recruiting', 'head of talent acquisition',
+   'recruiting coordinator', 'talent acquisition coordinator',
+   'technical recruiter', 'tech recruiter', 'executive recruiter', 'executive search'],
+];
+
+// Build reverse lookup: normalized term → all terms in its group
+const _roleAliasLookup = new Map<string, string[]>();
+for (const group of ROLE_ALIAS_GROUPS) {
+  for (const term of group) {
+    _roleAliasLookup.set(term, group);
+  }
+}
+
+/**
+ * Get all equivalent role terms for DB filtering.
+ * Returns the alias group if the role matches one, otherwise just the original term.
+ */
+export function getRoleSearchTerms(role: string): string[] {
+  const normalized = role.trim().toLowerCase();
+  return _roleAliasLookup.get(normalized) || [normalized];
+}
+
+/**
+ * Check if two normalized role strings are aliases of each other.
+ */
+export function areRolesAliased(role1: string, role2: string): boolean {
+  const group = _roleAliasLookup.get(role1);
+  if (!group) return false;
+  return group.includes(role2);
 }
 
 /**
@@ -770,62 +853,33 @@ export interface PersonFilters {
   role?: string;             // Optional - role ILIKE match
   university?: string;       // Optional - educationSchool ILIKE match
   requireEmail?: boolean;    // Default true - only return people with emails
-  excludePersonKeys?: Set<string>; // Set of "fullName_company" keys to exclude
+  excludePersonIds?: string[]; // Person IDs to exclude (already displayed + sent/hidden)
   limit: number;
 }
 
+// Normalize company name for matching (remove dots, extra spaces)
+// "L.E.K. Consulting" → "LEK Consulting", "LEK Consulting" → "LEK Consulting"
+export const normalizeCompanyForMatch = (name: string) =>
+  name.replace(/\./g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+
 /**
- * Find people in the database matching the given filters
- * This is the main query function for the database-first search approach
+ * Build Prisma where clause from PersonFilters.
+ * Shared between findPeopleByFilters and countPeopleByFilters.
  */
-export async function findPeopleByFilters(filters: PersonFilters): Promise<
-  Array<{
-    id: string;
-    fullName: string;
-    firstName: string | null;
-    lastName: string | null;
-    company: string;
-    role: string | null;
-    linkedinUrl: string | null;
-    email: string | null;
-    emailStatus: string | null;
-    emailConfidence: number | null;
-    emailDeliverable: boolean | null;
-    emailVerifiedAt: Date | null;
-    emailVerificationReason: string | null;
-    city: string | null;
-    state: string | null;
-    country: string | null;
-    educationSchool: string | null;
-    educationDegree: string | null;
-    educationField: string | null;
-    educationYear: string | null;
-    sourceLinks: Array<{
-      url: string;
-      title: string;
-      snippet: string | null;
-      domain: string | null;
-    }>;
-  }>
-> {
-  const { company, location, role, university, requireEmail = true, excludePersonKeys, limit } = filters;
+export function buildPersonWhereClause(filters: Omit<PersonFilters, 'limit'>): Record<string, unknown> {
+  const { company, location, role, university, requireEmail = true, excludePersonIds } = filters;
 
-  // Normalize company name for matching (remove dots, extra spaces)
-  // "L.E.K. Consulting" → "LEK Consulting", "LEK Consulting" → "LEK Consulting"
-  const normalizeCompany = (name: string) =>
-    name.replace(/\./g, '').replace(/\s+/g, ' ').trim().toLowerCase();
-
-  // Build where clause
-  // Note: Company matching is done post-query for fuzzy matching (L.E.K. = LEK)
   const where: Record<string, unknown> = {};
-  const normalizedSearchCompany = company ? normalizeCompany(company) : null;
+
+  // Exclude already-displayed people (prevents duplicates when prescrape shifts offset positions)
+  if (excludePersonIds && excludePersonIds.length > 0) {
+    where.id = { notIn: excludePersonIds };
+  }
 
   // Company filter - DB filter using alias mapping with appropriate match types
-  // Uses getCompanySearchTerms to get all valid variations for the search company
   if (company && company.trim()) {
     const searchTerms = getCompanySearchTerms(company);
 
-    // Build Prisma filter based on match type
     const buildCompanyFilter = (term: CompanySearchTerm) => {
       switch (term.matchType) {
         case 'equals':
@@ -842,22 +896,31 @@ export async function findPeopleByFilters(filters: PersonFilters): Promise<
       const filter = buildCompanyFilter(searchTerms[0]);
       where.company = filter.company;
     } else if (searchTerms.length > 1) {
-      // Use OR to match any of the alias terms
       where.OR = searchTerms.map(buildCompanyFilter);
     }
   }
 
-  // Location filter - city must contain search term
+  // Location filter
   if (location && location.trim()) {
     where.city = { contains: location.trim(), mode: 'insensitive' };
   }
 
-  // Role filter - role must contain search term
+  // Role filter — expand with aliases (e.g., "Vice President" also matches "VP")
   if (role && role.trim()) {
-    where.role = { contains: role.trim(), mode: 'insensitive' };
+    const roleTerms = getRoleSearchTerms(role);
+    if (roleTerms.length === 1) {
+      where.role = { contains: roleTerms[0], mode: 'insensitive' };
+    } else {
+      if (!where.AND) where.AND = [];
+      (where.AND as unknown[]).push({
+        OR: roleTerms.map(term => ({
+          role: { contains: term, mode: 'insensitive' as const }
+        }))
+      });
+    }
   }
 
-  // University filter - educationSchool must contain search term
+  // University filter
   if (university && university.trim()) {
     where.educationSchool = { contains: university.trim(), mode: 'insensitive' };
   }
@@ -865,16 +928,89 @@ export async function findPeopleByFilters(filters: PersonFilters): Promise<
   // Email filter - must have email AND not be marked as undeliverable
   if (requireEmail) {
     where.email = { not: null };
-    // Exclude people we've verified as undeliverable
-    // emailDeliverable: null (unchecked) or true (verified) are OK
-    // Prisma's { not: false } excludes null, so we use OR to include both true and null
     if (!where.AND) where.AND = [];
     (where.AND as unknown[]).push({
       OR: [{ emailDeliverable: true }, { emailDeliverable: null }]
     });
   }
 
-  // Query the database
+  return where;
+}
+
+/**
+ * Apply post-query filtering: company fuzzy match.
+ * Person exclusions (sent/hidden) are handled at the DB level via excludePersonIds.
+ */
+export function applyPostQueryFilters<T extends { company: string }>(
+  people: T[],
+  searchCompany: string | undefined
+): T[] {
+  const normalizedSearchCompany = searchCompany ? normalizeCompanyForMatch(searchCompany) : null;
+  if (!normalizedSearchCompany) return people;
+
+  return people.filter((person) => {
+    const normalizedPersonCompany = normalizeCompanyForMatch(person.company);
+    return companiesMatch(normalizedPersonCompany, normalizedSearchCompany);
+  });
+}
+
+/**
+ * Find people in the database matching the given filters.
+ * Supports offset-based pagination with stable sorting for consistent results.
+ */
+export type PersonResult = {
+  id: string;
+  fullName: string;
+  firstName: string | null;
+  lastName: string | null;
+  company: string;
+  role: string | null;
+  linkedinUrl: string | null;
+  email: string | null;
+  emailStatus: string | null;
+  emailConfidence: number | null;
+  emailDeliverable: boolean | null;
+  emailVerifiedAt: Date | null;
+  emailVerificationReason: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  educationSchool: string | null;
+  educationDegree: string | null;
+  educationField: string | null;
+  educationYear: string | null;
+  sourceLinks: Array<{
+    url: string;
+    title: string;
+    snippet: string | null;
+    domain: string | null;
+  }>;
+};
+
+/**
+ * Check if vector-based role matching is enabled.
+ * Requires OPENAI_API_KEY to be set and USE_VECTOR_ROLE_MATCHING !== 'false'.
+ */
+export function isVectorRoleMatchingEnabled(): boolean {
+  return process.env.USE_VECTOR_ROLE_MATCHING !== 'false' && !!process.env.OPENAI_API_KEY;
+}
+
+export async function findPeopleByFilters(filters: PersonFilters): Promise<PersonResult[]> {
+  const { company, role, limit } = filters;
+
+  // Dispatch to vector path if role provided and vector matching is enabled
+  if (role && role.trim() && isVectorRoleMatchingEnabled()) {
+    const searchEmbedding = await getSearchRoleEmbedding(role);
+    if (searchEmbedding) {
+      return findPeopleByFiltersVector(filters, searchEmbedding);
+    }
+  }
+
+  // Fallback: existing Prisma path
+  const where = buildPersonWhereClause(filters);
+
+  // excludePersonIds (NOT IN) handles pagination at the DB level,
+  // so no OFFSET needed — always fetch the top-ranked unseen people.
   const people = await prisma.person.findMany({
     where,
     select: {
@@ -911,31 +1047,259 @@ export async function findPeopleByFilters(filters: PersonFilters): Promise<
       },
     },
     orderBy: [
-      { emailStatus: 'asc' }, // VERIFIED first
+      { emailStatus: 'asc' },       // VERIFIED first
       { emailConfidence: 'desc' },
+      { createdAt: 'asc' },          // Stable sort — new people go to end
     ],
-    take: limit * 2, // Get extra to allow for exclusions
+    take: limit * 2, // Overfetch to compensate for post-query filtering
   });
 
-  // Filter by company using alias mapping for known companies
-  // Falls back to word-boundary matching for unknown companies
-  let filtered = people;
-  if (normalizedSearchCompany) {
-    filtered = people.filter((person) => {
-      const normalizedPersonCompany = normalizeCompany(person.company);
-      return companiesMatch(normalizedPersonCompany, normalizedSearchCompany);
-    });
-  }
-
-  // Filter out excluded people
-  if (excludePersonKeys && excludePersonKeys.size > 0) {
-    filtered = filtered.filter((person) => {
-      const key = `${person.fullName}_${person.company}`.toLowerCase();
-      return !excludePersonKeys.has(key);
-    });
-  }
-
+  const filtered = applyPostQueryFilters(people, company);
   return filtered.slice(0, limit);
+}
+
+/**
+ * Vector-based role matching: uses pgvector cosine distance for semantic role similarity.
+ * Hard filters (company, location, university, email, excludes) remain as SQL WHERE clauses.
+ * Role matching is done via ORDER BY embedding distance + threshold filter.
+ * Records with null embeddings are included with a penalty distance of 1.0 (appear at end).
+ */
+async function findPeopleByFiltersVector(
+  filters: PersonFilters,
+  searchEmbedding: number[]
+): Promise<PersonResult[]> {
+  const { company, location, university, requireEmail = true, excludePersonIds, limit } = filters;
+  const vectorString = `[${searchEmbedding.join(',')}]`;
+
+  // Build WHERE conditions as Prisma.sql fragments
+  const conditions: Prisma.Sql[] = [Prisma.sql`1=1`];
+
+  // Company filter — mirror the alias-based logic from buildPersonWhereClause
+  if (company && company.trim()) {
+    const searchTerms = getCompanySearchTerms(company);
+    const companyConditions = searchTerms.map(term => {
+      switch (term.matchType) {
+        case 'equals':
+          return Prisma.sql`p.company ILIKE ${term.term}`;
+        case 'startsWith':
+          return Prisma.sql`p.company ILIKE ${term.term + '%'}`;
+        case 'contains':
+        default:
+          return Prisma.sql`p.company ILIKE ${'%' + term.term + '%'}`;
+      }
+    });
+    conditions.push(Prisma.sql`(${Prisma.join(companyConditions, ' OR ')})`);
+  }
+
+  // Location filter
+  if (location && location.trim()) {
+    conditions.push(Prisma.sql`p.city ILIKE ${'%' + location.trim() + '%'}`);
+  }
+
+  // University filter
+  if (university && university.trim()) {
+    conditions.push(Prisma.sql`p."educationSchool" ILIKE ${'%' + university.trim() + '%'}`);
+  }
+
+  // Email filter
+  if (requireEmail) {
+    conditions.push(Prisma.sql`p.email IS NOT NULL`);
+    conditions.push(Prisma.sql`(p."emailDeliverable" = true OR p."emailDeliverable" IS NULL)`);
+  }
+
+  // Exclude filter
+  if (excludePersonIds && excludePersonIds.length > 0) {
+    conditions.push(Prisma.sql`p.id NOT IN (${Prisma.join(excludePersonIds)})`);
+  }
+
+  // Vector similarity threshold: include null embeddings (penalty), exclude far embeddings
+  conditions.push(Prisma.sql`(
+    p.role_embedding IS NULL
+    OR (p.role_embedding <=> ${vectorString}::vector) <= 0.35
+  )`);
+
+  const whereClause = Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}`;
+  const fetchLimit = limit * 2; // Overfetch for post-query company filtering
+
+  const rows = await prisma.$queryRaw<Array<{
+    id: string;
+    fullName: string;
+    firstName: string | null;
+    lastName: string | null;
+    company: string;
+    role: string | null;
+    linkedinUrl: string | null;
+    email: string | null;
+    emailStatus: string | null;
+    emailConfidence: number | null;
+    emailDeliverable: boolean | null;
+    emailVerifiedAt: Date | null;
+    emailVerificationReason: string | null;
+    city: string | null;
+    state: string | null;
+    country: string | null;
+    educationSchool: string | null;
+    educationDegree: string | null;
+    educationField: string | null;
+    educationYear: string | null;
+    role_distance: number;
+  }>>(Prisma.sql`
+    SELECT
+      p.id,
+      p."fullName",
+      p."firstName",
+      p."lastName",
+      p.company,
+      p.role,
+      p."linkedinUrl",
+      p.email,
+      p."emailStatus"::text,
+      p."emailConfidence",
+      p."emailDeliverable",
+      p."emailVerifiedAt",
+      p."emailVerificationReason",
+      p.city,
+      p.state,
+      p.country,
+      p."educationSchool",
+      p."educationDegree",
+      p."educationField",
+      p."educationYear",
+      CASE
+        WHEN p.role_embedding IS NOT NULL
+        THEN (p.role_embedding <=> ${vectorString}::vector)
+        ELSE 1.0
+      END as role_distance
+    FROM "Person" p
+    ${whereClause}
+    ORDER BY role_distance ASC, p."emailStatus" ASC, p."emailConfidence" DESC NULLS LAST
+    LIMIT ${fetchLimit}
+  `);
+
+  // Post-query company fuzzy matching (unchanged from Prisma path)
+  const filtered = applyPostQueryFilters(rows, company);
+  const limited = filtered.slice(0, limit);
+
+  if (limited.length === 0) return [];
+
+  // Fetch source links (raw SQL can't do nested selects)
+  const personIds = limited.map(p => p.id);
+  const sourceLinks = await prisma.sourceLink.findMany({
+    where: {
+      personId: { in: personIds },
+      kind: 'DISCOVERY',
+    },
+    orderBy: { createdAt: 'asc' },
+    select: {
+      personId: true,
+      url: true,
+      title: true,
+      snippet: true,
+      domain: true,
+    },
+  });
+
+  // Group by personId (first link per person)
+  const sourceLinkMap = new Map<string, (typeof sourceLinks)[0]>();
+  for (const sl of sourceLinks) {
+    if (!sourceLinkMap.has(sl.personId)) {
+      sourceLinkMap.set(sl.personId, sl);
+    }
+  }
+
+  return limited.map(row => {
+    const sl = sourceLinkMap.get(row.id);
+    return {
+      ...row,
+      sourceLinks: sl
+        ? [{ url: sl.url, title: sl.title, snippet: sl.snippet, domain: sl.domain }]
+        : [],
+    };
+  });
+}
+
+/**
+ * Look up people by name (ILIKE) with optional company filter.
+ * Used by the Person Lookup feature — different from findPeopleByFilters
+ * which requires company as the primary filter.
+ */
+export async function findPeopleByName(params: {
+  name: string;
+  company?: string;
+  limit?: number;
+}): Promise<PersonResult[]> {
+  const { name, company, limit = 5 } = params;
+
+  const where: any = {
+    fullName: { contains: name, mode: 'insensitive' },
+  };
+
+  // If company provided, add a loose ILIKE filter — post-query fuzzy match refines it
+  if (company && company.trim()) {
+    where.company = { contains: company.trim(), mode: 'insensitive' };
+  }
+
+  const people = await prisma.person.findMany({
+    where,
+    select: {
+      id: true,
+      fullName: true,
+      firstName: true,
+      lastName: true,
+      company: true,
+      role: true,
+      linkedinUrl: true,
+      email: true,
+      emailStatus: true,
+      emailConfidence: true,
+      emailDeliverable: true,
+      emailVerifiedAt: true,
+      emailVerificationReason: true,
+      city: true,
+      state: true,
+      country: true,
+      educationSchool: true,
+      educationDegree: true,
+      educationField: true,
+      educationYear: true,
+      sourceLinks: {
+        where: { kind: 'DISCOVERY' },
+        orderBy: { createdAt: 'asc' as const },
+        take: 1,
+        select: {
+          url: true,
+          title: true,
+          snippet: true,
+          domain: true,
+        },
+      },
+    },
+    orderBy: [
+      { emailStatus: 'asc' },       // VERIFIED first
+      { emailConfidence: 'desc' },
+      { createdAt: 'asc' },
+    ],
+    take: limit,
+  });
+
+  return people;
+}
+
+/**
+ * Count people matching filters (approximate — pre-app-layer filtering).
+ * Used for hasMore calculation in pagination.
+ *
+ * Note: This count is approximate because company fuzzy matching and
+ * exclusion filtering happen in the application layer. The DB count may
+ * be slightly higher than the actual filtered count. This is acceptable
+ * for hasMore calculation (worst case: user clicks Load More and gets
+ * fewer results than expected, but never misses data).
+ */
+export async function countPeopleByFilters(
+  filters: Omit<PersonFilters, 'limit'>
+): Promise<number> {
+  const where = buildPersonWhereClause(filters);
+  return prisma.person.count({ where });
 }
 
 /**
@@ -1030,6 +1394,12 @@ export async function saveDiscoveredPerson(
       },
     });
 
+    // Fire-and-forget: generate role embedding
+    if (apolloData.role) {
+      updatePersonRoleEmbedding(existing.id, apolloData.role)
+        .catch(err => console.error('[Embedding] Error:', err));
+    }
+
     return { personId: existing.id, isNew: false };
   }
 
@@ -1074,6 +1444,12 @@ export async function saveDiscoveredPerson(
       domain: sourceDomain,
     },
   });
+
+  // Fire-and-forget: generate role embedding
+  if (apolloData.role) {
+    updatePersonRoleEmbedding(person.id, apolloData.role)
+      .catch(err => console.error('[Embedding] Error:', err));
+  }
 
   return { personId: person.id, isNew: true };
 }
@@ -1228,6 +1604,12 @@ export async function saveScrapedProfile(
       },
     });
 
+    // Fire-and-forget: generate role embedding
+    if (profile.role) {
+      updatePersonRoleEmbedding(existingByUrl.id, profile.role)
+        .catch(err => console.error('[Embedding] Error:', err));
+    }
+
     return { personId: existingByUrl.id, isNew: false };
   }
 
@@ -1260,6 +1642,12 @@ export async function saveScrapedProfile(
         scrapedAt: new Date(),
       },
     });
+
+    // Fire-and-forget: generate role embedding
+    if (profile.role) {
+      updatePersonRoleEmbedding(existingByName.id, profile.role)
+        .catch(err => console.error('[Embedding] Error:', err));
+    }
 
     return { personId: existingByName.id, isNew: false };
   }
@@ -1296,6 +1684,12 @@ export async function saveScrapedProfile(
       domain: sourceDomain,
     },
   });
+
+  // Fire-and-forget: generate role embedding
+  if (profile.role) {
+    updatePersonRoleEmbedding(person.id, profile.role)
+      .catch(err => console.error('[Embedding] Error:', err));
+  }
 
   return { personId: person.id, isNew: true };
 }

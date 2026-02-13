@@ -71,7 +71,7 @@ export function ResultsList({
       <div className="flex items-center justify-between mb-4">
         <div>
           <div className="flex items-center gap-2">
-            <h2 className="text-lg font-semibold text-gray-900">
+            <h2 className="text-lg font-semibold text-surface-900">
               {results.length} Results Found
             </h2>
             {/* LinkedIn Dropdown */}
@@ -87,13 +87,13 @@ export function ResultsList({
                 </button>
 
                 {linkedinDropdownOpen && (
-                  <div className="absolute left-0 mt-2 w-64 max-h-80 overflow-y-auto bg-white rounded-md shadow-lg border border-gray-200 z-50">
+                  <div className="absolute left-0 mt-2 w-64 max-h-80 overflow-y-auto bg-white rounded-md shadow-lg border border-surface-200 z-50">
                     <div className="py-1">
                       {peopleWithLinkedin.map((person) => (
                         <button
                           key={person.id}
                           onClick={() => handleOpenLinkedin(person.linkedinUrl!, person.id)}
-                          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center justify-between gap-2"
+                          className="w-full px-4 py-2 text-left text-sm hover:bg-surface-100 flex items-center justify-between gap-2"
                         >
                           <span className="truncate">{person.fullName}</span>
                           {openedLinkedins.has(person.id) ? (
@@ -101,7 +101,7 @@ export function ResultsList({
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                             </svg>
                           ) : (
-                            <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4 text-surface-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                             </svg>
                           )}

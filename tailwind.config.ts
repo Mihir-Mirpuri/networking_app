@@ -70,6 +70,8 @@ const config: Config = {
         'scale-in': 'scale-in 0.2s ease-out',
         'shimmer': 'shimmer 2s infinite',
         'pulse-soft': 'pulse-soft 2s infinite',
+        'bounce-dot': 'bounce-dot 1.4s ease-in-out infinite',
+        'ripple': 'ripple 2s cubic-bezier(0, 0.2, 0.8, 1) infinite',
       },
       keyframes: {
         'fade-in': {
@@ -95,6 +97,14 @@ const config: Config = {
         'pulse-soft': {
           '0%, 100%': { opacity: '1' },
           '50%': { opacity: '0.7' },
+        },
+        'bounce-dot': {
+          '0%, 80%, 100%': { transform: 'scale(0.4)', opacity: '0.3' },
+          '40%': { transform: 'scale(1)', opacity: '1' },
+        },
+        'ripple': {
+          '0%': { transform: 'scale(1)', opacity: '0.6' },
+          '100%': { transform: 'scale(2.5)', opacity: '0' },
         },
       },
       transitionTimingFunction: {

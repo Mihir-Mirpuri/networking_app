@@ -82,7 +82,7 @@ export function PersonCard({
       {onHide && person.userCandidateId && (
         <button
           onClick={onHide}
-          className="absolute top-3 right-3 p-1.5 text-surface-400 hover:text-surface-600 hover:bg-surface-100 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+          className="absolute top-3 right-3 p-1.5 text-surface-400 hover:text-surface-600 hover:bg-surface-100 rounded-lg opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all"
           title="Don't show again"
         >
           <svg

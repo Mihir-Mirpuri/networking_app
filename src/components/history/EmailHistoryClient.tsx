@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { getSendLogs, SendLogEntry } from '@/app/actions/sendlog';
 import { updateScheduledEmailAction, cancelScheduledEmailAction, sendFollowUpAction } from '@/app/actions/send';
 import { generateFollowUpAction } from '@/app/actions/personalize';
+import { Toast } from '@/components/ui/Toast';
 
 interface GroupedLogs {
   [date: string]: SendLogEntry[];
@@ -69,6 +70,7 @@ export function EmailHistoryClient({
   const [isGeneratingFollowUp, setIsGeneratingFollowUp] = useState<string | null>(null);
   const [isSendingFollowUp, setIsSendingFollowUp] = useState(false);
   const [followUpError, setFollowUpError] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const handleSearch = async () => {
     setIsLoading(true);
@@ -261,10 +263,10 @@ export function EmailHistoryClient({
           setHasMore(refreshResult.hasMore);
         }
       } else {
-        alert(result.error || 'Failed to cancel scheduled email');
+        setToast({ message: result.error || 'Failed to cancel scheduled email', type: 'error' });
       }
     } catch (error) {
-      alert(error instanceof Error ? error.message : 'Failed to cancel scheduled email');
+      setToast({ message: error instanceof Error ? error.message : 'Failed to cancel scheduled email', type: 'error' });
     } finally {
       setIsCanceling(null);
     }
@@ -348,20 +350,20 @@ export function EmailHistoryClient({
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-4">Email History</h1>
+        <h1 className="text-2xl font-bold text-surface-900 mb-4">Email History</h1>
 
         {/* Tabs */}
-        <div className="flex border-b border-gray-300 mb-4">
+        <div className="flex border-b border-surface-300 mb-4">
           <button
             onClick={() => setActiveTab('all')}
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
               activeTab === 'all'
                 ? 'border-primary-600 text-primary-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                : 'border-transparent text-surface-500 hover:text-surface-700 hover:border-surface-300'
             }`}
           >
             Sent
-            <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600">
+            <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-surface-100 text-surface-600">
               {timeFilteredLogs.length}
             </span>
           </button>
@@ -370,7 +372,7 @@ export function EmailHistoryClient({
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
               activeTab === 'ongoing'
                 ? 'border-primary-600 text-primary-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                : 'border-transparent text-surface-500 hover:text-surface-700 hover:border-surface-300'
             }`}
           >
             Ongoing Conversations
@@ -385,7 +387,7 @@ export function EmailHistoryClient({
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
               activeTab === 'no-response'
                 ? 'border-primary-600 text-primary-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                : 'border-transparent text-surface-500 hover:text-surface-700 hover:border-surface-300'
             }`}
           >
             No Response
@@ -404,12 +406,12 @@ export function EmailHistoryClient({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            className="flex-1 min-w-[200px] px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="input flex-1 min-w-[200px]"
           />
           <div className="flex gap-2">
             {showCustomInput ? (
               <div className="flex items-center gap-1">
-                <span className="text-sm text-gray-600">Last</span>
+                <span className="text-sm text-surface-600">Last</span>
                 <input
                   type="number"
                   min="1"
@@ -430,10 +432,10 @@ export function EmailHistoryClient({
                     }
                   }}
                   placeholder="days"
-                  className="w-20 px-2 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="input w-20"
                   autoFocus
                 />
-                <span className="text-sm text-gray-600">days</span>
+                <span className="text-sm text-surface-600">days</span>
                 <button
                   onClick={() => {
                     const days = parseInt(customDays, 10);
@@ -443,7 +445,7 @@ export function EmailHistoryClient({
                     }
                   }}
                   disabled={!customDays || parseInt(customDays, 10) <= 0}
-                  className="px-2 py-2 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
+                  className="btn-primary text-sm px-2"
                 >
                   Apply
                 </button>
@@ -452,7 +454,7 @@ export function EmailHistoryClient({
                     setShowCustomInput(false);
                     setCustomDays('');
                   }}
-                  className="px-2 py-2 text-sm text-gray-600 hover:text-gray-800"
+                  className="px-2 py-2 text-sm text-surface-600 hover:text-surface-800"
                 >
                   Cancel
                 </button>
@@ -471,7 +473,7 @@ export function EmailHistoryClient({
                     setTimeFilter(parseInt(val, 10));
                   }
                 }}
-                className="px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500 cursor-pointer"
+                className="input cursor-pointer"
               >
                 {TIME_FILTER_PRESETS.map((option) => (
                   <option key={String(option.value)} value={String(option.value)}>
@@ -488,7 +490,7 @@ export function EmailHistoryClient({
           <button
             onClick={handleSearch}
             disabled={isLoading}
-            className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
+            className="btn-primary text-sm"
           >
             {isLoading ? 'Searching...' : 'Search'}
           </button>
@@ -496,7 +498,7 @@ export function EmailHistoryClient({
             <button
               onClick={handleClearSearch}
               disabled={isLoading}
-              className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50"
+              className="btn-secondary text-sm"
             >
               Clear
             </button>
@@ -506,11 +508,11 @@ export function EmailHistoryClient({
 
       {isLoading ? (
         <div className="flex items-center justify-center h-64">
-          <p className="text-gray-500">Loading...</p>
+          <p className="text-surface-500">Loading...</p>
         </div>
       ) : filteredLogs.length === 0 ? (
         <div className="flex items-center justify-center h-64">
-          <p className="text-gray-500">
+          <p className="text-surface-500">
             {isSearchMode
               ? 'No emails found'
               : timeFilter !== 'all'
@@ -524,17 +526,17 @@ export function EmailHistoryClient({
         </div>
       ) : (
         <>
-          <div className="border border-gray-400 rounded-md overflow-hidden">
+          <div className="border border-surface-300 rounded-md overflow-hidden">
             {sortedDates.map((dateKey, dateIndex) => (
               <div key={dateKey}>
-                <h2 className={`text-sm font-semibold text-gray-700 px-4 py-2 bg-gray-100 border-b border-gray-400 ${dateIndex > 0 ? 'border-t border-gray-400' : ''}`}>
+                <h2 className={`text-sm font-semibold text-surface-700 px-4 py-2 bg-surface-100 border-b border-surface-300 ${dateIndex > 0 ? 'border-t border-surface-300' : ''}`}>
                   {formatDate(new Date(dateKey))}
                 </h2>
-                <div className="divide-y divide-gray-300">
+                <div className="divide-y divide-surface-200">
                   {groupedLogs[dateKey].map((log) => (
                     <div
                       key={log.id}
-                      className="bg-white px-4 py-3 hover:bg-gray-50"
+                      className="bg-white px-4 py-3 hover:bg-surface-50"
                     >
                       <button
                         onClick={() =>
@@ -544,7 +546,7 @@ export function EmailHistoryClient({
                       >
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-3">
-                            <span className="font-medium text-gray-900">
+                            <span className="font-medium text-surface-900">
                               {log.toName || log.toEmail}
                             </span>
                             {log.isDirectSend && (
@@ -568,7 +570,7 @@ export function EmailHistoryClient({
                               </span>
                             )}
                             {log.isScheduled && log.scheduledFor && (
-                              <span className="text-xs text-gray-500">
+                              <span className="text-xs text-surface-500">
                                 {formatCountdown(log.scheduledFor)}
                               </span>
                             )}
@@ -599,37 +601,37 @@ export function EmailHistoryClient({
                                 {isGeneratingFollowUp === log.id ? 'Generating...' : 'Follow Up'}
                               </button>
                             )}
-                            <span className="text-sm text-gray-500">
+                            <span className="text-sm text-surface-500">
                               {log.isScheduled && log.scheduledFor
                                 ? formatTime(log.scheduledFor)
                                 : formatTime(log.sentAt)}
                             </span>
                           </div>
                         </div>
-                        {log.company && <p className="text-sm text-gray-600">{log.company}</p>}
-                        <p className="text-sm text-gray-500 truncate mt-1">
+                        {log.company && <p className="text-sm text-surface-600">{log.company}</p>}
+                        <p className="text-sm text-surface-500 truncate mt-1">
                           Subject: {log.subject}
                         </p>
                       </button>
 
                       {expandedId === log.id && (
-                        <div className="mt-3 pt-3 border-t border-gray-300">
+                        <div className="mt-3 pt-3 border-t border-surface-300">
                           <div className="mb-3">
-                            <p className="text-xs font-medium text-gray-500 mb-1">To:</p>
-                            <p className="text-sm text-gray-900">{log.toEmail}</p>
+                            <p className="text-xs font-medium text-surface-500 mb-1">To:</p>
+                            <p className="text-sm text-surface-900">{log.toEmail}</p>
                           </div>
                           <div className="mb-3">
-                            <p className="text-xs font-medium text-gray-500 mb-1">Subject:</p>
-                            <p className="text-sm text-gray-900">{log.subject}</p>
+                            <p className="text-xs font-medium text-surface-500 mb-1">Subject:</p>
+                            <p className="text-sm text-surface-900">{log.subject}</p>
                           </div>
                           <div className="mb-3">
-                            <p className="text-xs font-medium text-gray-500 mb-1">Body:</p>
-                            <p className="text-sm text-gray-900 whitespace-pre-wrap bg-gray-50 p-3 border border-gray-300">
+                            <p className="text-xs font-medium text-surface-500 mb-1">Body:</p>
+                            <p className="text-sm text-surface-900 whitespace-pre-wrap bg-surface-50 p-3 border border-surface-300">
                               {log.body}
                             </p>
                           </div>
                           {log.isScheduled && log.scheduledEmailId && log.status === 'PENDING' && (
-                            <div className="mt-3 pt-3 border-t border-gray-300 flex gap-2">
+                            <div className="mt-3 pt-3 border-t border-surface-300 flex gap-2">
                               <button
                                 onClick={() => {
                                   if (log.scheduledFor) {
@@ -668,7 +670,7 @@ export function EmailHistoryClient({
               <button
                 onClick={handleLoadMore}
                 disabled={isLoadingMore}
-                className="px-6 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50"
+                className="btn-secondary"
               >
                 {isLoadingMore ? 'Loading...' : 'Load More'}
               </button>
@@ -679,12 +681,12 @@ export function EmailHistoryClient({
 
       {/* Edit Schedule Modal */}
       {editingScheduleId && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-surface-900/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-soft-xl max-w-md w-full p-6">
             <h3 className="text-lg font-semibold mb-4">Edit Scheduled Time</h3>
 
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-surface-700 mb-2">
                 New Date & Time
               </label>
               <input
@@ -695,9 +697,9 @@ export function EmailHistoryClient({
                   setEditScheduleError(null);
                 }}
                 min={new Date(new Date().getTime() + 5 * 60 * 1000).toISOString().slice(0, 16)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="input"
               />
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-surface-500">
                 Minimum: 5 minutes from now
               </p>
             </div>
@@ -716,14 +718,14 @@ export function EmailHistoryClient({
                   setEditScheduleError(null);
                 }}
                 disabled={isUpdatingSchedule}
-                className="px-4 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50"
+                className="btn-secondary text-sm"
               >
                 Cancel
               </button>
               <button
                 onClick={() => editingScheduleId && handleEditSchedule(editingScheduleId, new Date(editScheduledDateTime))}
                 disabled={isUpdatingSchedule || !editScheduledDateTime}
-                className="px-4 py-2 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn-primary text-sm"
               >
                 {isUpdatingSchedule ? 'Updating...' : 'Update'}
               </button>
@@ -734,38 +736,38 @@ export function EmailHistoryClient({
 
       {/* Follow Up Modal */}
       {followUpData && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-surface-900/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-soft-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-semibold mb-4">Follow Up Email</h3>
 
             <div className="mb-4">
-              <p className="text-sm text-gray-600 mb-2">
-                To: <span className="font-medium text-gray-900">{followUpData.toName || followUpData.toEmail}</span>
-                {followUpData.company && <span className="text-gray-500"> at {followUpData.company}</span>}
+              <p className="text-sm text-surface-600 mb-2">
+                To: <span className="font-medium text-surface-900">{followUpData.toName || followUpData.toEmail}</span>
+                {followUpData.company && <span className="text-surface-500"> at {followUpData.company}</span>}
               </p>
             </div>
 
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-surface-700 mb-2">
                 Subject
               </label>
               <input
                 type="text"
                 value={followUpData.subject}
                 onChange={(e) => setFollowUpData({ ...followUpData, subject: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="input"
               />
             </div>
 
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-surface-700 mb-2">
                 Message
               </label>
               <textarea
                 value={followUpData.body}
                 onChange={(e) => setFollowUpData({ ...followUpData, body: e.target.value })}
                 rows={8}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 resize-y"
+                className="input resize-y"
               />
             </div>
 
@@ -782,20 +784,28 @@ export function EmailHistoryClient({
                   setFollowUpError(null);
                 }}
                 disabled={isSendingFollowUp}
-                className="px-4 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50"
+                className="btn-secondary text-sm"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSendFollowUp}
                 disabled={isSendingFollowUp || !followUpData.body.trim()}
-                className="px-4 py-2 text-sm bg-purple-600 text-white rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn-primary text-sm"
               >
                 {isSendingFollowUp ? 'Sending...' : 'Send Follow Up'}
               </button>
             </div>
           </div>
         </div>
+      )}
+
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
       )}
     </div>
   );

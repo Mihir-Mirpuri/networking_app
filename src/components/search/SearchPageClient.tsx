@@ -6,13 +6,11 @@ import { ResultsList } from './ResultsList';
 import { ExpandedReview } from './ExpandedReview';
 import { BulkReview } from './BulkReview';
 import { LoadingSpinner } from './LoadingSpinner';
+import { SearchLoadingState } from './SearchLoadingState';
 import { Toast } from '@/components/ui/Toast';
 import { LimitReachedModal, dispatchCreditsChanged } from '@/components/credits';
-import { searchPeopleAction, SearchResultWithDraft, hidePersonAction, refreshSearchAction } from '@/app/actions/search';
+import { searchPeopleAction, SearchResultWithDraft, hidePersonAction, loadMorePeopleAction } from '@/app/actions/search';
 import { sendSingleEmailAction, sendEmailsAction, PersonToSend } from '@/app/actions/send';
-
-// Loading message shown during search
-const LOADING_MESSAGE = 'Searching for profiles...';
 
 interface SearchPageClientProps {
   initialRemainingDaily: number;
@@ -31,15 +29,15 @@ interface SearchPageState {
   showBulkReview: boolean;
   generatingStatuses: Array<[string, boolean]>;
   remainingDaily?: number;
-  // NEW: Add search parameters
   searchParams?: {
     company?: string;
     role?: string;
     university?: string;
     location?: string;
+    limit: number;
     templateId: string;
   };
-  currentPage?: number;
+  totalLoaded?: number;
   hasMore?: boolean;
   savedAt: number;
 }
@@ -66,20 +64,24 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
   const [generatingStatuses, setGeneratingStatuses] = useState<Map<string, boolean>>(new Map());
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [showLimitModal, setShowLimitModal] = useState(false);
   const [searchParams, setSearchParams] = useState<{
     company?: string;
     role?: string;
     university?: string;
     location?: string;
+    limit: number;
     templateId: string;
   } | null>(null);
 
   // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
+  const [totalLoaded, setTotalLoaded] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
+  const retryTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const retryCountRef = useRef(0);
+  const MAX_RETRIES = 5;
 
   // Restore state from sessionStorage on mount
   useEffect(() => {
@@ -106,13 +108,12 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
           if (state.generatingStatuses) {
             setGeneratingStatuses(arrayToMap(state.generatingStatuses));
           }
-          // NEW: Restore search parameters
           if (state.searchParams) {
             setSearchParams(state.searchParams);
           }
           // Restore pagination state
-          if (state.currentPage !== undefined) {
-            setCurrentPage(state.currentPage);
+          if (state.totalLoaded !== undefined) {
+            setTotalLoaded(state.totalLoaded);
           }
           if (state.hasMore !== undefined) {
             setHasMore(state.hasMore);
@@ -164,8 +165,8 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
             showBulkReview,
             generatingStatuses: mapToArray(generatingStatuses),
             remainingDaily,
-            searchParams: paramsToSave, // Preserve search params
-            currentPage,
+            searchParams: paramsToSave,
+            totalLoaded,
             hasMore,
             savedAt: Date.now(),
           };
@@ -181,7 +182,16 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [results, expandedIndex, sendStatuses, showBulkReview, generatingStatuses, remainingDaily, searchParams, currentPage, hasMore]);
+  }, [results, expandedIndex, sendStatuses, showBulkReview, generatingStatuses, remainingDaily, searchParams, totalLoaded, hasMore]);
+
+  // Cleanup retry timer on unmount
+  useEffect(() => {
+    return () => {
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleSearch = async (params: {
     company?: string;
@@ -201,15 +211,19 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
     setError(null);
     setResults([]);
     setSendStatuses(new Map());
-    // Reset pagination on new search
-    setCurrentPage(1);
+    setTotalLoaded(0);
     setHasMore(true);
 
-    const result = await searchPeopleAction(params);
+    const result = await searchPeopleAction({ ...params });
 
     if (result.success) {
       setResults(result.results);
-      // Save search parameters immediately after successful search
+      setTotalLoaded(result.results.length);
+      setHasMore(result.searchMeta.hasMore);
+      setSearchParams(params);
+      setIsSearching(false);
+
+      // Save to sessionStorage
       try {
         const state: SearchPageState = {
           version: STORAGE_VERSION,
@@ -219,75 +233,28 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
           showBulkReview: false,
           generatingStatuses: [],
           remainingDaily,
-          searchParams: params, // Save search parameters
+          searchParams: params,
+          totalLoaded: result.results.length,
+          hasMore: result.searchMeta.hasMore,
           savedAt: Date.now(),
         };
         sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-        setSearchParams(params); // Also update state
-      } catch (error) {
-        console.error('Error saving search params to sessionStorage:', error);
+      } catch (e) {
+        console.error('Error saving search params to sessionStorage:', e);
       }
 
-      // If cache missed, trigger refresh to discover more people
-      if (result.searchMeta.needsRefresh) {
-        const hasInitialResults = result.results.length > 0;
-
-        // Only show as "background" refresh if we have results to display
-        // Otherwise, keep the main search spinner active
-        if (hasInitialResults) {
-          setIsSearching(false);
-          setIsRefreshing(true);
-        }
-        // If no results, isSearching stays true until refresh completes
-
-        refreshSearchAction({
-          company: params.company,
+      // Fire-and-forget via API route (not server action) so it doesn't
+      // block subsequent server action calls like searchPeopleAction.
+      fetch('/api/prescrape', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          company: params.company!,
           role: params.role,
           university: params.university,
           location: params.location,
-          limit: params.limit,
-        }).then((refreshResult) => {
-          if (refreshResult.success) {
-            console.log(`[Refresh] Complete: ${refreshResult.newPeopleCount} new, ${refreshResult.emailsGenerated} emails`);
-            setHasMore(refreshResult.hasMore);
-            // Re-fetch results to include newly discovered people
-            searchPeopleAction(params).then((updatedResult) => {
-              if (updatedResult.success) {
-                setResults(updatedResult.results);
-                // Update sessionStorage with new results
-                try {
-                  const updatedState: SearchPageState = {
-                    version: STORAGE_VERSION,
-                    results: updatedResult.results,
-                    expandedIndex: null,
-                    sendStatuses: mapToArray(sendStatuses),
-                    showBulkReview: false,
-                    generatingStatuses: mapToArray(generatingStatuses),
-                    remainingDaily,
-                    searchParams: params,
-                    savedAt: Date.now(),
-                  };
-                  sessionStorage.setItem(STORAGE_KEY, JSON.stringify(updatedState));
-                } catch (e) {
-                  console.error('Error updating sessionStorage after refresh:', e);
-                }
-              }
-              setIsSearching(false);
-              setIsRefreshing(false);
-            });
-          } else {
-            console.error('[Refresh] Failed:', refreshResult.error);
-            setIsSearching(false);
-            setIsRefreshing(false);
-          }
-        }).catch((err) => {
-          console.error('[Refresh] Error:', err);
-          setIsSearching(false);
-          setIsRefreshing(false);
-        });
-      } else {
-        setIsSearching(false);
-      }
+        }),
+      }).catch(err => console.error('[Prescrape] Error:', err));
     } else {
       setError(result.error);
       setIsSearching(false);
@@ -385,53 +352,43 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
     }
   };
 
-  const handleLoadMore = async () => {
+  const handleLoadMore = useCallback(async () => {
     if (!searchParams?.company || isLoadingMore || !hasMore) return;
 
     setIsLoadingMore(true);
-    const nextPage = currentPage + 1;
-    const pageStart = (nextPage - 1) * 10 + 1; // page 2 → start=11, page 3 → start=21
-
+    setIsRetrying(false);
     try {
-      const result = await refreshSearchAction({
+      const result = await loadMorePeopleAction({
         company: searchParams.company,
         role: searchParams.role,
         university: searchParams.university,
         location: searchParams.location,
-        pageStart,
+        limit: searchParams.limit,
+        templateId: searchParams.templateId,
+        excludePersonIds: results.map(r => r.id),
       });
 
       if (result.success) {
-        setCurrentPage(nextPage);
-        setHasMore(result.hasMore);
-
-        // Re-fetch to get updated results including new people
-        const updatedResult = await searchPeopleAction({
-          ...searchParams,
-          limit: nextPage * 10, // Get all results so far
-        });
-
-        if (updatedResult.success) {
-          setResults(updatedResult.results);
-          // Update sessionStorage with new results
-          try {
-            const updatedState: SearchPageState = {
-              version: STORAGE_VERSION,
-              results: updatedResult.results,
-              expandedIndex,
-              sendStatuses: mapToArray(sendStatuses),
-              showBulkReview,
-              generatingStatuses: mapToArray(generatingStatuses),
-              remainingDaily,
-              searchParams,
-              currentPage: nextPage,
-              hasMore: result.hasMore,
-              savedAt: Date.now(),
-            };
-            sessionStorage.setItem(STORAGE_KEY, JSON.stringify(updatedState));
-          } catch (e) {
-            console.error('Error updating sessionStorage after load more:', e);
-          }
+        if (result.results.length > 0) {
+          // Got results — append and reset retry count
+          setResults(prev => [...prev, ...result.results]);
+          setTotalLoaded(prev => prev + result.results.length);
+          setHasMore(result.loadMoreMeta.hasMore);
+          retryCountRef.current = 0;
+        } else if (result.loadMoreMeta.prescrapeRunning && retryCountRef.current < MAX_RETRIES) {
+          // 0 results but prescrape still running — auto-retry after delay
+          retryCountRef.current++;
+          setIsRetrying(true);
+          setIsLoadingMore(false);
+          console.log(`[LoadMore] Prescrape running, retrying in 3s (attempt ${retryCountRef.current}/${MAX_RETRIES})`);
+          retryTimerRef.current = setTimeout(() => {
+            handleLoadMore();
+          }, 3000);
+          return; // Don't clear isLoadingMore below — the retry will handle it
+        } else {
+          // No results and prescrape done (or retries exhausted)
+          setHasMore(false);
+          retryCountRef.current = 0;
         }
       } else {
         setToast({ message: result.error || 'Failed to load more profiles', type: 'error' });
@@ -441,8 +398,9 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
       setToast({ message: 'Failed to load more profiles', type: 'error' });
     }
 
+    setIsRetrying(false);
     setIsLoadingMore(false);
-  };
+  }, [searchParams, isLoadingMore, hasMore, results]);
 
   return (
     <div className="relative">
@@ -458,17 +416,15 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
         </div>
       )}
 
-      {isSearching && (
-        <div className="flex items-center gap-3 py-8 text-gray-600">
-          <LoadingSpinner size="md" />
-          <span className="text-base">{LOADING_MESSAGE}</span>
-        </div>
-      )}
+      {isSearching && <SearchLoadingState />}
 
-      {isRefreshing && !isSearching && expandedIndex === null && !showBulkReview && (
-        <div className="flex items-center gap-2 mb-4 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm">
-          <LoadingSpinner size="sm" />
-          <span>Discovering more profiles in background...</span>
+      {!isSearching && !error && results.length === 0 && searchParams && (
+        <div className="flex flex-col items-center justify-center py-16 text-surface-500">
+          <svg className="w-12 h-12 mb-4 text-surface-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+          </svg>
+          <p className="text-base font-medium text-surface-600 mb-1">No profiles found</p>
+          <p className="text-sm">Try adjusting your search filters or broadening your criteria.</p>
         </div>
       )}
 
@@ -485,28 +441,33 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
           />
 
           {/* Load More Button */}
-          {hasMore && !isSearching && !isRefreshing && (
-            <div className="flex justify-center mt-6">
+          {hasMore && !isSearching && (
+            <div className="flex flex-col items-center mt-6 gap-1">
               <button
                 onClick={handleLoadMore}
-                disabled={isLoadingMore}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+                disabled={isLoadingMore || isRetrying}
+                className="btn-secondary flex items-center gap-2"
               >
-                {isLoadingMore ? (
+                {isLoadingMore || isRetrying ? (
                   <>
                     <LoadingSpinner size="sm" />
-                    Loading...
+                    {isRetrying ? 'Still searching for profiles...' : 'Loading...'}
                   </>
                 ) : (
                   'Load More Profiles'
                 )}
               </button>
+              {isRetrying && (
+                <p className="text-sm text-surface-500">
+                  Background search is still finding profiles. Retrying automatically...
+                </p>
+              )}
             </div>
           )}
 
           {/* No More Results Message */}
           {!hasMore && (
-            <p className="text-center text-gray-500 mt-6">
+            <p className="text-center text-surface-500 mt-6">
               No more profiles available
             </p>
           )}

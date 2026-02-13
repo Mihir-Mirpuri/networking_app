@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { INDUSTRIES, COMPANIES_BY_INDUSTRY, ROLES_BY_COMPANY, UNIVERSITIES, LOCATIONS, EMAIL_TEMPLATES } from '@/lib/constants';
+import { INDUSTRIES, COMPANIES_BY_INDUSTRY, ROLES_BY_COMPANY, LOCATIONS, EMAIL_TEMPLATES } from '@/lib/constants';
 import { LoadingSpinner } from './LoadingSpinner';
 import { SearchableCombobox } from './SearchableCombobox';
 import { getTemplatesAction, TemplateData } from '@/app/actions/profile';
@@ -44,7 +44,7 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
   // Get roles for the selected company (if no company selected, show all roles)
   const availableRoles = company
     ? (ROLES_BY_COMPANY[company] || [])
-    : [...new Set(Object.values(ROLES_BY_COMPANY).flat())];
+    : Array.from(new Set(Object.values(ROLES_BY_COMPANY).flat()));
   const [university, setUniversity] = useState<string>(initialParams?.university || '');
   const [location, setLocation] = useState<string>(initialParams?.location || '');
   const [templateId, setTemplateId] = useState<string>(
@@ -214,17 +214,20 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
         />
 
         {/* University */}
-        <SearchableCombobox
-          options={[
-            { label: 'Any University', value: '' },
-            ...UNIVERSITIES.map((u) => ({ label: u, value: u })),
-          ]}
-          value={university}
-          onChange={setUniversity}
-          label="University"
-          placeholder="Select a university..."
-          id="university"
-        />
+        <div>
+          <label htmlFor="university" className="block text-sm font-medium text-surface-700 mb-1.5">
+            University
+          </label>
+          <select
+            id="university"
+            value={university}
+            onChange={(e) => setUniversity(e.target.value)}
+            className="input"
+          >
+            <option value="">Any Location</option>
+            <option value="University of Texas at Austin">University of Texas at Austin</option>
+          </select>
+        </div>
 
         {/* Office Location */}
         <SearchableCombobox

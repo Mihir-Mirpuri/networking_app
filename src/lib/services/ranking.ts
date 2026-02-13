@@ -3,6 +3,8 @@
  * Scores candidates by similarity to search criteria and returns top N
  */
 
+import { areRolesAliased } from '@/lib/db/person-service';
+
 export interface SearchCriteria {
   company?: string;
   role?: string;
@@ -103,12 +105,74 @@ export function scoreCompanyMatch(search: string | undefined, apollo: string | n
 }
 
 /**
- * Score role match using token overlap
- * Handles variations like "associate consultant" ↔ "consulting associate"
- * - Exact match: 1.0
- * - Token overlap >= 50%: 0.8
- * - Partial overlap: proportional
- * - No overlap: 0
+ * Abbreviation → expanded form for role token matching.
+ * Used to normalize abbreviations before Jaccard comparison so that
+ * "VP of Operations" and "Vice President of Operations" share tokens.
+ */
+const ROLE_WORD_EXPANSIONS: Record<string, string> = {
+  // Finance seniority
+  'vp': 'vice president',
+  'svp': 'senior vice president',
+  'evp': 'executive vice president',
+  'avp': 'assistant vice president',
+  'md': 'managing director',
+  // Finance divisions
+  'ib': 'investment banking',
+  'ibd': 'investment banking division',
+  'pe': 'private equity',
+  'am': 'asset management',
+  'wm': 'wealth management',
+  'pwm': 'private wealth management',
+  's&t': 'sales and trading',
+  // Consulting
+  'ba': 'business analyst',
+  'sba': 'senior business analyst',
+  'em': 'engagement manager',
+  'ctl': 'case team leader',
+  'pl': 'project leader',
+  'ap': 'associate principal',
+  // Product/Tech
+  'pm': 'product manager',
+  'apm': 'associate product manager',
+  'tpm': 'technical product manager',
+  'rpm': 'rotational product manager',
+  'pgm': 'program manager',
+  // Prefix/suffix abbreviations
+  'sr': 'senior',
+  'sr.': 'senior',
+  'jr': 'junior',
+  'jr.': 'junior',
+  'mgr': 'manager',
+  'dir': 'director',
+  'mgmt': 'management',
+  'assoc': 'associate',
+  'assoc.': 'associate',
+};
+
+/**
+ * Expand abbreviations in a role string for better token matching.
+ * First checks if the entire string is an abbreviation, then word-by-word.
+ * e.g. "VP" → "vice president", "sr. pm" → "senior product manager"
+ */
+function expandRoleForMatching(normalized: string): string {
+  // Check if the entire string is an abbreviation
+  if (ROLE_WORD_EXPANSIONS[normalized]) {
+    return ROLE_WORD_EXPANSIONS[normalized];
+  }
+  // Word-by-word expansion
+  return normalized.split(/\s+/).map(word => ROLE_WORD_EXPANSIONS[word] || word).join(' ');
+}
+
+/**
+ * Score role match using alias groups, abbreviation expansion, and token overlap
+ *
+ * Matching priority:
+ * 1. Exact match (after normalization): 1.0
+ * 2. Alias group match (e.g., "vice president" ↔ "vp"): 1.0
+ * 3. Expanded exact match (e.g., "sr consultant" → "senior consultant"): 1.0
+ * 4. Token overlap >= 50% (on expanded forms): 0.8
+ * 5. Partial token overlap: proportional
+ * 6. No overlap: 0
  */
 export function scoreRoleMatch(search: string | undefined, apollo: string | null): number {
   if (!search || !search.trim()) return 0; // No search criteria
@@ -120,13 +184,37 @@ export function scoreRoleMatch(search: string | undefined, apollo: string | null
   // Exact match
   if (searchNorm === apolloNorm) return 1.0;
 
-  // Token-based matching
-  const searchTokens = tokenize(search);
-  const apolloTokens = tokenize(apollo);
+  // Alias group match (e.g., "vice president" ↔ "vp")
+  if (areRolesAliased(searchNorm, apolloNorm)) return 1.0;
 
-  if (searchTokens.size === 0 || apolloTokens.size === 0) return 0;
+  // Extract core role (before comma/dash qualifiers like "VP, IBD" → "VP")
+  // LinkedIn titles often have "Role, Department" or "Role - Division" format
+  const apolloCore = apolloNorm.split(/[,\-–—]/, 1)[0].trim();
 
-  const similarity = jaccardSimilarity(searchTokens, apolloTokens);
+  // Check alias on core role (e.g., "VP, IBD" → core "vp" aliases "vice president")
+  if (apolloCore && apolloCore !== apolloNorm && areRolesAliased(searchNorm, apolloCore)) return 1.0;
+
+  // Expand abbreviations for better token comparison
+  const searchExpanded = expandRoleForMatching(searchNorm);
+  const apolloExpanded = expandRoleForMatching(apolloNorm);
+
+  // Expanded exact match (e.g., "sr consultant" expands to match "senior consultant")
+  if (searchExpanded === apolloExpanded) return 1.0;
+
+  // Also expand just the core role for comparison
+  const apolloCoreExpanded = expandRoleForMatching(apolloCore || apolloNorm);
+
+  // Token-based matching — try both full role and core role, take the better score
+  const toTokens = (s: string) => new Set(s.split(' ').filter(w => w.length > 0));
+  const searchTokens = toTokens(searchExpanded);
+  if (searchTokens.size === 0) return 0;
+
+  const fullTokens = toTokens(apolloExpanded);
+  const coreTokens = toTokens(apolloCoreExpanded);
+
+  const fullSimilarity = fullTokens.size > 0 ? jaccardSimilarity(searchTokens, fullTokens) : 0;
+  const coreSimilarity = coreTokens.size > 0 ? jaccardSimilarity(searchTokens, coreTokens) : 0;
+  const similarity = Math.max(fullSimilarity, coreSimilarity);
 
   // High overlap (>= 50%)
   if (similarity >= 0.5) return 0.8;

@@ -2,15 +2,22 @@
 
 import { useState } from 'react';
 import { SearchPageClient } from '@/components/search/SearchPageClient';
+import { PersonLookup } from '@/components/search/PersonLookup';
 import { ComposeEmailModal } from '@/components/compose/ComposeEmailModal';
 import { Toast } from '@/components/ui/Toast';
-import { MagnifyingGlassIcon, PaperAirplaneIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, UserIcon, PaperAirplaneIcon } from '@heroicons/react/24/outline';
 
-type HomeTabId = 'find' | 'quick';
+type HomeTabId = 'find' | 'lookup' | 'quick';
 
 interface HomeTabsProps {
   initialRemainingDaily: number;
 }
+
+const TABS: { id: HomeTabId; label: string; icon: typeof MagnifyingGlassIcon }[] = [
+  { id: 'find', label: 'Find Connections', icon: MagnifyingGlassIcon },
+  { id: 'lookup', label: 'Look Up', icon: UserIcon },
+  { id: 'quick', label: 'Quick Send', icon: PaperAirplaneIcon },
+];
 
 export function HomeTabs({ initialRemainingDaily }: HomeTabsProps) {
   const [activeTab, setActiveTab] = useState<HomeTabId>('find');
@@ -25,30 +32,24 @@ export function HomeTabs({ initialRemainingDaily }: HomeTabsProps) {
       {/* Tab Navigation */}
       <div className="mb-8">
         <nav className="inline-flex p-1 bg-surface-100 rounded-xl" aria-label="Tabs">
-          <button
-            type="button"
-            onClick={() => setActiveTab('find')}
-            className={`flex items-center gap-2 px-5 py-2.5 text-sm font-medium rounded-lg transition-all ${
-              activeTab === 'find'
-                ? 'bg-white text-primary-700 shadow-soft'
-                : 'text-surface-600 hover:text-surface-900'
-            }`}
-          >
-            <MagnifyingGlassIcon className="w-4 h-4" />
-            Find Connections
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('quick')}
-            className={`flex items-center gap-2 px-5 py-2.5 text-sm font-medium rounded-lg transition-all ${
-              activeTab === 'quick'
-                ? 'bg-white text-primary-700 shadow-soft'
-                : 'text-surface-600 hover:text-surface-900'
-            }`}
-          >
-            <PaperAirplaneIcon className="w-4 h-4" />
-            Quick Send
-          </button>
+          {TABS.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 px-5 py-2.5 text-sm font-medium rounded-lg transition-all ${
+                  activeTab === tab.id
+                    ? 'bg-white text-primary-700 shadow-soft'
+                    : 'text-surface-600 hover:text-surface-900'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                {tab.label}
+              </button>
+            );
+          })}
         </nav>
       </div>
 
@@ -56,6 +57,12 @@ export function HomeTabs({ initialRemainingDaily }: HomeTabsProps) {
       {activeTab === 'find' && (
         <div className="animate-fade-in">
           <SearchPageClient initialRemainingDaily={initialRemainingDaily} />
+        </div>
+      )}
+
+      {activeTab === 'lookup' && (
+        <div className="animate-fade-in">
+          <PersonLookup />
         </div>
       )}
 

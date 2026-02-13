@@ -7,14 +7,27 @@
  * - Ranking service scores and returns top candidates
  */
 
+import { completeJson } from '@/lib/services/groq';
+import { getCompanyKey, getCompanyAliases } from '@/lib/db/person-service';
+
 const CSE_API_KEY = process.env.GOOGLE_CSE_API_KEY;
 const CSE_CX = process.env.GOOGLE_CSE_CX || 'bf53ffdb484f145c5';
+
+interface CSEMetatag {
+  'og:description'?: string;
+  'profile:first_name'?: string;
+  'profile:last_name'?: string;
+  [key: string]: string | undefined;
+}
 
 interface CSEResult {
   title: string;
   link: string;
   snippet: string;
   displayLink: string;
+  pagemap?: {
+    metatags?: CSEMetatag[];
+  };
 }
 
 interface CSEResponse {
@@ -44,6 +57,9 @@ export interface CSEDiscoveryResult {
   sourceTitle: string;
   sourceSnippet: string;
   sourceDomain: string;
+  cseCompany: string | null;   // Extracted from og:description "Experience: [Company]"
+  cseFirstName: string | null; // From profile:first_name metatag
+  cseLastName: string | null;  // From profile:last_name metatag
 }
 
 /**
@@ -178,6 +194,93 @@ function normalizeKey(name: string, url: string): string {
 }
 
 /**
+ * Extract current company from LinkedIn og:description metatag.
+ * Format: "... · Experience: [Company] · ..." or "... · Experience: [Company]"
+ * Returns null if unparseable.
+ */
+function parseExperienceCompany(ogDescription: string | undefined): string | null {
+  if (!ogDescription) return null;
+  const match = ogDescription.match(/Experience:\s*([^·]+)/);
+  if (!match) return null;
+  return match[1].trim() || null;
+}
+
+// ── Company name expansion for CSE queries ──────────────────────────────
+// Two-tier: COMPANY_ALIASES (instant) → Groq LLM fallback (~200-400ms)
+// Cached in-memory so pagination / repeat searches skip expansion entirely.
+
+const companyExpansionCache = new Map<string, string[]>();
+
+/**
+ * Expand a company name into well-known abbreviations / alternate names
+ * suitable for CSE OR-queries.
+ *
+ * Tier 1: Check COMPANY_ALIASES (0 ms, no API call)
+ * Tier 2: Ask Groq llama-3.1-8b-instant for abbreviations (~200-400 ms)
+ * Returns an array of alternate names (may be empty).
+ */
+export async function expandCompanyName(company: string): Promise<string[]> {
+  const normalized = company.trim().toLowerCase();
+  if (!normalized) return [];
+
+  // Check cache first
+  const cached = companyExpansionCache.get(normalized);
+  if (cached !== undefined) return cached;
+
+  try {
+    // Tier 1 – alias map
+    const key = getCompanyKey(normalized);
+    if (key) {
+      const aliases = getCompanyAliases(key);
+      // Filter out the original company name (case-insensitive) and take up to 3
+      const alternatives = aliases
+        .filter(a => a.toLowerCase() !== normalized)
+        .slice(0, 3);
+      companyExpansionCache.set(normalized, alternatives);
+      console.log(`[Discovery] Company expansion (alias): "${company}" → ${JSON.stringify(alternatives)}`);
+      return alternatives;
+    }
+
+    // Tier 2 – LLM fallback
+    interface ExpansionResponse { alternatives: string[] }
+    const response = await completeJson<ExpansionResponse>({
+      systemPrompt:
+        'You are a company name abbreviation expert. Given a company name, return a JSON object with an "alternatives" array containing 1-3 widely-recognized abbreviations or short-form names used on LinkedIn profiles. Only include abbreviations that are well-known and unambiguous (e.g. "GS" for Goldman Sachs, "JPM" for JPMorgan, "BCG" for Boston Consulting Group). Do NOT include divisions, subsidiaries, or parent companies. If the company has no well-known abbreviations, return {"alternatives": []}.',
+      userPrompt: company.trim(),
+      options: {
+        model: 'llama-3.1-8b-instant',
+        temperature: 0.1,
+        maxTokens: 150,
+      },
+    });
+
+    const alternatives = (response.content.alternatives || []).slice(0, 3);
+    companyExpansionCache.set(normalized, alternatives);
+    console.log(`[Discovery] Company expansion (LLM): "${company}" → ${JSON.stringify(alternatives)}`);
+    return alternatives;
+  } catch (error) {
+    // On any failure, cache empty array so we don't retry
+    console.warn(`[Discovery] Company expansion failed for "${company}":`, error);
+    companyExpansionCache.set(normalized, []);
+    return [];
+  }
+}
+
+/**
+ * Build the company portion of a CSE query.
+ * Currently just quotes the company name. LLM expansion (expandCompanyName)
+ * is available but disabled — all current UI inputs are constrained dropdowns
+ * that already provide canonical names. Re-enable when natural language
+ * or freetext company input is added.
+ */
+export async function buildCompanyQueryPart(company: string): Promise<string> {
+  const trimmed = company.trim();
+  if (!trimmed) return '';
+
+  return `"${trimmed}"`;
+}
+
+/**
  * Discover LinkedIn profiles via Google Custom Search
  *
  * This simplified version:
@@ -192,7 +295,7 @@ export async function discoverLinkedInProfiles(params: SearchParams): Promise<CS
   // Build query for LinkedIn profile search
   // Include company, university, role, and location for targeted results
   const queryParts: string[] = [];
-  if (company && company.trim()) queryParts.push(`"${company.trim()}"`);
+  if (company && company.trim()) queryParts.push(await buildCompanyQueryPart(company));
   // Omit university if "any" is selected (case-insensitive)
   if (university && university.trim() && university.trim().toLowerCase() !== 'any') {
     queryParts.push(`"${university.trim()}"`);
@@ -248,27 +351,49 @@ export async function discoverLinkedInProfiles(params: SearchParams): Promise<CS
         if (seenKeys.has(result.link)) continue;
         seenKeys.add(result.link);
 
-        // Try to extract name from title (optional - scraper will provide accurate name)
-        const parsed = extractNameFromTitle(result.title);
+        // Extract metatag data (more reliable than title parsing)
+        const metatags = result.pagemap?.metatags?.[0];
+        const cseFirstName = metatags?.['profile:first_name'] || null;
+        const cseLastName = metatags?.['profile:last_name'] || null;
+        const cseCompany = parseExperienceCompany(metatags?.['og:description']);
+
+        // Use metatag names as primary source, fall back to title parsing
+        let fullName = '';
+        let firstName: string | null = null;
+        let lastName: string | null = null;
+
+        if (cseFirstName && cseLastName) {
+          firstName = cseFirstName;
+          lastName = cseLastName;
+          fullName = `${cseFirstName} ${cseLastName}`;
+        } else {
+          const parsed = extractNameFromTitle(result.title);
+          fullName = parsed?.fullName || '';
+          firstName = parsed?.firstName || null;
+          lastName = parsed?.lastName || null;
+        }
 
         // Check if this person should be excluded (already sent/hidden)
         // Only check if we could parse a name
-        if (parsed?.fullName && company) {
-          const personKey = `${parsed.fullName}_${company}`.toLowerCase();
+        if (fullName && company) {
+          const personKey = `${fullName}_${company}`.toLowerCase();
           if (excludePersonKeys.has(personKey)) {
-            console.log(`[Discovery] Skipping excluded person: ${parsed.fullName}`);
+            console.log(`[Discovery] Skipping excluded person: ${fullName}`);
             continue;
           }
         }
 
         candidates.push({
-          fullName: parsed?.fullName || '',  // Scraper will provide actual name
-          firstName: parsed?.firstName || null,
-          lastName: parsed?.lastName || null,
+          fullName,
+          firstName,
+          lastName,
           linkedinUrl: result.link,
           sourceTitle: result.title,
           sourceSnippet: result.snippet,
           sourceDomain: result.displayLink,
+          cseCompany,
+          cseFirstName,
+          cseLastName,
         });
       }
     }
@@ -280,6 +405,97 @@ export async function discoverLinkedInProfiles(params: SearchParams): Promise<CS
   }
 
   console.log(`[Discovery] Found ${candidates.length} LinkedIn profiles`);
+  return candidates;
+}
+
+/**
+ * Look up a specific person by name via CSE.
+ *
+ * Two-pass strategy (based on empirical testing of 18 people):
+ *   1. If company provided: "name" + company → #1 hit 89% of the time
+ *   2. Fallback to "name" only → 100% find rate, avg position 2.6
+ *
+ * Returns top 5 LinkedIn profiles for the user to pick from.
+ */
+export async function lookupByName(params: {
+  name: string;
+  company?: string;
+}): Promise<CSEDiscoveryResult[]> {
+  const { name, company } = params;
+  const cleanName = name.replace(/,.*$/, '').trim(); // Strip suffixes like ", MBA, MHA"
+
+  if (!cleanName) return [];
+
+  const LIMIT = 5;
+
+  const processResults = (results: CSEResult[]): CSEDiscoveryResult[] => {
+    const candidates: CSEDiscoveryResult[] = [];
+    const seenUrls = new Set<string>();
+
+    for (const result of results) {
+      if (candidates.length >= LIMIT) break;
+      if (!isLinkedInProfileUrl(result.link)) continue;
+      if (seenUrls.has(result.link)) continue;
+      seenUrls.add(result.link);
+
+      const metatags = result.pagemap?.metatags?.[0];
+      const cseFirstName = metatags?.['profile:first_name'] || null;
+      const cseLastName = metatags?.['profile:last_name'] || null;
+      const cseCompany = parseExperienceCompany(metatags?.['og:description']);
+
+      let fullName = '';
+      let firstName: string | null = null;
+      let lastName: string | null = null;
+
+      if (cseFirstName && cseLastName) {
+        firstName = cseFirstName;
+        lastName = cseLastName;
+        fullName = `${cseFirstName} ${cseLastName}`;
+      } else {
+        const parsed = extractNameFromTitle(result.title);
+        fullName = parsed?.fullName || '';
+        firstName = parsed?.firstName || null;
+        lastName = parsed?.lastName || null;
+      }
+
+      candidates.push({
+        fullName,
+        firstName,
+        lastName,
+        linkedinUrl: result.link,
+        sourceTitle: result.title,
+        sourceSnippet: result.snippet,
+        sourceDomain: result.displayLink,
+        cseCompany,
+        cseFirstName,
+        cseLastName,
+      });
+    }
+
+    return candidates;
+  };
+
+  // Pass 1: name + company (if company provided)
+  if (company && company.trim()) {
+    const companyPart = await buildCompanyQueryPart(company);
+    const query = `site:linkedin.com/in "${cleanName}" ${companyPart}`;
+    console.log(`[Lookup] Pass 1 query: ${query}`);
+    const results = await searchCSE(query);
+    const candidates = processResults(results);
+
+    if (candidates.length > 0) {
+      console.log(`[Lookup] Pass 1 found ${candidates.length} results`);
+      return candidates;
+    }
+    console.log('[Lookup] Pass 1 returned 0 results, falling back to name-only');
+  }
+
+  // Pass 2: name only (fallback or no company provided)
+  const query = `site:linkedin.com/in "${cleanName}"`;
+  console.log(`[Lookup] Pass 2 query: ${query}`);
+  const results = await searchCSE(query);
+  const candidates = processResults(results);
+  console.log(`[Lookup] Pass 2 found ${candidates.length} results`);
   return candidates;
 }
 
