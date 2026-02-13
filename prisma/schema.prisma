@@ -595,3 +595,16 @@ model OutreachTracker {
   @@index([userId, status])
   @@index([userId, reminderDate])
 }
+
+model CompanyResearch {
+  id            String   @id @default(cuid())
+  company       String
+  role          String   @default("")
+  talkingPoints Json
+  rawResponse   String?  @db.Text
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+
+  @@unique([company, role])
+  @@index([company])
+}
