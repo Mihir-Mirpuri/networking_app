@@ -14,6 +14,7 @@ interface SearchableComboboxProps {
   placeholder?: string;
   id?: string;
   disabled?: boolean;
+  allowFreeText?: boolean;
 }
 
 export function SearchableCombobox({
@@ -24,6 +25,7 @@ export function SearchableCombobox({
   placeholder = 'Search...',
   id,
   disabled = false,
+  allowFreeText = false,
 }: SearchableComboboxProps) {
   const [query, setQuery] = useState('');
 
@@ -79,7 +81,21 @@ export function SearchableCombobox({
           </Combobox.Button>
 
           <Combobox.Options className="absolute z-20 mt-1.5 max-h-60 w-full overflow-auto rounded-xl bg-white py-1.5 text-base shadow-soft-lg border border-surface-200 focus:outline-none sm:text-sm">
-            {filteredOptions.length === 0 && query !== '' ? (
+            {allowFreeText && query !== '' && !normalizedOptions.some((o) => o.value.toLowerCase() === query.toLowerCase()) && (
+              <Combobox.Option
+                value={query}
+                className={({ active }) =>
+                  `relative cursor-pointer select-none py-2.5 pl-4 pr-4 transition-colors ${
+                    active ? 'bg-primary-50 text-primary-900' : 'text-surface-800'
+                  }`
+                }
+              >
+                <span className="block truncate">
+                  Use &ldquo;{query}&rdquo;
+                </span>
+              </Combobox.Option>
+            )}
+            {filteredOptions.length === 0 && query !== '' && !allowFreeText ? (
               <div className="relative cursor-default select-none px-4 py-3 text-surface-500">
                 No results found.
               </div>

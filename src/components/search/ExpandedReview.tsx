@@ -13,6 +13,32 @@ interface ExpandedReviewProps {
   sendStatuses: Map<string, 'success' | 'failed' | 'pending'>;
 }
 
+function SendSuccessAnimation() {
+  return (
+    <div className="flex flex-col items-center justify-center py-6 animate-fade-in">
+      <svg className="w-16 h-16" viewBox="0 0 52 52">
+        <circle
+          className="draw-check-circle"
+          cx="26" cy="26" r="25"
+          fill="none"
+          stroke="#10b981"
+          strokeWidth="2"
+        />
+        <path
+          className="draw-check-mark"
+          fill="none"
+          stroke="#10b981"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M14.1 27.2l7.1 7.2 16.7-16.8"
+        />
+      </svg>
+      <p className="mt-3 text-sm font-medium text-emerald-700">Email sent!</p>
+    </div>
+  );
+}
+
 export function ExpandedReview({
   results,
   currentIndex,
@@ -29,11 +55,12 @@ export function ExpandedReview({
   const [scheduledDateTime, setScheduledDateTime] = useState('');
   const [scheduleError, setScheduleError] = useState<string | null>(null);
   const [isScheduling, setIsScheduling] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   const currentPerson = results[internalIndex];
   const status = currentPerson ? sendStatuses.get(currentPerson.id) : undefined;
 
-  const [researchCollapsed, setResearchCollapsed] = useState(false);
+  const [researchCollapsed, setResearchCollapsed] = useState(true);
 
   // Update subject/body when currentPerson changes
   useEffect(() => {
@@ -57,14 +84,14 @@ export function ExpandedReview({
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
         e.preventDefault();
-        if (currentPerson && !status && !isSending) {
+        if (currentPerson && !status && !isSending && !showSuccess) {
           handleSend();
         }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showScheduleModal, currentPerson, status, isSending, onClose]);
+  }, [showScheduleModal, currentPerson, status, isSending, showSuccess, onClose]);
 
 
   const handleSend = async () => {
@@ -74,14 +101,18 @@ export function ExpandedReview({
     await onSend(internalIndex, subject, body);
     setIsSending(false);
 
-    // Auto-advance to next unsent person
-    const nextIndex = findNextUnsent(internalIndex + 1);
-    if (nextIndex !== -1) {
-      setInternalIndex(nextIndex);
-    } else {
-      // No more to send, close the review
-      onClose();
-    }
+    // Show success animation before auto-advancing
+    setShowSuccess(true);
+    setTimeout(() => {
+      setShowSuccess(false);
+      // Auto-advance to next unsent person
+      const nextIndex = findNextUnsent(internalIndex + 1);
+      if (nextIndex !== -1) {
+        setInternalIndex(nextIndex);
+      } else {
+        onClose();
+      }
+    }, 1200);
   };
 
   const findNextUnsent = (startIndex: number): number => {
@@ -189,11 +220,18 @@ export function ExpandedReview({
     return null;
   }
 
-  const canSend = !status;
+  const canSend = !status && !showSuccess;
 
   return (
     <div className="fixed inset-0 bg-surface-900/50 flex items-center justify-center z-50 p-4 animate-fade-in" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="bg-white rounded-lg shadow-soft-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-scale-in">
+      <div className="bg-white rounded-lg shadow-soft-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-scale-in relative">
+        {/* Success animation overlay */}
+        {showSuccess && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/90 rounded-lg">
+            <SendSuccessAnimation />
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b">
           <div>
@@ -247,19 +285,9 @@ export function ExpandedReview({
         </div>
 
         {/* Status Banner */}
-        {status && (
-          <div
-            className={`px-4 py-2 ${
-              status === 'success'
-                ? 'bg-green-100 text-emerald-700'
-                : status === 'failed'
-                ? 'bg-red-100 text-red-800'
-                : 'bg-yellow-100 text-yellow-800'
-            }`}
-          >
-            {status === 'success' && 'Email sent successfully!'}
-            {status === 'failed' && 'Failed to send email'}
-            {status === 'pending' && 'Sending...'}
+        {status === 'failed' && (
+          <div className="px-4 py-2 bg-red-100 text-red-800">
+            Failed to send email
           </div>
         )}
 
@@ -281,7 +309,7 @@ export function ExpandedReview({
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
-                Company Research
+                {currentPerson.company} Recent Events
               </button>
               {!researchCollapsed && (
                 <CompanyResearchPanel
@@ -314,11 +342,11 @@ export function ExpandedReview({
             <textarea
               value={body}
               onChange={(e) => setBody(e.target.value)}
-              rows={12}
+              rows={10}
               className="input resize-none text-sm"
             />
           </div>
-          
+
           {/* Resume Attachment Indicator */}
           {currentPerson.resumeId && (
             <div className="mt-4 flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-md">
@@ -437,7 +465,6 @@ export function ExpandedReview({
           </div>
         </div>
       )}
-
     </div>
   );
 }

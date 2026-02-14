@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { INDUSTRIES, COMPANIES_BY_INDUSTRY, ROLES_BY_COMPANY, LOCATIONS, EMAIL_TEMPLATES } from '@/lib/constants';
+import { COMPANIES, ROLES, ROLES_BY_COMPANY, LOCATIONS, EMAIL_TEMPLATES } from '@/lib/constants';
 import { LoadingSpinner } from './LoadingSpinner';
 import { SearchableCombobox } from './SearchableCombobox';
 import { getTemplatesAction, TemplateData } from '@/app/actions/profile';
@@ -31,20 +31,13 @@ interface SearchFormProps {
 export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormProps) {
   const { status } = useSession();
 
-  // Initialize with initialParams if available, otherwise empty (user must select)
-  const [industry, setIndustry] = useState<string>(initialParams?.company ? '' : ''); // Default to Any Industry
   const [company, setCompany] = useState<string>(initialParams?.company || '');
   const [role, setRole] = useState<string>(initialParams?.role || '');
 
-  // Get companies for the selected industry (if no industry selected, show all companies)
-  const availableCompanies = industry
-    ? (COMPANIES_BY_INDUSTRY[industry] || [])
-    : Object.values(COMPANIES_BY_INDUSTRY).flat();
-
-  // Get roles for the selected company (if no company selected, show all roles)
+  // Get roles for the selected company, fall back to generic roles list
   const availableRoles = company
-    ? (ROLES_BY_COMPANY[company] || [])
-    : Array.from(new Set(Object.values(ROLES_BY_COMPANY).flat()));
+    ? (ROLES_BY_COMPANY[company] || [...ROLES])
+    : [...ROLES];
   const [university, setUniversity] = useState<string>(initialParams?.university || '');
   const [location, setLocation] = useState<string>(initialParams?.location || '');
   const [templateId, setTemplateId] = useState<string>(
@@ -166,84 +159,80 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
   return (
     <form onSubmit={handleSubmit} className="card p-6 mb-6">
       <h2 className="text-xl font-bold text-surface-900 mb-4">Find People</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mb-6">
-        {/* Industry */}
-        <SearchableCombobox
-          options={[
-            { label: 'Any Industry', value: '' },
-            ...INDUSTRIES.map((ind) => ({ label: ind, value: ind })),
-          ]}
-          value={industry}
-          onChange={(val) => {
-            setIndustry(val);
-            setCompany(''); // Reset company when industry changes
-            setRole(''); // Reset role when industry changes
-          }}
-          label="Industry"
-          placeholder="Select an industry..."
-          id="industry"
-        />
-
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-5 mb-6">
         {/* Company */}
-        <SearchableCombobox
-          options={[
-            { label: 'Any Company', value: '' },
-            ...availableCompanies.map((c) => ({ label: c, value: c })),
-          ]}
-          value={company}
-          onChange={(val) => {
-            setCompany(val);
-            setRole(''); // Reset role when company changes
-          }}
-          label="Company"
-          placeholder="Select a company..."
-          id="company"
-        />
+        <div className="lg:col-span-2">
+          <SearchableCombobox
+            options={[
+              { label: 'Any Company', value: '' },
+              ...COMPANIES.map((c) => ({ label: c, value: c })),
+            ]}
+            value={company}
+            onChange={(val) => {
+              setCompany(val);
+              setRole(''); // Reset role when company changes
+            }}
+            label="Company"
+            placeholder="Type or select a company..."
+            id="company"
+            allowFreeText
+          />
+        </div>
 
         {/* Role */}
-        <SearchableCombobox
-          options={[
-            { label: 'Any Role', value: '' },
-            ...availableRoles.map((r) => ({ label: r, value: r })),
-          ]}
-          value={role}
-          onChange={setRole}
-          label="Role"
-          placeholder="Select a role..."
-          id="role"
-        />
+        <div className="lg:col-span-2">
+          <SearchableCombobox
+            options={[
+              { label: 'Any Role', value: '' },
+              ...availableRoles.map((r) => ({ label: r, value: r })),
+            ]}
+            value={role}
+            onChange={setRole}
+            label="Role"
+            placeholder="Type or select a role..."
+            id="role"
+            allowFreeText
+          />
+        </div>
 
         {/* University */}
-        <SearchableCombobox
-          options={[
-            { label: 'Any University', value: '' },
-            { label: 'University of Texas at Austin', value: 'University of Texas at Austin' },
-          ]}
-          value={university}
-          onChange={setUniversity}
-          label="University"
-          placeholder="Select a university..."
-          id="university"
-        />
+        <div className="lg:col-span-2">
+          <SearchableCombobox
+            options={[
+              { label: 'Any University', value: '' },
+              { label: 'University of Texas at Austin', value: 'University of Texas at Austin' },
+              { label: 'Texas A&M University', value: 'Texas A&M University' },
+            ]}
+            value={university}
+            onChange={setUniversity}
+            label="University"
+            placeholder="Type or select a university..."
+            id="university"
+            allowFreeText
+          />
+        </div>
 
         {/* Office Location */}
-        <SearchableCombobox
-          options={[
-            { label: 'Any Location', value: '' },
-            ...LOCATIONS.filter((loc) => loc !== '').map((loc) => ({
-              label: loc,
-              value: loc,
-            })),
-          ]}
-          value={location}
-          onChange={setLocation}
-          label="Office Location"
-          placeholder="Select a location..."
-          id="location"
-        />
+        <div className="lg:col-span-3">
+          <SearchableCombobox
+            options={[
+              { label: 'Any Location', value: '' },
+              ...LOCATIONS.filter((loc) => loc !== '').map((loc) => ({
+                label: loc,
+                value: loc,
+              })),
+            ]}
+            value={location}
+            onChange={setLocation}
+            label="Office Location"
+            placeholder="Type or select a location..."
+            id="location"
+            allowFreeText
+          />
+        </div>
 
         {/* Template */}
-        <div>
+        <div className="lg:col-span-3">
           <SearchableCombobox
             options={
               isLoadingTemplates

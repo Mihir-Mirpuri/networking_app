@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { sendInviteAction } from '@/app/actions/invitations';
+import { sendInviteAction, hasInvitedTodayAction } from '@/app/actions/invitations';
 import { createCheckoutSession } from '@/app/actions/subscription';
 import { EMAIL_LIMITS } from '@/lib/constants';
 import { LoadingSpinner } from '@/components/search/LoadingSpinner';
@@ -18,6 +18,18 @@ export function LimitReachedModal({ isOpen, onClose, onCreditsAwarded }: LimitRe
   const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [hasInvitedToday, setHasInvitedToday] = useState(false);
+  const [checkingInviteStatus, setCheckingInviteStatus] = useState(true);
+
+  // Check if user already invited someone today
+  useEffect(() => {
+    if (!isOpen) return;
+    setCheckingInviteStatus(true);
+    hasInvitedTodayAction().then((result) => {
+      setHasInvitedToday(result);
+      setCheckingInviteStatus(false);
+    });
+  }, [isOpen]);
 
   // ESC to close
   useEffect(() => {
@@ -53,6 +65,7 @@ export function LimitReachedModal({ isOpen, onClose, onCreditsAwarded }: LimitRe
     if (result.success) {
       setSuccessMessage(`Invite sent! +${result.creditsAwarded} credits added to your account.`);
       setEmail('');
+      setHasInvitedToday(true);
       onCreditsAwarded?.(result.creditsAwarded || 0);
     } else {
       setError(result.error || 'Failed to send invite');
@@ -100,27 +113,28 @@ export function LimitReachedModal({ isOpen, onClose, onCreditsAwarded }: LimitRe
 
         {/* Body */}
         <div className="px-6 py-5">
-          <div className="bg-primary-50 rounded-lg p-4 mb-5">
-            <div className="flex items-start gap-3">
-              <svg
-                className="w-5 h-5 text-primary-600 mt-0.5 flex-shrink-0"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z" />
-              </svg>
-              <div>
-                <p className="text-sm font-medium text-primary-900">
-                  Invite a friend to earn more emails
-                </p>
-                <p className="text-sm text-primary-700 mt-1">
-                  Get <span className="font-semibold">+{EMAIL_LIMITS.CREDITS_ON_INVITE_SENT} credits</span> instantly
-                  when you send an invite, plus{' '}
-                  <span className="font-semibold">+{EMAIL_LIMITS.CREDITS_ON_INVITEE_SIGNUP} more</span> when they sign up!
-                </p>
+          {!hasInvitedToday && !successMessage && (
+            <div className="bg-primary-50 rounded-lg p-4 mb-5">
+              <div className="flex items-start gap-3">
+                <svg
+                  className="w-5 h-5 text-primary-600 mt-0.5 flex-shrink-0"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z" />
+                </svg>
+                <div>
+                  <p className="text-sm font-medium text-primary-900">
+                    Invite a friend to double your daily limit
+                  </p>
+                  <p className="text-sm text-primary-700 mt-1">
+                    Get <span className="font-semibold">+{EMAIL_LIMITS.CREDITS_ON_INVITE_SENT} bonus emails</span> instantly
+                    when you share Signl with a friend.
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Subscribe Option */}
           <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 mb-4 border border-blue-100">
@@ -156,15 +170,17 @@ export function LimitReachedModal({ isOpen, onClose, onCreditsAwarded }: LimitRe
             </button>
           </div>
 
-          {/* Divider */}
-          <div className="relative my-4">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-surface-200" />
+          {/* Divider - only show if invite section is visible */}
+          {(!hasInvitedToday || successMessage) && (
+            <div className="relative my-4">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-surface-200" />
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-surface-500">or invite a friend</span>
+              </div>
             </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-surface-500">or get free credits</span>
-            </div>
-          </div>
+          )}
 
           {successMessage ? (
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
@@ -179,8 +195,18 @@ export function LimitReachedModal({ isOpen, onClose, onCreditsAwarded }: LimitRe
                 <p className="text-green-800 font-medium">{successMessage}</p>
               </div>
               <p className="text-green-700 text-sm mt-2">
-                You can send another invite to earn more credits.
+                You&apos;ve used your daily invite. Upgrade to Pro for unlimited emails.
               </p>
+            </div>
+          ) : hasInvitedToday ? (
+            <div className="bg-surface-50 rounded-lg p-4 mt-4">
+              <p className="text-sm text-surface-600 text-center">
+                You&apos;ve already invited someone today. Upgrade to Pro for unlimited emails, or invite another friend tomorrow.
+              </p>
+            </div>
+          ) : checkingInviteStatus ? (
+            <div className="flex justify-center py-4">
+              <LoadingSpinner size="sm" />
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -226,7 +252,7 @@ export function LimitReachedModal({ isOpen, onClose, onCreditsAwarded }: LimitRe
                         d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
                       />
                     </svg>
-                    Send Invite (+{EMAIL_LIMITS.CREDITS_ON_INVITE_SENT} credits)
+                    Invite Friend (+{EMAIL_LIMITS.CREDITS_ON_INVITE_SENT} emails)
                   </>
                 )}
               </button>

@@ -596,6 +596,17 @@ model OutreachTracker {
   @@index([userId, reminderDate])
 }
 
+model CompanyAlias {
+  id            String   @id @default(cuid())
+  canonicalName String   // "Procter & Gamble"
+  aliases       String[] // ["p&g", "procter & gamble", "procter and gamble"]
+  source        String   @default("LLM") // "LLM" or "MANUAL"
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+
+  @@index([canonicalName])
+}
+
 model CompanyResearch {
   id            String   @id @default(cuid())
   company       String

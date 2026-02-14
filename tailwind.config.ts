@@ -65,8 +65,9 @@ const config: Config = {
       },
       animation: {
         'fade-in': 'fade-in 0.2s ease-out',
-        'fade-in-up': 'fade-in-up 0.3s ease-out',
+        'fade-in-up': 'fade-in-up 0.3s ease-out both',
         'slide-in-right': 'slide-in-right 0.3s ease-out',
+        'slide-panel-in': 'slide-panel-in 0.3s cubic-bezier(0.32, 0.72, 0, 1) both',
         'scale-in': 'scale-in 0.2s ease-out',
         'shimmer': 'shimmer 2s infinite',
         'pulse-soft': 'pulse-soft 2s infinite',
@@ -85,6 +86,10 @@ const config: Config = {
         'slide-in-right': {
           '0%': { opacity: '0', transform: 'translateX(10px)' },
           '100%': { opacity: '1', transform: 'translateX(0)' },
+        },
+        'slide-panel-in': {
+          '0%': { transform: 'translateX(100%)' },
+          '100%': { transform: 'translateX(0)' },
         },
         'scale-in': {
           '0%': { opacity: '0', transform: 'scale(0.95)' },

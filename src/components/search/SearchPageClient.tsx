@@ -9,7 +9,8 @@ import { LoadingSpinner } from './LoadingSpinner';
 import { SearchLoadingState } from './SearchLoadingState';
 import { Toast } from '@/components/ui/Toast';
 import { LimitReachedModal, dispatchCreditsChanged } from '@/components/credits';
-import { searchPeopleAction, SearchResultWithDraft, hidePersonAction, loadMorePeopleAction } from '@/app/actions/search';
+import { searchPeopleAction, SearchResultWithDraft, hidePersonAction, loadMorePeopleAction, getRecentSearchesAction, RecentSearch } from '@/app/actions/search';
+import { EMAIL_TEMPLATES } from '@/lib/constants';
 import { sendSingleEmailAction, sendEmailsAction, PersonToSend } from '@/app/actions/send';
 
 interface SearchPageClientProps {
@@ -82,6 +83,17 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
   const retryTimerRef = useRef<NodeJS.Timeout | null>(null);
   const retryCountRef = useRef(0);
   const MAX_RETRIES = 5;
+
+  // Recent searches state
+  const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([]);
+  const [isLoadingRecent, setIsLoadingRecent] = useState(true);
+  const [formPrefill, setFormPrefill] = useState<{
+    company?: string;
+    role?: string;
+    university?: string;
+    location?: string;
+    templateId: string;
+  } | null>(null);
 
   // Restore state from sessionStorage on mount
   useEffect(() => {
@@ -193,6 +205,24 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
     };
   }, []);
 
+  // Fetch recent searches on mount
+  useEffect(() => {
+    getRecentSearchesAction()
+      .then(setRecentSearches)
+      .catch(() => {})
+      .finally(() => setIsLoadingRecent(false));
+  }, []);
+
+  const handleRecentSearchClick = (search: RecentSearch) => {
+    setFormPrefill({
+      company: search.company || undefined,
+      role: search.role || undefined,
+      university: search.university || undefined,
+      location: search.location || undefined,
+      templateId: searchParams?.templateId || EMAIL_TEMPLATES[0].id,
+    });
+  };
+
   const handleSearch = async (params: {
     company?: string;
     role?: string;
@@ -213,6 +243,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
     setSendStatuses(new Map());
     setTotalLoaded(0);
     setHasMore(true);
+    setFormPrefill(null);
 
     const result = await searchPeopleAction({ ...params });
 
@@ -415,11 +446,39 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
 
   return (
     <div className="relative">
-      <SearchForm 
-        onSearch={handleSearch} 
+      <SearchForm
+        onSearch={handleSearch}
         isLoading={isSearching}
-        initialParams={searchParams}
+        initialParams={formPrefill || searchParams}
       />
+
+      {/* Recent searches — always visible below the form for quick re-runs */}
+      {!isLoadingRecent && recentSearches.length > 0 && !isSearching && (
+        <div className="mb-4 -mt-2">
+          <div className="flex items-center gap-2 mb-2">
+            <svg className="w-3.5 h-3.5 text-surface-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+            </svg>
+            <span className="text-xs font-medium text-surface-400">Recent</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {recentSearches.map((search, i) => {
+              const label = [search.company, search.role, search.university, search.location]
+                .filter(Boolean)
+                .join(' \u00b7 ');
+              return (
+                <button
+                  key={i}
+                  onClick={() => handleRecentSearchClick(search)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-surface-600 bg-surface-100 border border-surface-200 rounded-full hover:bg-primary-50 hover:text-primary-700 hover:border-primary-200 transition-colors cursor-pointer"
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">

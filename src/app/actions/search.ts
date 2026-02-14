@@ -34,6 +34,16 @@ import {
   getCompanyPattern,
   generateEmailFromPattern,
 } from '@/lib/services/email-pattern';
+import { resolveCompanyAliases } from '@/lib/services/company-alias';
+
+export interface RecentSearch {
+  company: string | null;
+  role: string | null;
+  university: string | null;
+  location: string | null;
+  searchedAt: Date;
+  resultsCount: number;
+}
 
 export interface SearchInput {
   name?: string;
@@ -538,6 +548,50 @@ export async function searchPeopleAction(
 }
 
 /**
+ * Get recent unique searches for the current user.
+ * Deduplicates by (company, role, university, location) key, returns top 8.
+ */
+export async function getRecentSearchesAction(): Promise<RecentSearch[]> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) return [];
+
+  try {
+    const logs = await prisma.searchLog.findMany({
+      where: { userId: session.user.id },
+      orderBy: { searchedAt: 'desc' },
+      take: 50,
+      select: {
+        company: true,
+        role: true,
+        university: true,
+        location: true,
+        searchedAt: true,
+        resultsCount: true,
+      },
+    });
+
+    // Deduplicate by combo key, keeping first (most recent) occurrence
+    const seen = new Set<string>();
+    const unique: RecentSearch[] = [];
+
+    for (const log of logs) {
+      const key = [log.company, log.role, log.university, log.location]
+        .map((v) => (v || '').toLowerCase().trim())
+        .join('|');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      unique.push(log);
+      if (unique.length >= 8) break;
+    }
+
+    return unique;
+  } catch (error) {
+    console.error('Error fetching recent searches:', error);
+    return [];
+  }
+}
+
+/**
  * Hide a person from future searches
  */
 export async function hidePersonAction(
@@ -779,16 +833,33 @@ async function processRefreshBatch(
   let csePrefiltered = 0;
   if (input.company) {
     const normalizedSearchCompany = normalizeCompanyForMatch(input.company);
+    // Resolve aliases (hardcoded → DB → LLM) for richer matching
+    const resolved = await resolveCompanyAliases(input.company);
+    const resolvedNormalized = resolved.aliases.map(a => normalizeCompanyForMatch(a));
+
     const beforeCount = urlsToScrape.length;
     urlsToScrape = urlsToScrape.filter((url) => {
       const cseResult = cseResultMap.get(url);
       if (!cseResult?.cseCompany) return true; // Keep if no metatag (conservative)
       const normalizedCseCompany = normalizeCompanyForMatch(cseResult.cseCompany);
-      const matches = companiesMatch(normalizedCseCompany, normalizedSearchCompany);
-      if (!matches) {
+
+      // Check against resolved aliases first
+      const aliasMatch = resolvedNormalized.some(alias =>
+        normalizedCseCompany === alias ||
+        normalizedCseCompany.startsWith(alias + ' ') ||
+        normalizedCseCompany.startsWith(alias + '-') ||
+        alias.startsWith(normalizedCseCompany + ' ') ||
+        alias.startsWith(normalizedCseCompany + '-')
+      );
+      if (aliasMatch) return true;
+
+      // Fallback: companiesMatch handles bidirectional substring for cases
+      // like "Pfizer" vs "Pfizer Inc." that don't need aliases
+      const fallbackMatch = companiesMatch(normalizedCseCompany, normalizedSearchCompany);
+      if (!fallbackMatch) {
         console.log(`[Refresh ${batchLabel}] Pre-filtered: "${cseResult.cseFirstName} ${cseResult.cseLastName}" — CSE company "${cseResult.cseCompany}" doesn't match "${input.company}"`);
       }
-      return matches;
+      return fallbackMatch;
     });
     csePrefiltered = beforeCount - urlsToScrape.length;
     if (csePrefiltered > 0) {

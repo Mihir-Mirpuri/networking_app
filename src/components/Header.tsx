@@ -3,9 +3,11 @@
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { usePolling } from '@/hooks/usePolling';
 import { getPendingSuggestionsCountAction } from '@/app/actions/meetingSuggestions';
+import { getCreditStatusAction } from '@/app/actions/invitations';
+import { CREDITS_CHANGED_EVENT } from '@/components/credits';
 import {
   PaperAirplaneIcon,
   ClockIcon,
@@ -13,10 +15,44 @@ import {
   UserCircleIcon,
 } from '@heroicons/react/24/outline';
 
+interface CreditStatus {
+  dailyUsed: number;
+  dailyLimit: number;
+  bonusCredits: number;
+  totalRemaining: number;
+  isSubscribed: boolean;
+}
+
 export function Header() {
   const { data: session, status } = useSession();
   const pathname = usePathname();
   const prevPathnameRef = useRef(pathname);
+  const [credits, setCredits] = useState<CreditStatus | null>(null);
+
+  const loadCredits = useCallback(async () => {
+    const result = await getCreditStatusAction();
+    if (result.success) {
+      setCredits({
+        dailyUsed: result.dailyUsed,
+        dailyLimit: result.dailyLimit,
+        bonusCredits: result.bonusCredits,
+        totalRemaining: result.totalRemaining,
+        isSubscribed: result.isSubscribed,
+      });
+    }
+  }, []);
+
+  // Load credits on mount and listen for changes
+  useEffect(() => {
+    if (session?.user) {
+      loadCredits();
+    }
+  }, [session?.user, loadCredits]);
+
+  useEffect(() => {
+    window.addEventListener(CREDITS_CHANGED_EVENT, loadCredits);
+    return () => window.removeEventListener(CREDITS_CHANGED_EVENT, loadCredits);
+  }, [loadCredits]);
 
   const { data: pendingSuggestionsCount, refetch } = usePolling(
     async () => {
@@ -99,8 +135,29 @@ export function Header() {
     return null;
   };
 
+  // Compute progress bar values
+  const getProgressInfo = () => {
+    if (!credits) return null;
+    if (credits.isSubscribed) return { percentage: 100, color: 'bg-primary-500', label: 'Pro', isPro: true };
+
+    const totalCapacity = credits.dailyLimit + credits.bonusCredits;
+    const totalUsed = totalCapacity - credits.totalRemaining;
+    const percentage = totalCapacity > 0 ? (totalUsed / totalCapacity) * 100 : 0;
+
+    const color =
+      credits.totalRemaining === 0
+        ? 'bg-red-500'
+        : credits.totalRemaining <= 3
+        ? 'bg-amber-500'
+        : 'bg-primary-500';
+
+    return { percentage, color, totalUsed, totalCapacity, isPro: false };
+  };
+
+  const progress = getProgressInfo();
+
   return (
-    <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-subtle border-b border-surface-200">
+    <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-subtle">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center gap-6">
@@ -111,10 +168,45 @@ export function Header() {
               <span className="text-xl font-bold text-surface-900 group-hover:text-primary-600 transition-colors">
                 Signl
               </span>
+              {progress?.isPro && (
+                <span className="inline-flex items-center px-1.5 py-0.5 bg-gradient-to-r from-primary-500 to-primary-700 rounded text-white font-semibold text-[10px] leading-tight">
+                  PRO
+                </span>
+              )}
             </Link>
           </div>
-          {renderNavContent()}
+          <div className="flex items-center gap-4">
+            {renderNavContent()}
+            {/* Compact credits label */}
+            {session?.user && progress && !progress.isPro && (
+              <div className="hidden sm:flex items-center gap-1.5 text-xs text-surface-500 pl-3 border-l border-surface-200">
+                <svg className="w-3.5 h-3.5 text-surface-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
+                </svg>
+                <span>
+                  <span className={`font-semibold ${
+                    credits!.totalRemaining === 0 ? 'text-red-600' : credits!.totalRemaining <= 3 ? 'text-amber-600' : 'text-surface-700'
+                  }`}>
+                    {progress.totalUsed}/{progress.totalCapacity}
+                  </span>
+                  {' '}sent
+                </span>
+              </div>
+            )}
+          </div>
         </div>
+      </div>
+      {/* Progress bar replaces bottom border */}
+      <div className="h-[2px] bg-surface-200">
+        {progress && !progress.isPro && (
+          <div
+            className={`h-full ${progress.color} rounded-r-full transition-all duration-700 ease-out`}
+            style={{ width: `${progress.percentage}%` }}
+          />
+        )}
+        {progress?.isPro && (
+          <div className="h-full bg-primary-500 w-full" />
+        )}
       </div>
     </header>
   );

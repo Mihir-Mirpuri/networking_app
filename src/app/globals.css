@@ -160,4 +160,23 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
+
+  /* Animated checkmark for send success */
+  .draw-check-circle {
+    stroke-dasharray: 166;
+    stroke-dashoffset: 166;
+    animation: draw-stroke 0.4s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+  }
+
+  .draw-check-mark {
+    stroke-dasharray: 48;
+    stroke-dashoffset: 48;
+    animation: draw-stroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.3s forwards;
+  }
+}
+
+@keyframes draw-stroke {
+  to {
+    stroke-dashoffset: 0;
+  }
 }

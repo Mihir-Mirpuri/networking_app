@@ -35,6 +35,20 @@ export async function sendInviteAction(inviteeEmail: string): Promise<SendInvite
     return { success: false, error: 'You cannot invite yourself' };
   }
 
+  // Check if user already sent an invite today (1 per day limit)
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayInvite = await prisma.invitation.findFirst({
+    where: {
+      referrerId: session.user.id,
+      sentAt: { gte: todayStart },
+    },
+  });
+
+  if (todayInvite) {
+    return { success: false, error: 'You can only invite one person per day. Try again tomorrow!' };
+  }
+
   // Check if already invited by this user
   const existingInvite = await prisma.invitation.findUnique({
     where: {
@@ -124,6 +138,22 @@ export async function getCreditStatusAction() {
     ...status,
     referralCode: user?.referralCode,
   };
+}
+
+export async function hasInvitedTodayAction(): Promise<boolean> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) return false;
+
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayInvite = await prisma.invitation.findFirst({
+    where: {
+      referrerId: session.user.id,
+      sentAt: { gte: todayStart },
+    },
+  });
+
+  return !!todayInvite;
 }
 
 export async function getInvitationsAction() {

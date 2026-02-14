@@ -3,8 +3,6 @@ import { NextAuthOptions } from 'next-auth';
 import { Adapter } from 'next-auth/adapters';
 import GoogleProvider from 'next-auth/providers/google';
 import prisma from './prisma';
-import { awardCredits } from './services/credits';
-import { EMAIL_LIMITS } from './constants';
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma) as Adapter,
@@ -89,17 +87,14 @@ async function handleReferralSignup(userId: string, userEmail: string): Promise<
     data: {
       status: 'SIGNED_UP',
       signedUpAt: new Date(),
-      creditsAwarded: invitation.creditsAwarded + EMAIL_LIMITS.CREDITS_ON_INVITEE_SIGNUP,
     },
   });
 
-  // Link the new user to their referrer
+  // Link the new user to their referrer (tracking only, no credit award)
   await prisma.user.update({
     where: { id: userId },
     data: { referredById: invitation.referrerId },
   });
 
-  // Award bonus credits to referrer for successful conversion
-  const awarded = await awardCredits(invitation.referrerId, EMAIL_LIMITS.CREDITS_ON_INVITEE_SIGNUP);
-  console.log(`[Auth] Awarded ${awarded} credits to referrer ${invitation.referrerId} for referral signup`);
+  console.log(`[Auth] Linked user ${userId} to referrer ${invitation.referrerId}`);
 }
