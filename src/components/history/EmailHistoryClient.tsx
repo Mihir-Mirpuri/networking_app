@@ -573,13 +573,34 @@ export function EmailHistoryClient({
               <p className="text-sm text-surface-500">All sent emails have been responded to</p>
             </>
           ) : (
-            <>
-              <svg className="w-12 h-12 text-surface-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
-              </svg>
-              <p className="text-base font-medium text-surface-600">No emails sent yet</p>
-              <p className="text-sm text-surface-500">Start by finding contacts and sending your first outreach</p>
-            </>
+            <div className="border border-surface-300 rounded-md overflow-hidden">
+              {/* Column headers */}
+              <div className="grid grid-cols-[1fr_1fr_2fr_auto_auto] gap-4 px-4 py-2.5 bg-surface-100 border-b border-surface-300 text-xs font-semibold text-surface-500 uppercase tracking-wide">
+                <span>Recipient</span>
+                <span>Company</span>
+                <span>Subject</span>
+                <span>Status</span>
+                <span className="text-right">Sent</span>
+              </div>
+              {/* Placeholder rows */}
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className={`grid grid-cols-[1fr_1fr_2fr_auto_auto] gap-4 px-4 py-3.5 ${i < 3 ? 'border-b border-surface-200' : ''}`}>
+                  <div className="h-3 w-24 bg-surface-100 rounded" />
+                  <div className="h-3 w-20 bg-surface-100 rounded" />
+                  <div className="h-3 w-40 bg-surface-100 rounded" />
+                  <div className="h-5 w-12 bg-surface-100 rounded-full" />
+                  <div className="h-3 w-14 bg-surface-100 rounded ml-auto" />
+                </div>
+              ))}
+              {/* Empty state message overlay */}
+              <div className="flex flex-col items-center justify-center py-8 -mt-[180px] mb-4 relative z-10">
+                <svg className="w-10 h-10 text-surface-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+                </svg>
+                <p className="text-base font-medium text-surface-600">No emails sent yet</p>
+                <p className="text-sm text-surface-500">Start by finding contacts and sending your first outreach</p>
+              </div>
+            </div>
           )}
         </div>
       ) : (
