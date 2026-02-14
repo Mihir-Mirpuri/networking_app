@@ -28,7 +28,7 @@ export function ResultsList({
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const sendableCount = results.filter(
-    (r) => r.email && !sendStatuses.has(r.id)
+    (r) => !sendStatuses.has(r.id)
   ).length;
 
   const peopleWithLinkedin = results.filter((r) => r.linkedinUrl);
@@ -129,14 +129,19 @@ export function ResultsList({
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {results.map((person, index) => (
-          <PersonCard
+          <div
             key={person.id}
-            person={person}
-            onExpand={() => onExpand(index)}
-            onHide={person.userCandidateId && onHide ? () => onHide(person.userCandidateId!) : undefined}
-            isSending={isSending && sendingIndex === index}
-            sendStatus={sendStatuses.get(person.id)}
-          />
+            className="animate-fade-in-up"
+            style={{ animationDelay: `${Math.min(index * 75, 600)}ms` }}
+          >
+            <PersonCard
+              person={person}
+              onExpand={() => onExpand(index)}
+              onHide={person.userCandidateId && onHide ? () => onHide(person.userCandidateId!) : undefined}
+              isSending={isSending && sendingIndex === index}
+              sendStatus={sendStatuses.get(person.id)}
+            />
+          </div>
         ))}
       </div>
     </div>

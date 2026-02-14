@@ -34,7 +34,6 @@ import {
   getCompanyPattern,
   generateEmailFromPattern,
 } from '@/lib/services/email-pattern';
-import { findEmail } from '@/lib/services/enrichment';
 
 export interface SearchInput {
   name?: string;
@@ -170,20 +169,19 @@ function getTemplate(templateId: string) {
 
 
 /**
- * On-demand enrichment: find people matching filters who lack emails,
- * then apply existing patterns or call Apollo directly (no pattern learning).
+ * Pattern-only enrichment: find people matching filters who lack emails,
+ * then apply existing email patterns (free — no Apollo calls).
+ * Apollo enrichment now happens at send time via enrichPersonBeforeSend() in send.ts.
  */
-async function enrichPeopleOnDemand(
+async function enrichPeopleWithPatterns(
   filters: PersonFilters,
-  searchCompany: string,
-  maxApolloCalls: number = 5
-): Promise<{ apolloCallsMade: number; emailsGenerated: number }> {
-  // Build where clause for people WITHOUT emails who haven't been tried with Apollo
+  searchCompany: string
+): Promise<{ emailsGenerated: number }> {
+  // Build where clause for people WITHOUT emails
   const baseWhere = buildPersonWhereClause({ ...filters, requireEmail: false });
   const where = {
     ...baseWhere,
     email: null,
-    apolloEnrichedAt: null,
     firstName: { not: null },
     lastName: { not: null },
   };
@@ -195,20 +193,18 @@ async function enrichPeopleOnDemand(
       firstName: true,
       lastName: true,
       company: true,
-      linkedinUrl: true,
     },
     orderBy: { createdAt: 'asc' },
-    take: maxApolloCalls * 3, // Overfetch to compensate for post-query company filtering
+    take: 30,
   });
 
   // Apply company fuzzy matching (same filter as findPeopleByFilters)
   const matched = applyPostQueryFilters(candidates, searchCompany);
 
-  let apolloCallsMade = 0;
   let emailsGenerated = 0;
 
   for (const person of matched) {
-    // Try existing pattern first (free — no Apollo call)
+    // Try existing pattern (free — no Apollo call)
     const normalizedCompany = normalizeCompanyForMatch(person.company);
     const companyKey = getCompanyKey(normalizedCompany);
 
@@ -237,64 +233,11 @@ async function enrichPeopleOnDemand(
       });
       emailsGenerated++;
       console.log(`[Enrich] Pattern → ${person.firstName} ${person.lastName} → ${generatedEmail}`);
-      continue;
-    }
-
-    // No pattern — call Apollo directly (counts toward cap)
-    if (apolloCallsMade >= maxApolloCalls) {
-      break;
-    }
-
-    const result = await findEmail({
-      firstName: person.firstName!,
-      lastName: person.lastName!,
-      company: person.company,
-      linkedinUrl: person.linkedinUrl,
-    });
-    apolloCallsMade++;
-
-    if (result.email) {
-      await prisma.person.update({
-        where: { id: person.id },
-        data: {
-          email: result.email,
-          emailStatus: result.status,
-          emailConfidence: result.confidence,
-          emailDeliverable: result.emailDeliverable,
-          apolloEnrichedAt: new Date(),
-          apolloStatus: result.apolloStatus === 'SUCCESS' || result.apolloStatus === 'NOT_FOUND'
-            ? result.apolloStatus : 'API_ERROR',
-          ...(result.city && { city: result.city }),
-          ...(result.state && { state: result.state }),
-          ...(result.country && { country: result.country }),
-        },
-      });
-      emailsGenerated++;
-      console.log(`[Enrich] Apollo → ${person.firstName} ${person.lastName} → ${result.email}`);
-    } else {
-      // Mark as attempted so we don't retry
-      await prisma.person.update({
-        where: { id: person.id },
-        data: {
-          apolloEnrichedAt: new Date(),
-          apolloStatus: result.apolloStatus === 'SUCCESS' || result.apolloStatus === 'NOT_FOUND'
-            ? result.apolloStatus : 'API_ERROR',
-          ...(result.city && { city: result.city }),
-          ...(result.state && { state: result.state }),
-          ...(result.country && { country: result.country }),
-        },
-      });
-      console.log(`[Enrich] Apollo → ${person.firstName} ${person.lastName} → no email (${result.apolloStatus})`);
-    }
-
-    // Rate limit between Apollo calls
-    if (apolloCallsMade < maxApolloCalls) {
-      await new Promise((r) => setTimeout(r, 300));
     }
   }
 
-  console.log(`[Enrich] Done: ${emailsGenerated} emails generated, ${apolloCallsMade} Apollo calls`);
-  return { apolloCallsMade, emailsGenerated };
+  console.log(`[Enrich] Done: ${emailsGenerated} emails generated (pattern-only)`);
+  return { emailsGenerated };
 }
 
 /**
@@ -454,25 +397,23 @@ export async function searchPeopleAction(
       location: input.location,
       role: input.role,
       university: input.university,
-      requireEmail: true,
+      requireEmail: false,
       excludePersonIds: allExcludedIds,
       limit: input.limit,
     };
 
-    // Query DB first — skip enrichment if we already have enough results
+    // Query DB first — try free pattern enrichment if we don't have enough results
     let people = await findPeopleByFilters(filters);
     console.log(`[Search] Found ${people.length} people in DB (need ${input.limit})`);
 
-    let apolloCallsMade = 0;
-
     if (people.length < input.limit) {
-      // Not enough results — enrich people without emails, then re-query
-      console.log(`[Search] Under limit, enriching to find more emails`);
-      const enrichResult = await enrichPeopleOnDemand(filters, input.company);
-      apolloCallsMade = enrichResult.apolloCallsMade;
+      // Not enough results — try free pattern enrichment, then re-query
+      console.log(`[Search] Under limit, enriching with patterns`);
+      await enrichPeopleWithPatterns(filters, input.company);
       people = await findPeopleByFilters(filters);
       console.log(`[Search] After enrichment: ${people.length} people`);
     }
+    const apolloCallsMade = 0;
     let apolloCacheHits = 0;
     let cseCallsMade = 0;
     let cseHasMorePages = false;
@@ -498,9 +439,8 @@ export async function searchPeopleAction(
           profilesMatchedSearch: batch.matchedCount,
         });
 
-        // Enrich newly scraped people before re-querying
-        const enrichResult2 = await enrichPeopleOnDemand(filters, input.company);
-        apolloCallsMade += enrichResult2.apolloCallsMade;
+        // Enrich newly scraped people with patterns before re-querying
+        await enrichPeopleWithPatterns(filters, input.company);
 
         // Re-query DB after scraping + enrichment added new people
         people = await findPeopleByFilters(filters);
@@ -688,19 +628,19 @@ export async function loadMorePeopleAction(
       location: input.location,
       role: input.role,
       university: input.university,
-      requireEmail: true,
+      requireEmail: false,
       excludePersonIds: allExcludedIds,
       limit: input.limit,
     };
 
-    // Query DB first — skip enrichment if we already have enough results
+    // Query DB first — try free pattern enrichment if not enough results
     let people = await findPeopleByFilters(filters);
     console.log(`[LoadMore] Found ${people.length} people in DB (need ${input.limit})`);
 
     if (people.length < input.limit) {
-      // Not enough results — enrich people without emails, then re-query
-      console.log(`[LoadMore] Under limit, enriching to find more emails`);
-      await enrichPeopleOnDemand(filters, input.company);
+      // Not enough results — try free pattern enrichment, then re-query
+      console.log(`[LoadMore] Under limit, enriching with patterns`);
+      await enrichPeopleWithPatterns(filters, input.company);
       people = await findPeopleByFilters(filters);
       console.log(`[LoadMore] After enrichment: ${people.length} people`);
     }
@@ -908,7 +848,7 @@ async function processRefreshBatch(
   return { newPeopleCount, matchedCount, emailsGenerated: 0, apolloCallsMade: 0, savedPersonIds, urlsScraped: urlsToScrape.length, urlsFromCse: cseResults.length, csePrefiltered };
 }
 
-const MAX_PRESCRAPE_PAGES = 4;
+const MAX_PRESCRAPE_PAGES = 2;
 
 /**
  * Background prescrape: scrape all remaining CSE pages (up to 4 total) for a search.
@@ -1213,11 +1153,11 @@ export async function lookupPersonAction(
       return { success: true, results: [] };
     }
 
-    // ===== STEP 4: Enrich people without emails =====
+    // ===== STEP 4: Enrich people without emails (pattern-only, free) =====
+    // Apollo enrichment now happens at send time.
     for (const person of top) {
       if (person.email || !person.firstName || !person.lastName) continue;
 
-      // Try pattern first
       const companyKey = getCompanyKey(normalizeCompanyForMatch(person.company));
       let pattern = companyKey ? await getCompanyPattern(companyKey) : null;
       if (!pattern) pattern = await getCompanyPattern(person.company);
@@ -1241,48 +1181,7 @@ export async function lookupPersonAction(
         person.emailStatus = 'UNVERIFIED';
         person.emailConfidence = Math.round(pattern.confidence * 100);
         console.log(`[Lookup] Pattern → ${person.fullName} → ${generatedEmail}`);
-        continue;
       }
-
-      // Apollo fallback
-      const result = await findEmail({
-        firstName: person.firstName,
-        lastName: person.lastName,
-        company: person.company,
-        linkedinUrl: person.linkedinUrl,
-      });
-
-      await prisma.person.update({
-        where: { id: person.id },
-        data: {
-          email: result.email,
-          emailStatus: result.email ? result.status : 'MISSING',
-          emailConfidence: result.confidence,
-          emailDeliverable: result.emailDeliverable,
-          apolloEnrichedAt: new Date(),
-          apolloStatus: result.apolloStatus === 'SUCCESS' || result.apolloStatus === 'NOT_FOUND'
-            ? result.apolloStatus : 'API_ERROR',
-          ...(result.city && { city: result.city }),
-          ...(result.state && { state: result.state }),
-          ...(result.country && { country: result.country }),
-          ...(result.education?.schoolName && { educationSchool: result.education.schoolName }),
-          ...(result.employment?.title && { role: result.employment.title }),
-        },
-      });
-
-      if (result.email) {
-        person.email = result.email;
-        person.emailStatus = result.status;
-        person.emailConfidence = result.confidence;
-        person.emailDeliverable = result.emailDeliverable;
-      }
-      if (result.city) person.city = result.city;
-      if (result.state) person.state = result.state;
-      if (result.education?.schoolName) person.educationSchool = result.education.schoolName;
-      if (result.employment?.title) person.role = result.employment.title;
-
-      console.log(`[Lookup] Apollo → ${person.fullName} → ${result.email || 'no email'}`);
-      await new Promise((r) => setTimeout(r, 300)); // Rate limit
     }
 
     // ===== STEP 5: Build results with drafts =====

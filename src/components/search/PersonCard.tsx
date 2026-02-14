@@ -1,7 +1,24 @@
 'use client';
 
 import { SearchResultWithDraft } from '@/app/actions/search';
-import { EnvelopeIcon, AcademicCapIcon, MapPinIcon, BuildingOfficeIcon } from '@heroicons/react/24/outline';
+import { EnvelopeIcon, AcademicCapIcon, MapPinIcon, BuildingOfficeIcon, CheckIcon } from '@heroicons/react/24/outline';
+
+const AVATAR_GRADIENTS = [
+  'from-primary-400 to-primary-600',
+  'from-teal-400 to-teal-600',
+  'from-rose-400 to-rose-600',
+  'from-amber-400 to-amber-600',
+  'from-violet-400 to-violet-600',
+];
+
+function nameToGradient(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = ((hash << 5) - hash) + name.charCodeAt(i);
+    hash |= 0;
+  }
+  return AVATAR_GRADIENTS[Math.abs(hash) % AVATAR_GRADIENTS.length];
+}
 
 interface PersonCardProps {
   person: SearchResultWithDraft;
@@ -76,10 +93,12 @@ export function PersonCard({
     .join('')
     .toUpperCase();
 
+  const gradient = nameToGradient(person.fullName);
+  const isSent = sendStatus === 'success';
+
   return (
-    <div className={`group relative card-hover p-5 flex flex-col items-center text-center ${
-      person.emailStatus === 'VERIFIED' ? 'border-l-2 border-l-emerald-400' :
-      person.emailStatus === 'UNVERIFIED' ? 'border-l-2 border-l-amber-300' : ''
+    <div className={`group relative card-hover p-5 flex flex-col items-center text-center hover:-translate-y-0.5 ${
+      isSent ? 'opacity-60 saturate-50' : ''
     }`}>
       {/* Hide button */}
       {onHide && person.userCandidateId && (
@@ -107,19 +126,17 @@ export function PersonCard({
       {/* Avatar */}
       <div className="mb-4">
         <div className="relative">
-          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center shadow-md">
+          <div className={`w-16 h-16 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center shadow-md`}>
             <span className="text-white font-semibold text-lg">{initials}</span>
           </div>
-          {/* Email status dot */}
-          <span className={`absolute bottom-0 right-0 w-4 h-4 rounded-full border-2 border-white ${
-            person.emailStatus === 'VERIFIED' ? 'bg-emerald-400' :
-            person.emailStatus === 'UNVERIFIED' ? 'bg-amber-400' :
-            'bg-surface-300'
-          }`} title={
-            person.emailStatus === 'VERIFIED' ? 'Verified email' :
-            person.emailStatus === 'UNVERIFIED' ? 'Unverified email' :
-            'No email'
-          } />
+          {/* Sent check overlay */}
+          {isSent && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-16 h-16 rounded-full bg-emerald-500/80 flex items-center justify-center">
+                <CheckIcon className="w-7 h-7 text-white" strokeWidth={2.5} />
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -184,15 +201,23 @@ export function PersonCard({
 
       {/* Action button */}
       <div className="w-full mt-auto">
-        <button
-          onClick={onExpand}
-          className={`text-sm w-full justify-center ${
-            person.email ? 'btn-primary' : 'btn-secondary opacity-60'
-          }`}
-        >
-          <EnvelopeIcon className="w-4 h-4 mr-1.5" />
-          {person.email ? 'Send Email' : 'No Email'}
-        </button>
+        {isSent ? (
+          <button
+            onClick={onExpand}
+            className="text-sm w-full justify-center btn-secondary text-emerald-600 border-emerald-200"
+          >
+            <CheckIcon className="w-4 h-4 mr-1.5" />
+            Sent
+          </button>
+        ) : (
+          <button
+            onClick={onExpand}
+            className="text-sm w-full justify-center btn-primary"
+          >
+            <EnvelopeIcon className="w-4 h-4 mr-1.5" />
+            Send Email
+          </button>
+        )}
       </div>
     </div>
   );

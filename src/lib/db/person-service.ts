@@ -932,6 +932,13 @@ export function buildPersonWhereClause(filters: Omit<PersonFilters, 'limit'>): R
     (where.AND as unknown[]).push({
       OR: [{ emailDeliverable: true }, { emailDeliverable: null }]
     });
+  } else {
+    // Even without requireEmail, exclude people Apollo already tried and couldn't find
+    // an email for — showing them would just lead to a failed send.
+    if (!where.AND) where.AND = [];
+    (where.AND as unknown[]).push({
+      NOT: { email: null, apolloEnrichedAt: { not: null } }
+    });
   }
 
   return where;
@@ -1106,6 +1113,9 @@ async function findPeopleByFiltersVector(
   if (requireEmail) {
     conditions.push(Prisma.sql`p.email IS NOT NULL`);
     conditions.push(Prisma.sql`(p."emailDeliverable" = true OR p."emailDeliverable" IS NULL)`);
+  } else {
+    // Exclude people Apollo already tried and couldn't find an email for
+    conditions.push(Prisma.sql`NOT (p.email IS NULL AND p."apolloEnrichedAt" IS NOT NULL)`);
   }
 
   // Exclude filter

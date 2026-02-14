@@ -24,10 +24,10 @@ export function BulkReview({
   const [drafts, setDrafts] = useState<Map<number, EmailDraft>>(new Map());
   const [isSending, setIsSending] = useState(false);
 
-  // Get only sendable results (have email and not already sent)
+  // Get only sendable results (not already sent — email resolved on send if missing)
   const sendableResults = results
     .map((r, i) => ({ result: r, index: i }))
-    .filter(({ result }) => result.email && !sendStatuses.has(result.id));
+    .filter(({ result }) => !sendStatuses.has(result.id));
 
   const sendableCount = sendableResults.filter(({ index }) => {
     const draft = drafts.get(index);
@@ -127,7 +127,6 @@ export function BulkReview({
                   <p className="text-sm text-surface-600">
                     {result.role ? `${result.role} at ` : ''}{result.company}
                   </p>
-                  <p className="text-sm text-primary-600">{result.email}</p>
                   {result.resumeId && (
                     <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-1 bg-emerald-50 border border-emerald-200 rounded-md">
                       <svg

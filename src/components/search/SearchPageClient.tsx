@@ -263,12 +263,12 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
 
   const handleSendFromReview = async (index: number, subject: string, body: string) => {
     const person = results[index];
-    if (!person.email || !person.userCandidateId) return;
+    if (!person.userCandidateId) return;
 
     setSendStatuses((prev) => new Map(prev).set(person.id, 'pending'));
 
     const personToSend: PersonToSend = {
-      email: person.email,
+      email: person.email || undefined,
       subject,
       body,
       userCandidateId: person.userCandidateId,
@@ -280,6 +280,15 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
     setSendStatuses((prev) =>
       new Map(prev).set(person.id, result.success ? 'success' : 'failed')
     );
+
+    // Update local state with resolved email from send result
+    if (result.success && result.email && result.email !== 'unknown') {
+      setResults((prev) =>
+        prev.map((r) =>
+          r.id === person.id ? { ...r, email: result.email, emailStatus: r.emailStatus === 'MISSING' ? 'UNVERIFIED' as const : r.emailStatus } : r
+        )
+      );
+    }
 
     if (result.success) {
       setRemainingDaily((prev) => Math.max(0, prev - 1));
@@ -296,9 +305,9 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
     const peopleToSend = emails
       .map(({ index, subject, body }) => {
         const person = results[index];
-        if (!person.email || !person.userCandidateId) return null;
+        if (!person.userCandidateId) return null;
         return {
-          email: person.email,
+          email: person.email || undefined,
           subject,
           body,
           userCandidateId: person.userCandidateId,
@@ -314,7 +323,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
     const newStatuses = new Map(sendStatuses);
     emails.forEach(({ index }) => {
       const person = results[index];
-      if (person.email && person.userCandidateId && !sendStatuses.has(person.id)) {
+      if (person.userCandidateId && !sendStatuses.has(person.id)) {
         newStatuses.set(person.id, 'pending');
       }
     });
@@ -325,7 +334,9 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
     if (result.success) {
       const updatedStatuses = new Map(newStatuses);
       result.results.forEach((res) => {
-        const person = results.find((r) => r.email === res.email);
+        // Match by email or by index position for people who had no email pre-send
+        const person = results.find((r) => r.email === res.email) ||
+          results.find((r) => !sendStatuses.has(r.id) && !r.email);
         if (person) {
           updatedStatuses.set(person.id, res.success ? 'success' : 'failed');
         }
@@ -417,6 +428,67 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
       )}
 
       {isSearching && <SearchLoadingState />}
+
+      {/* Pre-search empty state */}
+      {!isSearching && !error && results.length === 0 && !searchParams && (
+        <div className="flex flex-col items-center justify-center py-16 animate-fade-in">
+          {/* Illustration: three connected profile nodes */}
+          <div className="relative w-40 h-32 mb-6">
+            {/* Center node */}
+            <div className="absolute left-1/2 top-0 -translate-x-1/2 w-14 h-14 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center shadow-md">
+              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+              </svg>
+            </div>
+            {/* Left node */}
+            <div className="absolute left-2 bottom-0 w-11 h-11 rounded-full bg-gradient-to-br from-accent-300 to-accent-500 flex items-center justify-center shadow-sm">
+              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+              </svg>
+            </div>
+            {/* Right node */}
+            <div className="absolute right-2 bottom-0 w-11 h-11 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-sm">
+              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+              </svg>
+            </div>
+            {/* Connecting lines */}
+            <svg className="absolute inset-0 w-full h-full" viewBox="0 0 160 128" fill="none">
+              <line x1="80" y1="50" x2="30" y2="88" stroke="currentColor" strokeWidth="1.5" strokeDasharray="4 3" className="text-surface-300" />
+              <line x1="80" y1="50" x2="130" y2="88" stroke="currentColor" strokeWidth="1.5" strokeDasharray="4 3" className="text-surface-300" />
+            </svg>
+          </div>
+
+          <h3 className="text-lg font-semibold text-surface-800 mb-2">
+            Discover people to connect with
+          </h3>
+          <p className="text-sm text-surface-500 text-center max-w-md mb-5">
+            Search by company, role, or university to find professionals and send personalized emails — all in one click.
+          </p>
+
+          {/* Hint chips */}
+          <div className="flex flex-wrap justify-center gap-2">
+            {['Company', 'Role', 'University', 'Location'].map((filter) => (
+              <span
+                key={filter}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-surface-500 bg-surface-100 rounded-full"
+              >
+                <svg className="w-3 h-3 text-primary-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+                </svg>
+                {filter}
+              </span>
+            ))}
+          </div>
+
+          {/* Subtle upward arrow pointing to the form */}
+          <div className="mt-6 animate-pulse-soft">
+            <svg className="w-5 h-5 text-surface-300 rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+            </svg>
+          </div>
+        </div>
+      )}
 
       {!isSearching && !error && results.length === 0 && searchParams && (
         <div className="flex flex-col items-center justify-center py-16 text-surface-500">

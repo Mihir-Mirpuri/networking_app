@@ -42,10 +42,10 @@ export interface RankedCandidate<T> {
 // so they don't differentiate candidates. Role is the primary ranking factor.
 const WEIGHTS = {
   company: 0.00,
-  role: 0.85,
+  role: 0.90,
   location: 0.00,
   university: 0.00,
-  email: 0.15,
+  email: 0.10,
 };
 
 // When vector role matching is active, the DB already handled role similarity
@@ -303,13 +303,12 @@ export function scoreUniversityMatch(search: string | undefined, school: string 
  * Score email quality
  * - Verified: 1.0
  * - Unverified: 0.5
- * - Missing: 0
+ * - Missing: 0.3 (can still be contacted via send-time enrichment)
  */
 export function scoreEmailQuality(email: string | null, status: 'VERIFIED' | 'UNVERIFIED' | 'MISSING'): number {
-  if (!email || status === 'MISSING') return 0;
-  if (status === 'VERIFIED') return 1.0;
-  if (status === 'UNVERIFIED') return 0.5;
-  return 0;
+  if (status === 'VERIFIED' && email) return 1.0;
+  if (status === 'UNVERIFIED' && email) return 0.5;
+  return 0.3;
 }
 
 /**

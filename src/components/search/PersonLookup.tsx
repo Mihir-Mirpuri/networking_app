@@ -93,12 +93,12 @@ export function PersonLookup() {
 
   const handleSendFromReview = async (index: number, subject: string, body: string) => {
     const person = results[index];
-    if (!person.email || !person.userCandidateId) return;
+    if (!person.userCandidateId) return;
 
     setSendStatuses((prev) => new Map(prev).set(person.id, 'pending'));
 
     const personToSend: PersonToSend = {
-      email: person.email,
+      email: person.email || undefined,
       subject,
       body,
       userCandidateId: person.userCandidateId,
@@ -110,6 +110,15 @@ export function PersonLookup() {
     setSendStatuses((prev) =>
       new Map(prev).set(person.id, result.success ? 'success' : 'failed')
     );
+
+    // Update local state with resolved email
+    if (result.success && result.email && result.email !== 'unknown') {
+      setResults((prev) =>
+        prev.map((r) =>
+          r.id === person.id ? { ...r, email: result.email } : r
+        )
+      );
+    }
 
     if (result.success) {
       setToast({ message: 'Email sent successfully!', type: 'success' });
@@ -349,10 +358,7 @@ function LookupResultCard({
 
   const emailBadge = () => {
     if (sendStatus === 'success') return <span className="badge-success">Sent</span>;
-    if (!person.email) return <span className="badge bg-surface-100 text-surface-500">No email</span>;
-    if (person.emailStatus === 'VERIFIED') return <span className="badge-success">Verified</span>;
-    if (person.emailStatus === 'UNVERIFIED') return <span className="badge-warning">Unverified</span>;
-    return <span className="badge-primary">Found</span>;
+    return null;
   };
 
   return (
@@ -406,12 +412,6 @@ function LookupResultCard({
             )}
           </div>
 
-          {person.email && (
-            <div className="flex items-center gap-1.5 mt-2 text-sm text-primary-600">
-              <EnvelopeIcon className="w-3.5 h-3.5" />
-              <span className="font-medium">{person.email}</span>
-            </div>
-          )}
         </div>
 
         {/* Action */}

@@ -11,11 +11,20 @@ import {
   incrementDailyCount,
 } from '@/lib/services/gmail';
 import { upsertOutreachTrackerOnSend } from './outreach';
+import {
+  getCompanyPattern,
+  generateEmailFromPattern,
+} from '@/lib/services/email-pattern';
+import { findEmail } from '@/lib/services/enrichment';
+import {
+  getCompanyKey,
+  normalizeCompanyForMatch,
+} from '@/lib/db/person-service';
 
 const BATCH_LIMIT = 10;
 
 export interface PersonToSend {
-  email: string;
+  email?: string | null;
   subject: string;
   body: string;
   userCandidateId?: string;
@@ -27,6 +36,102 @@ export interface SendResult {
   email: string;
   success: boolean;
   error?: string;
+}
+
+/**
+ * Enrich a person's email right before sending.
+ * 1. If Person already has an email → return it immediately
+ * 2. Try free email pattern lookup
+ * 3. Fall back to Apollo findEmail()
+ * Returns the resolved email or an error.
+ */
+async function enrichPersonBeforeSend(
+  userCandidateId: string
+): Promise<{ email: string | null; error?: string }> {
+  const uc = await prisma.userCandidate.findUnique({
+    where: { id: userCandidateId },
+    include: { person: true },
+  });
+
+  if (!uc?.person) {
+    return { email: null, error: 'Person not found' };
+  }
+
+  const person = uc.person;
+
+  // Already has email — skip enrichment
+  if (person.email) {
+    return { email: person.email };
+  }
+
+  if (!person.firstName || !person.lastName) {
+    return { email: null, error: 'Could not find an email address for this person (missing name)' };
+  }
+
+  // Already tried Apollo and got nothing — don't call again
+  if (person.apolloEnrichedAt) {
+    return { email: null, error: 'Could not find an email address for this person' };
+  }
+
+  // Try free pattern lookup first
+  const normalizedCompany = normalizeCompanyForMatch(person.company);
+  const companyKey = getCompanyKey(normalizedCompany);
+
+  let pattern = companyKey ? await getCompanyPattern(companyKey) : null;
+  if (!pattern) {
+    pattern = await getCompanyPattern(person.company);
+  }
+
+  if (pattern) {
+    const generatedEmail = generateEmailFromPattern(
+      person.firstName,
+      person.lastName,
+      pattern.pattern as any,
+      pattern.domain
+    );
+    await prisma.person.update({
+      where: { id: person.id },
+      data: {
+        email: generatedEmail,
+        emailStatus: 'UNVERIFIED',
+        emailConfidence: Math.round(pattern.confidence * 100),
+      },
+    });
+    console.log(`[Send:Enrich] Pattern → ${person.firstName} ${person.lastName} → ${generatedEmail}`);
+    return { email: generatedEmail };
+  }
+
+  // Apollo fallback
+  const result = await findEmail({
+    firstName: person.firstName,
+    lastName: person.lastName,
+    company: person.company,
+    linkedinUrl: person.linkedinUrl,
+  });
+
+  await prisma.person.update({
+    where: { id: person.id },
+    data: {
+      email: result.email,
+      emailStatus: result.email ? result.status : 'MISSING',
+      emailConfidence: result.confidence,
+      emailDeliverable: result.emailDeliverable,
+      apolloEnrichedAt: new Date(),
+      apolloStatus: result.apolloStatus === 'SUCCESS' || result.apolloStatus === 'NOT_FOUND'
+        ? result.apolloStatus : 'API_ERROR',
+      ...(result.city && { city: result.city }),
+      ...(result.state && { state: result.state }),
+      ...(result.country && { country: result.country }),
+    },
+  });
+
+  if (result.email) {
+    console.log(`[Send:Enrich] Apollo → ${person.firstName} ${person.lastName} → ${result.email}`);
+    return { email: result.email };
+  }
+
+  console.log(`[Send:Enrich] Apollo → ${person.firstName} ${person.lastName} → no email`);
+  return { email: null, error: 'Could not find an email address for this person' };
 }
 
 export async function sendEmailsAction(
@@ -85,42 +190,57 @@ export async function sendEmailsAction(
   const results: SendResult[] = [];
 
   for (const person of toSend) {
-    if (!person.email) {
-      results.push({
-        email: person.email || 'unknown',
-        success: false,
-        error: 'No email address',
-      });
-      continue;
-    }
-
     if (!person.userCandidateId) {
       results.push({
-        email: person.email,
+        email: person.email || 'unknown',
         success: false,
         error: 'UserCandidate ID required',
       });
       continue;
     }
 
-    console.log('[Send] Sending email to:', person.email, 'subject:', person.subject?.substring(0, 50), 'resumeId:', person.resumeId);
+    // Resolve email: use provided email or enrich on-the-fly
+    let resolvedEmail = person.email || null;
+    if (!resolvedEmail && person.userCandidateId) {
+      const enrichResult = await enrichPersonBeforeSend(person.userCandidateId);
+      resolvedEmail = enrichResult.email;
+      if (!resolvedEmail) {
+        results.push({
+          email: 'unknown',
+          success: false,
+          error: enrichResult.error || 'Could not find an email address for this person',
+        });
+        continue;
+      }
+    }
+
+    if (!resolvedEmail) {
+      results.push({
+        email: 'unknown',
+        success: false,
+        error: 'No email address',
+      });
+      continue;
+    }
+
+    console.log('[Send] Sending email to:', resolvedEmail, 'subject:', person.subject?.substring(0, 50), 'resumeId:', person.resumeId);
     const sendResult = await sendEmail(
       accessToken,
       refreshToken,
       session.user.email,
-      person.email,
+      resolvedEmail,
       person.subject,
       person.body,
       person.resumeId
     );
-    console.log('[Send] Send result:', { email: person.email, success: sendResult.success, error: sendResult.error });
+    console.log('[Send] Send result:', { email: resolvedEmail, success: sendResult.success, error: sendResult.error });
 
     // Log the send attempt
     const sendLog = await prisma.sendLog.create({
       data: {
         userId: session.user.id,
         userCandidateId: person.userCandidateId,
-        toEmail: person.email,
+        toEmail: resolvedEmail,
         subject: person.subject,
         body: person.body,
         resumeAttached: !!person.resumeId,
@@ -160,7 +280,7 @@ export async function sendEmailsAction(
       // Upsert outreach tracker
       const trackerResult = await upsertOutreachTrackerOnSend({
         userId: session.user.id,
-        toEmail: person.email,
+        toEmail: resolvedEmail,
         contactName,
         company,
         role,
@@ -193,7 +313,7 @@ export async function sendEmailsAction(
     }
 
     results.push({
-      email: person.email,
+      email: resolvedEmail,
       success: sendResult.success,
       error: sendResult.error,
     });
@@ -209,10 +329,10 @@ export async function sendSingleEmailAction(
   const result = await sendEmailsAction([person]);
 
   if (!result.success) {
-    return { email: person.email, success: false, error: result.error };
+    return { email: person.email || 'unknown', success: false, error: result.error };
   }
 
-  return result.results[0] || { email: person.email, success: false, error: 'Unknown error' };
+  return result.results[0] || { email: person.email || 'unknown', success: false, error: 'Unknown error' };
 }
 
 export async function getRemainingDailyLimit(): Promise<number> {
@@ -243,35 +363,49 @@ export async function scheduleEmailAction(
 ): Promise<SendResult> {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email || !session.user.id) {
-    return { email: person.email, success: false, error: 'Not authenticated' };
+    return { email: person.email || 'unknown', success: false, error: 'Not authenticated' };
   }
 
   if (!person.scheduledFor) {
-    return { email: person.email, success: false, error: 'scheduledFor is required' };
+    return { email: person.email || 'unknown', success: false, error: 'scheduledFor is required' };
   }
 
   // Validate: must be at least 5 minutes in future
   const now = new Date();
   const minScheduledTime = new Date(now.getTime() + 5 * 60 * 1000); // 5 minutes from now
   if (person.scheduledFor < minScheduledTime) {
-    return { 
-      email: person.email, 
-      success: false, 
-      error: 'Scheduled time must be at least 5 minutes in the future' 
+    return {
+      email: person.email || 'unknown',
+      success: false,
+      error: 'Scheduled time must be at least 5 minutes in the future'
     };
   }
 
   if (!person.userCandidateId) {
-    return { email: person.email, success: false, error: 'UserCandidate ID required' };
+    return { email: person.email || 'unknown', success: false, error: 'UserCandidate ID required' };
+  }
+
+  // Resolve email before scheduling: enrich if missing
+  let resolvedEmail = person.email || null;
+  if (!resolvedEmail) {
+    const enrichResult = await enrichPersonBeforeSend(person.userCandidateId);
+    resolvedEmail = enrichResult.email;
+    if (!resolvedEmail) {
+      return {
+        email: 'unknown',
+        success: false,
+        error: enrichResult.error || 'Could not find an email address for this person',
+      };
+    }
   }
 
   // Check daily limit (count at schedule time)
   const { canSend, remaining } = await checkDailyLimit(session.user.id);
   if (!canSend) {
-    return { 
-      email: person.email, 
-      success: false, 
-      error: 'LIMIT_REACHED' 
+    return {
+      email: resolvedEmail,
+      success: false,
+      error: 'LIMIT_REACHED'
     };
   }
 
@@ -281,7 +415,7 @@ export async function scheduleEmailAction(
       data: {
         userId: session.user.id,
         userCandidateId: person.userCandidateId,
-        toEmail: person.email,
+        toEmail: resolvedEmail,
         subject: person.subject,
         body: person.body,
         resumeId: person.resumeId || null,
@@ -294,13 +428,13 @@ export async function scheduleEmailAction(
     await incrementDailyCount(session.user.id);
 
     console.log('[Schedule] Scheduled email created:', scheduledEmail.id);
-    return { email: person.email, success: true };
+    return { email: resolvedEmail, success: true };
   } catch (error) {
     console.error('[Schedule] Error scheduling email:', error);
-    return { 
-      email: person.email, 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Failed to schedule email' 
+    return {
+      email: resolvedEmail,
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to schedule email'
     };
   }
 }

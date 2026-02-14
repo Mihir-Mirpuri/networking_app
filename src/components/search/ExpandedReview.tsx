@@ -57,7 +57,7 @@ export function ExpandedReview({
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
         e.preventDefault();
-        if (currentPerson?.email && !status && !isSending) {
+        if (currentPerson && !status && !isSending) {
           handleSend();
         }
       }
@@ -68,7 +68,7 @@ export function ExpandedReview({
 
 
   const handleSend = async () => {
-    if (!currentPerson?.email) return;
+    if (!currentPerson) return;
 
     setIsSending(true);
     await onSend(internalIndex, subject, body);
@@ -86,7 +86,7 @@ export function ExpandedReview({
 
   const findNextUnsent = (startIndex: number): number => {
     for (let i = startIndex; i < results.length; i++) {
-      if (results[i].email && !sendStatuses.has(results[i].id)) {
+      if (!sendStatuses.has(results[i].id)) {
         return i;
       }
     }
@@ -115,7 +115,7 @@ export function ExpandedReview({
   };
 
   const handleSchedule = async () => {
-    if (!currentPerson?.email || !currentPerson.userCandidateId) return;
+    if (!currentPerson?.userCandidateId) return;
 
     if (!scheduledDateTime) {
       setScheduleError('Please select a date and time');
@@ -136,7 +136,7 @@ export function ExpandedReview({
 
     try {
       const result = await scheduleEmailAction({
-        email: currentPerson.email,
+        email: currentPerson.email || undefined,
         subject,
         body,
         userCandidateId: currentPerson.userCandidateId,
@@ -189,7 +189,7 @@ export function ExpandedReview({
     return null;
   }
 
-  const canSend = currentPerson.email && !status;
+  const canSend = !status;
 
   return (
     <div className="fixed inset-0 bg-surface-900/50 flex items-center justify-center z-50 p-4 animate-fade-in" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -202,23 +202,6 @@ export function ExpandedReview({
               {currentPerson.role ? `${currentPerson.role} at ` : ''}
               {currentPerson.company}
             </p>
-            {currentPerson.email ? (
-              <div className="flex items-center gap-2">
-                <p className="text-sm text-primary-600">{currentPerson.email}</p>
-                {currentPerson.emailStatus === 'VERIFIED' && (
-                  <span className="px-2 py-0.5 text-xs rounded-full bg-green-100 text-emerald-700">
-                    Verified
-                  </span>
-                )}
-                {currentPerson.emailStatus === 'UNVERIFIED' && (
-                  <span className="px-2 py-0.5 text-xs rounded-full bg-yellow-100 text-yellow-800">
-                    Unverified
-                  </span>
-                )}
-              </div>
-            ) : (
-              <p className="text-sm text-red-500">No email found</p>
-            )}
             {currentPerson.linkedinUrl && (
               <a
                 href={currentPerson.linkedinUrl}
