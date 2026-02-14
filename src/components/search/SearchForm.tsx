@@ -214,20 +214,17 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
         />
 
         {/* University */}
-        <div>
-          <label htmlFor="university" className="block text-sm font-medium text-surface-700 mb-1.5">
-            University
-          </label>
-          <select
-            id="university"
-            value={university}
-            onChange={(e) => setUniversity(e.target.value)}
-            className="input"
-          >
-            <option value="">Any University</option>
-            <option value="University of Texas at Austin">University of Texas at Austin</option>
-          </select>
-        </div>
+        <SearchableCombobox
+          options={[
+            { label: 'Any University', value: '' },
+            { label: 'University of Texas at Austin', value: 'University of Texas at Austin' },
+          ]}
+          value={university}
+          onChange={setUniversity}
+          label="University"
+          placeholder="Select a university..."
+          id="university"
+        />
 
         {/* Office Location */}
         <SearchableCombobox
