@@ -366,8 +366,8 @@ export interface ScrapeProgress {
   prescrapeStatus: string | null;
 }
 
-// Hard cap: 5 total pages (1 sync + 4 prescrape). Page 5 = start 41.
-const MAX_CSE_PAGE_START = 41;
+// Hard cap: 3 total pages (1 sync + 2 prescrape). Page 3 = start 21.
+const MAX_CSE_PAGE_START = 21;
 
 /**
  * Compute the next CSE page start value based on scrape progress.
