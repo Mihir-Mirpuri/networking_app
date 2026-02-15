@@ -38,20 +38,6 @@ export function PersonCard({
   scheduledFor,
 }: PersonCardProps) {
   const getStatusBadge = () => {
-    if (sendStatus === 'success') {
-      return (
-        <span className="badge-success">
-          Sent
-        </span>
-      );
-    }
-    if (sendStatus === 'failed') {
-      return (
-        <span className="badge-error">
-          Failed
-        </span>
-      );
-    }
     if (sendStatus === 'pending') {
       return (
         <span className="badge-warning">
@@ -95,10 +81,11 @@ export function PersonCard({
 
   const gradient = nameToGradient(person.fullName);
   const isSent = sendStatus === 'success';
+  const isFailed = sendStatus === 'failed';
 
   return (
     <div className={`group relative card-hover p-5 flex flex-col items-center text-center hover:-translate-y-0.5 ${
-      isSent ? 'opacity-60 saturate-50' : ''
+      (isSent || isFailed) ? 'opacity-60 saturate-50' : ''
     }`}>
       {/* Hide button */}
       {onHide && person.userCandidateId && (
@@ -134,6 +121,16 @@ export function PersonCard({
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="w-16 h-16 rounded-full bg-emerald-500/80 flex items-center justify-center">
                 <CheckIcon className="w-7 h-7 text-white" strokeWidth={2.5} />
+              </div>
+            </div>
+          )}
+          {/* Failed X overlay */}
+          {isFailed && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-16 h-16 rounded-full bg-red-500/80 flex items-center justify-center">
+                <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
               </div>
             </div>
           )}
@@ -208,6 +205,13 @@ export function PersonCard({
           >
             <CheckIcon className="w-4 h-4 mr-1.5" />
             Sent
+          </button>
+        ) : isFailed ? (
+          <button
+            onClick={onExpand}
+            className="text-sm w-full justify-center btn-secondary text-red-600 border-red-200"
+          >
+            Failed
           </button>
         ) : (
           <button
