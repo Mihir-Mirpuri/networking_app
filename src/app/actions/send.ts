@@ -46,7 +46,8 @@ export interface SendResult {
  * Returns the resolved email or an error.
  */
 async function enrichPersonBeforeSend(
-  userCandidateId: string
+  userCandidateId: string,
+  userId: string
 ): Promise<{ email: string | null; error?: string }> {
   const uc = await prisma.userCandidate.findUnique({
     where: { id: userCandidateId },
@@ -107,6 +108,12 @@ async function enrichPersonBeforeSend(
     lastName: person.lastName,
     company: person.company,
     linkedinUrl: person.linkedinUrl,
+  });
+
+  // Track Apollo API call on the user
+  await prisma.user.update({
+    where: { id: userId },
+    data: { apolloCallsMade: { increment: 1 } },
   });
 
   await prisma.person.update({
@@ -202,7 +209,7 @@ export async function sendEmailsAction(
     // Resolve email: use provided email or enrich on-the-fly
     let resolvedEmail = person.email || null;
     if (!resolvedEmail && person.userCandidateId) {
-      const enrichResult = await enrichPersonBeforeSend(person.userCandidateId);
+      const enrichResult = await enrichPersonBeforeSend(person.userCandidateId, session.user.id);
       resolvedEmail = enrichResult.email;
       if (!resolvedEmail) {
         results.push({
@@ -388,7 +395,7 @@ export async function scheduleEmailAction(
   // Resolve email before scheduling: enrich if missing
   let resolvedEmail = person.email || null;
   if (!resolvedEmail) {
-    const enrichResult = await enrichPersonBeforeSend(person.userCandidateId);
+    const enrichResult = await enrichPersonBeforeSend(person.userCandidateId, session.user.id);
     resolvedEmail = enrichResult.email;
     if (!resolvedEmail) {
       return {

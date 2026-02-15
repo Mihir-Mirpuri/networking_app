@@ -51,6 +51,7 @@ model User {
   calendarConnected          Boolean                      @default(false)
   // Credit system fields
   emailCredits               Int                          @default(0)
+  apolloCallsMade            Int                          @default(0)
   referralCode               String?                      @unique
   referredById               String?
   // Stripe subscription fields

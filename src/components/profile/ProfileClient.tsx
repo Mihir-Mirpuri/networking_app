@@ -240,11 +240,21 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
         body: formData,
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to upload resume');
+        let message = 'Failed to upload resume';
+        try {
+          const data = await response.json();
+          message = data.error || message;
+        } catch {
+          // Response body was empty or not JSON (e.g. 413 from Next.js)
+          if (response.status === 413) {
+            message = 'File is too large to upload';
+          }
+        }
+        throw new Error(message);
       }
+
+      const data = await response.json();
 
       setResumeSuccess(true);
       setTimeout(() => setResumeSuccess(false), 3000);
