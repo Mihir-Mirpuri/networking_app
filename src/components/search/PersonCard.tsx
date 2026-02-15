@@ -162,7 +162,7 @@ export function PersonCard({
       )}
 
       {/* Role */}
-      <p className="text-sm text-primary-600 font-medium mb-4">
+      <p className="text-sm text-primary-600 font-medium mb-4 truncate w-full" title={person.role || 'Professional'}>
         {person.role || 'Professional'}
       </p>
 
