@@ -44,7 +44,6 @@ async function extractResumeText(fileUrl: string, mimeType: string): Promise<str
 
   // Parse based on mime type
   if (mimeType === 'application/pdf') {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const pdf = require('pdf-parse');
     const pdfData = await pdf(buffer);
     return pdfData.text;
