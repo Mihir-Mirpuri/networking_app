@@ -717,15 +717,40 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                     ))}
                   </div>
                 </div>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={newTemplate.attachResume}
-                    onChange={(e) => setNewTemplate({ ...newTemplate, attachResume: e.target.checked })}
-                    className="w-4 h-4 text-primary-500 border-surface-300 rounded focus:ring-primary-500"
-                  />
-                  <span className="text-sm text-surface-700">Attach resume</span>
-                </label>
+                {resumes.length > 0 && (
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={newTemplate.attachResume}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          const activeResume = resumes.find((r) => r.isActive);
+                          setNewTemplate({
+                            ...newTemplate,
+                            attachResume: checked,
+                            resumeId: checked ? (activeResume?.id || resumes[0]?.id || null) : null,
+                          });
+                        }}
+                        className="w-4 h-4 text-primary-500 border-surface-300 rounded focus:ring-primary-500"
+                      />
+                      <span className="text-sm text-surface-700">Attach resume</span>
+                    </label>
+                    {newTemplate.attachResume && (
+                      <select
+                        value={newTemplate.resumeId || ''}
+                        onChange={(e) => setNewTemplate({ ...newTemplate, resumeId: e.target.value || null })}
+                        className="w-full bg-white border border-surface-200 rounded-lg text-sm p-2"
+                      >
+                        {resumes.map((resume) => (
+                          <option key={resume.id} value={resume.id}>
+                            {resume.filename} {resume.isActive ? '(Active)' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                )}
                 <div className="flex gap-3">
                   <button
                     onClick={handleCreateTemplate}
@@ -861,15 +886,40 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                       ))}
                     </div>
                   </div>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={editingTemplate.attachResume}
-                      onChange={(e) => setEditingTemplate({ ...editingTemplate, attachResume: e.target.checked })}
-                      className="w-4 h-4 text-primary-500 border-surface-300 rounded"
-                    />
-                    <span className="text-sm text-surface-700">Attach resume</span>
-                  </label>
+                  {resumes.length > 0 && (
+                    <div className="space-y-2">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={editingTemplate.attachResume}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            const activeResume = resumes.find((r) => r.isActive);
+                            setEditingTemplate({
+                              ...editingTemplate,
+                              attachResume: checked,
+                              resumeId: checked ? (editingTemplate.resumeId || activeResume?.id || resumes[0]?.id || null) : null,
+                            });
+                          }}
+                          className="w-4 h-4 text-primary-500 border-surface-300 rounded"
+                        />
+                        <span className="text-sm text-surface-700">Attach resume</span>
+                      </label>
+                      {editingTemplate.attachResume && (
+                        <select
+                          value={editingTemplate.resumeId || ''}
+                          onChange={(e) => setEditingTemplate({ ...editingTemplate, resumeId: e.target.value || null })}
+                          className="w-full bg-white border border-surface-200 rounded-lg text-sm p-2"
+                        >
+                          {resumes.map((resume) => (
+                            <option key={resume.id} value={resume.id}>
+                              {resume.filename} {resume.isActive ? '(Active)' : ''}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                  )}
                   <div className="flex gap-3 pt-5 border-t border-surface-200">
                     <button
                       onClick={async () => {
