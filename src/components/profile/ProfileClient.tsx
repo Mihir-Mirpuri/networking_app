@@ -702,6 +702,21 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                     placeholder="Email body"
                   />
                 </div>
+                <div className="p-3 bg-surface-100 rounded-xl">
+                  <p className="text-xs font-semibold text-surface-700 mb-2">Available Placeholders:</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {DEFAULT_PLACEHOLDERS.map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setNewTemplate({ ...newTemplate, body: newTemplate.body + p })}
+                        className="text-xs px-2.5 py-1 bg-primary-100 text-primary-700 rounded-full font-medium hover:bg-primary-200 transition-colors cursor-pointer"
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -830,6 +845,21 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                       rows={8}
                       className="w-full bg-surface-50 border-none rounded-lg focus:ring-2 focus:ring-primary-500 text-sm p-3 resize-none"
                     />
+                  </div>
+                  <div className="p-3 bg-surface-100 rounded-xl">
+                    <p className="text-xs font-semibold text-surface-700 mb-2">Available Placeholders:</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {DEFAULT_PLACEHOLDERS.map((p) => (
+                        <button
+                          key={p}
+                          type="button"
+                          onClick={() => setEditingTemplate({ ...editingTemplate, body: editingTemplate.body + p })}
+                          className="text-xs px-2.5 py-1 bg-primary-100 text-primary-700 rounded-full font-medium hover:bg-primary-200 transition-colors cursor-pointer"
+                        >
+                          {p}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
