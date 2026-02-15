@@ -112,7 +112,10 @@ export function ExpandedReview({
     await onSend(internalIndex, subject, body);
     setIsSending(false);
 
-    // Show success animation before auto-advancing
+    // Only show success animation if the send actually succeeded
+    const sendResult = sendStatuses.get(currentPerson.id);
+    if (sendResult === 'failed') return;
+
     setShowSuccess(true);
     setTimeout(() => {
       setShowSuccess(false);
