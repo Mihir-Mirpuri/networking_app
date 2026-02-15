@@ -256,7 +256,8 @@ export async function sendEmail(
       attachments.push(resumeData);
       console.log(`[Gmail] Resume attachment loaded: ${resumeData.filename} (${resumeData.content.length} bytes, ${resumeData.mimeType})`);
     } else {
-      console.warn(`[Gmail] Failed to load resume ${resumeId}, sending email without resume attachment`);
+      console.error(`[Gmail] Failed to load resume ${resumeId}, aborting send`);
+      return { success: false, error: 'Failed to attach resume. Please re-upload your resume and try again.' };
     }
   }
 
@@ -465,7 +466,8 @@ export async function sendReplyEmail(
       attachments.push(resumeData);
       console.log(`[Gmail] Resume attachment loaded: ${resumeData.filename} (${resumeData.content.length} bytes, ${resumeData.mimeType})`);
     } else {
-      console.warn(`[Gmail] Failed to load resume ${resumeId}, sending email without attachment`);
+      console.error(`[Gmail] Failed to load resume ${resumeId}, aborting send`);
+      return { success: false, error: 'Failed to attach resume. Please re-upload your resume and try again.' };
     }
   }
 
