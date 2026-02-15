@@ -9,9 +9,11 @@ import { LoadingSpinner } from './LoadingSpinner';
 import { SearchLoadingState } from './SearchLoadingState';
 import { Toast } from '@/components/ui/Toast';
 import { LimitReachedModal, dispatchCreditsChanged } from '@/components/credits';
-import { searchPeopleAction, SearchResultWithDraft, hidePersonAction, loadMorePeopleAction, getRecentSearchesAction, RecentSearch } from '@/app/actions/search';
+import { searchPeopleAction, SearchResultWithDraft, hidePersonAction, loadMorePeopleAction, getRecentSearchesAction, RecentSearch, regenerateDraftAction } from '@/app/actions/search';
 import { EMAIL_TEMPLATES } from '@/lib/constants';
 import { sendSingleEmailAction, sendEmailsAction, PersonToSend } from '@/app/actions/send';
+import { getTemplatesAction, TemplateData } from '@/app/actions/profile';
+import { useSession } from 'next-auth/react';
 
 interface SearchPageClientProps {
   initialRemainingDaily: number;
@@ -36,7 +38,6 @@ interface SearchPageState {
     university?: string;
     location?: string;
     limit: number;
-    templateId: string;
   };
   totalLoaded?: number;
   hasMore?: boolean;
@@ -53,6 +54,7 @@ function arrayToMap<T>(array: Array<[string, T]>): Map<string, T> {
 }
 
 export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProps) {
+  const { status: sessionStatus } = useSession();
   const [results, setResults] = useState<SearchResultWithDraft[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -72,8 +74,12 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
     university?: string;
     location?: string;
     limit: number;
-    templateId: string;
   } | null>(null);
+
+  // Template state
+  const [templates, setTemplates] = useState<TemplateData[]>([]);
+  const [defaultTemplateId, setDefaultTemplateId] = useState<string>(EMAIL_TEMPLATES[0].id);
+  const [isRegenerating, setIsRegenerating] = useState(false);
 
   // Pagination state
   const [totalLoaded, setTotalLoaded] = useState(0);
@@ -92,7 +98,6 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
     role?: string;
     university?: string;
     location?: string;
-    templateId: string;
   } | null>(null);
 
   // Restore state from sessionStorage on mount
@@ -213,13 +218,34 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
       .finally(() => setIsLoadingRecent(false));
   }, []);
 
+  // Load templates when session is ready
+  useEffect(() => {
+    if (sessionStatus !== 'authenticated') return;
+    const loadTemplates = async () => {
+      const result = await getTemplatesAction();
+      const hardcoded = EMAIL_TEMPLATES[0];
+      if (result.success) {
+        const combined: TemplateData[] = [
+          ...result.templates,
+          { id: hardcoded.id, name: hardcoded.name, subject: hardcoded.subject, body: hardcoded.body, isDefault: false, attachResume: false, resumeId: null, createdAt: new Date() },
+        ];
+        setTemplates(combined);
+        const defaultT = result.templates.find((t) => t.isDefault);
+        setDefaultTemplateId(defaultT?.id || result.templates[0]?.id || hardcoded.id);
+      } else {
+        setTemplates([{ id: hardcoded.id, name: hardcoded.name, subject: hardcoded.subject, body: hardcoded.body, isDefault: false, attachResume: false, resumeId: null, createdAt: new Date() }]);
+        setDefaultTemplateId(hardcoded.id);
+      }
+    };
+    loadTemplates();
+  }, [sessionStatus]);
+
   const handleRecentSearchClick = (search: RecentSearch) => {
     setFormPrefill({
       company: search.company || undefined,
       role: search.role || undefined,
       university: search.university || undefined,
       location: search.location || undefined,
-      templateId: searchParams?.templateId || EMAIL_TEMPLATES[0].id,
     });
   };
 
@@ -229,7 +255,6 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
     university?: string;
     location?: string;
     limit: number;
-    templateId: string;
   }) => {
     try {
       sessionStorage.removeItem(STORAGE_KEY);
@@ -394,6 +419,54 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
     }
   };
 
+  const handleTemplateChange = async (templateId: string, personIndex: number) => {
+    const person = results[personIndex];
+    if (!person?.userCandidateId) return;
+
+    setIsRegenerating(true);
+    const result = await regenerateDraftAction({
+      userCandidateId: person.userCandidateId,
+      templateId,
+    });
+
+    if (result.success) {
+      setResults((prev) =>
+        prev.map((r, i) =>
+          i === personIndex
+            ? { ...r, draftSubject: result.subject, draftBody: result.body, resumeId: result.resumeId }
+            : r
+        )
+      );
+    } else {
+      setToast({ message: result.error || 'Failed to regenerate draft', type: 'error' });
+    }
+    setIsRegenerating(false);
+  };
+
+  const handleApplyTemplateToAll = async (templateId: string) => {
+    setIsRegenerating(true);
+    const sendable = results
+      .map((r, i) => ({ r, i }))
+      .filter(({ r }) => r.userCandidateId && !sendStatuses.has(r.id));
+
+    const promises = sendable.map(({ r }) =>
+      regenerateDraftAction({ userCandidateId: r.userCandidateId!, templateId })
+    );
+    const outcomes = await Promise.all(promises);
+
+    setResults((prev) => {
+      const updated = [...prev];
+      sendable.forEach(({ i }, idx) => {
+        const outcome = outcomes[idx];
+        if (outcome.success) {
+          updated[i] = { ...updated[i], draftSubject: outcome.subject, draftBody: outcome.body, resumeId: outcome.resumeId };
+        }
+      });
+      return updated;
+    });
+    setIsRegenerating(false);
+  };
+
   const handleLoadMore = useCallback(async () => {
     if (!searchParams?.company || isLoadingMore || !hasMore) return;
 
@@ -406,7 +479,6 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
         university: searchParams.university,
         location: searchParams.location,
         limit: searchParams.limit,
-        templateId: searchParams.templateId,
         excludePersonIds: results.map(r => r.id),
       });
 
@@ -612,6 +684,10 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
           onClose={() => setExpandedIndex(null)}
           onSend={handleSendFromReview}
           sendStatuses={sendStatuses}
+          templates={templates}
+          defaultTemplateId={defaultTemplateId}
+          onTemplateChange={handleTemplateChange}
+          isRegenerating={isRegenerating}
         />
       )}
 
@@ -621,6 +697,9 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
           onClose={() => setShowBulkReview(false)}
           onSendAll={handleBulkSend}
           sendStatuses={sendStatuses}
+          templates={templates}
+          onApplyTemplateToAll={handleApplyTemplateToAll}
+          isRegenerating={isRegenerating}
         />
       )}
 

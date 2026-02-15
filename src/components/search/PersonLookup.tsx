@@ -11,11 +11,10 @@ import {
   AcademicCapIcon,
   BriefcaseIcon,
 } from '@heroicons/react/24/outline';
-import { lookupPersonAction, SearchResultWithDraft } from '@/app/actions/search';
+import { lookupPersonAction, SearchResultWithDraft, regenerateDraftAction } from '@/app/actions/search';
 import { sendSingleEmailAction, PersonToSend } from '@/app/actions/send';
 import { getTemplatesAction, TemplateData } from '@/app/actions/profile';
 import { ExpandedReview } from './ExpandedReview';
-import { SearchableCombobox } from './SearchableCombobox';
 import { Toast } from '@/components/ui/Toast';
 import { LimitReachedModal, dispatchCreditsChanged } from '@/components/credits';
 import { EMAIL_TEMPLATES } from '@/lib/constants';
@@ -30,9 +29,9 @@ export function PersonLookup() {
   const [error, setError] = useState<string | null>(null);
 
   // Template state
-  const [templateId, setTemplateId] = useState<string>(EMAIL_TEMPLATES[0].id);
   const [templates, setTemplates] = useState<TemplateData[]>([]);
-  const [isLoadingTemplates, setIsLoadingTemplates] = useState(true);
+  const [defaultTemplateId, setDefaultTemplateId] = useState<string>(EMAIL_TEMPLATES[0].id);
+  const [isRegenerating, setIsRegenerating] = useState(false);
 
   // ExpandedReview state
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
@@ -44,22 +43,20 @@ export function PersonLookup() {
   useEffect(() => {
     if (status !== 'authenticated') return;
     const loadTemplates = async () => {
-      setIsLoadingTemplates(true);
       const result = await getTemplatesAction();
       const hardcoded = EMAIL_TEMPLATES[0];
       if (result.success) {
-        const combined = [
+        const combined: TemplateData[] = [
           ...result.templates,
           { id: hardcoded.id, name: hardcoded.name, subject: hardcoded.subject, body: hardcoded.body, isDefault: false, attachResume: false, resumeId: null, createdAt: new Date() },
         ];
         setTemplates(combined);
         const defaultT = result.templates.find((t) => t.isDefault);
-        setTemplateId(defaultT?.id || result.templates[0]?.id || hardcoded.id);
+        setDefaultTemplateId(defaultT?.id || result.templates[0]?.id || hardcoded.id);
       } else {
         setTemplates([{ id: hardcoded.id, name: hardcoded.name, subject: hardcoded.subject, body: hardcoded.body, isDefault: false, attachResume: false, resumeId: null, createdAt: new Date() }]);
-        setTemplateId(hardcoded.id);
+        setDefaultTemplateId(hardcoded.id);
       }
-      setIsLoadingTemplates(false);
     };
     loadTemplates();
   }, [status]);
@@ -80,7 +77,6 @@ export function PersonLookup() {
     const result = await lookupPersonAction({
       name: name.trim(),
       company: company.trim() || undefined,
-      templateId,
     });
 
     if (result.success) {
@@ -130,6 +126,30 @@ export function PersonLookup() {
     }
   };
 
+  const handleTemplateChange = async (templateId: string, personIndex: number) => {
+    const person = results[personIndex];
+    if (!person?.userCandidateId) return;
+
+    setIsRegenerating(true);
+    const result = await regenerateDraftAction({
+      userCandidateId: person.userCandidateId,
+      templateId,
+    });
+
+    if (result.success) {
+      setResults((prev) =>
+        prev.map((r, i) =>
+          i === personIndex
+            ? { ...r, draftSubject: result.subject, draftBody: result.body, resumeId: result.resumeId }
+            : r
+        )
+      );
+    } else {
+      setToast({ message: result.error || 'Failed to regenerate draft', type: 'error' });
+    }
+    setIsRegenerating(false);
+  };
+
   // If ExpandedReview is active, render it
   if (expandedIndex !== null && results.length > 0) {
     return (
@@ -140,6 +160,10 @@ export function PersonLookup() {
           onClose={() => setExpandedIndex(null)}
           onSend={handleSendFromReview}
           sendStatuses={sendStatuses}
+          templates={templates}
+          defaultTemplateId={defaultTemplateId}
+          onTemplateChange={handleTemplateChange}
+          isRegenerating={isRegenerating}
         />
         {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
         <LimitReachedModal
@@ -199,26 +223,6 @@ export function PersonLookup() {
               onChange={(e) => setCompany(e.target.value)}
               placeholder="Company (optional — helps narrow results)"
               className="w-full pl-12 pr-4 py-2.5 bg-surface-50 border border-surface-200 rounded-lg text-surface-800 text-sm placeholder:text-surface-400 hover:border-surface-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 focus:outline-none focus:bg-white transition-all"
-            />
-          </div>
-
-          {/* Template selector */}
-          <div className="mb-5">
-            <SearchableCombobox
-              options={
-                isLoadingTemplates
-                  ? [{ label: 'Loading templates...', value: '' }]
-                  : templates.map((t) => ({
-                      label: t.name + (t.isDefault ? ' (Default)' : ''),
-                      value: t.id,
-                    }))
-              }
-              value={templateId}
-              onChange={setTemplateId}
-              label="Email Template"
-              placeholder="Select a template..."
-              id="lookup-template"
-              disabled={isLoadingTemplates}
             />
           </div>
 

@@ -2,12 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import { SearchResultWithDraft } from '@/app/actions/search';
+import { TemplateData } from '@/app/actions/profile';
 
 interface BulkReviewProps {
   results: SearchResultWithDraft[];
   onClose: () => void;
   onSendAll: (emails: { index: number; subject: string; body: string }[]) => Promise<void>;
   sendStatuses: Map<string, 'success' | 'failed' | 'pending'>;
+  templates?: TemplateData[];
+  onApplyTemplateToAll?: (templateId: string) => Promise<void>;
+  isRegenerating?: boolean;
 }
 
 interface EmailDraft {
@@ -20,6 +24,9 @@ export function BulkReview({
   onClose,
   onSendAll,
   sendStatuses,
+  templates,
+  onApplyTemplateToAll,
+  isRegenerating,
 }: BulkReviewProps) {
   const [drafts, setDrafts] = useState<Map<number, EmailDraft>>(new Map());
   const [isSending, setIsSending] = useState(false);
@@ -34,7 +41,7 @@ export function BulkReview({
     return draft && draft.subject && draft.body;
   }).length;
 
-  // Initialize drafts from search results
+  // Initialize/refresh drafts from search results
   useEffect(() => {
     const newDrafts = new Map<number, EmailDraft>();
     for (const { result, index } of sendableResults) {
@@ -44,7 +51,13 @@ export function BulkReview({
       });
     }
     setDrafts(newDrafts);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [results]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleApplyTemplate = async (templateId: string) => {
+    if (!onApplyTemplateToAll) return;
+    await onApplyTemplateToAll(templateId);
+    // Drafts will refresh via the results useEffect above
+  };
 
   const handleSubjectChange = (index: number, value: string) => {
     setDrafts((prev) => {
@@ -89,11 +102,28 @@ export function BulkReview({
       <div className="bg-white rounded-lg shadow-soft-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-surface-200">
-          <div>
-            <h2 className="text-lg font-semibold text-surface-900">Review Emails</h2>
-            <p className="text-sm text-surface-600">
-              {sendableCount} of {sendableResults.length} emails ready to send
-            </p>
+          <div className="flex items-center gap-4">
+            <div>
+              <h2 className="text-lg font-semibold text-surface-900">Review Emails</h2>
+              <p className="text-sm text-surface-600">
+                {sendableCount} of {sendableResults.length} emails ready to send
+              </p>
+            </div>
+            {templates && templates.length > 0 && onApplyTemplateToAll && (
+              <select
+                onChange={(e) => handleApplyTemplate(e.target.value)}
+                disabled={isRegenerating}
+                defaultValue=""
+                className="input text-sm py-1.5 w-auto"
+              >
+                <option value="" disabled>Apply template...</option>
+                {templates.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}{t.isDefault ? ' (Default)' : ''}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
           <button
             onClick={onClose}

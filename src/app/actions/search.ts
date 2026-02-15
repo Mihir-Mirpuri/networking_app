@@ -52,7 +52,7 @@ export interface SearchInput {
   university?: string;
   location?: string;
   limit: number;
-  templateId: string;
+  templateId?: string;
   excludePersonIds?: string[]; // IDs of people already displayed (prevents duplicates on Load More)
 }
 
@@ -136,16 +136,72 @@ interface PersonWithSource {
   }>;
 }
 
+/** Resolved template shape used by generateEmailDraft */
+interface ResolvedTemplate {
+  id: string;
+  subject: string;
+  body: string;
+  attachResume: boolean;
+  resumeId: string | null;
+}
+
+/**
+ * Resolve which email template to use for a user.
+ * Priority: explicit templateId → user's default DB template → hardcoded fallback.
+ */
+async function resolveTemplateForUser(
+  userId: string,
+  templateId?: string
+): Promise<ResolvedTemplate> {
+  // 1. If templateId matches a hardcoded template, use it
+  if (templateId) {
+    const hardcoded = EMAIL_TEMPLATES.find((t) => t.id === templateId);
+    if (hardcoded) {
+      return { id: hardcoded.id, subject: hardcoded.subject, body: hardcoded.body, attachResume: false, resumeId: null };
+    }
+
+    // 2. If templateId provided, try DB lookup
+    const dbTemplate = await prisma.emailTemplate.findUnique({
+      where: { id: templateId },
+      select: { id: true, prompt: true, attachResume: true, resumeId: true },
+    });
+    if (dbTemplate) {
+      return { id: dbTemplate.id, ...parseTemplatePrompt(dbTemplate.prompt), attachResume: dbTemplate.attachResume, resumeId: dbTemplate.resumeId };
+    }
+  }
+
+  // 3. No templateId or not found — fetch user's default template
+  const defaultTemplate = await prisma.emailTemplate.findFirst({
+    where: { userId, isDefault: true },
+    select: { id: true, prompt: true, attachResume: true, resumeId: true },
+  });
+  if (defaultTemplate) {
+    return { id: defaultTemplate.id, ...parseTemplatePrompt(defaultTemplate.prompt), attachResume: defaultTemplate.attachResume, resumeId: defaultTemplate.resumeId };
+  }
+
+  // 4. Final fallback — hardcoded default
+  const fallback = EMAIL_TEMPLATES[0];
+  return { id: fallback.id, subject: fallback.subject, body: fallback.body, attachResume: false, resumeId: null };
+}
+
+/** Parse the EmailTemplate.prompt field (JSON with subject/body, or plain text as body) */
+function parseTemplatePrompt(prompt: string): { subject: string; body: string } {
+  try {
+    const parsed = JSON.parse(prompt);
+    return { subject: parsed.subject || '', body: parsed.body || prompt };
+  } catch {
+    return { subject: '', body: prompt };
+  }
+}
+
 /**
  * Generate email draft using template replacement
  */
 function generateEmailDraft(
-  templateId: string,
+  template: { subject: string; body: string },
   person: { firstName: string | null; company: string; role: string | null },
   user: { name: string | null; university: string | null; classification: string | null; major: string | null; career: string | null }
 ): { subject: string; body: string } {
-  const template = EMAIL_TEMPLATES.find((t) => t.id === templateId) || EMAIL_TEMPLATES[0];
-
   // Replace placeholders
   let subject: string = template.subject;
   let body: string = template.body;
@@ -168,13 +224,6 @@ function generateEmailDraft(
   }
 
   return { subject, body };
-}
-
-/**
- * Get template by ID
- */
-function getTemplate(templateId: string) {
-  return EMAIL_TEMPLATES.find((t) => t.id === templateId) || EMAIL_TEMPLATES[0];
 }
 
 
@@ -257,7 +306,7 @@ async function enrichPeopleWithPatterns(
 async function buildResultsWithDrafts(
   rankedPeople: Array<{ candidate: PersonWithSource; score: number; breakdown: ScoreBreakdown }>,
   userId: string,
-  templateId: string,
+  template: ResolvedTemplate,
   user: { name: string | null; university: string | null; classification: string | null; major: string | null; career: string | null }
 ): Promise<SearchResultWithDraft[]> {
   return Promise.all(
@@ -278,17 +327,17 @@ async function buildResultsWithDrafts(
       });
 
       const draft = generateEmailDraft(
-        templateId,
+        template,
         { firstName: person.firstName, company: person.company, role: person.role },
         user
       );
 
-      const isHardcodedTemplate = EMAIL_TEMPLATES.some(t => t.id === templateId);
+      const isHardcodedTemplate = EMAIL_TEMPLATES.some(t => t.id === template.id);
       const emailDraft = await prisma.emailDraft.upsert({
         where: { userCandidateId: userCandidate.id },
         create: {
           userCandidateId: userCandidate.id,
-          templateId: isHardcodedTemplate ? null : templateId,
+          templateId: isHardcodedTemplate ? null : template.id,
           subject: draft.subject,
           body: draft.body,
           status: 'APPROVED',
@@ -326,7 +375,7 @@ async function buildResultsWithDrafts(
         draftSubject: emailDraft.subject,
         draftBody: emailDraft.body,
         userCandidateId: userCandidate.id,
-        resumeId: null,
+        resumeId: template.attachResume ? template.resumeId : null,
         score,
         scoreBreakdown: breakdown,
       };
@@ -506,7 +555,8 @@ export async function searchPeopleAction(
     }
 
     // ===== STEP 4: Build results with drafts =====
-    const results = await buildResultsWithDrafts(rankedPeople, userId, input.templateId, user);
+    const template = await resolveTemplateForUser(userId, input.templateId);
+    const results = await buildResultsWithDrafts(rankedPeople, userId, template, user);
 
     // ===== STEP 5: Compute hasMore =====
     // Full page from DB means probably more rows; CSE having more pages
@@ -626,7 +676,7 @@ export interface LoadMoreInput {
   location?: string;
   name?: string;
   limit: number;
-  templateId: string;
+  templateId?: string;
   excludePersonIds: string[];
 }
 
@@ -740,7 +790,8 @@ export async function loadMorePeopleAction(
     }
 
     // Build results with drafts
-    const results = await buildResultsWithDrafts(rankedPeople, userId, input.templateId, user);
+    const template = await resolveTemplateForUser(userId, input.templateId);
+    const results = await buildResultsWithDrafts(rankedPeople, userId, template, user);
 
     // Check prescrape status
     const normalizedParams = normalizeSearchParams({
@@ -1033,7 +1084,7 @@ export async function prescrapeAction(
 export interface LookupInput {
   name: string;
   company?: string;
-  templateId: string;
+  templateId?: string;
 }
 
 export type LookupActionResult = {
@@ -1263,12 +1314,83 @@ export async function lookupPersonAction(
       breakdown: {} as ScoreBreakdown,
     }));
 
-    const results = await buildResultsWithDrafts(ranked, userId, input.templateId, user);
+    const template = await resolveTemplateForUser(userId, input.templateId);
+    const results = await buildResultsWithDrafts(ranked, userId, template, user);
 
     console.log(`[Lookup] Returning ${results.length} results for "${cleanName}"`);
     return { success: true, results };
   } catch (error) {
     console.error('Lookup error:', error);
     return { success: false, error: 'Lookup failed. Please try again.' };
+  }
+}
+
+// ===== REGENERATE DRAFT (template change in review modal) =====
+
+export async function regenerateDraftAction(input: {
+  userCandidateId: string;
+  templateId: string;
+}): Promise<
+  { success: true; subject: string; body: string; resumeId: string | null } |
+  { success: false; error: string }
+> {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.id) {
+    return { success: false, error: 'Not authenticated' };
+  }
+
+  try {
+    const userId = session.user.id;
+
+    // Fetch UserCandidate + Person
+    const uc = await prisma.userCandidate.findUnique({
+      where: { id: input.userCandidateId, userId },
+      select: {
+        id: true,
+        person: {
+          select: { firstName: true, company: true, role: true },
+        },
+      },
+    });
+
+    if (!uc) {
+      return { success: false, error: 'Candidate not found' };
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true, university: true, classification: true, major: true, career: true },
+    });
+
+    if (!user) {
+      return { success: false, error: 'User not found' };
+    }
+
+    const template = await resolveTemplateForUser(userId, input.templateId);
+    const draft = generateEmailDraft(template, uc.person, user);
+    const resumeId = template.attachResume ? template.resumeId : null;
+
+    const isHardcodedTemplate = EMAIL_TEMPLATES.some(t => t.id === template.id);
+    await prisma.emailDraft.upsert({
+      where: { userCandidateId: uc.id },
+      create: {
+        userCandidateId: uc.id,
+        templateId: isHardcodedTemplate ? null : template.id,
+        subject: draft.subject,
+        body: draft.body,
+        status: 'APPROVED',
+      },
+      update: {
+        templateId: isHardcodedTemplate ? null : template.id,
+        subject: draft.subject,
+        body: draft.body,
+      },
+    });
+
+    return { success: true, subject: draft.subject, body: draft.body, resumeId };
+  } catch (error) {
+    console.error('RegenerateDraft error:', error);
+    return { success: false, error: 'Failed to regenerate draft' };
   }
 }

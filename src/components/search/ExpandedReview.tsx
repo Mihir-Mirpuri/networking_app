@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { SearchResultWithDraft } from '@/app/actions/search';
 import { scheduleEmailAction } from '@/app/actions/send';
 import { CompanyResearchPanel } from '@/components/compose/CompanyResearchPanel';
+import { TemplateData } from '@/app/actions/profile';
 
 interface ExpandedReviewProps {
   results: SearchResultWithDraft[];
@@ -11,6 +12,10 @@ interface ExpandedReviewProps {
   onClose: () => void;
   onSend: (index: number, subject: string, body: string) => Promise<void>;
   sendStatuses: Map<string, 'success' | 'failed' | 'pending'>;
+  templates?: TemplateData[];
+  defaultTemplateId?: string;
+  onTemplateChange?: (templateId: string, personIndex: number) => void;
+  isRegenerating?: boolean;
 }
 
 function SendSuccessAnimation() {
@@ -45,6 +50,10 @@ export function ExpandedReview({
   onClose,
   onSend,
   sendStatuses,
+  templates,
+  defaultTemplateId,
+  onTemplateChange,
+  isRegenerating,
 }: ExpandedReviewProps) {
   const person = results[currentIndex];
   const [subject, setSubject] = useState(person?.draftSubject || '');
@@ -61,6 +70,7 @@ export function ExpandedReview({
   const status = currentPerson ? sendStatuses.get(currentPerson.id) : undefined;
 
   const [researchCollapsed, setResearchCollapsed] = useState(true);
+  const [selectedTemplateId, setSelectedTemplateId] = useState(defaultTemplateId || '');
 
   // Update subject/body when currentPerson changes
   useEffect(() => {
@@ -324,6 +334,31 @@ export function ExpandedReview({
             </div>
           )}
 
+          {/* Template Selector */}
+          {templates && templates.length > 0 && onTemplateChange && (
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-surface-700 mb-1">
+                Template
+              </label>
+              <select
+                value={selectedTemplateId}
+                onChange={(e) => {
+                  const newId = e.target.value;
+                  setSelectedTemplateId(newId);
+                  onTemplateChange(newId, internalIndex);
+                }}
+                disabled={!canSend || isRegenerating}
+                className="input text-sm"
+              >
+                {templates.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}{t.isDefault ? ' (Default)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div className="mb-4">
             <label className="block text-sm font-medium text-surface-700 mb-1">
               Subject
@@ -332,7 +367,7 @@ export function ExpandedReview({
               type="text"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              className="input text-sm"
+              className={`input text-sm${isRegenerating ? ' opacity-50' : ''}`}
             />
           </div>
           <div>
@@ -343,7 +378,7 @@ export function ExpandedReview({
               value={body}
               onChange={(e) => setBody(e.target.value)}
               rows={10}
-              className="input resize-none text-sm"
+              className={`input resize-none text-sm${isRegenerating ? ' opacity-50' : ''}`}
             />
           </div>
 
