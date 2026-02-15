@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { SearchResultWithDraft } from '@/app/actions/search';
 import { scheduleEmailAction } from '@/app/actions/send';
 import { CompanyResearchPanel } from '@/components/compose/CompanyResearchPanel';
+import { SearchableCombobox } from './SearchableCombobox';
 import { TemplateData } from '@/app/actions/profile';
 
 interface ExpandedReviewProps {
@@ -337,25 +338,21 @@ export function ExpandedReview({
           {/* Template Selector */}
           {templates && templates.length > 0 && onTemplateChange && (
             <div className="mb-4">
-              <label className="block text-sm font-medium text-surface-700 mb-1">
-                Template
-              </label>
-              <select
+              <SearchableCombobox
+                options={templates.map((t) => ({
+                  label: t.name + (t.isDefault ? ' (Default)' : ''),
+                  value: t.id,
+                }))}
                 value={selectedTemplateId}
-                onChange={(e) => {
-                  const newId = e.target.value;
+                onChange={(newId) => {
                   setSelectedTemplateId(newId);
                   onTemplateChange(newId, internalIndex);
                 }}
+                label="Template"
+                placeholder="Select a template..."
+                id="review-template"
                 disabled={!canSend || isRegenerating}
-                className="input text-sm"
-              >
-                {templates.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}{t.isDefault ? ' (Default)' : ''}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
           )}
 

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { SearchResultWithDraft } from '@/app/actions/search';
 import { TemplateData } from '@/app/actions/profile';
+import { SearchableCombobox } from './SearchableCombobox';
 
 interface BulkReviewProps {
   results: SearchResultWithDraft[];
@@ -110,19 +111,20 @@ export function BulkReview({
               </p>
             </div>
             {templates && templates.length > 0 && onApplyTemplateToAll && (
-              <select
-                onChange={(e) => handleApplyTemplate(e.target.value)}
-                disabled={isRegenerating}
-                defaultValue=""
-                className="input text-sm py-1.5 w-auto"
-              >
-                <option value="" disabled>Apply template...</option>
-                {templates.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}{t.isDefault ? ' (Default)' : ''}
-                  </option>
-                ))}
-              </select>
+              <div className="w-48">
+                <SearchableCombobox
+                  options={templates.map((t) => ({
+                    label: t.name + (t.isDefault ? ' (Default)' : ''),
+                    value: t.id,
+                  }))}
+                  value=""
+                  onChange={(id) => handleApplyTemplate(id)}
+                  label=""
+                  placeholder="Apply template..."
+                  id="bulk-template"
+                  disabled={isRegenerating}
+                />
+              </div>
             )}
           </div>
           <button
