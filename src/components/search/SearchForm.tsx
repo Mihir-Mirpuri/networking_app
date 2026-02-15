@@ -52,7 +52,7 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
       role: role || undefined,
       university: university || undefined,
       location: location || undefined,
-      limit: 10,
+      limit: 6,
     });
   };
 
