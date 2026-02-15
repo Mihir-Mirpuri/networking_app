@@ -461,7 +461,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
             </svg>
             <span className="text-xs font-medium text-surface-400">Recent</span>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto">
             {recentSearches.map((search, i) => {
               const label = [search.company, search.role, search.university, search.location]
                 .filter(Boolean)
