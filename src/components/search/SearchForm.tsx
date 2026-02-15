@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { COMPANIES, ROLES, ROLES_BY_COMPANY, LOCATIONS } from '@/lib/constants';
 import { LoadingSpinner } from './LoadingSpinner';
 import { SearchableCombobox } from './SearchableCombobox';
-import { CreditsDisplay } from '@/components/credits';
+
 
 
 interface SearchFormProps {
@@ -151,7 +151,6 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
             </p>
           )}
         </div>
-        <CreditsDisplay />
       </div>
     </form>
   );
