@@ -4,7 +4,7 @@
 
 - **SearchPageClient.tsx** is the top-level search page component. It orchestrates the entire client-side flow.
 - **Server Actions** are functions marked with `'use server'` that run on the server. They live in `src/app/actions/search.ts`.
-- **Key files:** `SearchForm.tsx` (UI form), `SearchPageClient.tsx` (orchestrator), `search.ts` (server actions), `discovery.ts` (CSE API), `person-service.ts` (DB service layer), `search-cache.ts` (scrape progress tracking), `ranking.ts` (candidate scoring), `linkedin-scraper.ts` (Apify scraper), `enrichment.ts` (Apollo API), `email-pattern.ts` (email pattern matching).
+- **Key files:** `SearchForm.tsx` (UI form), `SearchPageClient.tsx` (orchestrator), `search.ts` (server actions), `discovery.ts` (CSE API), `person-service.ts` (DB service layer), `search-cache.ts` (scrape progress tracking), `ranking.ts` (candidate scoring), `linkedin-scraper.ts` (Apify scraper), `enrichment.ts` (Apollo API), `email-pattern.ts` (email pattern matching), `company-alias.ts` (company alias resolution for CSE pre-filter).
 
 ---
 
@@ -230,12 +230,17 @@ processRefreshBatch(input, pageStart)
  |-- Double-check right before scraping (race condition guard for concurrent batches)
  |
  |-- STEP 2.5: CSE Company Pre-filter -----------------------
+ |-- resolveCompanyAliases(input.company)    // 3-tier alias resolution
+ |   |-- Tier 1: Check hardcoded COMPANY_ALIASES (instant, ~50 companies)
+ |   |-- Tier 2: Query CompanyAlias DB table (fast, persisted LLM results)
+ |   \-- Tier 3: Ask Groq LLM for canonical name + aliases (~300ms, saved to DB)
  |-- For each URL to scrape:
  |   |-- Get cseCompany from og:description metatag
- |   |-- IF cseCompany exists AND doesn't match search company:
+ |   |-- Check resolved aliases (exact match or starts-with with word boundary)
+ |   |-- Fallback: companiesMatch() for bidirectional substring (e.g. "Pfizer" vs "Pfizer Inc.")
+ |   |-- IF cseCompany exists AND doesn't match search company or any alias:
  |   |   \-- Skip (don't waste a scraper call on wrong company)
  |   \-- IF no cseCompany metatag: keep (conservative, assume it might match)
- |-- Uses companiesMatch() with alias-aware matching
  |
  |-- STEP 3: Scrape LinkedIn profiles -----------------------
  |-- scrapeLinkedInProfiles(urlsToScrape, { includeEmail: false })
@@ -259,7 +264,7 @@ processRefreshBatch(input, pageStart)
 
 **Important notes:**
 - `discoverLinkedInProfiles()` does NOT filter by company. It returns all LinkedIn profiles from CSE. Company pre-filtering happens in Step 2.5 of processRefreshBatch.
-- LLM-based company name expansion (Groq) is **disabled**. The `buildCompanyQueryPart()` function just quotes the company name. The `expandCompanyName()` function exists but is never called.
+- LLM-based company name expansion for CSE queries is **disabled**. The `buildCompanyQueryPart()` function just quotes the company name. However, `resolveCompanyAliases()` (in Step 2.5) DOES use LLM to resolve unknown company aliases for pre-filtering, with results persisted to the `CompanyAlias` DB table.
 - Email enrichment does NOT happen during scraping. Profiles are saved without emails. Emails are populated later by `enrichPeopleWithPatterns()` (free, pattern-only) when a search query matches them. Apollo enrichment happens at send time.
 - Role embeddings are generated fire-and-forget on every save/update, so they're available for future vector-based searches.
 
@@ -397,8 +402,8 @@ lookupPersonAction({ name, company, templateId })
 2. **enrichPeopleWithPatterns()** (renamed from `enrichPeopleOnDemand`) — pattern-only, no Apollo calls. Runs when DB results are under the limit. Apollo enrichment moved to `enrichPersonBeforeSend()` in `send.ts`.
 3. **Apollo pattern learning removed from discovery flow** — patterns must be added manually.
 4. **Prescrape moved to initial search** — prescrape fires immediately after the first search response, not triggered by Load More. Load More is now a pure DB read.
-5. **CSE company pre-filter** — before scraping, checks og:description metatag to skip people whose CSE-reported company doesn't match the search company.
-6. **LLM company expansion disabled** — `expandCompanyName()` (Groq) exists but is not called. `buildCompanyQueryPart()` just quotes the company name.
+5. **CSE company pre-filter with alias resolution** — before scraping, resolves company aliases via `resolveCompanyAliases()` (hardcoded map → DB `CompanyAlias` table → Groq LLM fallback), then checks og:description metatag against all resolved aliases. LLM results are persisted so each company is only resolved once. Falls back to `companiesMatch()` for bidirectional substring matching.
+6. **LLM company expansion disabled for CSE queries** — `expandCompanyName()` (Groq) exists but is not called in query building. `buildCompanyQueryPart()` just quotes the company name. However, LLM-based alias resolution IS used in the pre-filter step (Step 2.5) via `resolveCompanyAliases()`.
 
 ### Page Budget Changes:
 1. **Reduced from 5 to 3 CSE pages** — `MAX_CSE_PAGE_START` 41→21, `MAX_PRESCRAPE_PAGES` 4→2. Pages 4-5 had diminishing relevance (CSE results ranked by quality) and consumed CSE quota + Apify credits on low-value profiles.
