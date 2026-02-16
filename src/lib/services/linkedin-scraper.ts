@@ -276,14 +276,20 @@ function parseLocationString(locationStr: string | null): {
 }
 
 /**
- * Extract location with priority: profile location → job location
+ * Extract location with priority: job location → profile location
  */
 function extractLocation(raw: ApifyProfileResponse): {
   city: string | null;
   state: string | null;
   country: string | null;
 } {
-  // Primary: profile location (pre-parsed)
+  // Primary: job location (where they work — most relevant for professional networking)
+  const jobLoc = raw.experience?.[0]?.location;
+  if (jobLoc && jobLoc !== 'null') {
+    return parseLocationString(jobLoc);
+  }
+
+  // Fallback: profile location (where they live)
   const profileLoc = raw.location?.parsed;
   if (profileLoc?.city || profileLoc?.state || profileLoc?.country) {
     return {
@@ -291,12 +297,6 @@ function extractLocation(raw: ApifyProfileResponse): {
       state: profileLoc.state || null,
       country: profileLoc.country || null,
     };
-  }
-
-  // Fallback: job location (needs parsing)
-  const jobLoc = raw.experience?.[0]?.location;
-  if (jobLoc && jobLoc !== 'null') {
-    return parseLocationString(jobLoc);
   }
 
   return { city: null, state: null, country: null };
