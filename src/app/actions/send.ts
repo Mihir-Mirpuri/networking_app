@@ -144,7 +144,7 @@ async function enrichPersonBeforeSend(
 export async function sendEmailsAction(
   people: PersonToSend[]
 ): Promise<{ success: true; results: SendResult[] } | { success: false; error: string }> {
-  console.log('[Send] sendEmailsAction called with', people?.length ?? 0, 'people:', JSON.stringify(people?.map(p => ({ email: p.email, hasSubject: !!p.subject, hasBody: !!p.body, scheduledFor: p.scheduledFor })) ?? []));
+  console.log('[Send] sendEmailsAction called with', people?.length ?? 0, 'people:', JSON.stringify(people?.map(p => ({ email: p.email, hasSubject: !!p.subject, hasBody: !!p.body, resumeId: p.resumeId, scheduledFor: p.scheduledFor })) ?? []));
 
   const session = await getServerSession(authOptions);
   if (!session?.user?.email || !session.user.id) {
@@ -230,7 +230,7 @@ export async function sendEmailsAction(
       continue;
     }
 
-    console.log('[Send] Sending email to:', resolvedEmail, 'subject:', person.subject?.substring(0, 50), 'resumeId:', person.resumeId);
+    console.log('[Send] Sending email to:', resolvedEmail, 'subject:', person.subject?.substring(0, 50), 'resumeId:', person.resumeId || '(none)');
     const sendResult = await sendEmail(
       accessToken,
       refreshToken,
@@ -238,7 +238,8 @@ export async function sendEmailsAction(
       resolvedEmail,
       person.subject,
       person.body,
-      person.resumeId
+      person.resumeId,
+      session.user.id
     );
     console.log('[Send] Send result:', { email: resolvedEmail, success: sendResult.success, error: sendResult.error });
 

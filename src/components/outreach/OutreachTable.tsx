@@ -83,8 +83,8 @@ export function OutreachTable({
   }
 
   return (
-    <div className="border border-surface-200 rounded-xl overflow-hidden shadow-soft">
-      <table className="w-full border-collapse table-fixed">
+    <div className="border border-surface-200 rounded-xl overflow-hidden shadow-soft overflow-x-auto">
+      <table className="w-full border-collapse md:table-fixed">
         <thead className="sticky top-0 z-10">
           <tr className="bg-surface-50">
             {COLUMNS.map((column, index) => (

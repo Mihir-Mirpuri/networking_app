@@ -78,10 +78,23 @@ export async function sendComposedEmailAction(
     return { success: false, error: 'LIMIT_REACHED' };
   }
 
+  // Resolve resumeId: fall back to active resume if attachResume is true but no resumeId
+  let resolvedResumeId = input.resumeId;
+  if (input.attachResume && !resolvedResumeId) {
+    const activeResume = await prisma.userResume.findFirst({
+      where: { userId: session.user.id, isActive: true },
+      select: { id: true },
+    });
+    if (activeResume) {
+      resolvedResumeId = activeResume.id;
+      console.log(`[Compose] resumeId was empty, falling back to active resume: ${activeResume.id}`);
+    }
+  }
+
   // Validate resumeId belongs to user if provided
-  if (input.attachResume && input.resumeId) {
+  if (input.attachResume && resolvedResumeId) {
     const resume = await prisma.userResume.findUnique({
-      where: { id: input.resumeId },
+      where: { id: resolvedResumeId },
       select: { userId: true },
     });
 
@@ -129,7 +142,7 @@ export async function sendComposedEmailAction(
     };
   }
 
-  console.log('[Compose] Sending composed email to:', input.recipientEmail);
+  console.log('[Compose] Sending composed email to:', input.recipientEmail, 'attachResume:', input.attachResume, 'resumeId:', resolvedResumeId || '(none)');
 
   // Send the email
   const sendResult = await sendEmail(
@@ -139,7 +152,7 @@ export async function sendComposedEmailAction(
     input.recipientEmail,
     input.subject,
     input.body,
-    input.attachResume ? input.resumeId : undefined,
+    input.attachResume ? resolvedResumeId : undefined,
     session.user.id,
     additionalAttachments.length > 0 ? additionalAttachments : undefined
   );
@@ -152,8 +165,8 @@ export async function sendComposedEmailAction(
       toEmail: input.recipientEmail,
       subject: input.subject,
       body: input.body,
-      resumeAttached: !!(input.attachResume && input.resumeId),
-      resumeId: input.attachResume ? (input.resumeId || null) : null,
+      resumeAttached: !!(input.attachResume && resolvedResumeId),
+      resumeId: input.attachResume ? (resolvedResumeId || null) : null,
       status: sendResult.success ? 'SUCCESS' : 'FAILED',
       errorMessage: sendResult.error,
       gmailMessageId: sendResult.messageId,

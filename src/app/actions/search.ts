@@ -166,7 +166,18 @@ async function resolveTemplateForUser(
       select: { id: true, prompt: true, attachResume: true, resumeId: true },
     });
     if (dbTemplate) {
-      return { id: dbTemplate.id, ...parseTemplatePrompt(dbTemplate.prompt), attachResume: dbTemplate.attachResume, resumeId: dbTemplate.resumeId };
+      let resolvedResumeId = dbTemplate.resumeId;
+      if (dbTemplate.attachResume && !resolvedResumeId) {
+        const activeResume = await prisma.userResume.findFirst({
+          where: { userId, isActive: true },
+          select: { id: true },
+        });
+        if (activeResume) {
+          resolvedResumeId = activeResume.id;
+          console.log(`[Template] resumeId was null, falling back to active resume: ${activeResume.id}`);
+        }
+      }
+      return { id: dbTemplate.id, ...parseTemplatePrompt(dbTemplate.prompt), attachResume: dbTemplate.attachResume, resumeId: resolvedResumeId };
     }
   }
 
@@ -176,10 +187,26 @@ async function resolveTemplateForUser(
     select: { id: true, prompt: true, attachResume: true, resumeId: true },
   });
   if (defaultTemplate) {
-    return { id: defaultTemplate.id, ...parseTemplatePrompt(defaultTemplate.prompt), attachResume: defaultTemplate.attachResume, resumeId: defaultTemplate.resumeId };
+    let resolvedResumeId = defaultTemplate.resumeId;
+
+    // Fallback: if attachResume is true but resumeId is missing, use the user's active resume
+    if (defaultTemplate.attachResume && !resolvedResumeId) {
+      const activeResume = await prisma.userResume.findFirst({
+        where: { userId, isActive: true },
+        select: { id: true },
+      });
+      if (activeResume) {
+        resolvedResumeId = activeResume.id;
+        console.log(`[Template] resumeId was null, falling back to active resume: ${activeResume.id}`);
+      }
+    }
+
+    console.log(`[Template] Using default template: id=${defaultTemplate.id}, attachResume=${defaultTemplate.attachResume}, resumeId=${resolvedResumeId || '(none)'}`);
+    return { id: defaultTemplate.id, ...parseTemplatePrompt(defaultTemplate.prompt), attachResume: defaultTemplate.attachResume, resumeId: resolvedResumeId };
   }
 
   // 4. Final fallback — hardcoded default
+  console.log('[Template] No default template found, using hardcoded fallback (no resume)');
   const fallback = EMAIL_TEMPLATES[0];
   return { id: fallback.id, subject: fallback.subject, body: fallback.body, attachResume: false, resumeId: null };
 }
@@ -556,6 +583,7 @@ export async function searchPeopleAction(
 
     // ===== STEP 4: Build results with drafts =====
     const template = await resolveTemplateForUser(userId, input.templateId);
+    console.log(`[Search] Resolved template: id=${template.id}, attachResume=${template.attachResume}, resumeId=${template.resumeId || '(none)'}`);
     const results = await buildResultsWithDrafts(rankedPeople, userId, template, user);
 
     // ===== STEP 5: Compute hasMore =====
