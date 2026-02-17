@@ -97,7 +97,7 @@ export function Header() {
     // Show actual navigation when authenticated
     if (session?.user) {
       return (
-        <nav className="flex items-center gap-1">
+        <nav className="flex items-center gap-0.5 md:gap-1">
           {tabs.map((tab) => {
             const isActive = pathname === tab.href;
             const showBadge = 'badge' in tab && tab.badge !== undefined && tab.badge > 0;
@@ -106,14 +106,14 @@ export function Header() {
               <Link
                 key={tab.href}
                 href={tab.href}
-                className={`relative flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
+                className={`relative flex items-center gap-2 px-2.5 md:px-4 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
                   isActive
                     ? 'bg-primary-600 text-white shadow-md shadow-primary-600/25'
                     : 'text-surface-600 hover:bg-surface-100 hover:text-surface-900'
                 }`}
               >
                 <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-surface-500'}`} />
-                <span>{tab.name}</span>
+                <span className="hidden md:inline">{tab.name}</span>
                 {showBadge && (
                   <span
                     className={`absolute -top-1.5 -right-1.5 min-w-[20px] h-[20px] flex items-center justify-center text-xs font-bold rounded-full shadow-sm ${
@@ -160,7 +160,7 @@ export function Header() {
     <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-subtle">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-3 md:gap-6">
             <Link href="/" className="flex items-center gap-2 group">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow">
                 <span className="text-white font-bold text-sm">S</span>

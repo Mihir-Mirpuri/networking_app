@@ -62,7 +62,7 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
   return (
     <form onSubmit={handleSubmit} className="card p-6 mb-6">
       <h2 className="text-xl font-bold text-surface-900 mb-4">Find People</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-5 mb-6">
         {/* Company */}
         <div>
           <SearchableCombobox
