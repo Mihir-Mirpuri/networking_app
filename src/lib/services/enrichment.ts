@@ -10,6 +10,8 @@ interface ApolloEducation {
 }
 
 interface ApolloPersonMatch {
+  first_name?: string;
+  last_name?: string;
   email: string;
   email_status: string;
   confidence: number;
@@ -56,6 +58,8 @@ export interface EmailResult {
   education: EducationInfo | null;
   employment: EmploymentInfo | null;
   apolloStatus: ApolloStatusType;
+  apolloFirstName?: string | null;  // Full first name from Apollo (for abbreviated name resolution)
+  apolloLastName?: string | null;   // Full last name from Apollo (for abbreviated name resolution)
 }
 
 export interface FindEmailParams {
@@ -215,6 +219,8 @@ export async function findEmail(params: FindEmailParams): Promise<EmailResult> {
         education,
         employment,
         apolloStatus: 'SUCCESS',
+        apolloFirstName: person.first_name || null,
+        apolloLastName: person.last_name || null,
       };
     }
 

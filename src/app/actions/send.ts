@@ -20,6 +20,7 @@ import {
   getCompanyKey,
   normalizeCompanyForMatch,
 } from '@/lib/db/person-service';
+import { isAbbreviatedName } from '@/lib/services/linkedin-scraper';
 
 const BATCH_LIMIT = 10;
 
@@ -116,6 +117,22 @@ async function enrichPersonBeforeSend(
     data: { apolloCallsMade: { increment: 1 } },
   });
 
+  // Check if Apollo returned a fuller name for abbreviated names (e.g., "G." → "Gelfer")
+  const nameUpdates: Record<string, string> = {};
+  if (result.apolloLastName && person.lastName && isAbbreviatedName(person.lastName) && result.apolloLastName.length > person.lastName.replace('.', '').length) {
+    console.log(`[Send:Enrich] Apollo name fix: lastName "${person.lastName}" → "${result.apolloLastName}"`);
+    nameUpdates.lastName = result.apolloLastName;
+  }
+  if (result.apolloFirstName && person.firstName && isAbbreviatedName(person.firstName) && result.apolloFirstName.length > person.firstName.replace('.', '').length) {
+    console.log(`[Send:Enrich] Apollo name fix: firstName "${person.firstName}" → "${result.apolloFirstName}"`);
+    nameUpdates.firstName = result.apolloFirstName;
+  }
+  if (nameUpdates.firstName || nameUpdates.lastName) {
+    const newFirst = nameUpdates.firstName || person.firstName;
+    const newLast = nameUpdates.lastName || person.lastName;
+    nameUpdates.fullName = `${newFirst} ${newLast}`.trim();
+  }
+
   await prisma.person.update({
     where: { id: person.id },
     data: {
@@ -129,6 +146,7 @@ async function enrichPersonBeforeSend(
       ...(result.city && { city: result.city }),
       ...(result.state && { state: result.state }),
       ...(result.country && { country: result.country }),
+      ...nameUpdates,
     },
   });
 

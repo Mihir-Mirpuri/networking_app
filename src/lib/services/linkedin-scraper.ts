@@ -320,17 +320,123 @@ function extractSchools(education: ApifyProfileResponse['education']): string[] 
 }
 
 /**
+ * Check if a name looks abbreviated (single letter + optional dot)
+ * Examples: "G.", "G", "S." → true; "Gelfer", "Smith" → false
+ */
+export function isAbbreviatedName(name: string): boolean {
+  return /^\w\.?$/.test(name.trim());
+}
+
+/**
+ * Extract first/last name from a LinkedIn URL slug
+ * "/in/sarah-gelfer" → { firstName: "Sarah", lastName: "Gelfer" }
+ * "/in/john-van-der-berg" → { firstName: "John", lastName: "Van Der Berg" }
+ * Returns null for non-name slugs (contain "ACoAA", purely numeric, etc.)
+ */
+export function extractNameFromSlug(linkedinUrl: string): { firstName: string; lastName: string } | null {
+  if (!linkedinUrl) return null;
+
+  // Extract slug from URL: "https://www.linkedin.com/in/sarah-gelfer" → "sarah-gelfer"
+  const slugMatch = linkedinUrl.match(/\/in\/([^/?#]+)/);
+  if (!slugMatch) return null;
+
+  const slug = slugMatch[1];
+
+  // Skip non-name slugs
+  if (
+    slug.includes('ACoAA') ||       // LinkedIn encoded IDs
+    /^\d+$/.test(slug) ||            // Purely numeric
+    slug.length < 3                  // Too short to be a real name
+  ) {
+    return null;
+  }
+
+  // Split on dashes, filter empty segments (from double dashes like "het--desai")
+  let parts = slug.split('-').filter(Boolean);
+
+  // Strip trailing LinkedIn disambiguation hashes (e.g., "b0b7044", "596ba8113")
+  // Hashes are: all-digit segments, or 7+ char alphanumeric segments with 2+ consecutive digits
+  while (parts.length > 1) {
+    const last = parts[parts.length - 1];
+    if (/^\d+$/.test(last) || (last.length >= 7 && /\d{2,}/.test(last))) {
+      parts.pop();
+    } else {
+      break;
+    }
+  }
+
+  // Need at least first-last
+  if (parts.length < 2) return null;
+
+  // Strip trailing digits from each part (e.g., "patel1" → "patel", "wright2" → "wright")
+  parts = parts.map(p => p.replace(/\d+$/, '')).filter(Boolean);
+
+  if (parts.length < 2) return null;
+
+  const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+
+  const firstName = capitalize(parts[0]);
+
+  // Filter single-char segments from lastName parts (middle initials like "m", "u", "j")
+  const lastNameParts = parts.slice(1).filter(p => p.length > 1);
+  if (lastNameParts.length === 0) return null;
+
+  const lastName = lastNameParts.map(capitalize).join(' ');
+
+  return { firstName, lastName };
+}
+
+/**
  * Parse raw Apify response into our ScrapedProfile format
  */
 function parseProfile(raw: ApifyProfileResponse): ScrapedProfile {
   const location = extractLocation(raw);
   const schools = extractSchools(raw.education);
 
+  let firstName = raw.firstName || '';
+  let lastName = raw.lastName || '';
+
+  // Slug fallback for abbreviated names (e.g., "Sarah G." → "Sarah Gelfer")
+  if (isAbbreviatedName(lastName) || isAbbreviatedName(firstName)) {
+    const slugName = extractNameFromSlug(raw.linkedinUrl);
+    if (slugName) {
+      // Detect reversed slugs (e.g., "baker-natalie" for Natalie Baker):
+      // if slug lastName matches Apify firstName, swap slug parts
+      if (
+        slugName.lastName.toLowerCase() === firstName.toLowerCase() &&
+        slugName.firstName.toLowerCase() !== firstName.toLowerCase()
+      ) {
+        const tmp = slugName.firstName;
+        slugName.firstName = slugName.lastName;
+        slugName.lastName = tmp;
+      }
+
+      // Verify slug firstName matches Apify firstName (catches custom slugs
+      // like "voronova-software-quality" where slug has no relation to the name)
+      const slugFirstMatchesApify =
+        slugName.firstName.toLowerCase() === firstName.toLowerCase() ||
+        slugName.firstName[0]?.toLowerCase() === firstName[0]?.toLowerCase();
+
+      if (slugFirstMatchesApify) {
+        if (isAbbreviatedName(lastName) && slugName.lastName.length > lastName.replace('.', '').length) {
+          console.log(`[Scraper] URL slug fallback: "${lastName}" → "${slugName.lastName}" for ${raw.linkedinUrl}`);
+          lastName = slugName.lastName;
+        }
+        if (isAbbreviatedName(firstName) && slugName.firstName.length > firstName.replace('.', '').length) {
+          console.log(`[Scraper] URL slug fallback: "${firstName}" → "${slugName.firstName}" for ${raw.linkedinUrl}`);
+          firstName = slugName.firstName;
+        }
+      }
+    }
+  }
+
+  const fullName = `${firstName} ${lastName}`.trim();
+
   return {
     linkedinUrl: raw.linkedinUrl,
-    fullName: `${raw.firstName || ''} ${raw.lastName || ''}`.trim(),
-    firstName: raw.firstName || '',
-    lastName: raw.lastName || '',
+    fullName,
+    firstName,
+    lastName,
     email: raw.email || null,
     company: raw.currentPosition?.[0]?.companyName || raw.experience?.[0]?.companyName || null,
     role: raw.experience?.[0]?.position || null,
