@@ -79,7 +79,7 @@ export function ExpandedReview({
       setSubject(currentPerson.draftSubject);
       setBody(currentPerson.draftBody);
     }
-  }, [internalIndex, currentPerson]);
+  }, [internalIndex, currentPerson?.draftSubject, currentPerson?.draftBody]);
 
   // Keyboard shortcuts
   useEffect(() => {

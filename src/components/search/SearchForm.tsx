@@ -73,7 +73,10 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
             value={company}
             onChange={(val) => {
               setCompany(val);
-              setRole(''); // Reset role when company changes
+              // Only reset role when the new company has its own predefined roles
+              if (val && ROLES_BY_COMPANY[val]) {
+                setRole('');
+              }
             }}
             label="Company"
             placeholder="Type or select a company..."
