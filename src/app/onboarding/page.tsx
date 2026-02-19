@@ -8,7 +8,7 @@ export default async function OnboardingPage() {
   const session = await getServerSession(authOptions);
 
   if (!session?.user?.id) {
-    redirect('/auth/signin');
+    redirect('/');
   }
 
   // Check if user has already completed onboarding

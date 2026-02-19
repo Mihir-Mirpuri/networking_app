@@ -94,7 +94,7 @@ export async function sendInviteAction(inviteeEmail: string): Promise<SendInvite
   // Send invitation email via Resend
   if (resend) {
     const baseUrl = process.env.NEXTAUTH_URL || 'https://signl.to';
-    const signUpUrl = `${baseUrl}/auth/signin?ref=${referralCode}`;
+    const signUpUrl = `${baseUrl}/?ref=${referralCode}`;
     const referrerName = session.user.name || 'A friend';
 
     try {

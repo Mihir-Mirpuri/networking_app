@@ -245,7 +245,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
   };
 
   const handleSignOut = () => {
-    signOut({ callbackUrl: '/auth/signin' });
+    signOut({ callbackUrl: '/' });
   };
 
   const handleUploadResume = async (event: React.ChangeEvent<HTMLInputElement>) => {

@@ -8,7 +8,7 @@ export default async function CalendarPage() {
   const session = await getServerSession(authOptions);
 
   if (!session?.user) {
-    redirect('/auth/signin');
+    redirect('/');
   }
 
   return (

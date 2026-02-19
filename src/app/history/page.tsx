@@ -9,7 +9,7 @@ export default async function HistoryPage() {
   const session = await getServerSession(authOptions);
 
   if (!session?.user) {
-    redirect('/auth/signin');
+    redirect('/');
   }
 
   // Fetch initial outreach data on the server

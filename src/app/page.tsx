@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { Header } from '@/components/Header';
 import { HomeTabs } from '@/components/home/HomeTabs';
+import { LandingPage } from '@/components/landing/LandingPage';
 import prisma from '@/lib/prisma';
 
 const DAILY_LIMIT = 30;
@@ -29,7 +30,7 @@ export default async function HomePage() {
   const session = await getServerSession(authOptions);
 
   if (!session?.user?.id) {
-    redirect('/auth/signin');
+    return <LandingPage />;
   }
 
   // For testing: Force re-authentication if Account record doesn't exist
@@ -46,7 +47,7 @@ export default async function HomePage() {
     await prisma.session.deleteMany({
       where: { userId: session.user.id },
     });
-    redirect('/auth/signin');
+    redirect('/');
   }
 
   // Check if user has completed onboarding
