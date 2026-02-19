@@ -311,6 +311,10 @@ export async function saveCompanyPattern(
   confidence: number,
   sampleSize: number
 ): Promise<void> {
+  // Pattern generation disabled — existing patterns are read-only
+  console.log(`[EmailPattern] Skipping save for ${company} (pattern generation disabled)`);
+  return;
+
   const normalized = normalizeCompanyName(company);
 
   await prisma.companyEmailPattern.upsert({
@@ -405,15 +409,8 @@ export async function learnPatternFromDatabase(company: string): Promise<{
 export async function getOrLearnPattern(
   company: string
 ): Promise<{ pattern: PatternType; domain: string; confidence: number } | null> {
-  // Check for existing pattern
-  const existing = await getCompanyPattern(company);
-  if (existing) {
-    return existing;
-  }
-
-  // Try to learn from database
-  const learned = await learnPatternFromDatabase(company);
-  return learned;
+  // Only return existing patterns — pattern learning is disabled
+  return getCompanyPattern(company);
 }
 
 /**
