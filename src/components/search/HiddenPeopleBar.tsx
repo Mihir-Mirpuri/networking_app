@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { getHiddenPeopleAction, unhidePersonAction, HiddenPerson } from '@/app/actions/search';
+import { getHiddenPeopleAction, unhidePersonAction, HiddenPerson, SearchResultWithDraft } from '@/app/actions/search';
 
 const AVATAR_GRADIENTS = [
   'from-primary-400 to-primary-600',
@@ -23,9 +23,10 @@ function nameToGradient(name: string): string {
 interface HiddenPeopleBarProps {
   hiddenCount: number;
   onCountChange: (delta: number) => void;
+  onUnhide: (person: SearchResultWithDraft) => void;
 }
 
-export function HiddenPeopleBar({ hiddenCount, onCountChange }: HiddenPeopleBarProps) {
+export function HiddenPeopleBar({ hiddenCount, onCountChange, onUnhide }: HiddenPeopleBarProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [people, setPeople] = useState<HiddenPerson[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -54,6 +55,7 @@ export function HiddenPeopleBar({ hiddenCount, onCountChange }: HiddenPeopleBarP
     if (result.success) {
       setPeople((prev) => prev.filter((p) => p.userCandidateId !== userCandidateId));
       onCountChange(-1);
+      onUnhide(result.person);
     }
     setUnhidingIds((prev) => {
       const next = new Set(prev);

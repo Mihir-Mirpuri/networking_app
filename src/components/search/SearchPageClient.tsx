@@ -663,6 +663,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
           <HiddenPeopleBar
             hiddenCount={hiddenCount}
             onCountChange={(delta) => setHiddenCount((prev) => prev + delta)}
+            onUnhide={(person) => setResults((prev) => [...prev, person])}
           />
           <ResultsList
             results={results}

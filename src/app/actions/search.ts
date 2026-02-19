@@ -753,11 +753,12 @@ export async function getHiddenPeopleAction(): Promise<
 }
 
 /**
- * Unhide a person (reverse of hidePersonAction)
+ * Unhide a person (reverse of hidePersonAction).
+ * Returns the full SearchResultWithDraft so the UI can re-insert them into results.
  */
 export async function unhidePersonAction(
   userCandidateId: string
-): Promise<{ success: true } | { success: false; error: string }> {
+): Promise<{ success: true; person: SearchResultWithDraft } | { success: false; error: string }> {
   const session = await getServerSession(authOptions);
 
   if (!session?.user?.id) {
@@ -765,13 +766,97 @@ export async function unhidePersonAction(
   }
 
   try {
+    const userId = session.user.id;
+
+    // Unhide
     await prisma.userCandidate.update({
-      where: { id: userCandidateId, userId: session.user.id },
+      where: { id: userCandidateId, userId },
       data: { doNotShow: false },
     });
 
-    console.log(`[Unhide] User ${session.user.id} unmarked userCandidate ${userCandidateId}`);
-    return { success: true };
+    // Fetch person + draft data to return to the UI
+    const uc = await prisma.userCandidate.findUnique({
+      where: { id: userCandidateId },
+      select: {
+        id: true,
+        personId: true,
+        person: {
+          select: {
+            id: true,
+            fullName: true,
+            firstName: true,
+            lastName: true,
+            company: true,
+            role: true,
+            linkedinUrl: true,
+            email: true,
+            emailStatus: true,
+            emailConfidence: true,
+            emailDeliverable: true,
+            emailVerifiedAt: true,
+            emailVerificationReason: true,
+            city: true,
+            state: true,
+            country: true,
+            educationSchool: true,
+            educationDegree: true,
+            educationField: true,
+            educationYear: true,
+            sourceLinks: {
+              where: { kind: 'DISCOVERY' },
+              orderBy: { createdAt: 'asc' as const },
+              take: 1,
+              select: { url: true, title: true, snippet: true, domain: true },
+            },
+          },
+        },
+        emailDraft: {
+          select: { subject: true, body: true, template: { select: { id: true, attachResume: true, resumeId: true } } },
+        },
+      },
+    });
+
+    if (!uc) {
+      return { success: false, error: 'Candidate not found' };
+    }
+
+    const p = uc.person;
+    const sourceLink = p.sourceLinks[0];
+    const draft = uc.emailDraft;
+
+    const person: SearchResultWithDraft = {
+      id: p.id,
+      fullName: p.fullName,
+      firstName: p.firstName,
+      lastName: p.lastName,
+      company: p.company,
+      role: p.role,
+      linkedinUrl: p.linkedinUrl,
+      email: p.email,
+      emailStatus: (p.emailStatus as 'VERIFIED' | 'UNVERIFIED' | 'MISSING') || 'MISSING',
+      emailConfidence: p.emailConfidence,
+      emailDeliverable: p.emailDeliverable,
+      emailVerifiedAt: p.emailVerifiedAt,
+      emailVerificationReason: p.emailVerificationReason,
+      city: p.city,
+      state: p.state,
+      country: p.country,
+      educationSchool: p.educationSchool,
+      educationDegree: p.educationDegree,
+      educationField: p.educationField,
+      educationYear: p.educationYear,
+      sourceUrl: sourceLink?.url || null,
+      sourceTitle: sourceLink?.title || null,
+      sourceSnippet: sourceLink?.snippet || null,
+      sourceDomain: sourceLink?.domain || null,
+      draftSubject: draft?.subject || '',
+      draftBody: draft?.body || '',
+      userCandidateId: uc.id,
+      resumeId: draft?.template?.attachResume ? draft.template.resumeId : null,
+    };
+
+    console.log(`[Unhide] User ${userId} unmarked userCandidate ${userCandidateId}`);
+    return { success: true, person };
   } catch (error) {
     console.error('Error unhiding person:', error);
     return { success: false, error: 'Failed to unhide person' };
