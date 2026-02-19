@@ -35,8 +35,10 @@ export function ComposeEmailModal({
   variant = 'modal',
 }: ComposeEmailModalProps) {
   const [recipientEmail, setRecipientEmail] = useState('');
+  const [recipientName, setRecipientName] = useState('');
   const [recipientCompany, setRecipientCompany] = useState('');
   const [recipientRole, setRecipientRole] = useState('');
+  const [showSuccess, setShowSuccess] = useState(false);
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [attachResume, setAttachResume] = useState(false);
@@ -319,6 +321,7 @@ export function ComposeEmailModal({
 
       const result = await sendComposedEmailAction({
         recipientEmail,
+        recipientName: recipientName.trim() || undefined,
         subject,
         body,
         attachResume,
@@ -327,8 +330,17 @@ export function ComposeEmailModal({
       });
 
       if (result.success) {
+        dispatchCreditsChanged();
         onSuccess?.(result.messageId, result.threadId);
-        handleClose();
+        if (isEmbedded) {
+          setShowSuccess(true);
+          setTimeout(() => {
+            setShowSuccess(false);
+            handleClose();
+          }, 2000);
+        } else {
+          handleClose();
+        }
       } else if (result.error === 'LIMIT_REACHED') {
         setShowLimitModal(true);
         setLimitReached(true);
@@ -345,8 +357,10 @@ export function ComposeEmailModal({
   const handleClose = () => {
     // Reset form
     setRecipientEmail('');
+    setRecipientName('');
     setRecipientCompany('');
     setRecipientRole('');
+    setShowSuccess(false);
     setSubject('');
     setBody('');
     setAttachResume(false);
@@ -423,7 +437,14 @@ export function ComposeEmailModal({
 
         {/* Form */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {isLoadingData ? (
+          {showSuccess ? (
+            <div className="flex flex-col items-center justify-center h-32 animate-fade-in">
+              <svg className="w-12 h-12 text-green-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-lg font-medium text-green-700">Email sent!</p>
+            </div>
+          ) : isLoadingData ? (
             <div className="flex items-center justify-center h-32">
               <LoadingSpinner size="lg" />
             </div>
@@ -471,6 +492,34 @@ export function ComposeEmailModal({
                 {emailError && (
                   <p className="mt-1 text-sm text-red-600">{emailError}</p>
                 )}
+              </div>
+
+              {/* Recipient Name */}
+              <div>
+                <label className="block text-sm font-medium text-surface-700 mb-1">
+                  Recipient Name
+                </label>
+                <input
+                  type="text"
+                  value={recipientName}
+                  onChange={(e) => setRecipientName(e.target.value)}
+                  placeholder="Jane Smith"
+                  className="input"
+                />
+              </div>
+
+              {/* Company */}
+              <div>
+                <label className="block text-sm font-medium text-surface-700 mb-1">
+                  Company
+                </label>
+                <input
+                  type="text"
+                  value={recipientCompany}
+                  onChange={(e) => setRecipientCompany(e.target.value)}
+                  placeholder="Acme Inc."
+                  className="input"
+                />
               </div>
 
               {/* Company Research */}
