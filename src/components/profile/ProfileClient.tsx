@@ -19,6 +19,11 @@ import {
   deleteResumeAction,
   ResumeData,
 } from '@/app/actions/resume';
+import {
+  createCheckoutSession,
+  createCustomerPortalSession,
+  getSubscriptionStatus,
+} from '@/app/actions/subscription';
 import { SearchableCombobox } from '@/components/search/SearchableCombobox';
 import { UNIVERSITIES, CLASSIFICATIONS } from '@/lib/constants';
 
@@ -93,11 +98,21 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
   const [resumeError, setResumeError] = useState<string | null>(null);
   const [resumeSuccess, setResumeSuccess] = useState(false);
 
+  // Subscription state
+  const [subscription, setSubscription] = useState<{
+    isSubscribed: boolean;
+    currentPeriodEnd?: Date | null;
+  }>({ isSubscribed: false });
+  const [isLoadingSubscription, setIsLoadingSubscription] = useState(true);
+  const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
+  const [isPortalLoading, setIsPortalLoading] = useState(false);
+
   useEffect(() => {
     if (status === 'authenticated') {
       loadProfile();
       loadTemplates();
       loadResumes();
+      loadSubscription();
     }
   }, [status]);
 
@@ -126,6 +141,16 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
       setResumes(result.resumes);
     }
     setIsLoadingResumes(false);
+  };
+
+  const loadSubscription = async () => {
+    setIsLoadingSubscription(true);
+    const result = await getSubscriptionStatus();
+    setSubscription({
+      isSubscribed: result.isSubscribed ?? false,
+      currentPeriodEnd: result.currentPeriodEnd,
+    });
+    setIsLoadingSubscription(false);
   };
 
   const handleSaveProfile = async () => {
@@ -770,6 +795,71 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                   </button>
                 </div>
               </div>
+            </div>
+          )}
+        </section>
+
+        {/* Plan & Billing Card */}
+        <section className="bg-white p-6 rounded-2xl border border-surface-200 card-shadow">
+          <h3 className="text-lg font-bold text-surface-900 mb-4">Plan & Billing</h3>
+          {isLoadingSubscription ? (
+            <div className="text-center py-4 text-surface-500 text-sm">Loading plan details...</div>
+          ) : subscription.isSubscribed ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <span className="inline-flex items-center px-2.5 py-1 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg text-white font-bold text-xs">
+                  PRO
+                </span>
+                <span className="text-sm text-surface-700 font-medium">Unlimited emails</span>
+              </div>
+              {subscription.currentPeriodEnd && (
+                <p className="text-sm text-surface-500">
+                  Next billing date: {new Date(subscription.currentPeriodEnd).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                </p>
+              )}
+              <button
+                onClick={async () => {
+                  setIsPortalLoading(true);
+                  try {
+                    await createCustomerPortalSession();
+                  } catch {
+                    setIsPortalLoading(false);
+                  }
+                }}
+                disabled={isPortalLoading}
+                className="px-6 py-2.5 rounded-xl font-semibold border border-surface-200 hover:bg-surface-50 transition-all text-surface-700 text-sm disabled:opacity-50"
+              >
+                {isPortalLoading ? 'Loading...' : 'Manage Billing'}
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <span className="inline-flex items-center px-2.5 py-1 bg-surface-100 rounded-lg text-surface-600 font-bold text-xs">
+                  FREE
+                </span>
+                <span className="text-sm text-surface-700 font-medium">10 emails/day</span>
+              </div>
+              <p className="text-sm text-surface-500">
+                Upgrade to Pro for unlimited emails at $10/month.
+              </p>
+              <button
+                onClick={async () => {
+                  setIsCheckoutLoading(true);
+                  try {
+                    await createCheckoutSession();
+                  } catch {
+                    setIsCheckoutLoading(false);
+                  }
+                }}
+                disabled={isCheckoutLoading}
+                className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl font-semibold hover:from-blue-600 hover:to-indigo-700 transition-all shadow-sm hover:shadow-md text-sm disabled:opacity-50"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                {isCheckoutLoading ? 'Loading...' : 'Upgrade to Pro'}
+              </button>
             </div>
           )}
         </section>

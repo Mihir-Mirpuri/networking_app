@@ -7,6 +7,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { usePolling } from '@/hooks/usePolling';
 import { getPendingSuggestionsCountAction } from '@/app/actions/meetingSuggestions';
 import { getCreditStatusAction } from '@/app/actions/invitations';
+import { createCheckoutSession } from '@/app/actions/subscription';
 import { CREDITS_CHANGED_EVENT } from '@/components/credits';
 import {
   PaperAirplaneIcon,
@@ -28,6 +29,7 @@ export function Header() {
   const pathname = usePathname();
   const prevPathnameRef = useRef(pathname);
   const [credits, setCredits] = useState<CreditStatus | null>(null);
+  const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
 
   const loadCredits = useCallback(async () => {
     const result = await getCreditStatusAction();
@@ -175,8 +177,27 @@ export function Header() {
               )}
             </Link>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 md:gap-4">
             {renderNavContent()}
+            {session?.user && credits && !credits.isSubscribed && (
+              <button
+                onClick={async () => {
+                  setIsCheckoutLoading(true);
+                  try {
+                    await createCheckoutSession();
+                  } catch {
+                    setIsCheckoutLoading(false);
+                  }
+                }}
+                disabled={isCheckoutLoading}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-sm font-medium rounded-lg hover:from-blue-600 hover:to-indigo-700 transition-all shadow-sm hover:shadow-md disabled:opacity-50"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                <span className="hidden md:inline">{isCheckoutLoading ? 'Loading...' : 'Upgrade'}</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
