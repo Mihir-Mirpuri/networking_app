@@ -11,12 +11,50 @@ interface ExpandedReviewProps {
   results: SearchResultWithDraft[];
   currentIndex: number;
   onClose: () => void;
-  onSend: (index: number, subject: string, body: string) => Promise<void>;
+  onSend: (index: number, subject: string, body: string) => Promise<boolean>;
   sendStatuses: Map<string, 'success' | 'failed' | 'pending'>;
+  sendErrors?: Map<string, string>;
   templates?: TemplateData[];
   defaultTemplateId?: string;
   onTemplateChange?: (templateId: string, personIndex: number) => void;
   isRegenerating?: boolean;
+  limitReached?: boolean;
+  onLimitReached?: () => void;
+}
+
+function SendFailureAnimation({ message }: { message: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-6 animate-fade-in">
+      <svg className="w-16 h-16" viewBox="0 0 52 52">
+        <circle
+          className="draw-check-circle"
+          cx="26" cy="26" r="25"
+          fill="none"
+          stroke="#ef4444"
+          strokeWidth="2"
+        />
+        <path
+          className="draw-check-mark"
+          fill="none"
+          stroke="#ef4444"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M17 17l18 18"
+        />
+        <path
+          className="draw-check-mark"
+          fill="none"
+          stroke="#ef4444"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M35 17l-18 18"
+        />
+      </svg>
+      <p className="mt-3 text-sm font-medium text-red-700">{message}</p>
+    </div>
+  );
 }
 
 function SendSuccessAnimation() {
@@ -51,10 +89,13 @@ export function ExpandedReview({
   onClose,
   onSend,
   sendStatuses,
+  sendErrors,
   templates,
   defaultTemplateId,
   onTemplateChange,
   isRegenerating,
+  limitReached,
+  onLimitReached,
 }: ExpandedReviewProps) {
   const person = results[currentIndex];
   const [subject, setSubject] = useState(person?.draftSubject || '');
@@ -66,6 +107,7 @@ export function ExpandedReview({
   const [scheduleError, setScheduleError] = useState<string | null>(null);
   const [isScheduling, setIsScheduling] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [showFailure, setShowFailure] = useState(false);
 
   const currentPerson = results[internalIndex];
   const status = currentPerson ? sendStatuses.get(currentPerson.id) : undefined;
@@ -95,7 +137,9 @@ export function ExpandedReview({
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
         e.preventDefault();
-        if (currentPerson && !status && !isSending && !showSuccess) {
+        if (limitReached) {
+          onLimitReached?.();
+        } else if (currentPerson && !status && !isSending && !showSuccess) {
           handleSend();
         }
       }
@@ -109,12 +153,14 @@ export function ExpandedReview({
     if (!currentPerson) return;
 
     setIsSending(true);
-    await onSend(internalIndex, subject, body);
+    const success = await onSend(internalIndex, subject, body);
     setIsSending(false);
 
-    // Only show success animation if the send actually succeeded
-    const sendResult = sendStatuses.get(currentPerson.id);
-    if (sendResult === 'failed') return;
+    if (!success) {
+      setShowFailure(true);
+      setTimeout(() => setShowFailure(false), 2000);
+      return;
+    }
 
     setShowSuccess(true);
     setTimeout(() => {
@@ -234,7 +280,7 @@ export function ExpandedReview({
     return null;
   }
 
-  const canSend = !status && !showSuccess;
+  const canSend = !status && !showSuccess && !limitReached;
 
   return (
     <div className="fixed inset-0 bg-surface-900/50 flex items-center justify-center z-50 p-4 animate-fade-in" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -243,6 +289,13 @@ export function ExpandedReview({
         {showSuccess && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/90 rounded-lg">
             <SendSuccessAnimation />
+          </div>
+        )}
+
+        {/* Failure animation overlay */}
+        {showFailure && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/90 rounded-lg">
+            <SendFailureAnimation message={sendErrors?.get(currentPerson.id) || 'Failed to send email'} />
           </div>
         )}
 
@@ -298,12 +351,6 @@ export function ExpandedReview({
           </div>
         </div>
 
-        {/* Status Banner */}
-        {status === 'failed' && (
-          <div className="px-4 py-2 bg-red-100 text-red-800">
-            Failed to send email
-          </div>
-        )}
 
         {/* Email Form */}
         <div className="flex-1 overflow-y-auto p-4">
@@ -427,18 +474,18 @@ export function ExpandedReview({
             </div>
             <div className="flex gap-2">
               <button
-                onClick={() => setShowScheduleModal(true)}
+                onClick={limitReached ? () => onLimitReached?.() : () => setShowScheduleModal(true)}
                 disabled={!canSend || isSending}
-                className="px-4 py-2 text-sm border border-primary-600 text-primary-600 rounded-md hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                className={`px-4 py-2 text-sm border border-primary-600 text-primary-600 rounded-md hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed${limitReached ? ' opacity-50 cursor-not-allowed' : ''}`}
               >
                 Schedule
               </button>
               <button
-                onClick={handleSend}
-                disabled={!canSend || isSending}
-                className="btn-primary text-sm"
+                onClick={limitReached ? () => onLimitReached?.() : handleSend}
+                disabled={limitReached ? false : (!canSend || isSending)}
+                className={`btn-primary text-sm${limitReached ? ' opacity-50 cursor-not-allowed' : ''}`}
               >
-                {isSending ? 'Sending...' : 'Send & Next'}
+                {isSending ? 'Sending...' : limitReached ? 'Daily limit reached' : 'Send & Next'}
               </button>
             </div>
           </div>

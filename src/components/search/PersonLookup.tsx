@@ -36,8 +36,10 @@ export function PersonLookup() {
   // ExpandedReview state
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
   const [sendStatuses, setSendStatuses] = useState<Map<string, 'success' | 'failed' | 'pending'>>(new Map());
+  const [sendErrors, setSendErrors] = useState<Map<string, string>>(new Map());
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [showLimitModal, setShowLimitModal] = useState(false);
+  const [limitReached, setLimitReached] = useState(false);
 
   // Load templates on mount
   useEffect(() => {
@@ -61,10 +63,14 @@ export function PersonLookup() {
     loadTemplates();
   }, [status]);
 
-  const canSearch = name.trim().length >= 2;
+  const canSearch = name.trim().length >= 2 && !limitReached;
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (limitReached) {
+      setShowLimitModal(true);
+      return;
+    }
     if (!canSearch) return;
 
     setIsSearching(true);
@@ -87,9 +93,9 @@ export function PersonLookup() {
     setIsSearching(false);
   };
 
-  const handleSendFromReview = async (index: number, subject: string, body: string) => {
+  const handleSendFromReview = async (index: number, subject: string, body: string): Promise<boolean> => {
     const person = results[index];
-    if (!person.userCandidateId) return;
+    if (!person.userCandidateId) return false;
 
     setSendStatuses((prev) => new Map(prev).set(person.id, 'pending'));
 
@@ -117,13 +123,15 @@ export function PersonLookup() {
     }
 
     if (result.success) {
-      setToast({ message: 'Email sent successfully!', type: 'success' });
       dispatchCreditsChanged();
+      return true;
     } else if (result.error === 'LIMIT_REACHED') {
       setShowLimitModal(true);
+      setLimitReached(true);
     } else {
-      setToast({ message: result.error || 'Failed to send email', type: 'error' });
+      setSendErrors((prev) => new Map(prev).set(person.id, result.error || 'Failed to send email'));
     }
+    return false;
   };
 
   const handleTemplateChange = async (templateId: string, personIndex: number) => {
@@ -160,16 +168,20 @@ export function PersonLookup() {
           onClose={() => setExpandedIndex(null)}
           onSend={handleSendFromReview}
           sendStatuses={sendStatuses}
+          sendErrors={sendErrors}
           templates={templates}
           defaultTemplateId={defaultTemplateId}
           onTemplateChange={handleTemplateChange}
           isRegenerating={isRegenerating}
+          limitReached={limitReached}
+          onLimitReached={() => setShowLimitModal(true)}
         />
         {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
         <LimitReachedModal
           isOpen={showLimitModal}
           onClose={() => setShowLimitModal(false)}
           onCreditsAwarded={(credits) => {
+            setLimitReached(false);
             setToast({ message: `+${credits} email credits added!`, type: 'success' });
             dispatchCreditsChanged();
           }}
@@ -229,8 +241,9 @@ export function PersonLookup() {
           {/* Search button */}
           <button
             type="submit"
-            disabled={!canSearch || isSearching}
-            className="btn-primary w-full py-3 text-base"
+            disabled={(!canSearch || isSearching) && !limitReached}
+            className={`btn-primary w-full py-3 text-base${limitReached ? ' opacity-50 cursor-not-allowed' : ''}`}
+            onClick={limitReached ? (e) => { e.preventDefault(); setShowLimitModal(true); } : undefined}
           >
             {isSearching ? (
               <span className="flex items-center justify-center gap-2">
@@ -243,7 +256,7 @@ export function PersonLookup() {
             ) : (
               <span className="flex items-center justify-center gap-2">
                 <MagnifyingGlassIcon className="w-5 h-5" />
-                Look Up
+                {limitReached ? 'Daily limit reached' : 'Look Up'}
               </span>
             )}
           </button>
@@ -273,7 +286,8 @@ export function PersonLookup() {
               key={person.id}
               person={person}
               sendStatus={sendStatuses.get(person.id)}
-              onEmail={() => setExpandedIndex(index)}
+              onEmail={limitReached ? () => setShowLimitModal(true) : () => setExpandedIndex(index)}
+              limitReached={limitReached}
             />
           ))}
         </div>
@@ -284,6 +298,7 @@ export function PersonLookup() {
         isOpen={showLimitModal}
         onClose={() => setShowLimitModal(false)}
         onCreditsAwarded={(credits) => {
+          setLimitReached(false);
           setToast({ message: `+${credits} email credits added!`, type: 'success' });
           dispatchCreditsChanged();
         }}
@@ -348,10 +363,12 @@ function LookupResultCard({
   person,
   sendStatus,
   onEmail,
+  limitReached,
 }: {
   person: SearchResultWithDraft;
   sendStatus?: 'success' | 'failed' | 'pending';
   onEmail: () => void;
+  limitReached?: boolean;
 }) {
   const initials = person.fullName
     .split(' ')
@@ -422,11 +439,17 @@ function LookupResultCard({
         <div className="flex-shrink-0">
           <button
             onClick={onEmail}
-            disabled={sendStatus === 'success'}
-            className={sendStatus === 'success' ? 'btn-secondary text-sm py-2 px-4 opacity-50 cursor-not-allowed' : 'btn-primary text-sm py-2 px-4'}
+            disabled={sendStatus === 'success' && !limitReached}
+            className={
+              sendStatus === 'success'
+                ? 'btn-secondary text-sm py-2 px-4 opacity-50 cursor-not-allowed'
+                : limitReached
+                  ? 'btn-primary text-sm py-2 px-4 opacity-50 cursor-not-allowed'
+                  : 'btn-primary text-sm py-2 px-4'
+            }
           >
             <EnvelopeIcon className="w-4 h-4 mr-1.5" />
-            {sendStatus === 'success' ? 'Sent' : 'Email'}
+            {sendStatus === 'success' ? 'Sent' : limitReached ? 'Limit reached' : 'Email'}
           </button>
         </div>
       </div>

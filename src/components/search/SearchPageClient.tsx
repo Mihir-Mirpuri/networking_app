@@ -62,12 +62,14 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
   const [sendStatuses, setSendStatuses] = useState<Map<string, 'success' | 'failed' | 'pending'>>(
     new Map()
   );
+  const [sendErrors, setSendErrors] = useState<Map<string, string>>(new Map());
   const [remainingDaily, setRemainingDaily] = useState(initialRemainingDaily);
   const [showBulkReview, setShowBulkReview] = useState(false);
   const [generatingStatuses, setGeneratingStatuses] = useState<Map<string, boolean>>(new Map());
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [showLimitModal, setShowLimitModal] = useState(false);
+  const [limitReached, setLimitReached] = useState(false);
   const [searchParams, setSearchParams] = useState<{
     company?: string;
     role?: string;
@@ -266,6 +268,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
     setError(null);
     setResults([]);
     setSendStatuses(new Map());
+    setSendErrors(new Map());
     setTotalLoaded(0);
     setHasMore(true);
     setFormPrefill(null);
@@ -317,9 +320,9 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
     }
   };
 
-  const handleSendFromReview = async (index: number, subject: string, body: string) => {
+  const handleSendFromReview = async (index: number, subject: string, body: string): Promise<boolean> => {
     const person = results[index];
-    if (!person.userCandidateId) return;
+    if (!person.userCandidateId) return false;
 
     setSendStatuses((prev) => new Map(prev).set(person.id, 'pending'));
 
@@ -348,13 +351,15 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
 
     if (result.success) {
       setRemainingDaily((prev) => Math.max(0, prev - 1));
-      setToast({ message: 'Email sent successfully!', type: 'success' });
       dispatchCreditsChanged(); // Update header credits display
+      return true;
     } else if (result.error === 'LIMIT_REACHED') {
       setShowLimitModal(true);
+      setLimitReached(true);
     } else {
-      setToast({ message: result.error || 'Failed to send email', type: 'error' });
+      setSendErrors((prev) => new Map(prev).set(person.id, result.error || 'Failed to send email'));
     }
+    return false;
   };
 
   const handleBulkSend = async (emails: { index: number; subject: string; body: string }[]) => {
@@ -389,6 +394,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
 
     if (result.success) {
       const updatedStatuses = new Map(newStatuses);
+      let hitLimit = false;
       result.results.forEach((res) => {
         // Match by email or by index position for people who had no email pre-send
         const person = results.find((r) => r.email === res.email) ||
@@ -396,8 +402,16 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
         if (person) {
           updatedStatuses.set(person.id, res.success ? 'success' : 'failed');
         }
+        if (!res.success && res.error === 'LIMIT_REACHED') {
+          hitLimit = true;
+        }
       });
       setSendStatuses(updatedStatuses);
+
+      if (hitLimit) {
+        setShowLimitModal(true);
+        setLimitReached(true);
+      }
 
       const successCount = result.results.filter((r) => r.success).length;
       setRemainingDaily((prev) => Math.max(0, prev - successCount));
@@ -522,6 +536,8 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
         onSearch={handleSearch}
         isLoading={isSearching}
         initialParams={formPrefill || searchParams}
+        disabled={limitReached}
+        onDisabledClick={() => setShowLimitModal(true)}
       />
 
       {/* Recent searches — always visible below the form for quick re-runs */}
@@ -641,6 +657,8 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
             isSending={isSending}
             sendingIndex={undefined}
             sendStatuses={sendStatuses}
+            limitReached={limitReached}
+            onLimitReached={() => setShowLimitModal(true)}
           />
 
           {/* Load More Button */}
@@ -684,10 +702,13 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
           onClose={() => setExpandedIndex(null)}
           onSend={handleSendFromReview}
           sendStatuses={sendStatuses}
+          sendErrors={sendErrors}
           templates={templates}
           defaultTemplateId={defaultTemplateId}
           onTemplateChange={handleTemplateChange}
           isRegenerating={isRegenerating}
+          limitReached={limitReached}
+          onLimitReached={() => setShowLimitModal(true)}
         />
       )}
 
@@ -716,6 +737,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
         onClose={() => setShowLimitModal(false)}
         onCreditsAwarded={(credits) => {
           setRemainingDaily((prev) => prev + credits);
+          setLimitReached(false);
           setToast({ message: `+${credits} email credits added!`, type: 'success' });
           dispatchCreditsChanged(); // Update header credits display
         }}
