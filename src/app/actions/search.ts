@@ -1362,12 +1362,13 @@ export async function lookupPersonAction(
         const cseUrls = cseResults.map((r) => r.linkedinUrl);
         const existingMap = await findPeopleByLinkedInUrls(cseUrls);
 
+        // Separate existing vs new CSE results
+        const newCseResults: typeof cseResults = [];
         for (const cseResult of cseResults) {
-          if (dbLinkedInUrls.has(cseResult.linkedinUrl)) continue; // Already in DB results
+          if (dbLinkedInUrls.has(cseResult.linkedinUrl)) continue;
 
           const existing = existingMap.get(cseResult.linkedinUrl);
           if (existing) {
-            // Already in DB but wasn't found by name search — add it
             csePeople.push({
               ...existing,
               emailDeliverable: null,
@@ -1376,22 +1377,44 @@ export async function lookupPersonAction(
             });
             dbLinkedInUrls.add(cseResult.linkedinUrl);
           } else {
-            // New person — save to DB
+            newCseResults.push(cseResult);
+          }
+        }
+
+        // Scrape new profiles via Apify to get full data (role, location, education)
+        if (newCseResults.length > 0) {
+          const urlsToScrape = newCseResults.map(r => r.linkedinUrl);
+          let scrapedMap = new Map<string, ScrapedProfile>();
+
+          try {
+            const scraped = await scrapeLinkedInProfiles(urlsToScrape, { includeEmail: false });
+            for (const profile of scraped) {
+              scrapedMap.set(profile.linkedinUrl, profile);
+            }
+            console.log(`[Lookup] Scraped ${scraped.length}/${urlsToScrape.length} new profiles`);
+          } catch (err) {
+            console.error('[Lookup] Scraper failed, falling back to CSE-only data:', err);
+          }
+
+          for (const cseResult of newCseResults) {
+            const scraped = scrapedMap.get(cseResult.linkedinUrl);
+            const profile = scraped || {
+              linkedinUrl: cseResult.linkedinUrl,
+              fullName: cseResult.fullName || '',
+              firstName: cseResult.firstName || '',
+              lastName: cseResult.lastName || '',
+              company: cseResult.cseCompany || input.company || null,
+              role: null,
+              email: null,
+              city: null,
+              state: null,
+              country: null,
+              schools: [] as string[],
+              educationSchool: null,
+            };
+
             const { personId } = await saveScrapedProfile(
-              {
-                linkedinUrl: cseResult.linkedinUrl,
-                fullName: cseResult.fullName || '',
-                firstName: cseResult.firstName || '',
-                lastName: cseResult.lastName || '',
-                company: cseResult.cseCompany || input.company || null,
-                role: null,
-                email: null,
-                city: null,
-                state: null,
-                country: null,
-                schools: [],
-                educationSchool: null,
-              },
+              profile,
               cseResult.linkedinUrl,
               cseResult.sourceTitle,
               cseResult.sourceSnippet,
@@ -1400,7 +1423,6 @@ export async function lookupPersonAction(
               undefined
             );
 
-            // Fetch the saved record to get the full PersonResult shape
             const saved = await prisma.person.findUnique({
               where: { id: personId },
               select: {
