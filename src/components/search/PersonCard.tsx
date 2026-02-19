@@ -27,6 +27,8 @@ interface PersonCardProps {
   isSending: boolean;
   sendStatus?: 'success' | 'failed' | 'pending';
   scheduledFor?: Date | null;
+  limitReached?: boolean;
+  onLimitReached?: () => void;
 }
 
 export function PersonCard({
@@ -36,6 +38,8 @@ export function PersonCard({
   isSending,
   sendStatus,
   scheduledFor,
+  limitReached,
+  onLimitReached,
 }: PersonCardProps) {
   const getStatusBadge = () => {
     if (sendStatus === 'pending') {
@@ -212,6 +216,14 @@ export function PersonCard({
             className="text-sm w-full justify-center btn-secondary text-red-600 border-red-200"
           >
             Failed
+          </button>
+        ) : limitReached ? (
+          <button
+            onClick={() => onLimitReached?.()}
+            className="text-sm w-full justify-center btn-primary opacity-50 cursor-not-allowed"
+          >
+            <EnvelopeIcon className="w-4 h-4 mr-1.5" />
+            Limit reached
           </button>
         ) : (
           <button

@@ -7,6 +7,8 @@ import { getResumesAction, ResumeData } from '@/app/actions/resume';
 import { EMAIL_TEMPLATES } from '@/lib/constants';
 import { LoadingSpinner } from '@/components/search/LoadingSpinner';
 import { CompanyResearchPanel } from '@/components/compose/CompanyResearchPanel';
+import { LimitReachedModal, dispatchCreditsChanged } from '@/components/credits';
+import { Toast } from '@/components/ui/Toast';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const MAX_ATTACHMENTS = 5;
@@ -49,6 +51,9 @@ export function ComposeEmailModal({
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
+  const [showLimitModal, setShowLimitModal] = useState(false);
+  const [limitReached, setLimitReached] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -101,11 +106,21 @@ export function ComposeEmailModal({
         setTemplates(combinedTemplates);
 
         if (!selectedTemplateId) {
+          let initialTemplate: TemplateData | undefined;
           if (templatesResult.templates.length > 0) {
             const defaultTemplate = templatesResult.templates.find((t) => t.isDefault);
-            setSelectedTemplateId(defaultTemplate ? defaultTemplate.id : templatesResult.templates[0].id);
+            initialTemplate = defaultTemplate || templatesResult.templates[0];
           } else {
-            setSelectedTemplateId(hardcodedDefault.id);
+            initialTemplate = combinedTemplates.find((t) => t.id === hardcodedDefault.id);
+          }
+          if (initialTemplate) {
+            setSelectedTemplateId(initialTemplate.id);
+            setSubject(applyProfileToTemplate(initialTemplate.subject, profile));
+            setBody(applyProfileToTemplate(initialTemplate.body, profile));
+            setAttachResume(initialTemplate.attachResume);
+            if (initialTemplate.resumeId) {
+              setSelectedResumeId(initialTemplate.resumeId);
+            }
           }
         }
       }
@@ -314,6 +329,9 @@ export function ComposeEmailModal({
       if (result.success) {
         onSuccess?.(result.messageId, result.threadId);
         handleClose();
+      } else if (result.error === 'LIMIT_REACHED') {
+        setShowLimitModal(true);
+        setLimitReached(true);
       } else {
         setError(result.error);
       }
@@ -636,15 +654,17 @@ export function ComposeEmailModal({
             </button>
           )}
           <button
-            onClick={handleSend}
-            disabled={isSending || isLoadingData}
-            className="btn-primary text-sm"
+            onClick={limitReached ? () => setShowLimitModal(true) : handleSend}
+            disabled={limitReached ? false : (isSending || isLoadingData)}
+            className={`btn-primary text-sm${limitReached ? ' opacity-50 cursor-not-allowed' : ''}`}
           >
             {isSending ? (
               <span className="flex items-center gap-2">
                 <LoadingSpinner size="sm" />
                 Sending...
               </span>
+            ) : limitReached ? (
+              'Daily limit reached'
             ) : (
               'Send'
             )}
@@ -652,6 +672,23 @@ export function ComposeEmailModal({
         </div>
       </div>
 
+      <LimitReachedModal
+        isOpen={showLimitModal}
+        onClose={() => setShowLimitModal(false)}
+        onCreditsAwarded={(credits) => {
+          setLimitReached(false);
+          setToast({ message: `+${credits} email credits added!`, type: 'success' });
+          dispatchCreditsChanged();
+        }}
+      />
+
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   );
 }

@@ -22,9 +22,11 @@ interface SearchFormProps {
     university?: string;
     location?: string;
   } | null;
+  disabled?: boolean;
+  onDisabledClick?: () => void;
 }
 
-export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormProps) {
+export function SearchForm({ onSearch, isLoading, initialParams, disabled, onDisabledClick }: SearchFormProps) {
   const [company, setCompany] = useState<string>(initialParams?.company || '');
   const [role, setRole] = useState<string>(initialParams?.role || '');
 
@@ -47,6 +49,10 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (disabled) {
+      onDisabledClick?.();
+      return;
+    }
     onSearch({
       company: company || undefined,
       role: role || undefined,
@@ -142,13 +148,19 @@ export function SearchForm({ onSearch, isLoading, initialParams }: SearchFormPro
         <div className="flex items-center gap-4">
           <button
             type="submit"
-            disabled={isLoading || !hasSearchParams}
-            className="btn-primary"
+            disabled={isLoading || (!hasSearchParams && !disabled)}
+            className={`btn-primary${disabled ? ' opacity-50 cursor-not-allowed' : ''}`}
+            onClick={disabled ? (e) => { e.preventDefault(); onDisabledClick?.(); } : undefined}
           >
             {isLoading && <LoadingSpinner size="sm" />}
             {isLoading ? 'Searching...' : 'Search'}
           </button>
-          {!hasSearchParams && (
+          {disabled && (
+            <p className="text-sm text-amber-600 font-medium">
+              Daily limit reached
+            </p>
+          )}
+          {!disabled && !hasSearchParams && (
             <p className="text-sm text-surface-500">
               Fill in at least one field to search
             </p>

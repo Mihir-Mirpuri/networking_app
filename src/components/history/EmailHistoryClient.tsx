@@ -6,6 +6,7 @@ import { updateScheduledEmailAction, cancelScheduledEmailAction, sendFollowUpAct
 import { generateFollowUpAction } from '@/app/actions/personalize';
 import { Toast } from '@/components/ui/Toast';
 import { LoadingSpinner } from '@/components/search/LoadingSpinner';
+import { LimitReachedModal, dispatchCreditsChanged } from '@/components/credits';
 
 interface GroupedLogs {
   [date: string]: SendLogEntry[];
@@ -72,6 +73,8 @@ export function EmailHistoryClient({
   const [isSendingFollowUp, setIsSendingFollowUp] = useState(false);
   const [followUpError, setFollowUpError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [showLimitModal, setShowLimitModal] = useState(false);
+  const [limitReached, setLimitReached] = useState(false);
 
   // ESC to close modals
   useEffect(() => {
@@ -346,6 +349,10 @@ export function EmailHistoryClient({
           setCursor(refreshResult.nextCursor);
           setHasMore(refreshResult.hasMore);
         }
+      } else if (result.error === 'LIMIT_REACHED') {
+        setShowLimitModal(true);
+        setLimitReached(true);
+        setFollowUpError(null);
       } else {
         setFollowUpError(result.error || 'Failed to send follow-up');
       }
@@ -672,12 +679,16 @@ export function EmailHistoryClient({
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleGenerateFollowUp(log.id);
+                                  if (limitReached) {
+                                    setShowLimitModal(true);
+                                  } else {
+                                    handleGenerateFollowUp(log.id);
+                                  }
                                 }}
                                 disabled={isGeneratingFollowUp === log.id}
-                                className="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200 disabled:opacity-50"
+                                className={`px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200 disabled:opacity-50${limitReached ? ' opacity-50 cursor-not-allowed' : ''}`}
                               >
-                                {isGeneratingFollowUp === log.id ? 'Generating...' : 'Follow Up'}
+                                {isGeneratingFollowUp === log.id ? 'Generating...' : limitReached ? 'Limit reached' : 'Follow Up'}
                               </button>
                             )}
                             <span className="text-sm text-surface-500">
@@ -868,16 +879,26 @@ export function EmailHistoryClient({
                 Cancel
               </button>
               <button
-                onClick={handleSendFollowUp}
-                disabled={isSendingFollowUp || !followUpData.body.trim()}
-                className="btn-primary text-sm"
+                onClick={limitReached ? () => setShowLimitModal(true) : handleSendFollowUp}
+                disabled={limitReached ? false : (isSendingFollowUp || !followUpData.body.trim())}
+                className={`btn-primary text-sm${limitReached ? ' opacity-50 cursor-not-allowed' : ''}`}
               >
-                {isSendingFollowUp ? 'Sending...' : 'Send Follow Up'}
+                {isSendingFollowUp ? 'Sending...' : limitReached ? 'Daily limit reached' : 'Send Follow Up'}
               </button>
             </div>
           </div>
         </div>
       )}
+
+      <LimitReachedModal
+        isOpen={showLimitModal}
+        onClose={() => setShowLimitModal(false)}
+        onCreditsAwarded={(credits) => {
+          setLimitReached(false);
+          setToast({ message: `+${credits} email credits added!`, type: 'success' });
+          dispatchCreditsChanged();
+        }}
+      />
 
       {toast && (
         <Toast

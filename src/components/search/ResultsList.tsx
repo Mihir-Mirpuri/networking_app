@@ -12,6 +12,8 @@ interface ResultsListProps {
   isSending: boolean;
   sendingIndex?: number;
   sendStatuses: Map<string, 'success' | 'failed' | 'pending'>;
+  limitReached?: boolean;
+  onLimitReached?: () => void;
 }
 
 export function ResultsList({
@@ -22,6 +24,8 @@ export function ResultsList({
   isSending,
   sendingIndex,
   sendStatuses,
+  limitReached,
+  onLimitReached,
 }: ResultsListProps) {
   const [linkedinDropdownOpen, setLinkedinDropdownOpen] = useState(false);
   const [openedLinkedins, setOpenedLinkedins] = useState<Set<string>>(new Set());
@@ -140,6 +144,8 @@ export function ResultsList({
               onHide={person.userCandidateId && onHide ? () => onHide(person.userCandidateId!) : undefined}
               isSending={isSending && sendingIndex === index}
               sendStatus={sendStatuses.get(person.id)}
+              limitReached={limitReached}
+              onLimitReached={onLimitReached}
             />
           </div>
         ))}
