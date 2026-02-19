@@ -925,6 +925,10 @@ export function buildPersonWhereClause(filters: Omit<PersonFilters, 'limit'>): R
     where.educationSchool = { contains: university.trim(), mode: 'insensitive' };
   }
 
+  // Never show people without a role (they display as "Professional" in the UI)
+  if (!where.AND) where.AND = [];
+  (where.AND as unknown[]).push({ role: { not: null } });
+
   // Email filter - must have email AND not be marked as undeliverable
   if (requireEmail) {
     where.email = { not: null };
@@ -1128,6 +1132,9 @@ async function findPeopleByFiltersVector(
   if (excludePersonIds && excludePersonIds.length > 0) {
     conditions.push(Prisma.sql`p.id NOT IN (${Prisma.join(excludePersonIds)})`);
   }
+
+  // Never show people without a role
+  conditions.push(Prisma.sql`p.role IS NOT NULL`);
 
   // Vector similarity threshold: include null embeddings (penalty), exclude far embeddings
   conditions.push(Prisma.sql`(
