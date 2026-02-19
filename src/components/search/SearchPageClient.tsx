@@ -10,6 +10,7 @@ import { SearchLoadingState } from './SearchLoadingState';
 import { Toast } from '@/components/ui/Toast';
 import { LimitReachedModal, dispatchCreditsChanged } from '@/components/credits';
 import { searchPeopleAction, SearchResultWithDraft, hidePersonAction, loadMorePeopleAction, getRecentSearchesAction, RecentSearch, regenerateDraftAction } from '@/app/actions/search';
+import { HiddenPeopleBar } from './HiddenPeopleBar';
 import { EMAIL_TEMPLATES } from '@/lib/constants';
 import { sendSingleEmailAction, sendEmailsAction, PersonToSend } from '@/app/actions/send';
 import { getTemplatesAction, TemplateData } from '@/app/actions/profile';
@@ -41,6 +42,7 @@ interface SearchPageState {
   };
   totalLoaded?: number;
   hasMore?: boolean;
+  hiddenCount?: number;
   savedAt: number;
 }
 
@@ -88,6 +90,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
+  const [hiddenCount, setHiddenCount] = useState(0);
   const retryTimerRef = useRef<NodeJS.Timeout | null>(null);
   const retryCountRef = useRef(0);
   const MAX_RETRIES = 5;
@@ -136,6 +139,9 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
           }
           if (state.hasMore !== undefined) {
             setHasMore(state.hasMore);
+          }
+          if (state.hiddenCount !== undefined) {
+            setHiddenCount(state.hiddenCount);
           }
         } else {
           sessionStorage.removeItem(STORAGE_KEY);
@@ -187,6 +193,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
             searchParams: paramsToSave,
             totalLoaded,
             hasMore,
+            hiddenCount,
             savedAt: Date.now(),
           };
           sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -201,7 +208,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [results, expandedIndex, sendStatuses, showBulkReview, generatingStatuses, remainingDaily, searchParams, totalLoaded, hasMore]);
+  }, [results, expandedIndex, sendStatuses, showBulkReview, generatingStatuses, remainingDaily, searchParams, totalLoaded, hasMore, hiddenCount]);
 
   // Cleanup retry timer on unmount
   useEffect(() => {
@@ -271,6 +278,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
     setSendErrors(new Map());
     setTotalLoaded(0);
     setHasMore(true);
+    setHiddenCount(0);
     setFormPrefill(null);
 
     const result = await searchPeopleAction({ ...params });
@@ -279,6 +287,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
       setResults(result.results);
       setTotalLoaded(result.results.length);
       setHasMore(result.searchMeta.hasMore);
+      setHiddenCount(result.hiddenCount);
       setSearchParams(params);
       setIsSearching(false);
 
@@ -295,6 +304,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
           searchParams: params,
           totalLoaded: result.results.length,
           hasMore: result.searchMeta.hasMore,
+          hiddenCount: result.hiddenCount,
           savedAt: Date.now(),
         };
         sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -428,6 +438,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
 
     if (result.success) {
       setResults((prev) => prev.filter((r) => r.userCandidateId !== userCandidateId));
+      setHiddenCount((prev) => prev + 1);
     } else {
       setError(result.error || 'Failed to hide person');
     }
@@ -649,6 +660,10 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
 
       {results.length > 0 && expandedIndex === null && !showBulkReview && (
         <>
+          <HiddenPeopleBar
+            hiddenCount={hiddenCount}
+            onCountChange={(delta) => setHiddenCount((prev) => prev + delta)}
+          />
           <ResultsList
             results={results}
             onReviewAndSend={() => setShowBulkReview(true)}

@@ -101,10 +101,19 @@ export type SearchActionResult = {
   results: SearchResultWithDraft[];
   searchMeta: SearchMeta;
   remainingDaily: number;
+  hiddenCount: number;
 } | {
   success: false;
   error: string;
 };
+
+export interface HiddenPerson {
+  userCandidateId: string;
+  personId: string;
+  fullName: string;
+  company: string;
+  role: string | null;
+}
 
 // Helper type for ranking
 interface PersonWithSource {
@@ -460,6 +469,11 @@ export async function searchPeopleAction(
     const remainingDaily =
       lastSendDay === today ? Math.max(0, dailyLimit - user.dailySendCount) : dailyLimit;
 
+    // Count hidden people for the UI bar
+    const hiddenCount = await prisma.userCandidate.count({
+      where: { userId, doNotShow: true },
+    });
+
     // Get excluded people (already sent or hidden)
     const excludedIds = await getExcludedPersonIds(userId);
     console.log(`[Search] User has ${excludedIds.length} excluded people (sent/hidden).`);
@@ -618,6 +632,7 @@ export async function searchPeopleAction(
         cseCallsMade,
       },
       remainingDaily,
+      hiddenCount,
     };
   } catch (error) {
     console.error('Search error:', error);
@@ -692,6 +707,74 @@ export async function hidePersonAction(
   } catch (error) {
     console.error('Error hiding person:', error);
     return { success: false, error: 'Failed to hide person' };
+  }
+}
+
+/**
+ * Fetch hidden people for the current user (for the "N people hidden" bar)
+ */
+export async function getHiddenPeopleAction(): Promise<
+  { success: true; people: HiddenPerson[] } | { success: false; error: string }
+> {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.id) {
+    return { success: false, error: 'Not authenticated' };
+  }
+
+  try {
+    const hidden = await prisma.userCandidate.findMany({
+      where: { userId: session.user.id, doNotShow: true },
+      orderBy: { updatedAt: 'desc' },
+      take: 100,
+      select: {
+        id: true,
+        personId: true,
+        person: {
+          select: { fullName: true, company: true, role: true },
+        },
+      },
+    });
+
+    return {
+      success: true,
+      people: hidden.map((uc) => ({
+        userCandidateId: uc.id,
+        personId: uc.personId,
+        fullName: uc.person.fullName,
+        company: uc.person.company,
+        role: uc.person.role,
+      })),
+    };
+  } catch (error) {
+    console.error('Error fetching hidden people:', error);
+    return { success: false, error: 'Failed to fetch hidden people' };
+  }
+}
+
+/**
+ * Unhide a person (reverse of hidePersonAction)
+ */
+export async function unhidePersonAction(
+  userCandidateId: string
+): Promise<{ success: true } | { success: false; error: string }> {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.id) {
+    return { success: false, error: 'Not authenticated' };
+  }
+
+  try {
+    await prisma.userCandidate.update({
+      where: { id: userCandidateId, userId: session.user.id },
+      data: { doNotShow: false },
+    });
+
+    console.log(`[Unhide] User ${session.user.id} unmarked userCandidate ${userCandidateId}`);
+    return { success: true };
+  } catch (error) {
+    console.error('Error unhiding person:', error);
+    return { success: false, error: 'Failed to unhide person' };
   }
 }
 
