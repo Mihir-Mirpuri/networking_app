@@ -23,12 +23,27 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onRowClick, isEven = 
   const [showInteractionModal, setShowInteractionModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  const formatDate = (date: Date | null) => {
+  const formatRelativeDate = (date: Date | null) => {
     if (!date) return '-';
+    const d = new Date(date);
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays}d ago`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+    if (diffDays < 365) return `${Math.floor(diffDays / 30)}mo ago`;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
+  };
+
+  const formatFullDate = (date: Date | null) => {
+    if (!date) return '';
     return new Date(date).toLocaleDateString('en-US', {
-      month: 'short',
+      month: 'long',
       day: 'numeric',
-      year: '2-digit',
+      year: 'numeric',
     });
   };
 
@@ -131,10 +146,13 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onRowClick, isEven = 
     return (
       <button
         onClick={() => handleStartEdit(field, value)}
-        className="w-full text-left truncate hover:text-primary-600 cursor-pointer transition-colors"
+        className="w-full text-left truncate hover:text-primary-600 cursor-pointer transition-colors flex items-center gap-1 group/edit"
         title={value || 'Click to edit'}
       >
-        {value || <span className="text-surface-400">-</span>}
+        <span className="truncate">{value || <span className="text-surface-300">--</span>}</span>
+        <svg className="w-3 h-3 text-surface-300 opacity-0 group-hover/edit:opacity-100 shrink-0 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+        </svg>
       </button>
     );
   };
@@ -188,15 +206,15 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onRowClick, isEven = 
   return (
     <>
       <tr
-        className={`${rowBg} hover:bg-primary-50/40 cursor-pointer transition-colors`}
+        className={`group ${rowBg} hover:bg-primary-50/60 cursor-pointer transition-colors`}
         onClick={handleRowClick}
       >
         {/* Name */}
         <td className={cellClass}>
-          <div className="truncate font-medium text-surface-900">
+          <div className="truncate font-semibold text-surface-900">
             {renderNameCell()}
           </div>
-          <div className="text-xs text-surface-500 truncate">{tracker.contactEmail}</div>
+          <div className="text-xs text-surface-400 truncate mt-0.5">{tracker.contactEmail}</div>
         </td>
 
         {/* Status */}
@@ -230,8 +248,11 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onRowClick, isEven = 
         </td>
 
         {/* Date Emailed */}
-        <td className={`${cellClass} text-surface-600 whitespace-nowrap`}>
-          {formatDate(tracker.dateEmailed)}
+        <td
+          className={`${cellClass} text-surface-600 whitespace-nowrap`}
+          title={formatFullDate(tracker.dateEmailed)}
+        >
+          {formatRelativeDate(tracker.dateEmailed)}
         </td>
 
         {/* Spoke To */}
@@ -241,10 +262,15 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onRowClick, isEven = 
             className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
               tracker.spokeToThem
                 ? 'bg-emerald-100 text-emerald-700'
-                : 'bg-surface-100 text-surface-600 hover:bg-surface-200'
+                : 'text-surface-300 hover:text-surface-500 hover:bg-surface-100'
             }`}
+            title={tracker.spokeToThem ? getInteractionLabel(tracker.interactionType) : 'Log interaction'}
           >
-            {tracker.spokeToThem ? getInteractionLabel(tracker.interactionType) : 'No'}
+            {tracker.spokeToThem ? getInteractionLabel(tracker.interactionType) : (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
+              </svg>
+            )}
           </button>
         </td>
 
@@ -252,10 +278,16 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onRowClick, isEven = 
         <td className={cellClass} onClick={(e) => e.stopPropagation()}>
           <button
             onClick={() => setShowNotesModal(true)}
-            className="w-full text-left text-surface-700 hover:text-primary-600 truncate transition-colors"
-            title={tracker.notes || 'Click to add notes'}
+            className="w-full text-left text-surface-700 hover:text-primary-600 truncate transition-colors flex items-center gap-1 group/notes"
+            title={tracker.notes || 'Add notes'}
           >
-            {tracker.notes || <span className="text-surface-400">-</span>}
+            {tracker.notes ? (
+              <span className="truncate">{tracker.notes}</span>
+            ) : (
+              <svg className="w-4 h-4 text-surface-300 group-hover/notes:text-primary-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
+              </svg>
+            )}
           </button>
         </td>
 
@@ -263,7 +295,7 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onRowClick, isEven = 
         <td className={cellClass} onClick={(e) => e.stopPropagation()}>
           <button
             onClick={() => setShowDeleteConfirm(true)}
-            className="p-1.5 text-surface-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            className="p-1.5 text-surface-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
             title="Delete"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

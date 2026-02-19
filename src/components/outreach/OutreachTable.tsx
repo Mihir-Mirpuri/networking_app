@@ -21,15 +21,15 @@ interface ColumnConfig {
 }
 
 const COLUMNS: ColumnConfig[] = [
-  { key: 'contactName', label: 'Name', sortable: true },
-  { key: 'status', label: 'Status', sortable: true },
-  { key: 'company', label: 'Company', sortable: true },
-  { key: 'role', label: 'Role', sortable: true },
-  { key: 'location', label: 'Location', sortable: true },
-  { key: 'dateEmailed', label: 'Emailed', sortable: true },
-  { key: null, label: 'Spoke To', sortable: false },
-  { key: null, label: 'Notes', sortable: false },
-  { key: null, label: '', sortable: false, className: 'w-12' },
+  { key: 'contactName', label: 'Name', sortable: true, className: 'w-[18%]' },
+  { key: 'status', label: 'Status', sortable: true, className: 'w-[10%]' },
+  { key: 'company', label: 'Company', sortable: true, className: 'w-[14%]' },
+  { key: 'role', label: 'Role', sortable: true, className: 'w-[14%]' },
+  { key: 'location', label: 'Location', sortable: true, className: 'w-[12%]' },
+  { key: 'dateEmailed', label: 'Emailed', sortable: true, className: 'w-[9%]' },
+  { key: null, label: 'Spoke To', sortable: false, className: 'w-[8%]' },
+  { key: null, label: 'Notes', sortable: false, className: 'w-[11%]' },
+  { key: null, label: '', sortable: false, className: 'w-[4%]' },
 ];
 
 export function OutreachTable({

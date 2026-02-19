@@ -127,52 +127,27 @@ export function OutreachTrackerClient({
 
   return (
     <div>
-      {/* Header with Stats */}
-      <div className="mb-8">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-surface-900">Outreach Tracker</h1>
-          <p className="text-surface-500 mt-1">Track and manage your networking outreach</p>
-        </div>
+      {/* Header */}
+      <div className="mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
+          <div>
+            <h1 className="text-2xl font-bold text-surface-900">Outreach Tracker</h1>
+            <p className="text-surface-500 mt-0.5 text-sm">Track and manage your networking outreach</p>
+          </div>
 
-        {/* Stats Summary */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-          <div className="card p-5 group hover:shadow-soft-lg transition-all">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-primary-100 flex items-center justify-center">
-                <svg className="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-primary-600">{stats.sent ?? 0}</div>
-                <div className="text-sm text-surface-500">Emails Sent</div>
-              </div>
+          {/* Compact Stats */}
+          <div className="flex items-center gap-1 text-sm">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-50 text-primary-700">
+              <span className="font-semibold">{stats.sent ?? 0}</span>
+              <span className="text-primary-500">sent</span>
             </div>
-          </div>
-          <div className="card p-5 group hover:shadow-soft-lg transition-all">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center">
-                <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-amber-600">{stats.waiting ?? 0}</div>
-                <div className="text-sm text-surface-500">No Response Yet</div>
-              </div>
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 text-amber-700">
+              <span className="font-semibold">{stats.waiting ?? 0}</span>
+              <span className="text-amber-500">waiting</span>
             </div>
-          </div>
-          <div className="card p-5 group hover:shadow-soft-lg transition-all">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center">
-                <svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                </svg>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-emerald-600">{stats.ongoingConversations ?? 0}</div>
-                <div className="text-sm text-surface-500">Ongoing Conversations</div>
-              </div>
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700">
+              <span className="font-semibold">{stats.ongoingConversations ?? 0}</span>
+              <span className="text-emerald-500">replied</span>
             </div>
           </div>
         </div>
@@ -187,6 +162,15 @@ export function OutreachTrackerClient({
           isLoading={isLoading}
         />
       </div>
+
+      {/* Result count */}
+      {trackers.length > 0 && (
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs text-surface-400">
+            Showing {trackers.length}{stats.total ? ` of ${stats.total}` : ''} contacts
+          </p>
+        </div>
+      )}
 
       {/* Table */}
       {isLoading && trackers.length === 0 ? (

@@ -32,6 +32,7 @@ export interface OutreachTrackerEntry {
 }
 
 export interface OutreachStats {
+  total: number;
   sent: number;
   waiting: number;
   ongoingConversations: number;
@@ -397,7 +398,11 @@ export async function getOutreachStats(): Promise<{
   }
 
   try {
-    const [sent, waiting, ongoingConversations] = await Promise.all([
+    const [total, sent, waiting, ongoingConversations] = await Promise.all([
+      // Total trackers for this user
+      prisma.outreachTracker.count({
+        where: { userId: session.user.id },
+      }),
       // Count all trackers where an email was sent
       prisma.outreachTracker.count({
         where: { userId: session.user.id, dateEmailed: { not: null } },
@@ -422,6 +427,7 @@ export async function getOutreachStats(): Promise<{
     return {
       success: true,
       stats: {
+        total,
         sent,
         waiting,
         ongoingConversations,

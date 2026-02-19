@@ -19,6 +19,7 @@ export default async function HistoryPage() {
   ]);
 
   const defaultStats = {
+    total: 0,
     sent: 0,
     waiting: 0,
     ongoingConversations: 0,
