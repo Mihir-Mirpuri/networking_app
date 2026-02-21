@@ -16,10 +16,6 @@ import {
   generateEmailFromPattern,
 } from '@/lib/services/email-pattern';
 import { findEmail } from '@/lib/services/enrichment';
-import {
-  getCompanyKey,
-  normalizeCompanyForMatch,
-} from '@/lib/db/person-service';
 import { isAbbreviatedName } from '@/lib/services/linkedin-scraper';
 
 const BATCH_LIMIT = 10;
@@ -76,13 +72,7 @@ async function enrichPersonBeforeSend(
   }
 
   // Try free pattern lookup first
-  const normalizedCompany = normalizeCompanyForMatch(person.company);
-  const companyKey = getCompanyKey(normalizedCompany);
-
-  let pattern = companyKey ? await getCompanyPattern(companyKey) : null;
-  if (!pattern) {
-    pattern = await getCompanyPattern(person.company);
-  }
+  const pattern = await getCompanyPattern(person.company);
 
   if (pattern) {
     const generatedEmail = generateEmailFromPattern(

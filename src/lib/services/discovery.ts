@@ -7,8 +7,7 @@
  * - Ranking service scores and returns top candidates
  */
 
-import { completeJson } from '@/lib/services/groq';
-import { getCompanyKey, getCompanyAliases } from '@/lib/db/person-service';
+import { resolveCompanyAliases } from '@/lib/services/company-alias';
 
 const CSE_API_KEY = process.env.GOOGLE_CSE_API_KEY;
 const CSE_CX = process.env.GOOGLE_CSE_CX || 'bf53ffdb484f145c5';
@@ -206,8 +205,8 @@ function parseExperienceCompany(ogDescription: string | undefined): string | nul
 }
 
 // ── Company name expansion for CSE queries ──────────────────────────────
-// Two-tier: COMPANY_ALIASES (instant) → Groq LLM fallback (~200-400ms)
-// Cached in-memory so pagination / repeat searches skip expansion entirely.
+// Uses resolveCompanyAliases (DB → LLM), cached in-memory so
+// pagination / repeat searches skip expansion entirely.
 
 const companyExpansionCache = new Map<string, string[]>();
 
@@ -215,8 +214,7 @@ const companyExpansionCache = new Map<string, string[]>();
  * Expand a company name into well-known abbreviations / alternate names
  * suitable for CSE OR-queries.
  *
- * Tier 1: Check COMPANY_ALIASES (0 ms, no API call)
- * Tier 2: Ask Groq llama-3.1-8b-instant for abbreviations (~200-400 ms)
+ * Uses resolveCompanyAliases (DB → LLM fallback).
  * Returns an array of alternate names (may be empty).
  */
 export async function expandCompanyName(company: string): Promise<string[]> {
@@ -228,35 +226,13 @@ export async function expandCompanyName(company: string): Promise<string[]> {
   if (cached !== undefined) return cached;
 
   try {
-    // Tier 1 – alias map
-    const key = getCompanyKey(normalized);
-    if (key) {
-      const aliases = getCompanyAliases(key);
-      // Filter out the original company name (case-insensitive) and take up to 3
-      const alternatives = aliases
-        .filter(a => a.toLowerCase() !== normalized)
-        .slice(0, 3);
-      companyExpansionCache.set(normalized, alternatives);
-      console.log(`[Discovery] Company expansion (alias): "${company}" → ${JSON.stringify(alternatives)}`);
-      return alternatives;
-    }
-
-    // Tier 2 – LLM fallback
-    interface ExpansionResponse { alternatives: string[] }
-    const response = await completeJson<ExpansionResponse>({
-      systemPrompt:
-        'You are a company name abbreviation expert. Given a company name, return a JSON object with an "alternatives" array containing 1-3 widely-recognized abbreviations or short-form names used on LinkedIn profiles. Only include abbreviations that are well-known and unambiguous (e.g. "GS" for Goldman Sachs, "JPM" for JPMorgan, "BCG" for Boston Consulting Group). Do NOT include divisions, subsidiaries, or parent companies. If the company has no well-known abbreviations, return {"alternatives": []}.',
-      userPrompt: company.trim(),
-      options: {
-        model: 'llama-3.1-8b-instant',
-        temperature: 0.1,
-        maxTokens: 150,
-      },
-    });
-
-    const alternatives = (response.content.alternatives || []).slice(0, 3);
+    // Use resolveCompanyAliases (DB → LLM) to get all known names
+    const resolved = await resolveCompanyAliases(company);
+    const alternatives = resolved.aliases
+      .filter(a => a.toLowerCase() !== normalized)
+      .slice(0, 3);
     companyExpansionCache.set(normalized, alternatives);
-    console.log(`[Discovery] Company expansion (LLM): "${company}" → ${JSON.stringify(alternatives)}`);
+    console.log(`[Discovery] Company expansion: "${company}" → ${JSON.stringify(alternatives)}`);
     return alternatives;
   } catch (error) {
     // On any failure, cache empty array so we don't retry

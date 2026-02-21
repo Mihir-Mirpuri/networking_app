@@ -14,173 +14,19 @@ const PERSONAL_DOMAINS = new Set([
 ]);
 
 /**
- * Company alias mapping for accurate matching
- * Maps canonical company key to all valid variations (normalized: lowercase, no dots)
- *
- * This prevents false positives like "EY" matching "Kearney" or "McKinsey"
- * and enables matching variations like "EY" = "Ernst & Young"
- */
-const COMPANY_ALIASES: Record<string, string[]> = {
-  // Big 4 Accounting
-  'ey': ['ey', 'ernst & young', 'ernst and young', 'ey-parthenon', 'parthenon-ey', 'ey parthenon', 'parthenon ey'],
-  'pwc': ['pwc', 'pricewaterhousecoopers', 'pricewaterhouse coopers', 'price waterhouse coopers', 'pwc strategy&', 'strategy&'],
-  'deloitte': ['deloitte', 'deloitte consulting', 'deloitte & touche', 'deloitte touche'],
-  'kpmg': ['kpmg', 'kpmg consulting'],
-
-  // MBB
-  'mckinsey': ['mckinsey', 'mckinsey & company', 'mckinsey and company'],
-  'bcg': ['bcg', 'boston consulting group'],
-  'bain': ['bain', 'bain & company', 'bain and company', 'bain capital'],
-
-  // Other Top Consulting
-  'kearney': ['kearney', 'at kearney', 'a t kearney', 'at kearney'],
-  'lek': ['lek', 'lek consulting', 'l e k', 'l e k consulting'],
-  'oliverwyman': ['oliver wyman', 'oliverwyman'],
-  'rolandberger': ['roland berger', 'rolandberger'],
-  'simonkucher': ['simon-kucher', 'simon kucher', 'simonkucher', 'simon-kucher & partners', 'simon kucher & partners'],
-  'atkearney': ['at kearney', 'a t kearney', 'kearney'], // Duplicate of kearney for "AT Kearney" searches
-  'accenture': ['accenture', 'accenture strategy', 'accenture consulting'],
-  'capgemini': ['capgemini', 'capgemini invent', 'cap gemini'],
-  'booz': ['booz allen', 'booz allen hamilton', 'booz'],
-  'alixpartners': ['alixpartners', 'alix partners'],
-  'fti': ['fti', 'fti consulting'],
-  'zs': ['zs', 'zs associates'],
-  'iqvia': ['iqvia', 'iqvia consulting'],
-  'parthenon': ['parthenon', 'parthenon-ey', 'ey-parthenon', 'ey parthenon'],
-
-  // Finance / Banking
-  'goldmansachs': ['goldman sachs', 'goldmansachs', 'goldman'],
-  'morganstanley': ['morgan stanley', 'morganstanley', 'morgan stanley private wealth', 'morgan stanley pwm'],
-  'jpmorgan': ['jp morgan', 'jpmorgan', 'j p morgan', 'jpmorgan chase', 'jp morgan chase'],
-  'blackstone': ['blackstone', 'blackstone group'],
-  'kkr': ['kkr', 'kohlberg kravis roberts'],
-  'carlyle': ['carlyle', 'carlyle group'],
-  'apollo': ['apollo', 'apollo global', 'apollo management'],
-  'tpg': ['tpg', 'tpg capital'],
-  'warburg': ['warburg pincus', 'warburg'],
-  'silverlake': ['silver lake', 'silverlake'],
-  'generatl atlantic': ['general atlantic'],
-  'hellman': ['hellman & friedman', 'hellman and friedman', 'h&f'],
-  'vista': ['vista equity', 'vista equity partners'],
-  'thoma': ['thoma bravo'],
-  'evercore': ['evercore'],
-  'lazard': ['lazard'],
-  'centerview': ['centerview', 'centerview partners'],
-  'moelis': ['moelis', 'moelis & company'],
-  'perella': ['perella weinberg', 'perella weinberg partners', 'pwp'],
-  'guggenheim': ['guggenheim', 'guggenheim partners', 'guggenheim securities'],
-  'pjt': ['pjt', 'pjt partners'],
-  'qatalyst': ['qatalyst', 'qatalyst partners'],
-  'greenhill': ['greenhill', 'greenhill & co'],
-  'houlihan': ['houlihan lokey', 'houlihan'],
-  'jefferies': ['jefferies', 'jefferies group'],
-  'williamblaire': ['william blair'],
-  'harrisw': ['harris williams', 'harris williams & co'],
-  'baird': ['baird', 'robert w baird'],
-  'raymond': ['raymond james'],
-  'stifel': ['stifel', 'stifel nicolaus'],
-  'piper': ['piper sandler', 'piper jaffray'],
-  'cowen': ['cowen', 'cowen and company'],
-  'citadel': ['citadel', 'citadel securities', 'citadel llc'],
-  'twosigma': ['two sigma', 'twosigma', '2 sigma'],
-  'jane': ['jane street', 'janestreet'],
-  'hrt': ['hrt', 'hudson river trading'],
-  'deshaw': ['de shaw', 'd e shaw', 'deshaw'],
-  'bridgewater': ['bridgewater', 'bridgewater associates'],
-  'citgroup': ['citi', 'citigroup', 'citibank'],
-  'bofa': ['bank of america', 'bofa', 'merrill lynch', 'bofa securities'],
-  'ubs': ['ubs', 'ubs investment bank'],
-  'barclays': ['barclays', 'barclays capital'],
-  'deutsche': ['deutsche bank', 'db'],
-  'credit': ['credit suisse'],
-  'hsbc': ['hsbc'],
-  'nomura': ['nomura'],
-  'rbc': ['rbc', 'rbc capital markets', 'royal bank of canada'],
-  'wells': ['wells fargo', 'wells fargo securities'],
-
-  // Tech
-  'google': ['google', 'alphabet', 'google cloud'],
-  'meta': ['meta', 'facebook', 'meta platforms'],
-  'amazon': ['amazon', 'aws', 'amazon web services'],
-  'microsoft': ['microsoft', 'msft'],
-  'apple': ['apple'],
-  'netflix': ['netflix'],
-  'salesforce': ['salesforce', 'salesforce consulting'],
-  'oracle': ['oracle', 'oracle consulting'],
-  'ibm': ['ibm', 'ibm consulting'],
-  'sap': ['sap', 'sap consulting'],
-};
-
-/**
- * Get all aliases for a given canonical company key
- */
-export function getCompanyAliases(key: string): string[] {
-  return COMPANY_ALIASES[key] || [];
-}
-
-/**
- * Get the canonical company key for a given company name
- * Checks if the company name matches any alias (exact match or starts with alias)
- * Returns the key if found, null otherwise
- */
-export function getCompanyKey(normalizedCompany: string): string | null {
-  for (const [key, aliases] of Object.entries(COMPANY_ALIASES)) {
-    for (const alias of aliases) {
-      // Exact match
-      if (normalizedCompany === alias) {
-        return key;
-      }
-      // Person company starts with alias (e.g., "ey parthenon" starts with "ey")
-      // Must be followed by word boundary (space, dash, or end)
-      if (normalizedCompany.startsWith(alias + ' ') ||
-          normalizedCompany.startsWith(alias + '-')) {
-        return key;
-      }
-      // Alias starts with person company (e.g., alias "mckinsey & company" for person "mckinsey")
-      if (alias.startsWith(normalizedCompany + ' ') ||
-          alias.startsWith(normalizedCompany + '-') ||
-          alias.startsWith(normalizedCompany + ' & ')) {
-        return key;
-      }
-    }
-  }
-  return null;
-}
-
-/**
- * Check if a person's company matches the search company
- * Uses alias mapping for known companies, falls back to word-boundary matching
+ * Check if a person's company matches the search company.
+ * Uses bidirectional substring matching with word-boundary awareness for short terms.
+ * For known companies, callers should use pre-resolved aliases via companyAliases filter
+ * (which does exact matching at the DB level) instead of this function.
  */
 export function companiesMatch(normalizedPersonCompany: string, normalizedSearchCompany: string): boolean {
-  // Get canonical keys for both companies
-  const searchKey = getCompanyKey(normalizedSearchCompany);
-  const personKey = getCompanyKey(normalizedPersonCompany);
-
-  // If both have keys, they must match (same canonical company)
-  if (searchKey && personKey) {
-    return searchKey === personKey;
-  }
-
-  // If only search has a key, person company must also resolve to that key
-  // This means person company doesn't match any known alias → not a match
-  if (searchKey && !personKey) {
-    return false;
-  }
-
-  // If only person has a key (known company) but search doesn't match it → not a match
-  // This prevents unknown search terms from matching known companies by accident
-  if (personKey && !searchKey) {
-    return false;
-  }
-
-  // Neither has a known key - fallback to word-boundary aware matching
   // For short search terms (<=3 chars), require word boundary match
   if (normalizedSearchCompany.length <= 3) {
     const regex = new RegExp(`(^|\\s|-)${escapeRegex(normalizedSearchCompany)}($|\\s|-)`, 'i');
     return regex.test(normalizedPersonCompany) || normalizedPersonCompany === normalizedSearchCompany;
   }
 
-  // For longer terms, use bidirectional includes (original logic)
+  // For longer terms, use bidirectional includes
   return normalizedPersonCompany.includes(normalizedSearchCompany) ||
          normalizedSearchCompany.includes(normalizedPersonCompany);
 }
@@ -192,50 +38,6 @@ function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-/**
- * Search term with match type for precise DB queries
- */
-type CompanySearchTerm = {
-  term: string;
-  matchType: 'equals' | 'startsWith' | 'contains';
-};
-
-/**
- * Get all company name variations to search in DB for a given search term
- * Returns array of terms with match types for precise queries
- */
-function getCompanySearchTerms(company: string): CompanySearchTerm[] {
-  const normalizeForKey = (name: string) =>
-    name.replace(/\./g, '').replace(/\s+/g, ' ').trim().toLowerCase();
-
-  const normalized = normalizeForKey(company);
-  const key = getCompanyKey(normalized);
-
-  if (key) {
-    // For known companies, use startsWith for all aliases.
-    // companiesMatch handles false positives in the post-query filter.
-    return COMPANY_ALIASES[key].map(alias => ({
-      term: alias,
-      matchType: 'startsWith' as const
-    }));
-  }
-
-  // No alias found, return original terms with appropriate match types
-  const words = company.replace(/[^a-zA-Z0-9\s]/g, '').trim().split(/\s+/).filter(w => w.length >= 2);
-  if (words.length === 0) return [{ term: company, matchType: 'contains' }];
-
-  const firstWord = words[0];
-  const longestWord = words.reduce((a, b) => (a.length >= b.length ? a : b), '');
-
-  // For unknown companies, use contains for flexibility
-  if (firstWord === longestWord) {
-    return [{ term: firstWord, matchType: 'contains' as const }];
-  }
-  return [
-    { term: firstWord, matchType: 'contains' as const },
-    { term: longestWord, matchType: 'contains' as const }
-  ];
-}
 
 /**
  * Normalize company name for consistent storage
@@ -762,7 +564,7 @@ export async function getExcludedPersonIds(
 /**
  * Role alias groups — each group contains equivalent role names (all lowercase).
  * When searching for any term in a group, all terms are used for DB filtering.
- * Follows the same pattern as COMPANY_ALIASES above.
+ * Follows the same pattern as the CompanyAlias DB table.
  */
 const ROLE_ALIAS_GROUPS: string[][] = [
   // Finance — seniority levels
@@ -849,6 +651,7 @@ export function areRolesAliased(role1: string, role2: string): boolean {
  */
 export interface PersonFilters {
   company: string;           // Required - ILIKE match
+  companyAliases?: string[]; // Pre-resolved aliases (exact match, skips post-query filter)
   location?: string;         // Optional - city ILIKE match
   role?: string;             // Optional - role ILIKE match
   university?: string;       // Optional - educationSchool ILIKE match
@@ -876,28 +679,20 @@ export function buildPersonWhereClause(filters: Omit<PersonFilters, 'limit'>, sc
     where.id = { notIn: excludePersonIds };
   }
 
-  // Company filter - DB filter using alias mapping with appropriate match types
-  if (company && company.trim()) {
-    const searchTerms = getCompanySearchTerms(company);
-
-    const buildCompanyFilter = (term: CompanySearchTerm) => {
-      switch (term.matchType) {
-        case 'equals':
-          return { company: { equals: term.term, mode: 'insensitive' as const } };
-        case 'startsWith':
-          return { company: { startsWith: term.term, mode: 'insensitive' as const } };
-        case 'contains':
-        default:
-          return { company: { contains: term.term, mode: 'insensitive' as const } };
-      }
-    };
-
-    if (searchTerms.length === 1) {
-      const filter = buildCompanyFilter(searchTerms[0]);
-      where.company = filter.company;
-    } else if (searchTerms.length > 1) {
-      where.OR = searchTerms.map(buildCompanyFilter);
+  // Company filter — use pre-resolved aliases (exact match) or fall back to alias mapping
+  if (filters.companyAliases && filters.companyAliases.length > 0) {
+    // Exact-match OR query for each resolved alias — zero false positives
+    const aliasFilters = filters.companyAliases.map(alias => ({
+      company: { equals: alias, mode: 'insensitive' as const }
+    }));
+    if (aliasFilters.length === 1) {
+      where.company = aliasFilters[0].company;
+    } else {
+      where.OR = aliasFilters;
     }
+  } else if (company && company.trim()) {
+    // Simple contains fallback — all real search paths use companyAliases
+    where.company = { contains: company.trim(), mode: 'insensitive' as const };
   }
 
   // Location filter
@@ -1092,6 +887,10 @@ export async function findPeopleByFilters(filters: PersonFilters): Promise<Perso
     take: limit * 2, // Overfetch to compensate for post-query filtering
   });
 
+  // If pre-resolved aliases were used, exact-match DB query is sufficient — skip post-filter
+  if (filters.companyAliases && filters.companyAliases.length > 0) {
+    return people.slice(0, limit);
+  }
   const filtered = applyPostQueryFilters(people, company);
   return filtered.slice(0, limit);
 }
@@ -1112,21 +911,15 @@ async function findPeopleByFiltersVector(
   // Build WHERE conditions as Prisma.sql fragments
   const conditions: Prisma.Sql[] = [Prisma.sql`1=1`];
 
-  // Company filter — mirror the alias-based logic from buildPersonWhereClause
-  if (company && company.trim()) {
-    const searchTerms = getCompanySearchTerms(company);
-    const companyConditions = searchTerms.map(term => {
-      switch (term.matchType) {
-        case 'equals':
-          return Prisma.sql`p.company ILIKE ${term.term}`;
-        case 'startsWith':
-          return Prisma.sql`p.company ILIKE ${term.term + '%'}`;
-        case 'contains':
-        default:
-          return Prisma.sql`p.company ILIKE ${'%' + term.term + '%'}`;
-      }
-    });
+  // Company filter — use pre-resolved aliases (exact match) or fall back to alias mapping
+  if (filters.companyAliases && filters.companyAliases.length > 0) {
+    const companyConditions = filters.companyAliases.map(alias =>
+      Prisma.sql`p.company ILIKE ${alias}`
+    );
     conditions.push(Prisma.sql`(${Prisma.join(companyConditions, ' OR ')})`);
+  } else if (company && company.trim()) {
+    // Simple contains fallback — all real search paths use companyAliases
+    conditions.push(Prisma.sql`p.company ILIKE ${'%' + company.trim() + '%'}`);
   }
 
   // Location filter
@@ -1231,8 +1024,10 @@ async function findPeopleByFiltersVector(
     LIMIT ${fetchLimit}
   `);
 
-  // Post-query company fuzzy matching (unchanged from Prisma path)
-  const filtered = applyPostQueryFilters(rows, company);
+  // If pre-resolved aliases were used, exact-match DB query is sufficient — skip post-filter
+  const filtered = (filters.companyAliases && filters.companyAliases.length > 0)
+    ? rows
+    : applyPostQueryFilters(rows, company);
   const limited = filtered.slice(0, limit);
 
   if (limited.length === 0) return [];

@@ -18,7 +18,6 @@ import {
   PersonResult,
   buildPersonWhereClause,
   applyPostQueryFilters,
-  getCompanyKey,
   normalizeCompanyForMatch,
   companiesMatch,
   isVectorRoleMatchingEnabled,
@@ -293,23 +292,16 @@ async function enrichPeopleWithPatterns(
     take: 30,
   });
 
-  // Apply company fuzzy matching (same filter as findPeopleByFilters)
-  const matched = applyPostQueryFilters(candidates, searchCompany);
+  // If pre-resolved aliases were used, exact-match DB query is sufficient — skip post-filter
+  const matched = (filters.companyAliases && filters.companyAliases.length > 0)
+    ? candidates
+    : applyPostQueryFilters(candidates, searchCompany);
 
   let emailsGenerated = 0;
 
   for (const person of matched) {
     // Try existing pattern (free — no Apollo call)
-    const normalizedCompany = normalizeCompanyForMatch(person.company);
-    const companyKey = getCompanyKey(normalizedCompany);
-
-    // Try pattern lookup: canonical key first, then exact normalized name
-    let pattern = companyKey
-      ? await getCompanyPattern(companyKey)
-      : null;
-    if (!pattern) {
-      pattern = await getCompanyPattern(person.company);
-    }
+    const pattern = await getCompanyPattern(person.company);
 
     if (pattern) {
       const generatedEmail = generateEmailFromPattern(
@@ -491,9 +483,14 @@ export async function searchPeopleAction(
       location: input.location,
     });
 
+    // Resolve company aliases (hardcoded → DB → LLM) for richer matching
+    const resolved = await resolveCompanyAliases(input.company);
+    console.log(`[Search] Resolved company "${input.company}" → ${resolved.aliases.length} aliases`);
+
     // ===== STEP 1: Query DB, enrich only if needed =====
     const filters: PersonFilters = {
       company: input.company,
+      companyAliases: resolved.aliases,
       location: input.location,
       role: input.role,
       university: input.university,
@@ -923,8 +920,12 @@ export async function loadMorePeopleAction(
     const excludedIds = await getExcludedPersonIds(userId);
     const allExcludedIds = [...excludedIds, ...input.excludePersonIds];
 
+    // Resolve company aliases (hardcoded → DB → LLM) for richer matching
+    const resolved = await resolveCompanyAliases(input.company);
+
     const filters: PersonFilters = {
       company: input.company,
+      companyAliases: resolved.aliases,
       location: input.location,
       role: input.role,
       university: input.university,
@@ -1498,9 +1499,7 @@ export async function lookupPersonAction(
     for (const person of top) {
       if (person.email || !person.firstName || !person.lastName) continue;
 
-      const companyKey = getCompanyKey(normalizeCompanyForMatch(person.company));
-      let pattern = companyKey ? await getCompanyPattern(companyKey) : null;
-      if (!pattern) pattern = await getCompanyPattern(person.company);
+      const pattern = await getCompanyPattern(person.company);
 
       if (pattern) {
         const generatedEmail = generateEmailFromPattern(

@@ -2,7 +2,7 @@
  * Company Alias Resolution Service
  *
  * Resolves company names to their canonical form + known aliases.
- * Three-tier lookup: hardcoded COMPANY_ALIASES → DB CompanyAlias table → LLM (Groq).
+ * Two-tier lookup: DB CompanyAlias table → LLM (Groq).
  * LLM results are persisted so each company is only resolved once.
  *
  * Used by the CSE pre-filter in processRefreshBatch to avoid discarding
@@ -11,7 +11,7 @@
 
 import prisma from '@/lib/prisma';
 import { completeJson } from '@/lib/services/groq';
-import { getCompanyKey, getCompanyAliases, normalizeCompanyForMatch } from '@/lib/db/person-service';
+import { normalizeCompanyForMatch } from '@/lib/db/person-service';
 
 export interface ResolvedCompanyAliases {
   canonicalName: string;
@@ -33,10 +33,9 @@ function normalizeForLookup(company: string): string {
 /**
  * Resolve a company name to its canonical name + all known aliases.
  *
- * 1. Check hardcoded COMPANY_ALIASES (instant, no DB/API)
- * 2. Check CompanyAlias DB table
- * 3. Fall back to LLM (Groq) and persist result
- * 4. On LLM failure, return input as-is (graceful degradation)
+ * 1. Check CompanyAlias DB table
+ * 2. Fall back to LLM (Groq) and persist result
+ * 3. On LLM failure, return input as-is (graceful degradation)
  */
 export async function resolveCompanyAliases(input: string): Promise<ResolvedCompanyAliases> {
   const normalized = normalizeForLookup(input);
@@ -44,15 +43,7 @@ export async function resolveCompanyAliases(input: string): Promise<ResolvedComp
     return { canonicalName: input, aliases: [normalizeCompanyForMatch(input)] };
   }
 
-  // ── Tier 1: Hardcoded COMPANY_ALIASES ──
-  const key = getCompanyKey(normalized);
-  if (key) {
-    const aliases = getCompanyAliases(key);
-    console.log(`[CompanyAlias] Resolved "${input}" → "${key}" (source: HARDCODED)`);
-    return { canonicalName: key, aliases };
-  }
-
-  // ── Tier 2: DB lookup ──
+  // ── Tier 1: DB lookup ──
   try {
     const dbResult = await prisma.companyAlias.findFirst({
       where: { aliases: { has: normalized } },
@@ -70,7 +61,7 @@ export async function resolveCompanyAliases(input: string): Promise<ResolvedComp
     // Continue to LLM fallback
   }
 
-  // ── Tier 3: LLM resolution + persist ──
+  // ── Tier 2: LLM resolution + persist ──
   try {
     interface AliasResponse {
       canonicalName: string;
