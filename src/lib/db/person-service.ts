@@ -866,7 +866,7 @@ export const normalizeCompanyForMatch = (name: string) =>
  * Build Prisma where clause from PersonFilters.
  * Shared between findPeopleByFilters and countPeopleByFilters.
  */
-export function buildPersonWhereClause(filters: Omit<PersonFilters, 'limit'>): Record<string, unknown> {
+export function buildPersonWhereClause(filters: Omit<PersonFilters, 'limit'>, schoolMatchIds?: string[]): Record<string, unknown> {
   const { company, location, role, university, requireEmail = true, excludePersonIds } = filters;
 
   const where: Record<string, unknown> = {};
@@ -920,9 +920,18 @@ export function buildPersonWhereClause(filters: Omit<PersonFilters, 'limit'>): R
     }
   }
 
-  // University filter
+  // University filter — check all schools, not just the primary one.
+  // educationSchool uses Prisma ILIKE (case-insensitive). For the schools JSON
+  // array, callers pre-query matching IDs via raw SQL and pass them in.
   if (university && university.trim()) {
-    where.educationSchool = { contains: university.trim(), mode: 'insensitive' };
+    const uniConditions: Record<string, unknown>[] = [
+      { educationSchool: { contains: university.trim(), mode: 'insensitive' as const } },
+    ];
+    if (schoolMatchIds && schoolMatchIds.length > 0) {
+      uniConditions.push({ id: { in: schoolMatchIds } });
+    }
+    if (!where.AND) where.AND = [];
+    (where.AND as unknown[]).push({ OR: uniConditions });
   }
 
   // Never show people without a role (they display as "Professional" in the UI)
@@ -950,6 +959,18 @@ export function buildPersonWhereClause(filters: Omit<PersonFilters, 'limit'>): R
   }
 
   return where;
+}
+
+/**
+ * Pre-query person IDs whose `schools` JSON array matches a university term
+ * (case-insensitive). Used to supplement the Prisma path which can't do ILIKE on JSON.
+ */
+async function getSchoolMatchIds(university: string): Promise<string[]> {
+  const uniTerm = '%' + university.trim() + '%';
+  const matches = await prisma.$queryRaw<{ id: string }[]>(
+    Prisma.sql`SELECT id FROM "Person" WHERE schools::text ILIKE ${uniTerm}`
+  );
+  return matches.map(r => r.id);
 }
 
 /**
@@ -1023,7 +1044,8 @@ export async function findPeopleByFilters(filters: PersonFilters): Promise<Perso
   }
 
   // Fallback: existing Prisma path
-  const where = buildPersonWhereClause(filters);
+  const schoolMatchIds = filters.university?.trim() ? await getSchoolMatchIds(filters.university) : undefined;
+  const where = buildPersonWhereClause(filters, schoolMatchIds);
 
   // excludePersonIds (NOT IN) handles pagination at the DB level,
   // so no OFFSET needed — always fetch the top-ranked unseen people.
@@ -1112,9 +1134,10 @@ async function findPeopleByFiltersVector(
     conditions.push(Prisma.sql`p.city ILIKE ${'%' + location.trim() + '%'}`);
   }
 
-  // University filter
+  // University filter — check all schools, not just the primary one
   if (university && university.trim()) {
-    conditions.push(Prisma.sql`p."educationSchool" ILIKE ${'%' + university.trim() + '%'}`);
+    const uniTerm = '%' + university.trim() + '%';
+    conditions.push(Prisma.sql`(p."educationSchool" ILIKE ${uniTerm} OR p.schools::text ILIKE ${uniTerm})`);
   }
 
   // Email filter
@@ -1331,7 +1354,8 @@ export async function findPeopleByName(params: {
 export async function countPeopleByFilters(
   filters: Omit<PersonFilters, 'limit'>
 ): Promise<number> {
-  const where = buildPersonWhereClause(filters);
+  const schoolMatchIds = filters.university?.trim() ? await getSchoolMatchIds(filters.university) : undefined;
+  const where = buildPersonWhereClause(filters, schoolMatchIds);
   return prisma.person.count({ where });
 }
 
