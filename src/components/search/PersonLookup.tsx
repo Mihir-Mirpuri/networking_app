@@ -175,6 +175,11 @@ export function PersonLookup() {
           isRegenerating={isRegenerating}
           limitReached={limitReached}
           onLimitReached={() => setShowLimitModal(true)}
+          onDraftGenerated={(idx, subject, body) => {
+            setResults((prev) => prev.map((r, i) =>
+              i === idx ? { ...r, draftSubject: subject, draftBody: body, llmDraftGenerated: true } : r
+            ));
+          }}
         />
         {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
         <LimitReachedModal

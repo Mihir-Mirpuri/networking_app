@@ -725,6 +725,11 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
           isRegenerating={isRegenerating}
           limitReached={limitReached}
           onLimitReached={() => setShowLimitModal(true)}
+          onDraftGenerated={(idx, subject, body) => {
+            setResults((prev) => prev.map((r, i) =>
+              i === idx ? { ...r, draftSubject: subject, draftBody: body, llmDraftGenerated: true } : r
+            ));
+          }}
         />
       )}
 

@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { SearchResultWithDraft } from '@/app/actions/search';
+import { useState, useEffect, useRef } from 'react';
+import { SearchResultWithDraft, refineDraftAction, generateLLMDraftAction } from '@/app/actions/search';
 import { scheduleEmailAction } from '@/app/actions/send';
 import { CompanyResearchPanel } from '@/components/compose/CompanyResearchPanel';
 import { SearchableCombobox } from './SearchableCombobox';
+import { LoadingDots } from './LoadingSpinner';
 import { TemplateData } from '@/app/actions/profile';
 
 interface ExpandedReviewProps {
@@ -20,6 +21,7 @@ interface ExpandedReviewProps {
   isRegenerating?: boolean;
   limitReached?: boolean;
   onLimitReached?: () => void;
+  onDraftGenerated?: (personIndex: number, subject: string, body: string) => void;
 }
 
 function SendFailureAnimation({ message }: { message: string }) {
@@ -96,10 +98,12 @@ export function ExpandedReview({
   isRegenerating,
   limitReached,
   onLimitReached,
+  onDraftGenerated,
 }: ExpandedReviewProps) {
   const person = results[currentIndex];
-  const [subject, setSubject] = useState(person?.draftSubject || '');
-  const [body, setBody] = useState(person?.draftBody || '');
+  const initialDraft = person?.llmDraftGenerated || !person?.userCandidateId;
+  const [subject, setSubject] = useState(initialDraft ? (person?.draftSubject || '') : '');
+  const [body, setBody] = useState(initialDraft ? (person?.draftBody || '') : '');
   const [isSending, setIsSending] = useState(false);
   const [internalIndex, setInternalIndex] = useState(currentIndex);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
@@ -114,14 +118,54 @@ export function ExpandedReview({
 
   const [researchCollapsed, setResearchCollapsed] = useState(true);
   const [selectedTemplateId, setSelectedTemplateId] = useState(defaultTemplateId || '');
+  const [refineInstruction, setRefineInstruction] = useState('');
+  const [isRefining, setIsRefining] = useState(false);
+  const [isGeneratingDraft, setIsGeneratingDraft] = useState(false);
+  const userEditedRef = useRef(false);
 
-  // Update subject/body when currentPerson changes
-  useEffect(() => {
-    if (currentPerson) {
-      setSubject(currentPerson.draftSubject);
-      setBody(currentPerson.draftBody);
+  // Synchronous state reset when person changes (avoids one-frame flash of stale draft)
+  const [prevIndex, setPrevIndex] = useState(internalIndex);
+  if (internalIndex !== prevIndex) {
+    setPrevIndex(internalIndex);
+    const nextPerson = results[internalIndex];
+    if (nextPerson?.llmDraftGenerated || !nextPerson?.userCandidateId) {
+      setSubject(nextPerson?.draftSubject || '');
+      setBody(nextPerson?.draftBody || '');
+    } else {
+      setSubject('');
+      setBody('');
     }
-  }, [internalIndex, currentPerson?.draftSubject, currentPerson?.draftBody]);
+    setRefineInstruction('');
+    userEditedRef.current = false;
+  }
+
+  // Trigger LLM generation for current person
+  useEffect(() => {
+    if (currentPerson && !currentPerson.llmDraftGenerated && currentPerson.userCandidateId) {
+      setIsGeneratingDraft(true);
+      const personId = currentPerson.id;
+      const idx = internalIndex;
+      generateLLMDraftAction({
+        personId: currentPerson.id,
+        userCandidateId: currentPerson.userCandidateId,
+      }).then((result) => {
+        if (result.success && !userEditedRef.current && personId === results[idx]?.id) {
+          setSubject(result.subject);
+          setBody(result.body);
+          onDraftGenerated?.(idx, result.subject, result.body);
+        }
+      }).catch((err) => {
+        console.warn('[Draft] LLM generation failed, using placeholder:', err);
+        const fallback = results[idx];
+        if (fallback && !userEditedRef.current && personId === fallback.id) {
+          setSubject(fallback.draftSubject);
+          setBody(fallback.draftBody);
+        }
+      }).finally(() => {
+        setIsGeneratingDraft(false);
+      });
+    }
+  }, [internalIndex]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -276,6 +320,30 @@ export function ExpandedReview({
     setBody(lines.join('\n'));
   };
 
+  const handleRefine = async () => {
+    if (!currentPerson || !refineInstruction.trim() || isRefining) return;
+
+    setIsRefining(true);
+    try {
+      const result = await refineDraftAction({
+        subject,
+        body,
+        instruction: refineInstruction.trim(),
+        personId: currentPerson.id,
+      });
+
+      if (result.success) {
+        setSubject(result.subject);
+        setBody(result.body);
+        setRefineInstruction('');
+      }
+    } catch (err) {
+      console.error('Refine error:', err);
+    } finally {
+      setIsRefining(false);
+    }
+  };
+
   if (!currentPerson) {
     return null;
   }
@@ -413,20 +481,62 @@ export function ExpandedReview({
             <input
               type="text"
               value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              className={`input text-sm${isRegenerating ? ' opacity-50' : ''}`}
+              onChange={(e) => { userEditedRef.current = true; setSubject(e.target.value); }}
+              className={`input text-sm${isRegenerating || isGeneratingDraft ? ' opacity-50' : ''}`}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-surface-700 mb-1">
-              Body
-            </label>
+            <div className="flex items-center gap-2 mb-1">
+              <label className="block text-sm font-medium text-surface-700">
+                Body
+              </label>
+              {isGeneratingDraft && (
+                <span className="text-xs text-primary-500 flex items-center gap-1">
+                  <LoadingDots className="text-primary-500" /> Personalizing
+                </span>
+              )}
+            </div>
             <textarea
               value={body}
-              onChange={(e) => setBody(e.target.value)}
+              onChange={(e) => { userEditedRef.current = true; setBody(e.target.value); }}
               rows={10}
-              className={`input resize-none text-sm${isRegenerating ? ' opacity-50' : ''}`}
+              className={`input resize-none text-sm${isRegenerating || isGeneratingDraft ? ' opacity-50' : ''}`}
             />
+          </div>
+
+          {/* Refine with AI */}
+          <div className="mt-3 flex items-center gap-2">
+            <div className="relative flex-1">
+              <input
+                type="text"
+                value={refineInstruction}
+                onChange={(e) => setRefineInstruction(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey) {
+                    e.preventDefault();
+                    handleRefine();
+                  }
+                }}
+                placeholder="Refine: e.g. &quot;make it shorter&quot; or &quot;add a question about their team&quot;"
+                disabled={isRefining}
+                className="input text-sm pr-10 w-full"
+              />
+              {isRefining && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <LoadingDots className="text-primary-500" />
+                </div>
+              )}
+            </div>
+            <button
+              onClick={handleRefine}
+              disabled={isRefining || !refineInstruction.trim()}
+              className="btn-secondary text-sm flex items-center gap-1.5 shrink-0 disabled:opacity-50"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+              </svg>
+              Refine
+            </button>
           </div>
 
           {/* Resume Attachment Indicator */}

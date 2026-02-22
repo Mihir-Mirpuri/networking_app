@@ -34,6 +34,7 @@ import {
   generateEmailFromPattern,
 } from '@/lib/services/email-pattern';
 import { resolveCompanyAliases } from '@/lib/services/company-alias';
+import { generateEmailWithLLM, getUserResumeSummary, getRecentSentEmails, refineEmailWithLLM } from '@/lib/services/personalization';
 
 export interface RecentSearch {
   company: string | null;
@@ -86,6 +87,7 @@ export interface SearchResultWithDraft {
   resumeId: string | null;
   score?: number;
   scoreBreakdown?: ScoreBreakdown;
+  llmDraftGenerated?: boolean;
 }
 
 export interface SearchMeta {
@@ -354,6 +356,7 @@ async function buildResultsWithDrafts(
         select: { id: true },
       });
 
+      // Generate placeholder-filled template (LLM generation happens on-demand when user opens profile)
       const draft = generateEmailDraft(
         template,
         { firstName: person.firstName, company: person.company, role: person.role },
@@ -1560,13 +1563,24 @@ export async function regenerateDraftAction(input: {
   try {
     const userId = session.user.id;
 
-    // Fetch UserCandidate + Person
+    // Fetch UserCandidate + Person (expanded fields for LLM)
     const uc = await prisma.userCandidate.findUnique({
       where: { id: input.userCandidateId, userId },
       select: {
         id: true,
         person: {
-          select: { firstName: true, company: true, role: true },
+          select: {
+            firstName: true,
+            lastName: true,
+            company: true,
+            role: true,
+            city: true,
+            state: true,
+            country: true,
+            educationSchool: true,
+            educationDegree: true,
+            educationField: true,
+          },
         },
       },
     });
@@ -1577,7 +1591,7 @@ export async function regenerateDraftAction(input: {
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { name: true, university: true, classification: true, major: true, career: true },
+      select: { name: true, university: true, classification: true, major: true, career: true, emailInstructions: true },
     });
 
     if (!user) {
@@ -1585,8 +1599,29 @@ export async function regenerateDraftAction(input: {
     }
 
     const template = await resolveTemplateForUser(userId, input.templateId);
-    const draft = generateEmailDraft(template, uc.person, user);
+    const placeholderDraft = generateEmailDraft(
+      template,
+      { firstName: uc.person.firstName, company: uc.person.company, role: uc.person.role },
+      user
+    );
     const resumeId = template.attachResume ? template.resumeId : null;
+
+    // Try LLM generation, fall back to placeholder draft on failure
+    let draft = placeholderDraft;
+    try {
+      const resumeSummary = await getUserResumeSummary(userId);
+      const sentEmailExamples = await getRecentSentEmails(userId);
+      draft = await generateEmailWithLLM({
+        person: uc.person,
+        user,
+        resumeSummary,
+        referenceTemplate: placeholderDraft,
+        sentEmailExamples,
+        customInstructions: user.emailInstructions || undefined,
+      });
+    } catch (err) {
+      console.warn('[RegenerateDraft] LLM generation failed, using placeholder:', err);
+    }
 
     const isHardcodedTemplate = EMAIL_TEMPLATES.some(t => t.id === template.id);
     await prisma.emailDraft.upsert({
@@ -1609,5 +1644,129 @@ export async function regenerateDraftAction(input: {
   } catch (error) {
     console.error('RegenerateDraft error:', error);
     return { success: false, error: 'Failed to regenerate draft' };
+  }
+}
+
+// ===== GENERATE LLM DRAFT (on-demand when user opens a profile) =====
+
+export async function generateLLMDraftAction(input: {
+  personId: string;
+  userCandidateId: string;
+}): Promise<
+  { success: true; subject: string; body: string } |
+  { success: false; error: string }
+> {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.id) {
+    return { success: false, error: 'Not authenticated' };
+  }
+
+  try {
+    const userId = session.user.id;
+
+    const [person, user, resumeSummary, sentEmailExamples] = await Promise.all([
+      prisma.person.findUnique({
+        where: { id: input.personId },
+        select: {
+          firstName: true,
+          lastName: true,
+          company: true,
+          role: true,
+          city: true,
+          state: true,
+          country: true,
+          educationSchool: true,
+          educationDegree: true,
+          educationField: true,
+        },
+      }),
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { name: true, university: true, classification: true, major: true, career: true, emailInstructions: true },
+      }),
+      getUserResumeSummary(userId),
+      getRecentSentEmails(userId),
+    ]);
+
+    if (!person || !user) {
+      return { success: false, error: 'Person or user not found' };
+    }
+
+    const template = await resolveTemplateForUser(userId);
+    const placeholderDraft = generateEmailDraft(
+      template,
+      { firstName: person.firstName, company: person.company, role: person.role },
+      user
+    );
+
+    const draft = await generateEmailWithLLM({
+      person,
+      user,
+      resumeSummary,
+      referenceTemplate: placeholderDraft,
+      sentEmailExamples,
+      customInstructions: user.emailInstructions || undefined,
+    });
+
+    // Save to DB so subsequent visits show the LLM draft
+    await prisma.emailDraft.update({
+      where: { userCandidateId: input.userCandidateId },
+      data: { subject: draft.subject, body: draft.body },
+    });
+
+    return { success: true, subject: draft.subject, body: draft.body };
+  } catch (error) {
+    console.error('GenerateLLMDraft error:', error);
+    return { success: false, error: 'Failed to generate draft' };
+  }
+}
+
+// ===== REFINE DRAFT (chat-based refinement) =====
+
+export async function refineDraftAction(input: {
+  subject: string;
+  body: string;
+  instruction: string;
+  personId: string;
+}): Promise<
+  { success: true; subject: string; body: string } |
+  { success: false; error: string }
+> {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.id) {
+    return { success: false, error: 'Not authenticated' };
+  }
+
+  if (!input.instruction?.trim()) {
+    return { success: false, error: 'Instruction is required' };
+  }
+
+  try {
+    const person = await prisma.person.findUnique({
+      where: { id: input.personId },
+      select: { firstName: true, company: true, role: true },
+    });
+
+    if (!person) {
+      return { success: false, error: 'Person not found' };
+    }
+
+    const result = await refineEmailWithLLM({
+      subject: input.subject,
+      body: input.body,
+      instruction: input.instruction,
+      person: {
+        firstName: person.firstName,
+        company: person.company,
+        role: person.role,
+      },
+    });
+
+    return { success: true, subject: result.subject, body: result.body };
+  } catch (error) {
+    console.error('RefineDraft error:', error);
+    return { success: false, error: 'Failed to refine email' };
   }
 }
