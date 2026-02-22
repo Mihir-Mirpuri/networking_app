@@ -1,10 +1,237 @@
 import Groq from 'groq-sdk';
 import prisma from '@/lib/prisma';
 import { ResumeSummary } from './resume-summary';
+import { complete } from '@/lib/services/groq';
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
 });
+
+// ===== LLM Email Generation =====
+
+export interface SentEmailExample {
+  subject: string;
+  body: string;
+}
+
+export interface LLMEmailInput {
+  person: {
+    firstName: string | null;
+    lastName: string | null;
+    company: string;
+    role: string | null;
+    city: string | null;
+    state: string | null;
+    country: string | null;
+    educationSchool: string | null;
+    educationDegree: string | null;
+    educationField: string | null;
+  };
+  user: {
+    name: string | null;
+    university: string | null;
+    classification: string | null;
+    major: string | null;
+    career: string | null;
+  };
+  resumeSummary: ResumeSummary | null;
+  referenceTemplate: { subject: string; body: string };
+  sentEmailExamples?: SentEmailExample[];
+  customInstructions?: string;
+}
+
+/**
+ * Get the 3 most recent successful sent emails for a user.
+ * Returns empty array if fewer than 3 (not representative enough for style matching).
+ */
+export async function getRecentSentEmails(userId: string): Promise<SentEmailExample[]> {
+  const logs = await prisma.sendLog.findMany({
+    where: { userId, status: 'SUCCESS' },
+    orderBy: { sentAt: 'desc' },
+    take: 3,
+    select: { subject: true, body: true },
+  });
+
+  if (logs.length < 3) return [];
+
+  return logs.map((log) => ({ subject: log.subject, body: log.body }));
+}
+
+/**
+ * Generate a personalized email draft using Groq LLM.
+ * The referenceTemplate should have placeholders already filled in so the LLM
+ * sees a concrete example, not raw {first_name} tokens.
+ * Throws on parse failure so the caller can fall back to the placeholder draft.
+ */
+export async function generateEmailWithLLM(
+  input: LLMEmailInput
+): Promise<{ subject: string; body: string }> {
+  const { person, user, resumeSummary, referenceTemplate, sentEmailExamples, customInstructions } = input;
+
+  const personName = [person.firstName, person.lastName].filter(Boolean).join(' ') || 'the recipient';
+  const location = [person.city, person.state, person.country].filter(Boolean).join(', ');
+  const education = [
+    person.educationSchool,
+    person.educationDegree,
+    person.educationField,
+  ].filter(Boolean).join(', ');
+
+  const userContext = resumeSummary ? buildUserContext(resumeSummary) : '';
+
+  let systemPrompt = `You are a college student writing a cold outreach email to a professional. Write a short, direct email.
+
+STRUCTURE (follow this exactly):
+- Line 1: "Hello {first_name},"
+- Blank line
+- Paragraph 1 (2-3 sentences): Introduce yourself (name, year, school, major) and state your interest. Ask for a specific time (e.g., "10-15 minutes on the phone").
+- Blank line
+- Paragraph 2 (1 sentence): Mention you've attached your resume for context.
+- Blank line
+- Sign-off: "Warm regards,\\n{sender_name}"
+
+RULES:
+1. EXACTLY 2 short paragraphs in the body — no more
+2. Be direct and straight to the point — every sentence must serve a purpose
+3. NO filler phrases: "I hope this email finds you well", "I came across your profile", "I was excited to see", "I would be thrilled", "I am reaching out because"
+4. Sound like a real college student — casual but respectful, not overly polished or enthusiastic
+5. Each email should be unique — vary how you express interest based on the recipient's role/company
+6. Use paragraph breaks (blank lines) between paragraphs — do NOT write a wall of text`;
+
+  if (sentEmailExamples && sentEmailExamples.length > 0) {
+    systemPrompt += `\n7. If example emails from the sender are provided, match their writing style closely`;
+  }
+
+  systemPrompt += `
+
+Return in this EXACT format:
+
+SUBJECT: [subject line]
+BODY:
+[email body]`;
+
+  let userPrompt = `RECIPIENT:
+${personName}${person.role ? `, ${person.role}` : ''} at ${person.company}`;
+
+  if (location) {
+    userPrompt += `\nLocation: ${location}`;
+  }
+  if (education) {
+    userPrompt += `\nEducation: ${education}`;
+  }
+
+  userPrompt += `\n\nSENDER:
+${user.name || 'A student'}`;
+  if (user.university) userPrompt += `, ${user.university}`;
+  if (user.classification) userPrompt += ` (${user.classification})`;
+  if (user.major) userPrompt += `\nMajor: ${user.major}`;
+  if (userContext) userPrompt += `\n${userContext}`;
+
+  if (customInstructions) {
+    userPrompt += `\n\nCUSTOM INSTRUCTIONS FROM SENDER (follow these closely):\n${customInstructions}`;
+  }
+
+  if (sentEmailExamples && sentEmailExamples.length > 0) {
+    userPrompt += `\n\nYOUR PREVIOUSLY SENT EMAILS (match this writing style closely):`;
+    sentEmailExamples.forEach((ex, i) => {
+      userPrompt += `\n\nEmail ${i + 1}:\nSubject: ${ex.subject}\nBody:\n${ex.body}`;
+    });
+  }
+
+  userPrompt += `\n\nREFERENCE EMAIL (use as a guide for tone and structure, but write a unique, personalized email for this specific recipient — do not copy it verbatim):
+Subject: ${referenceTemplate.subject}
+Body:
+${referenceTemplate.body}`;
+
+  const response = await complete({
+    systemPrompt,
+    userPrompt,
+    options: {
+      model: 'llama-3.3-70b-versatile',
+      temperature: 0.7,
+      maxTokens: 300,
+    },
+  });
+
+  const text = response.content;
+  const subjectMatch = text.match(/SUBJECT:\s*([^\n]+)/);
+  const bodyMatch = text.match(/BODY:\s*([\s\S]+)$/);
+
+  if (!subjectMatch || !bodyMatch) {
+    throw new Error('Failed to parse LLM email response');
+  }
+
+  return {
+    subject: subjectMatch[1].trim(),
+    body: bodyMatch[1].trim(),
+  };
+}
+
+// ===== Chat-Based Email Refinement =====
+
+export interface RefineEmailInput {
+  subject: string;
+  body: string;
+  instruction: string;
+  person: {
+    firstName: string | null;
+    company: string;
+    role: string | null;
+  };
+}
+
+/**
+ * Refine an existing email draft based on a user instruction.
+ * Each call is standalone — no chat history, just current email + instruction.
+ */
+export async function refineEmailWithLLM(
+  input: RefineEmailInput
+): Promise<{ subject: string; body: string }> {
+  const { subject, body, instruction, person } = input;
+
+  const personName = person.firstName || 'the recipient';
+
+  const systemPrompt = `You are helping a college student refine a cold outreach email. Apply ONLY the requested change. Keep everything else the same — same greeting, same sign-off, same structure unless the instruction explicitly asks to change it.
+
+Return in this EXACT format:
+
+SUBJECT: [subject line]
+BODY:
+[email body]`;
+
+  const userPrompt = `CURRENT EMAIL:
+Subject: ${subject}
+Body:
+${body}
+
+RECIPIENT: ${personName}${person.role ? `, ${person.role}` : ''} at ${person.company}
+
+REQUESTED CHANGE: ${instruction}`;
+
+  const response = await complete({
+    systemPrompt,
+    userPrompt,
+    options: {
+      model: 'llama-3.3-70b-versatile',
+      temperature: 0.5,
+      maxTokens: 300,
+    },
+  });
+
+  const text = response.content;
+  const subjectMatch = text.match(/SUBJECT:\s*([^\n]+)/);
+  const bodyMatch = text.match(/BODY:\s*([\s\S]+)$/);
+
+  if (!subjectMatch || !bodyMatch) {
+    throw new Error('Failed to parse LLM refinement response');
+  }
+
+  return {
+    subject: subjectMatch[1].trim(),
+    body: bodyMatch[1].trim(),
+  };
+}
+
+// ===== LinkedIn Personalization (existing) =====
 
 export interface LinkedInData {
   about: string | null;
@@ -41,7 +268,7 @@ export interface PersonalizationResult {
 /**
  * Get the user's active resume summary
  */
-async function getUserResumeSummary(userId: string): Promise<ResumeSummary | null> {
+export async function getUserResumeSummary(userId: string): Promise<ResumeSummary | null> {
   const activeResume = await prisma.userResume.findFirst({
     where: {
       userId,
