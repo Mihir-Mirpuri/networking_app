@@ -945,7 +945,7 @@ export const LOCATIONS = [
 export const EMAIL_TEMPLATES = [
   {
     id: 'default',
-    name: 'Default',
+    name: 'AI Personalized',
     subject: '{university} {classification} interested in {industry} at {company}',
     body: `Hello {first_name},
 

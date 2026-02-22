@@ -34,7 +34,7 @@ interface ProfileClientProps {
 }
 
 const DEFAULT_TEMPLATE = {
-  name: 'Default',
+  name: 'AI Personalized',
   subject: '{university} {classification} interested in {industry} at {company}',
   body: `Hi {first_name},
 
@@ -628,25 +628,28 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
             <div className="text-center py-4 text-surface-500 text-sm">Loading templates...</div>
           ) : (
             <div className="space-y-3">
-              {/* Default Template (when no user templates) */}
-              {templates.length === 0 && (
-                <button
-                  onClick={() => setShowDefaultTemplate(true)}
-                  className="group w-full text-left bg-white border border-surface-200 p-4 rounded-xl hover:border-primary-500/50 transition-all"
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-semibold text-surface-900">Default Template</h4>
+              {/* Built-in AI Personalized Template (always shown) */}
+              <button
+                onClick={() => setShowDefaultTemplate(true)}
+                className="group w-full text-left bg-white border border-surface-200 p-4 rounded-xl hover:border-primary-500/50 transition-all"
+              >
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-semibold text-surface-900">AI Personalized</h4>
+                    <span className="bg-primary-500/10 text-primary-500 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">
+                      Built-in
+                    </span>
+                    {!templates.some(t => t.isDefault) && (
                       <span className="bg-primary-500/10 text-primary-500 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">
                         Default
                       </span>
-                    </div>
+                    )}
                   </div>
-                  <p className="text-sm text-surface-500 line-clamp-2">
-                    Hi there, I&apos;m writing to express interest in learning more about your experiences...
-                  </p>
-                </button>
-              )}
+                </div>
+                <p className="text-sm text-surface-500 line-clamp-2">
+                  AI generates a unique personalized email for each recipient based on their background and your profile.
+                </p>
+              </button>
 
               {/* User Templates */}
               {templates.map((template) => (
@@ -677,16 +680,14 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                         </svg>
                       </button>
-                      {!template.isDefault && (
-                        <button
-                          onClick={() => handleDeleteTemplate(template.id)}
-                          className="p-1.5 hover:bg-red-50 rounded-lg text-surface-400 hover:text-red-500"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-                      )}
+                      <button
+                        onClick={() => handleDeleteTemplate(template.id)}
+                        className="p-1.5 hover:bg-red-50 rounded-lg text-surface-400 hover:text-red-500"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
                     </div>
                   </div>
                   <p className="text-sm text-surface-500 line-clamp-2">{template.body}</p>
@@ -907,7 +908,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
             <div className="p-6">
               <div className="flex items-center justify-between mb-6 pb-4 border-b border-surface-200">
                 <h3 className="text-lg font-bold text-surface-900">
-                  {showDefaultTemplate ? 'Default Template' : selectedTemplate?.name}
+                  {showDefaultTemplate ? 'AI Personalized' : selectedTemplate?.name}
                 </h3>
                 <button
                   onClick={() => {
@@ -1075,24 +1076,22 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                       Edit Template
                     </button>
                     {!selectedTemplate.isDefault && (
-                      <>
-                        <button
-                          onClick={() => handleSetDefault(selectedTemplate.id)}
-                          className="px-6 py-2.5 rounded-xl font-semibold border border-surface-200 hover:bg-surface-50 transition-all text-surface-700"
-                        >
-                          Set as Default
-                        </button>
-                        <button
-                          onClick={() => {
-                            handleDeleteTemplate(selectedTemplate.id);
-                            setSelectedTemplate(null);
-                          }}
-                          className="px-6 py-2.5 rounded-xl font-semibold border border-red-200 hover:bg-red-50 transition-all text-red-600"
-                        >
-                          Delete
-                        </button>
-                      </>
+                      <button
+                        onClick={() => handleSetDefault(selectedTemplate.id)}
+                        className="px-6 py-2.5 rounded-xl font-semibold border border-surface-200 hover:bg-surface-50 transition-all text-surface-700"
+                      >
+                        Set as Default
+                      </button>
                     )}
+                    <button
+                      onClick={() => {
+                        handleDeleteTemplate(selectedTemplate.id);
+                        setSelectedTemplate(null);
+                      }}
+                      className="px-6 py-2.5 rounded-xl font-semibold border border-red-200 hover:bg-red-50 transition-all text-red-600"
+                    >
+                      Delete
+                    </button>
                   </div>
                 </div>
               ) : null}

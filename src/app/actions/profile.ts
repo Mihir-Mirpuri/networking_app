@@ -346,10 +346,6 @@ export async function deleteTemplateAction(
       return { success: false, error: 'Template not found' };
     }
 
-    if (existing.isDefault) {
-      return { success: false, error: 'Cannot delete the default template' };
-    }
-
     await prisma.emailTemplate.delete({
       where: { id },
     });
