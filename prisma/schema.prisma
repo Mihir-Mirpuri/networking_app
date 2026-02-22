@@ -60,6 +60,7 @@ model User {
   stripeCurrentPeriodEnd     DateTime?
   subscriptionStatus         String?
   timezone                   String?                      // e.g., "America/Chicago"
+  emailInstructions          String?                      // Free-text custom instructions for LLM email generation
   referredBy                 User?                        @relation("Referrals", fields: [referredById], references: [id])
   referrals                  User[]                       @relation("Referrals")
   createdAt                  DateTime                     @default(now())

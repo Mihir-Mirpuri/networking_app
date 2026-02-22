@@ -68,6 +68,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
     major: null,
     university: null,
     career: null,
+    emailInstructions: null,
   });
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
@@ -465,6 +466,21 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                 className="w-full bg-surface-50 border-none rounded-lg focus:ring-2 focus:ring-primary-500 text-sm p-3"
                 placeholder="e.g., Investment Banking, Consulting"
               />
+            </div>
+
+            <div className="md:col-span-2 space-y-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider text-surface-500">
+                Email Style Instructions
+              </label>
+              <textarea
+                value={profile.emailInstructions || ''}
+                onChange={(e) => setProfile({ ...profile, emailInstructions: e.target.value || null })}
+                disabled={isLoadingProfile}
+                rows={3}
+                className="w-full bg-surface-50 border-none rounded-lg focus:ring-2 focus:ring-primary-500 text-sm p-3 resize-none"
+                placeholder="e.g. Keep emails under 3 sentences. Always mention I'm looking for a summer internship. Don't include my resume."
+              />
+              <p className="text-xs text-surface-400">These instructions will be applied to every AI-generated email.</p>
             </div>
           </div>
 

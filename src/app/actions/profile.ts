@@ -10,6 +10,7 @@ export interface UserProfile {
   major: string | null;
   university: string | null;
   career: string | null;
+  emailInstructions: string | null;
 }
 
 export interface TemplateData {
@@ -45,6 +46,7 @@ export async function getProfileAction(): Promise<
         major: true,
         university: true,
         career: true,
+        emailInstructions: true,
       },
     });
 
@@ -77,6 +79,7 @@ export async function updateProfileAction(
         major: profile.major,
         university: profile.university,
         career: profile.career,
+        emailInstructions: profile.emailInstructions,
       },
     });
 
