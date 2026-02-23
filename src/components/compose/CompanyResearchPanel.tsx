@@ -1,3 +1,6 @@
+/* Company Research Panel — disabled (too general for personalization)
+ * Kept commented out for potential future restoration.
+
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -159,3 +162,5 @@ export function CompanyResearchPanel({
     </div>
   );
 }
+
+*/

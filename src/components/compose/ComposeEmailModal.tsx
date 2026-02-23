@@ -6,7 +6,7 @@ import { getProfileAction, getTemplatesAction, TemplateData, UserProfile } from 
 import { getResumesAction, ResumeData } from '@/app/actions/resume';
 import { EMAIL_TEMPLATES } from '@/lib/constants';
 import { LoadingSpinner } from '@/components/search/LoadingSpinner';
-import { CompanyResearchPanel } from '@/components/compose/CompanyResearchPanel';
+// import { CompanyResearchPanel } from '@/components/compose/CompanyResearchPanel';
 import { LimitReachedModal, dispatchCreditsChanged } from '@/components/credits';
 import { Toast } from '@/components/ui/Toast';
 
@@ -387,12 +387,12 @@ export function ComposeEmailModal({
 
   const isEmbedded = variant === 'embedded';
 
-  const handleUseTalkingPoint = (point: string) => {
-    const lines = body.split('\n');
-    const insertIdx = lines.findIndex(l => l.trim() === '') + 1 || 1;
-    lines.splice(insertIdx, 0, `\nI saw that ${point.charAt(0).toLowerCase() + point.slice(1)} — really cool.\n`);
-    setBody(lines.join('\n'));
-  };
+  // const handleUseTalkingPoint = (point: string) => {
+  //   const lines = body.split('\n');
+  //   const insertIdx = lines.findIndex(l => l.trim() === '') + 1 || 1;
+  //   lines.splice(insertIdx, 0, `\nI saw that ${point.charAt(0).toLowerCase() + point.slice(1)} — really cool.\n`);
+  //   setBody(lines.join('\n'));
+  // };
 
   return (
     <div
@@ -522,7 +522,7 @@ export function ComposeEmailModal({
                 />
               </div>
 
-              {/* Company Research */}
+              {/* Company Research — disabled (too general for personalization)
               {recipientCompany && (
                 <CompanyResearchPanel
                   company={recipientCompany}
@@ -531,6 +531,7 @@ export function ComposeEmailModal({
                   onUseTalkingPoint={handleUseTalkingPoint}
                 />
               )}
+              */}
 
               {/* Subject */}
               <div>

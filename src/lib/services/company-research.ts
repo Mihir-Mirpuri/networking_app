@@ -1,10 +1,9 @@
-/**
- * Company Research Service
+/* Company Research Service — disabled (too general for personalization)
+ * Kept commented out for potential future restoration.
  *
  * Uses Perplexity Sonar API for real-time web search + summarization
  * to find specific, referenceable talking points about a company.
  * Falls back to Groq training knowledge if Perplexity is unavailable.
- */
 
 import { completeJson } from '@/lib/services/groq';
 
@@ -42,9 +41,6 @@ interface PerplexityResponse {
 
 // --- Helpers ---
 
-/**
- * Map a job title to a general department for search bias
- */
 export function inferDepartment(role: string): string {
   const r = role.toLowerCase();
   if (/engineer|developer|swe|sde|devops|infrastructure|backend|frontend|fullstack|full-stack/.test(r)) return 'engineering';
@@ -190,3 +186,5 @@ export async function researchCompany(
     }
   }
 }
+
+*/

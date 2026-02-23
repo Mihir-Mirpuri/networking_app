@@ -1,3 +1,6 @@
+/* Company Research Action — disabled (too general for personalization)
+ * Kept commented out for potential future restoration.
+
 'use server';
 
 import { getServerSession } from 'next-auth';
@@ -102,3 +105,5 @@ export async function researchCompanyAction(
     };
   }
 }
+
+*/

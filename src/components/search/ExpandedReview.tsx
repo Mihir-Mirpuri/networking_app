@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { SearchResultWithDraft, refineDraftAction, generateLLMDraftAction } from '@/app/actions/search';
 import { scheduleEmailAction } from '@/app/actions/send';
-import { CompanyResearchPanel } from '@/components/compose/CompanyResearchPanel';
+// import { CompanyResearchPanel } from '@/components/compose/CompanyResearchPanel';
 import { SearchableCombobox } from './SearchableCombobox';
 import { LoadingDots } from './LoadingSpinner';
 import { TemplateData } from '@/app/actions/profile';
@@ -116,7 +116,7 @@ export function ExpandedReview({
   const currentPerson = results[internalIndex];
   const status = currentPerson ? sendStatuses.get(currentPerson.id) : undefined;
 
-  const [researchCollapsed, setResearchCollapsed] = useState(true);
+  // const [researchCollapsed, setResearchCollapsed] = useState(true);
   const [selectedTemplateId, setSelectedTemplateId] = useState(defaultTemplateId || '');
   const [refineInstruction, setRefineInstruction] = useState('');
   const [isRefining, setIsRefining] = useState(false);
@@ -313,12 +313,12 @@ export function ExpandedReview({
     }
   }, [showScheduleModal, scheduledDateTime]);
 
-  const handleUseTalkingPoint = (point: string) => {
-    const lines = body.split('\n');
-    const insertIdx = lines.findIndex(l => l.trim() === '') + 1 || 1;
-    lines.splice(insertIdx, 0, `\nI saw that ${point.charAt(0).toLowerCase() + point.slice(1)} — really cool.\n`);
-    setBody(lines.join('\n'));
-  };
+  // const handleUseTalkingPoint = (point: string) => {
+  //   const lines = body.split('\n');
+  //   const insertIdx = lines.findIndex(l => l.trim() === '') + 1 || 1;
+  //   lines.splice(insertIdx, 0, `\nI saw that ${point.charAt(0).toLowerCase() + point.slice(1)} — really cool.\n`);
+  //   setBody(lines.join('\n'));
+  // };
 
   const handleRefine = async () => {
     if (!currentPerson || !refineInstruction.trim() || isRefining) return;
@@ -422,7 +422,7 @@ export function ExpandedReview({
 
         {/* Email Form */}
         <div className="flex-1 overflow-y-auto p-4">
-          {/* Company Research */}
+          {/* Company Research — disabled (too general for personalization)
           {currentPerson.company && (
             <div className="mb-4">
               <button
@@ -452,6 +452,7 @@ export function ExpandedReview({
               )}
             </div>
           )}
+          */}
 
           {/* Template Selector */}
           {templates && templates.length > 0 && onTemplateChange && (
