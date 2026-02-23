@@ -7,8 +7,12 @@ import { FeedbackButton } from '@/components/feedback/FeedbackButton';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://signl.to'),
   title: 'Signl',
   description: 'Finance/consulting recruiting outreach tool',
+  alternates: {
+    canonical: './',
+  },
 };
 
 export default function RootLayout({

@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /onboarding
+Disallow: /profile
+Disallow: /calendar
+Disallow: /history
+Disallow: /auth/
+
+Sitemap: https://signl.to/sitemap.xml
