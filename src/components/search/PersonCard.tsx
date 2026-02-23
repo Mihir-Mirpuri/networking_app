@@ -189,11 +189,11 @@ export function PersonCard({
         )}
 
         {/* Location */}
-        {(person.city || person.state) && (
+        {(person.city || person.state || person.country) && (
           <div className="flex items-center gap-2">
             <MapPinIcon className="w-4 h-4 text-surface-400 flex-shrink-0" />
             <p className="text-sm text-surface-500 truncate">
-              {[person.city, person.state].filter(Boolean).join(', ')}
+              {[person.city, person.state].filter(Boolean).join(', ') || person.country}
             </p>
           </div>
         )}

@@ -430,10 +430,10 @@ function LookupResultCard({
                 {person.educationSchool}
               </span>
             )}
-            {(person.city || person.state) && (
+            {(person.city || person.state || person.country) && (
               <span className="flex items-center gap-1">
                 <MapPinIcon className="w-3.5 h-3.5" />
-                {[person.city, person.state].filter(Boolean).join(', ')}
+                {[person.city, person.state].filter(Boolean).join(', ') || person.country}
               </span>
             )}
           </div>

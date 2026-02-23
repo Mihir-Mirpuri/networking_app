@@ -269,7 +269,14 @@ function parseLocationString(locationStr: string | null): {
   } else if (parts.length === 2) {
     return { city: parts[0], state: null, country: parts[1] };
   } else if (parts.length === 1) {
-    return { city: null, state: null, country: parts[0] };
+    // Single-part locations are almost always cities or metro areas
+    // (e.g., "Dallas-Fort Worth Metroplex", "NYC", "Greater Boston Area")
+    // Only treat as country if it looks like one (e.g., "United States", "Canada")
+    const KNOWN_COUNTRIES = ['united states', 'united kingdom', 'canada', 'australia', 'india', 'germany', 'france', 'brazil', 'mexico', 'japan', 'china', 'singapore', 'ireland', 'israel', 'netherlands', 'spain', 'italy', 'sweden', 'switzerland', 'south korea'];
+    if (KNOWN_COUNTRIES.includes(parts[0].toLowerCase())) {
+      return { city: null, state: null, country: parts[0] };
+    }
+    return { city: parts[0], state: null, country: null };
   }
 
   return { city: null, state: null, country: null };
