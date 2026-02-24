@@ -34,7 +34,7 @@ function assert(
 // ─── Helper: test that scoreRoleMatch returns within expected range ───
 function expectScore(
   search: string,
-  personRole: string,
+  personRole: string | null,
   minScore: number,
   maxScore: number,
   label?: string
