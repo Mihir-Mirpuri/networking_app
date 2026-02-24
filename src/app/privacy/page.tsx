@@ -18,7 +18,7 @@ export default function PrivacyPage() {
         </Link>
 
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Privacy Policy</h1>
-        <p className="text-gray-500 mb-8">Last updated: February 23, 2026</p>
+        <p className="text-gray-500 mb-8">Last updated: February 24, 2026</p>
 
         <div className="prose prose-gray max-w-none">
           <section className="mb-8">
@@ -129,8 +129,96 @@ export default function PrivacyPage() {
           </section>
 
           <section className="mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">4. Third-Party Services</h2>
-            <p className="text-gray-700 mb-4">We use the following third-party services:</p>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">4. Sharing, Transfer, and Disclosure of Google User Data</h2>
+            <p className="text-gray-700 mb-4">
+              We only share Google user data with third parties as necessary to provide
+              and operate the Service. We do not sell Google user data. Below is a
+              complete list of third parties that receive Google user data, what data is
+              shared, and why:
+            </p>
+
+            <h3 className="text-lg font-medium text-gray-900 mt-4 mb-2">Service Infrastructure</h3>
+            <ul className="list-disc pl-6 text-gray-700 mb-4">
+              <li>
+                <strong>Supabase</strong> (database hosting): Your name, email address, and
+                profile picture obtained from Google are stored in our database hosted on
+                Supabase to maintain your account. Supabase also stores OAuth tokens in
+                encrypted form.{' '}
+                <a href="https://supabase.com/privacy" className="text-blue-600 hover:text-blue-800" target="_blank" rel="noopener noreferrer">
+                  Supabase Privacy Policy
+                </a>
+              </li>
+              <li>
+                <strong>Vercel</strong> (hosting): Your Google user data passes through
+                Vercel&apos;s infrastructure as part of normal application hosting and delivery.{' '}
+                <a href="https://vercel.com/legal/privacy-policy" className="text-blue-600 hover:text-blue-800" target="_blank" rel="noopener noreferrer">
+                  Vercel Privacy Policy
+                </a>
+              </li>
+            </ul>
+
+            <h3 className="text-lg font-medium text-gray-900 mt-4 mb-2">Email Sending</h3>
+            <ul className="list-disc pl-6 text-gray-700 mb-4">
+              <li>
+                <strong>Google Gmail API:</strong> We use your OAuth access token (obtained
+                through Google sign-in) to send outreach emails on your behalf via the
+                Gmail API. The email content you compose or approve is transmitted to
+                Google&apos;s servers for delivery. We do not read or access emails in your
+                inbox.
+              </li>
+            </ul>
+
+            <h3 className="text-lg font-medium text-gray-900 mt-4 mb-2">AI Email Generation</h3>
+            <ul className="list-disc pl-6 text-gray-700 mb-4">
+              <li>
+                <strong>Groq</strong> (AI/LLM provider): To generate personalized email
+                drafts, we send your name, university, major, and career preferences
+                (collected at sign-up via your Google account) along with resume summary
+                data (if provided) to Groq&apos;s language model. We do not send your email
+                address, OAuth tokens, or profile picture to Groq.{' '}
+                <a href="https://groq.com/privacy-policy/" className="text-blue-600 hover:text-blue-800" target="_blank" rel="noopener noreferrer">
+                  Groq Privacy Policy
+                </a>
+              </li>
+            </ul>
+
+            <h3 className="text-lg font-medium text-gray-900 mt-4 mb-2">Payment Processing</h3>
+            <ul className="list-disc pl-6 text-gray-700 mb-4">
+              <li>
+                <strong>Stripe:</strong> Your email address (obtained from Google sign-in)
+                is shared with Stripe to create a customer record and process subscription
+                payments. We do not share your name, profile picture, or OAuth tokens with
+                Stripe.{' '}
+                <a href="https://stripe.com/privacy" className="text-blue-600 hover:text-blue-800" target="_blank" rel="noopener noreferrer">
+                  Stripe Privacy Policy
+                </a>
+              </li>
+            </ul>
+
+            <h3 className="text-lg font-medium text-gray-900 mt-4 mb-2">No Other Sharing of Google User Data</h3>
+            <p className="text-gray-700 mb-4">
+              The following services are used by Signl but do <strong>not</strong> receive
+              any data obtained from your Google account (they only receive professional
+              contact data collected from public sources, or search queries):
+            </p>
+            <ul className="list-disc pl-6 text-gray-700 mb-4">
+              <li><strong>Apollo:</strong> Receives names and company information from public LinkedIn profiles (not from your Google account) for email discovery</li>
+              <li><strong>Apify:</strong> Receives public LinkedIn URLs (not Google user data) for profile data collection</li>
+              <li><strong>Emailable:</strong> Receives professional email addresses discovered from public sources (not your Google email) for verification</li>
+              <li><strong>Google Custom Search:</strong> Receives search queries (not Google user data) for discovering professional profiles</li>
+            </ul>
+
+            <p className="text-gray-700 mb-4">
+              We do not sell, rent, or trade your Google user data to any third party.
+              We do not share Google user data with third parties for their own marketing
+              or advertising purposes. We only transfer Google user data as described
+              above, strictly to provide the Service&apos;s functionality to you.
+            </p>
+          </section>
+
+          <section className="mb-8">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">5. Third-Party Services</h2>
+            <p className="text-gray-700 mb-4">We use the following third-party services to operate the Service:</p>
             <ul className="list-disc pl-6 text-gray-700 mb-4">
               <li><strong>Google OAuth, Gmail API &amp; Calendar API:</strong> For authentication, email sending, and calendar features</li>
               <li><strong>Stripe:</strong> For payment processing and subscription management</li>
@@ -144,11 +232,12 @@ export default function PrivacyPage() {
             </ul>
             <p className="text-gray-700 mb-4">
               Each of these services has their own privacy policies governing their use of data.
+              We encourage you to review those policies.
             </p>
           </section>
 
           <section className="mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">5. Data Security</h2>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">6. Data Security</h2>
             <p className="text-gray-700 mb-4">
               We implement appropriate technical and organizational security measures to protect
               your personal information, including:
@@ -162,7 +251,7 @@ export default function PrivacyPage() {
           </section>
 
           <section className="mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">6. Data Retention</h2>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">7. Data Retention</h2>
             <p className="text-gray-700 mb-4">
               We retain your data for as long as your account is active or as needed to provide
               you services. Email send history is retained indefinitely to provide outreach
@@ -172,7 +261,7 @@ export default function PrivacyPage() {
           </section>
 
           <section className="mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">7. Your Rights</h2>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">8. Your Rights</h2>
             <p className="text-gray-700 mb-4">You have the right to:</p>
             <ul className="list-disc pl-6 text-gray-700 mb-4">
               <li>Access the personal information we hold about you</li>
@@ -185,7 +274,7 @@ export default function PrivacyPage() {
           </section>
 
           <section className="mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">8. Changes to This Policy</h2>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">9. Changes to This Policy</h2>
             <p className="text-gray-700 mb-4">
               We may update this Privacy Policy from time to time. We will notify you of any
               changes by posting the new Privacy Policy on this page and updating the
@@ -194,7 +283,7 @@ export default function PrivacyPage() {
           </section>
 
           <section className="mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">9. Contact Us</h2>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">10. Contact Us</h2>
             <p className="text-gray-700 mb-4">
               If you have any questions about this Privacy Policy, please contact us at:{' '}
               <a href="mailto:mihirmirpuri@gmail.com" className="text-blue-600 hover:text-blue-800">
