@@ -146,7 +146,7 @@ export function LimitReachedModal({ isOpen, onClose, onCreditsAwarded }: LimitRe
               </div>
               <div className="flex-1">
                 <p className="text-sm font-medium text-blue-900">Unlimited emails with Pro</p>
-                <p className="text-sm text-blue-700 mt-0.5">Send unlimited outreach emails for $10/month</p>
+                <p className="text-sm text-blue-700 mt-0.5">Send unlimited outreach emails for $20/month</p>
               </div>
             </div>
             <button
@@ -164,7 +164,7 @@ export function LimitReachedModal({ isOpen, onClose, onCreditsAwarded }: LimitRe
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                   </svg>
-                  Upgrade to Pro - $10/month
+                  Upgrade to Pro - $20/month
                 </>
               )}
             </button>

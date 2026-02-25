@@ -393,104 +393,122 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-surface-500">
-                Full Name
-              </label>
-              <input
-                type="text"
-                value={profile.name || ''}
-                onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-                disabled={isLoadingProfile}
-                className="w-full bg-surface-50 border-none rounded-lg focus:ring-2 focus:ring-primary-500 text-sm p-3"
-                placeholder="Your full name"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-surface-500">
-                Classification
-              </label>
-              <select
-                value={profile.classification || ''}
-                onChange={(e) => setProfile({ ...profile, classification: e.target.value })}
-                disabled={isLoadingProfile}
-                className="w-full bg-surface-50 border-none rounded-lg focus:ring-2 focus:ring-primary-500 text-sm p-3"
-              >
-                <option value="">Select classification</option>
-                {CLASSIFICATIONS.map((c) => (
-                  <option key={c} value={c}>{c}</option>
+          {isLoadingProfile ? (
+            <div className="animate-pulse">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="space-y-1.5">
+                    <div className="h-3 w-20 bg-surface-200 rounded" />
+                    <div className="h-11 bg-surface-100 rounded-lg" />
+                  </div>
                 ))}
-              </select>
+                <div className="md:col-span-2 space-y-1.5">
+                  <div className="h-3 w-28 bg-surface-200 rounded" />
+                  <div className="h-11 bg-surface-100 rounded-lg" />
+                </div>
+                <div className="md:col-span-2 space-y-1.5">
+                  <div className="h-3 w-36 bg-surface-200 rounded" />
+                  <div className="h-[84px] bg-surface-100 rounded-lg" />
+                </div>
+              </div>
+              <div className="mt-6 h-11 w-32 bg-surface-200 rounded-xl" />
             </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-surface-500">
+                    Full Name
+                  </label>
+                  <input
+                    type="text"
+                    value={profile.name || ''}
+                    onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+                    className="w-full bg-surface-50 border-none rounded-lg focus:ring-2 focus:ring-primary-500 text-sm p-3"
+                    placeholder="Your full name"
+                  />
+                </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-surface-500">
-                Major
-              </label>
-              <input
-                type="text"
-                value={profile.major || ''}
-                onChange={(e) => setProfile({ ...profile, major: e.target.value })}
-                disabled={isLoadingProfile}
-                className="w-full bg-surface-50 border-none rounded-lg focus:ring-2 focus:ring-primary-500 text-sm p-3"
-                placeholder="e.g., Computer Science"
-              />
-            </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-surface-500">
+                    Classification
+                  </label>
+                  <select
+                    value={profile.classification || ''}
+                    onChange={(e) => setProfile({ ...profile, classification: e.target.value })}
+                    className="w-full bg-surface-50 border-none rounded-lg focus:ring-2 focus:ring-primary-500 text-sm p-3"
+                  >
+                    <option value="">Select classification</option>
+                    {CLASSIFICATIONS.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-surface-500">
-                University
-              </label>
-              <SearchableCombobox
-                options={UNIVERSITIES}
-                value={profile.university || ''}
-                onChange={(value) => setProfile({ ...profile, university: value })}
-                label=""
-                placeholder="Search universities..."
-                id="university"
-                disabled={isLoadingProfile}
-              />
-            </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-surface-500">
+                    Major
+                  </label>
+                  <input
+                    type="text"
+                    value={profile.major || ''}
+                    onChange={(e) => setProfile({ ...profile, major: e.target.value })}
+                    className="w-full bg-surface-50 border-none rounded-lg focus:ring-2 focus:ring-primary-500 text-sm p-3"
+                    placeholder="e.g., Computer Science"
+                  />
+                </div>
 
-            <div className="md:col-span-2 space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-surface-500">
-                Career Interest
-              </label>
-              <input
-                type="text"
-                value={profile.career || ''}
-                onChange={(e) => setProfile({ ...profile, career: e.target.value })}
-                disabled={isLoadingProfile}
-                className="w-full bg-surface-50 border-none rounded-lg focus:ring-2 focus:ring-primary-500 text-sm p-3"
-                placeholder="e.g., Investment Banking, Consulting"
-              />
-            </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-surface-500">
+                    University
+                  </label>
+                  <SearchableCombobox
+                    options={UNIVERSITIES}
+                    value={profile.university || ''}
+                    onChange={(value) => setProfile({ ...profile, university: value })}
+                    label=""
+                    placeholder="Search universities..."
+                    id="university"
+                  />
+                </div>
 
-            <div className="md:col-span-2 space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-surface-500">
-                Email Style Instructions
-              </label>
-              <textarea
-                value={profile.emailInstructions || ''}
-                onChange={(e) => setProfile({ ...profile, emailInstructions: e.target.value || null })}
-                disabled={isLoadingProfile}
-                rows={3}
-                className="w-full bg-surface-50 border-none rounded-lg focus:ring-2 focus:ring-primary-500 text-sm p-3 resize-none"
-                placeholder="e.g. Keep emails under 3 sentences. Always mention I'm looking for a summer internship. Don't include my resume."
-              />
-              <p className="text-xs text-surface-400">These instructions will be applied to every AI-generated email.</p>
-            </div>
-          </div>
+                <div className="md:col-span-2 space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-surface-500">
+                    Career Interest
+                  </label>
+                  <input
+                    type="text"
+                    value={profile.career || ''}
+                    onChange={(e) => setProfile({ ...profile, career: e.target.value })}
+                    className="w-full bg-surface-50 border-none rounded-lg focus:ring-2 focus:ring-primary-500 text-sm p-3"
+                    placeholder="e.g., Investment Banking, Consulting"
+                  />
+                </div>
 
-          <button
-            onClick={handleSaveProfile}
-            disabled={isSavingProfile || isLoadingProfile}
-            className="mt-6 w-full md:w-auto bg-primary-500 text-white px-6 py-2.5 rounded-xl font-semibold hover:bg-primary-600 transition-all disabled:opacity-50"
-          >
-            {isSavingProfile ? 'Saving...' : 'Save Profile'}
-          </button>
+                <div className="md:col-span-2 space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-surface-500">
+                    Email Style Instructions
+                  </label>
+                  <textarea
+                    value={profile.emailInstructions || ''}
+                    onChange={(e) => setProfile({ ...profile, emailInstructions: e.target.value || null })}
+                    rows={3}
+                    className="w-full bg-surface-50 border-none rounded-lg focus:ring-2 focus:ring-primary-500 text-sm p-3 resize-none"
+                    placeholder="e.g. Keep emails under 3 sentences. Always mention I'm looking for a summer internship. Don't include my resume."
+                  />
+                  <p className="text-xs text-surface-400">These instructions will be applied to every AI-generated email.</p>
+                </div>
+              </div>
+
+              <button
+                onClick={handleSaveProfile}
+                disabled={isSavingProfile}
+                className="mt-6 w-full md:w-auto bg-primary-500 text-white px-6 py-2.5 rounded-xl font-semibold hover:bg-primary-600 transition-all disabled:opacity-50"
+              >
+                {isSavingProfile ? 'Saving...' : 'Save Profile'}
+              </button>
+            </>
+          )}
         </section>
 
         {/* Resume Card */}
@@ -858,7 +876,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                 <span className="text-sm text-surface-700 font-medium">10 emails/day</span>
               </div>
               <p className="text-sm text-surface-500">
-                Upgrade to Pro for unlimited emails at $10/month.
+                Upgrade to Pro for unlimited emails at $20/month.
               </p>
               <button
                 onClick={async () => {
