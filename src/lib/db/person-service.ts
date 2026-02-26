@@ -733,6 +733,14 @@ export function buildPersonWhereClause(filters: Omit<PersonFilters, 'limit'>, sc
   if (!where.AND) where.AND = [];
   (where.AND as unknown[]).push({ role: { not: null } });
 
+  // Exclude people whose role indicates they haven't started yet (e.g., "Incoming Analyst")
+  (where.AND as unknown[]).push({
+    NOT: { role: { startsWith: 'incoming ', mode: 'insensitive' as const } }
+  });
+  (where.AND as unknown[]).push({
+    NOT: { role: { startsWith: 'future ', mode: 'insensitive' as const } }
+  });
+
   // Email filter - must have email AND not be marked as undeliverable
   if (requireEmail) {
     where.email = { not: null };
@@ -951,6 +959,9 @@ async function findPeopleByFiltersVector(
 
   // Never show people without a role
   conditions.push(Prisma.sql`p.role IS NOT NULL`);
+
+  // Exclude people whose role indicates they haven't started yet (e.g., "Incoming Analyst")
+  conditions.push(Prisma.sql`p.role !~* '^(incoming|future)\s+'`);
 
   // Vector similarity threshold: include null embeddings (penalty), exclude far embeddings
   conditions.push(Prisma.sql`(
