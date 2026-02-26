@@ -111,17 +111,34 @@ export function OutreachTrackerClient({
     setTimeout(() => fetchTrackers(true), 0);
   };
 
+  const recomputeStats = (trackerList: OutreachTrackerEntry[]) => {
+    const total = trackerList.length;
+    const sent = trackerList.filter((t) => t.dateEmailed !== null).length;
+    const waiting = trackerList.filter(
+      (t) => t.dateEmailed !== null && !t.responseReceivedAt && !['RESPONDED', 'SCHEDULED_CALL', 'HAD_CALL', 'CONNECTED'].includes(t.status)
+    ).length;
+    const ongoingConversations = trackerList.filter(
+      (t) => t.responseReceivedAt !== null || ['RESPONDED', 'SCHEDULED_CALL', 'HAD_CALL', 'CONNECTED'].includes(t.status)
+    ).length;
+    setStats({ total, sent, waiting, ongoingConversations });
+  };
+
   const handleUpdate = (updatedTracker: OutreachTrackerEntry) => {
-    setTrackers((prev) =>
-      prev.map((t) => (t.id === updatedTracker.id ? updatedTracker : t))
-    );
+    setTrackers((prev) => {
+      const updated = prev.map((t) => (t.id === updatedTracker.id ? updatedTracker : t));
+      recomputeStats(updated);
+      return updated;
+    });
   };
 
   const handleDelete = async (id: string) => {
     const result = await deleteOutreachTracker(id);
     if (result.success) {
-      setTrackers((prev) => prev.filter((t) => t.id !== id));
-      setStats((prev) => ({ ...prev, sent: Math.max(0, (prev.sent ?? 0) - 1) }));
+      setTrackers((prev) => {
+        const updated = prev.filter((t) => t.id !== id);
+        recomputeStats(updated);
+        return updated;
+      });
     }
   };
 
