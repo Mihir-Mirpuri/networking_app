@@ -79,6 +79,7 @@ model User {
   ExtractedMeetingSuggestion ExtractedMeetingSuggestion[]
   searchLogs                 SearchLog[]
   invitations                Invitation[]
+  groqUsageLogs              GroqUsageLog[]
 }
 
 model VerificationToken {
@@ -115,6 +116,7 @@ model Person {
   educationField   String?
   educationYear    String?
   schools          Json?             // Array of all schools (normalized)
+  role_embedding   Unsupported("vector(1536)")?  // pgvector embedding for semantic role matching
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
   sourceLinks      SourceLink[]
@@ -607,6 +609,38 @@ model CompanyAlias {
   updatedAt     DateTime @default(now()) @updatedAt
 
   @@index([canonicalName])
+}
+
+enum GroqAction {
+  EMAIL_GENERATION
+  EMAIL_REFINEMENT
+  PERSONALIZATION
+  PERSONALIZATION_FOUND_INFO
+  FOLLOW_UP
+  RESUME_PARSE
+  COMPANY_ALIAS
+  CALENDAR_PARSE
+  CALENDAR_THREAD_PARSE
+  SEARCH_FILTER_EXTRACTION
+}
+
+model GroqUsageLog {
+  id               String     @id @default(cuid())
+  userId           String?
+  action           GroqAction
+  model            String
+  promptTokens     Int
+  completionTokens Int
+  totalTokens      Int
+  durationMs       Int?
+  error            Boolean    @default(false)
+  createdAt        DateTime   @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([action])
 }
 
 model CompanyResearch {
