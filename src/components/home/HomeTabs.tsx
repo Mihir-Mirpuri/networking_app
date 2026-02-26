@@ -5,9 +5,10 @@ import { SearchPageClient } from '@/components/search/SearchPageClient';
 import { PersonLookup } from '@/components/search/PersonLookup';
 import { ComposeEmailModal } from '@/components/compose/ComposeEmailModal';
 import { Toast } from '@/components/ui/Toast';
-import { MagnifyingGlassIcon, UserIcon, PaperAirplaneIcon } from '@heroicons/react/24/outline';
+import { AISearchPageClient } from '@/components/search/AISearchPageClient';
+import { MagnifyingGlassIcon, UserIcon, PaperAirplaneIcon, ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
 
-type HomeTabId = 'find' | 'lookup' | 'quick';
+type HomeTabId = 'find' | 'ai' | 'lookup' | 'quick';
 
 interface HomeTabsProps {
   initialRemainingDaily: number;
@@ -15,6 +16,7 @@ interface HomeTabsProps {
 
 const TABS: { id: HomeTabId; label: string; icon: typeof MagnifyingGlassIcon }[] = [
   { id: 'find', label: 'Find Connections', icon: MagnifyingGlassIcon },
+  { id: 'ai', label: 'AI Search', icon: ChatBubbleLeftRightIcon },
   { id: 'lookup', label: 'Look Up', icon: UserIcon },
   { id: 'quick', label: 'Direct Send', icon: PaperAirplaneIcon },
 ];
@@ -57,6 +59,12 @@ export function HomeTabs({ initialRemainingDaily }: HomeTabsProps) {
       {activeTab === 'find' && (
         <div className="animate-fade-in">
           <SearchPageClient initialRemainingDaily={initialRemainingDaily} />
+        </div>
+      )}
+
+      {activeTab === 'ai' && (
+        <div className="animate-fade-in">
+          <AISearchPageClient initialRemainingDaily={initialRemainingDaily} />
         </div>
       )}
 

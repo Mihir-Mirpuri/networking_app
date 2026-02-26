@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { SearchForm } from './SearchForm';
 import { ResultsList } from './ResultsList';
 import { ExpandedReview } from './ExpandedReview';
@@ -9,12 +9,9 @@ import { LoadingSpinner } from './LoadingSpinner';
 import { SearchLoadingState } from './SearchLoadingState';
 import { Toast } from '@/components/ui/Toast';
 import { LimitReachedModal, dispatchCreditsChanged } from '@/components/credits';
-import { searchPeopleAction, SearchResultWithDraft, hidePersonAction, loadMorePeopleAction, getRecentSearchesAction, RecentSearch, regenerateDraftAction } from '@/app/actions/search';
+import { searchPeopleAction, SearchResultWithDraft, getRecentSearchesAction, RecentSearch } from '@/app/actions/search';
 import { HiddenPeopleBar } from './HiddenPeopleBar';
-import { EMAIL_TEMPLATES } from '@/lib/constants';
-import { sendSingleEmailAction, sendEmailsAction, PersonToSend } from '@/app/actions/send';
-import { getTemplatesAction, TemplateData } from '@/app/actions/profile';
-import { useSession } from 'next-auth/react';
+import { useSearchResults, SearchParams } from '@/hooks/useSearchResults';
 
 interface SearchPageClientProps {
   initialRemainingDaily: number;
@@ -33,13 +30,7 @@ interface SearchPageState {
   showBulkReview: boolean;
   generatingStatuses: Array<[string, boolean]>;
   remainingDaily?: number;
-  searchParams?: {
-    company?: string;
-    role?: string;
-    university?: string;
-    location?: string;
-    limit: number;
-  };
+  searchParams?: SearchParams;
   totalLoaded?: number;
   hasMore?: boolean;
   hiddenCount?: number;
@@ -56,44 +47,10 @@ function arrayToMap<T>(array: Array<[string, T]>): Map<string, T> {
 }
 
 export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProps) {
-  const { status: sessionStatus } = useSession();
-  const [results, setResults] = useState<SearchResultWithDraft[]>([]);
+  const hook = useSearchResults({ initialRemainingDaily });
+
   const [isSearching, setIsSearching] = useState(false);
-  const [isSending, setIsSending] = useState(false);
-  const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
-  const [sendStatuses, setSendStatuses] = useState<Map<string, 'success' | 'failed' | 'pending'>>(
-    new Map()
-  );
-  const [sendErrors, setSendErrors] = useState<Map<string, string>>(new Map());
-  const [remainingDaily, setRemainingDaily] = useState(initialRemainingDaily);
-  const [showBulkReview, setShowBulkReview] = useState(false);
-  const [generatingStatuses, setGeneratingStatuses] = useState<Map<string, boolean>>(new Map());
   const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  const [showLimitModal, setShowLimitModal] = useState(false);
-  const [limitReached, setLimitReached] = useState(false);
-  const [searchParams, setSearchParams] = useState<{
-    company?: string;
-    role?: string;
-    university?: string;
-    location?: string;
-    limit: number;
-  } | null>(null);
-
-  // Template state
-  const [templates, setTemplates] = useState<TemplateData[]>([]);
-  const [defaultTemplateId, setDefaultTemplateId] = useState<string>(EMAIL_TEMPLATES[0].id);
-  const [isRegenerating, setIsRegenerating] = useState(false);
-
-  // Pagination state
-  const [totalLoaded, setTotalLoaded] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [isRetrying, setIsRetrying] = useState(false);
-  const [hiddenCount, setHiddenCount] = useState(0);
-  const retryTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const retryCountRef = useRef(0);
-  const MAX_RETRIES = 5;
 
   // Recent searches state
   const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([]);
@@ -116,32 +73,32 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
         // Check version compatibility
         if (state.version === STORAGE_VERSION) {
           if (state.results && state.results.length > 0) {
-            setResults(state.results);
+            hook.setResults(state.results);
           }
           if (state.expandedIndex !== undefined) {
-            setExpandedIndex(state.expandedIndex);
+            hook.setExpandedIndex(state.expandedIndex);
           }
           if (state.sendStatuses) {
-            setSendStatuses(arrayToMap(state.sendStatuses));
+            hook.setSendStatuses(arrayToMap(state.sendStatuses));
           }
           if (state.showBulkReview !== undefined) {
-            setShowBulkReview(state.showBulkReview);
+            hook.setShowBulkReview(state.showBulkReview);
           }
           if (state.generatingStatuses) {
-            setGeneratingStatuses(arrayToMap(state.generatingStatuses));
+            hook.setGeneratingStatuses(arrayToMap(state.generatingStatuses));
           }
           if (state.searchParams) {
-            setSearchParams(state.searchParams);
+            hook.setSearchParams(state.searchParams);
           }
           // Restore pagination state
           if (state.totalLoaded !== undefined) {
-            setTotalLoaded(state.totalLoaded);
+            hook.setTotalLoaded(state.totalLoaded);
           }
           if (state.hasMore !== undefined) {
-            setHasMore(state.hasMore);
+            hook.setHasMore(state.hasMore);
           }
           if (state.hiddenCount !== undefined) {
-            setHiddenCount(state.hiddenCount);
+            hook.setHiddenCount(state.hiddenCount);
           }
         } else {
           sessionStorage.removeItem(STORAGE_KEY);
@@ -155,13 +112,14 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
         // Ignore errors clearing
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Debounced save to sessionStorage
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    if (results.length > 0) {
+    if (hook.results.length > 0) {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
       }
@@ -180,20 +138,20 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
             }
           }
           // Use current searchParams state if available, otherwise use existing from storage
-          const paramsToSave = searchParams || existingSearchParams;
+          const paramsToSave = hook.searchParams || existingSearchParams;
 
           const state: SearchPageState = {
             version: STORAGE_VERSION,
-            results,
-            expandedIndex,
-            sendStatuses: mapToArray(sendStatuses),
-            showBulkReview,
-            generatingStatuses: mapToArray(generatingStatuses),
-            remainingDaily,
+            results: hook.results,
+            expandedIndex: hook.expandedIndex,
+            sendStatuses: mapToArray(hook.sendStatuses),
+            showBulkReview: hook.showBulkReview,
+            generatingStatuses: mapToArray(hook.generatingStatuses),
+            remainingDaily: hook.remainingDaily,
             searchParams: paramsToSave,
-            totalLoaded,
-            hasMore,
-            hiddenCount,
+            totalLoaded: hook.totalLoaded,
+            hasMore: hook.hasMore,
+            hiddenCount: hook.hiddenCount,
             savedAt: Date.now(),
           };
           sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -208,16 +166,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [results, expandedIndex, sendStatuses, showBulkReview, generatingStatuses, remainingDaily, searchParams, totalLoaded, hasMore, hiddenCount]);
-
-  // Cleanup retry timer on unmount
-  useEffect(() => {
-    return () => {
-      if (retryTimerRef.current) {
-        clearTimeout(retryTimerRef.current);
-      }
-    };
-  }, []);
+  }, [hook.results, hook.expandedIndex, hook.sendStatuses, hook.showBulkReview, hook.generatingStatuses, hook.remainingDaily, hook.searchParams, hook.totalLoaded, hook.hasMore, hook.hiddenCount]);
 
   // Fetch recent searches on mount
   useEffect(() => {
@@ -226,28 +175,6 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
       .catch(() => {})
       .finally(() => setIsLoadingRecent(false));
   }, []);
-
-  // Load templates when session is ready
-  useEffect(() => {
-    if (sessionStatus !== 'authenticated') return;
-    const loadTemplates = async () => {
-      const result = await getTemplatesAction();
-      const hardcoded = EMAIL_TEMPLATES[0];
-      if (result.success) {
-        const combined: TemplateData[] = [
-          ...result.templates,
-          { id: hardcoded.id, name: hardcoded.name, subject: hardcoded.subject, body: hardcoded.body, isDefault: false, attachResume: false, resumeId: null, createdAt: new Date() },
-        ];
-        setTemplates(combined);
-        const defaultT = result.templates.find((t) => t.isDefault);
-        setDefaultTemplateId(defaultT?.id || result.templates[0]?.id || hardcoded.id);
-      } else {
-        setTemplates([{ id: hardcoded.id, name: hardcoded.name, subject: hardcoded.subject, body: hardcoded.body, isDefault: false, attachResume: false, resumeId: null, createdAt: new Date() }]);
-        setDefaultTemplateId(hardcoded.id);
-      }
-    };
-    loadTemplates();
-  }, [sessionStatus]);
 
   const handleRecentSearchClick = (search: RecentSearch) => {
     setFormPrefill({
@@ -258,13 +185,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
     });
   };
 
-  const handleSearch = async (params: {
-    company?: string;
-    role?: string;
-    university?: string;
-    location?: string;
-    limit: number;
-  }) => {
+  const handleSearch = async (params: SearchParams) => {
     try {
       sessionStorage.removeItem(STORAGE_KEY);
     } catch (error) {
@@ -273,22 +194,13 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
 
     setIsSearching(true);
     setError(null);
-    setResults([]);
-    setSendStatuses(new Map());
-    setSendErrors(new Map());
-    setTotalLoaded(0);
-    setHasMore(true);
-    setHiddenCount(0);
+    hook.resetResults();
     setFormPrefill(null);
 
     const result = await searchPeopleAction({ ...params });
 
     if (result.success) {
-      setResults(result.results);
-      setTotalLoaded(result.results.length);
-      setHasMore(result.searchMeta.hasMore);
-      setHiddenCount(result.hiddenCount);
-      setSearchParams(params);
+      hook.applySearchResults(result.results, result.searchMeta, result.hiddenCount, params);
       setIsSearching(false);
 
       // Save to sessionStorage
@@ -300,7 +212,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
           sendStatuses: [],
           showBulkReview: false,
           generatingStatuses: [],
-          remainingDaily,
+          remainingDaily: hook.remainingDaily,
           searchParams: params,
           totalLoaded: result.results.length,
           hasMore: result.searchMeta.hasMore,
@@ -330,225 +242,14 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
     }
   };
 
-  const handleSendFromReview = async (index: number, subject: string, body: string): Promise<boolean> => {
-    const person = results[index];
-    if (!person.userCandidateId) return false;
-
-    setSendStatuses((prev) => new Map(prev).set(person.id, 'pending'));
-
-    const personToSend: PersonToSend = {
-      email: person.email || undefined,
-      subject,
-      body,
-      userCandidateId: person.userCandidateId,
-      resumeId: person.resumeId ?? undefined,
-    };
-
-    const result = await sendSingleEmailAction(personToSend);
-
-    setSendStatuses((prev) =>
-      new Map(prev).set(person.id, result.success ? 'success' : 'failed')
-    );
-
-    // Update local state with resolved email from send result
-    if (result.success && result.email && result.email !== 'unknown') {
-      setResults((prev) =>
-        prev.map((r) =>
-          r.id === person.id ? { ...r, email: result.email, emailStatus: r.emailStatus === 'MISSING' ? 'UNVERIFIED' as const : r.emailStatus } : r
-        )
-      );
-    }
-
-    if (result.success) {
-      setRemainingDaily((prev) => Math.max(0, prev - 1));
-      dispatchCreditsChanged(); // Update header credits display
-      return true;
-    } else if (result.error === 'LIMIT_REACHED') {
-      setShowLimitModal(true);
-      setLimitReached(true);
-    } else {
-      setSendErrors((prev) => new Map(prev).set(person.id, result.error || 'Failed to send email'));
-    }
-    return false;
-  };
-
-  const handleBulkSend = async (emails: { index: number; subject: string; body: string }[]) => {
-    const peopleToSend = emails
-      .map(({ index, subject, body }) => {
-        const person = results[index];
-        if (!person.userCandidateId) return null;
-        return {
-          email: person.email || undefined,
-          subject,
-          body,
-          userCandidateId: person.userCandidateId,
-          resumeId: person.resumeId ?? undefined,
-        };
-      })
-      .filter((p): p is NonNullable<typeof p> => p !== null);
-
-    if (peopleToSend.length === 0) return;
-
-    setIsSending(true);
-
-    const newStatuses = new Map(sendStatuses);
-    emails.forEach(({ index }) => {
-      const person = results[index];
-      if (person.userCandidateId && !sendStatuses.has(person.id)) {
-        newStatuses.set(person.id, 'pending');
-      }
-    });
-    setSendStatuses(newStatuses);
-
-    const result = await sendEmailsAction(peopleToSend);
-
-    if (result.success) {
-      const updatedStatuses = new Map(newStatuses);
-      let hitLimit = false;
-      result.results.forEach((res) => {
-        // Match by email or by index position for people who had no email pre-send
-        const person = results.find((r) => r.email === res.email) ||
-          results.find((r) => !sendStatuses.has(r.id) && !r.email);
-        if (person) {
-          updatedStatuses.set(person.id, res.success ? 'success' : 'failed');
-        }
-        if (!res.success && res.error === 'LIMIT_REACHED') {
-          hitLimit = true;
-        }
-      });
-      setSendStatuses(updatedStatuses);
-
-      if (hitLimit) {
-        setShowLimitModal(true);
-        setLimitReached(true);
-      }
-
-      const successCount = result.results.filter((r) => r.success).length;
-      setRemainingDaily((prev) => Math.max(0, prev - successCount));
-      if (successCount > 0) {
-        dispatchCreditsChanged(); // Update header credits display
-      }
-    }
-
-    setIsSending(false);
-  };
-
-  const handleHidePerson = async (userCandidateId: string) => {
-    const result = await hidePersonAction(userCandidateId);
-
-    if (result.success) {
-      setResults((prev) => prev.filter((r) => r.userCandidateId !== userCandidateId));
-      setHiddenCount((prev) => prev + 1);
-    } else {
-      setError(result.error || 'Failed to hide person');
-    }
-  };
-
-  const handleTemplateChange = async (templateId: string, personIndex: number) => {
-    const person = results[personIndex];
-    if (!person?.userCandidateId) return;
-
-    setIsRegenerating(true);
-    const result = await regenerateDraftAction({
-      userCandidateId: person.userCandidateId,
-      templateId,
-    });
-
-    if (result.success) {
-      setResults((prev) =>
-        prev.map((r, i) =>
-          i === personIndex
-            ? { ...r, draftSubject: result.subject, draftBody: result.body, resumeId: result.resumeId }
-            : r
-        )
-      );
-    } else {
-      setToast({ message: result.error || 'Failed to regenerate draft', type: 'error' });
-    }
-    setIsRegenerating(false);
-  };
-
-  const handleApplyTemplateToAll = async (templateId: string) => {
-    setIsRegenerating(true);
-    const sendable = results
-      .map((r, i) => ({ r, i }))
-      .filter(({ r }) => r.userCandidateId && !sendStatuses.has(r.id));
-
-    const promises = sendable.map(({ r }) =>
-      regenerateDraftAction({ userCandidateId: r.userCandidateId!, templateId })
-    );
-    const outcomes = await Promise.all(promises);
-
-    setResults((prev) => {
-      const updated = [...prev];
-      sendable.forEach(({ i }, idx) => {
-        const outcome = outcomes[idx];
-        if (outcome.success) {
-          updated[i] = { ...updated[i], draftSubject: outcome.subject, draftBody: outcome.body, resumeId: outcome.resumeId };
-        }
-      });
-      return updated;
-    });
-    setIsRegenerating(false);
-  };
-
-  const handleLoadMore = useCallback(async () => {
-    if (!searchParams?.company || isLoadingMore || !hasMore) return;
-
-    setIsLoadingMore(true);
-    setIsRetrying(false);
-    try {
-      const result = await loadMorePeopleAction({
-        company: searchParams.company,
-        role: searchParams.role,
-        university: searchParams.university,
-        location: searchParams.location,
-        limit: searchParams.limit,
-        excludePersonIds: results.map(r => r.id),
-      });
-
-      if (result.success) {
-        if (result.results.length > 0) {
-          // Got results — append and reset retry count
-          setResults(prev => [...prev, ...result.results]);
-          setTotalLoaded(prev => prev + result.results.length);
-          setHasMore(result.loadMoreMeta.hasMore);
-          retryCountRef.current = 0;
-        } else if (result.loadMoreMeta.prescrapeRunning && retryCountRef.current < MAX_RETRIES) {
-          // 0 results but prescrape still running — auto-retry after delay
-          retryCountRef.current++;
-          setIsRetrying(true);
-          setIsLoadingMore(false);
-          console.log(`[LoadMore] Prescrape running, retrying in 3s (attempt ${retryCountRef.current}/${MAX_RETRIES})`);
-          retryTimerRef.current = setTimeout(() => {
-            handleLoadMore();
-          }, 3000);
-          return; // Don't clear isLoadingMore below — the retry will handle it
-        } else {
-          // No results and prescrape done (or retries exhausted)
-          setHasMore(false);
-          retryCountRef.current = 0;
-        }
-      } else {
-        setToast({ message: result.error || 'Failed to load more profiles', type: 'error' });
-      }
-    } catch (err) {
-      console.error('[LoadMore] Error:', err);
-      setToast({ message: 'Failed to load more profiles', type: 'error' });
-    }
-
-    setIsRetrying(false);
-    setIsLoadingMore(false);
-  }, [searchParams, isLoadingMore, hasMore, results]);
-
   return (
     <div className="relative">
       <SearchForm
         onSearch={handleSearch}
         isLoading={isSearching}
-        initialParams={formPrefill || searchParams}
-        disabled={limitReached}
-        onDisabledClick={() => setShowLimitModal(true)}
+        initialParams={formPrefill || hook.searchParams}
+        disabled={hook.limitReached}
+        onDisabledClick={() => hook.setShowLimitModal(true)}
       />
 
       {/* Recent searches — always visible below the form for quick re-runs */}
@@ -588,7 +289,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
       {isSearching && <SearchLoadingState />}
 
       {/* Pre-search empty state */}
-      {!isSearching && !error && results.length === 0 && !searchParams && (
+      {!isSearching && !error && hook.results.length === 0 && !hook.searchParams && (
         <div className="flex flex-col items-center justify-center py-16 animate-fade-in">
           {/* Illustration: three connected profile nodes */}
           <div className="relative w-40 h-32 mb-6">
@@ -648,7 +349,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
         </div>
       )}
 
-      {!isSearching && !error && results.length === 0 && searchParams && (
+      {!isSearching && !error && hook.results.length === 0 && hook.searchParams && (
         <div className="flex flex-col items-center justify-center py-16 text-surface-500">
           <svg className="w-12 h-12 mb-4 text-surface-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
@@ -658,43 +359,43 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
         </div>
       )}
 
-      {results.length > 0 && expandedIndex === null && !showBulkReview && (
+      {hook.results.length > 0 && hook.expandedIndex === null && !hook.showBulkReview && (
         <>
           <HiddenPeopleBar
-            hiddenCount={hiddenCount}
-            onCountChange={(delta) => setHiddenCount((prev) => prev + delta)}
-            onUnhide={(person) => setResults((prev) => [...prev, person])}
+            hiddenCount={hook.hiddenCount}
+            onCountChange={(delta) => hook.setHiddenCount((prev) => prev + delta)}
+            onUnhide={(person) => hook.setResults((prev) => [...prev, person])}
           />
           <ResultsList
-            results={results}
-            onReviewAndSend={() => setShowBulkReview(true)}
-            onExpand={setExpandedIndex}
-            onHide={handleHidePerson}
-            isSending={isSending}
+            results={hook.results}
+            onReviewAndSend={() => hook.setShowBulkReview(true)}
+            onExpand={hook.setExpandedIndex}
+            onHide={hook.handleHidePerson}
+            isSending={hook.isSending}
             sendingIndex={undefined}
-            sendStatuses={sendStatuses}
-            limitReached={limitReached}
-            onLimitReached={() => setShowLimitModal(true)}
+            sendStatuses={hook.sendStatuses}
+            limitReached={hook.limitReached}
+            onLimitReached={() => hook.setShowLimitModal(true)}
           />
 
           {/* Load More Button */}
-          {hasMore && !isSearching && (
+          {hook.hasMore && !isSearching && (
             <div className="flex flex-col items-center mt-6 gap-1">
               <button
-                onClick={handleLoadMore}
-                disabled={isLoadingMore || isRetrying}
+                onClick={hook.handleLoadMore}
+                disabled={hook.isLoadingMore || hook.isRetrying}
                 className="btn-secondary flex items-center gap-2"
               >
-                {isLoadingMore || isRetrying ? (
+                {hook.isLoadingMore || hook.isRetrying ? (
                   <>
                     <LoadingSpinner size="sm" />
-                    {isRetrying ? 'Still searching for profiles...' : 'Loading...'}
+                    {hook.isRetrying ? 'Still searching for profiles...' : 'Loading...'}
                   </>
                 ) : (
                   'Load More Profiles'
                 )}
               </button>
-              {isRetrying && (
+              {hook.isRetrying && (
                 <p className="text-sm text-surface-500">
                   Background search is still finding profiles. Retrying automatically...
                 </p>
@@ -703,7 +404,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
           )}
 
           {/* No More Results Message */}
-          {!hasMore && (
+          {!hook.hasMore && (
             <p className="text-center text-surface-500 mt-6">
               No more profiles available
             </p>
@@ -711,56 +412,56 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
         </>
       )}
 
-      {expandedIndex !== null && (
+      {hook.expandedIndex !== null && (
         <ExpandedReview
-          results={results}
-          currentIndex={expandedIndex}
-          onClose={() => setExpandedIndex(null)}
-          onSend={handleSendFromReview}
-          sendStatuses={sendStatuses}
-          sendErrors={sendErrors}
-          templates={templates}
-          defaultTemplateId={defaultTemplateId}
-          onTemplateChange={handleTemplateChange}
-          isRegenerating={isRegenerating}
-          limitReached={limitReached}
-          onLimitReached={() => setShowLimitModal(true)}
+          results={hook.results}
+          currentIndex={hook.expandedIndex}
+          onClose={() => hook.setExpandedIndex(null)}
+          onSend={hook.handleSendFromReview}
+          sendStatuses={hook.sendStatuses}
+          sendErrors={hook.sendErrors}
+          templates={hook.templates}
+          defaultTemplateId={hook.defaultTemplateId}
+          onTemplateChange={hook.handleTemplateChange}
+          isRegenerating={hook.isRegenerating}
+          limitReached={hook.limitReached}
+          onLimitReached={() => hook.setShowLimitModal(true)}
           onDraftGenerated={(idx, subject, body) => {
-            setResults((prev) => prev.map((r, i) =>
+            hook.setResults((prev) => prev.map((r, i) =>
               i === idx ? { ...r, draftSubject: subject, draftBody: body, llmDraftGenerated: true } : r
             ));
           }}
         />
       )}
 
-      {showBulkReview && (
+      {hook.showBulkReview && (
         <BulkReview
-          results={results}
-          onClose={() => setShowBulkReview(false)}
-          onSendAll={handleBulkSend}
-          sendStatuses={sendStatuses}
-          templates={templates}
-          onApplyTemplateToAll={handleApplyTemplateToAll}
-          isRegenerating={isRegenerating}
+          results={hook.results}
+          onClose={() => hook.setShowBulkReview(false)}
+          onSendAll={hook.handleBulkSend}
+          sendStatuses={hook.sendStatuses}
+          templates={hook.templates}
+          onApplyTemplateToAll={hook.handleApplyTemplateToAll}
+          isRegenerating={hook.isRegenerating}
         />
       )}
 
-      {toast && (
+      {hook.toast && (
         <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
+          message={hook.toast.message}
+          type={hook.toast.type}
+          onClose={() => hook.setToast(null)}
         />
       )}
 
       <LimitReachedModal
-        isOpen={showLimitModal}
-        onClose={() => setShowLimitModal(false)}
+        isOpen={hook.showLimitModal}
+        onClose={() => hook.setShowLimitModal(false)}
         onCreditsAwarded={(credits) => {
-          setRemainingDaily((prev) => prev + credits);
-          setLimitReached(false);
-          setToast({ message: `+${credits} email credits added!`, type: 'success' });
-          dispatchCreditsChanged(); // Update header credits display
+          hook.setRemainingDaily((prev) => prev + credits);
+          hook.setLimitReached(false);
+          hook.setToast({ message: `+${credits} email credits added!`, type: 'success' });
+          dispatchCreditsChanged();
         }}
       />
     </div>
