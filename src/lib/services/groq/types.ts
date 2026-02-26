@@ -2,6 +2,9 @@
  * Types for Groq LLM service
  */
 
+import { GroqAction } from '@prisma/client';
+export { GroqAction } from '@prisma/client';
+
 export type GroqModel =
   | 'llama-3.1-8b-instant'    // Fast, cheap - good for extraction
   | 'llama-3.3-70b-versatile'; // More capable - complex reasoning
@@ -17,6 +20,7 @@ export interface GroqCompletionRequest {
   systemPrompt?: string;
   userPrompt: string;
   options?: GroqRequestOptions;
+  metadata?: { userId?: string; action: GroqAction };
 }
 
 export interface GroqCompletionResponse<T = string> {

@@ -16,6 +16,7 @@ import {
   GroqJsonParseError,
   GroqApiError,
 } from './errors';
+import { logGroqUsage } from './logging';
 
 // Default configuration
 const DEFAULT_MODEL: GroqModel = 'llama-3.1-8b-instant';
@@ -135,7 +136,7 @@ async function executeWithRetry<T>(
 export async function complete(
   request: GroqCompletionRequest
 ): Promise<GroqCompletionResponse<string>> {
-  const { systemPrompt, userPrompt, options = {} } = request;
+  const { systemPrompt, userPrompt, options = {}, metadata } = request;
   const {
     model = DEFAULT_MODEL,
     temperature = DEFAULT_TEMPERATURE,
@@ -152,26 +153,52 @@ export async function complete(
   }
   messages.push({ role: 'user', content: userPrompt });
 
-  const completion = await executeWithRetry(() =>
-    client.chat.completions.create({
-      model,
-      messages,
-      temperature,
-      max_tokens: maxTokens,
-      response_format: jsonMode ? { type: 'json_object' } : undefined,
-    })
-  );
+  const startTime = Date.now();
+
+  let completion;
+  try {
+    completion = await executeWithRetry(() =>
+      client.chat.completions.create({
+        model,
+        messages,
+        temperature,
+        max_tokens: maxTokens,
+        response_format: jsonMode ? { type: 'json_object' } : undefined,
+      })
+    );
+  } catch (error) {
+    const durationMs = Date.now() - startTime;
+    if (metadata) {
+      // Fire-and-forget error log
+      logGroqUsage(
+        metadata,
+        { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+        model,
+        durationMs,
+        true
+      );
+    }
+    throw error;
+  }
 
   const content = completion.choices[0]?.message?.content || '';
   const usage = completion.usage;
+  const durationMs = Date.now() - startTime;
+
+  const usageData = {
+    promptTokens: usage?.prompt_tokens || 0,
+    completionTokens: usage?.completion_tokens || 0,
+    totalTokens: usage?.total_tokens || 0,
+  };
+
+  if (metadata) {
+    // Fire-and-forget success log
+    logGroqUsage(metadata, usageData, completion.model, durationMs);
+  }
 
   return {
     content,
-    usage: {
-      promptTokens: usage?.prompt_tokens || 0,
-      completionTokens: usage?.completion_tokens || 0,
-      totalTokens: usage?.total_tokens || 0,
-    },
+    usage: usageData,
     model: completion.model,
   };
 }
