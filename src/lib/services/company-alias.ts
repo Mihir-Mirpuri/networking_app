@@ -82,6 +82,7 @@ export async function resolveCompanyAliases(input: string): Promise<ResolvedComp
         temperature: 0.1,
         maxTokens: 200,
       },
+      metadata: { action: 'COMPANY_ALIAS' },
     });
 
     const canonicalName = response.content.canonicalName || input;

@@ -7,6 +7,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { usePolling } from '@/hooks/usePolling';
 import { getPendingSuggestionsCountAction } from '@/app/actions/meetingSuggestions';
 import { getCreditStatusAction } from '@/app/actions/invitations';
+import { getIsAmbassadorAction } from '@/app/actions/referral';
 import { createCheckoutSession } from '@/app/actions/subscription';
 import { CREDITS_CHANGED_EVENT } from '@/components/credits';
 import {
@@ -14,6 +15,7 @@ import {
   ClockIcon,
   CalendarDaysIcon,
   UserCircleIcon,
+  MegaphoneIcon,
 } from '@heroicons/react/24/outline';
 
 interface CreditStatus {
@@ -30,6 +32,7 @@ export function Header() {
   const prevPathnameRef = useRef(pathname);
   const [credits, setCredits] = useState<CreditStatus | null>(null);
   const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
+  const [isAmbassador, setIsAmbassador] = useState(false);
 
   const loadCredits = useCallback(async () => {
     const result = await getCreditStatusAction();
@@ -48,6 +51,7 @@ export function Header() {
   useEffect(() => {
     if (session?.user) {
       loadCredits();
+      getIsAmbassadorAction().then(setIsAmbassador);
     }
   }, [session?.user, loadCredits]);
 
@@ -78,6 +82,7 @@ export function Header() {
     // TEMPORARILY DISABLED: gmail.readonly scope removed — Calendar has no utility without it
     // { name: 'Calendar', href: '/calendar', icon: CalendarDaysIcon, badge: pendingSuggestionsCount ?? 0 },
     { name: 'Profile', href: '/profile', icon: UserCircleIcon },
+    ...(isAmbassador ? [{ name: 'Ambassador', href: '/ambassador', icon: MegaphoneIcon }] : []),
   ];
 
   const renderNavContent = () => {

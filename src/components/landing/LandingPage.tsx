@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { signIn } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
 import {
@@ -488,6 +489,17 @@ export function LandingPage() {
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get('callbackUrl') || '/';
   const error = searchParams.get('error');
+  const ref = searchParams.get('ref');
+
+  useEffect(() => {
+    if (!ref) return;
+    document.cookie = `signl_ref=${encodeURIComponent(ref)}; path=/; max-age=${30 * 24 * 60 * 60}; SameSite=Lax`;
+    fetch('/api/referral/click', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: ref }),
+    }).catch(() => {});
+  }, [ref]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-surface-50 via-white to-primary-50/30">

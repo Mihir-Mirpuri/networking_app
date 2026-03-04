@@ -1,5 +1,6 @@
-import Groq from 'groq-sdk';
 import { createClient } from '@supabase/supabase-js';
+import { completeJson } from '@/lib/services/groq';
+import { GroqAction } from '@prisma/client';
 
 export interface ResumeSummary {
   organizations: string[];
@@ -65,7 +66,8 @@ async function extractResumeText(fileUrl: string, mimeType: string): Promise<str
  */
 export async function summarizeResume(
   fileUrl: string,
-  mimeType: string
+  mimeType: string,
+  userId?: string
 ): Promise<ResumeSummary> {
   // Extract text from the resume
   const resumeText = await extractResumeText(fileUrl, mimeType);
@@ -94,28 +96,18 @@ Return a JSON object with these exact keys:
 
 Be concise. Only include notable items, not generic ones. Return ONLY valid JSON, no other text.`;
 
-  const groq = new Groq({
-    apiKey: process.env.GROQ_API_KEY,
-  });
-
-  const completion = await groq.chat.completions.create({
-    messages: [{ role: 'user', content: prompt }],
-    model: 'llama-3.3-70b-versatile',
-    temperature: 0.3,
-    max_tokens: 512,
-  });
-
-  const response = completion.choices[0]?.message?.content || '';
-
-  // Parse JSON response
   try {
-    // Extract JSON from response (in case there's extra text)
-    const jsonMatch = response.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error('No JSON found in response');
-    }
-    const parsed = JSON.parse(jsonMatch[0]) as ResumeSummary;
-    return parsed;
+    const response = await completeJson<ResumeSummary>({
+      userPrompt: prompt,
+      options: {
+        model: 'llama-3.3-70b-versatile',
+        temperature: 0.3,
+        maxTokens: 512,
+      },
+      metadata: { userId, action: 'RESUME_PARSE' as GroqAction },
+    });
+
+    return response.content;
   } catch {
     // Return empty summary if parsing fails
     return {

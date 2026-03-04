@@ -69,6 +69,18 @@ export async function POST(req: NextRequest) {
           });
 
           console.log(`Subscription activated for customer: ${session.customer}`);
+
+          // Track referral paid conversion
+          const subscribedUser = await prisma.user.findUnique({
+            where: { stripeCustomerId: session.customer as string },
+            select: { referralLinkId: true },
+          });
+          if (subscribedUser?.referralLinkId) {
+            await prisma.referralLink.update({
+              where: { id: subscribedUser.referralLinkId },
+              data: { paidCount: { increment: 1 } },
+            });
+          }
         }
         break;
       }

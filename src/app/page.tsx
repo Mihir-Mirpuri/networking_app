@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { Header } from '@/components/Header';
 import { HomeTabs } from '@/components/home/HomeTabs';
 import { LandingPage } from '@/components/landing/LandingPage';
+import { ReferralCapture } from '@/components/ReferralCapture';
 import prisma from '@/lib/prisma';
 
 const DAILY_LIMIT = 30;
@@ -65,6 +66,7 @@ export default async function HomePage() {
   return (
     <div className="min-h-screen bg-surface-50">
       <Header />
+      <ReferralCapture />
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <HomeTabs initialRemainingDaily={remainingDaily} />
       </main>

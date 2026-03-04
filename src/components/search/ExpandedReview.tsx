@@ -122,6 +122,9 @@ export function ExpandedReview({
   const [isRefining, setIsRefining] = useState(false);
   const [isGeneratingDraft, setIsGeneratingDraft] = useState(false);
   const userEditedRef = useRef(false);
+  const [originalSubject, setOriginalSubject] = useState(initialDraft ? (person?.draftSubject || '') : '');
+  const [originalBody, setOriginalBody] = useState(initialDraft ? (person?.draftBody || '') : '');
+  const [hasRefined, setHasRefined] = useState(false);
 
   // Synchronous state reset when person changes (avoids one-frame flash of stale draft)
   const [prevIndex, setPrevIndex] = useState(internalIndex);
@@ -137,6 +140,9 @@ export function ExpandedReview({
     }
     setRefineInstruction('');
     userEditedRef.current = false;
+    setOriginalSubject(nextPerson?.draftSubject || '');
+    setOriginalBody(nextPerson?.draftBody || '');
+    setHasRefined(false);
   }
 
   // Trigger LLM generation for current person
@@ -152,6 +158,9 @@ export function ExpandedReview({
         if (result.success && !userEditedRef.current && personId === results[idx]?.id) {
           setSubject(result.subject);
           setBody(result.body);
+          setOriginalSubject(result.subject);
+          setOriginalBody(result.body);
+          setHasRefined(false);
           onDraftGenerated?.(idx, result.subject, result.body);
         }
       }).catch((err) => {
@@ -336,6 +345,7 @@ export function ExpandedReview({
         setSubject(result.subject);
         setBody(result.body);
         setRefineInstruction('');
+        setHasRefined(true);
       }
     } catch (err) {
       console.error('Refine error:', err);
@@ -538,6 +548,22 @@ export function ExpandedReview({
               </svg>
               Refine
             </button>
+            {hasRefined && (
+              <button
+                onClick={() => {
+                  setSubject(originalSubject);
+                  setBody(originalBody);
+                  setHasRefined(false);
+                }}
+                className="btn-secondary text-sm flex items-center gap-1.5 shrink-0 text-surface-500 hover:text-surface-700"
+                title="Restore original draft"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a5 5 0 015 5v2M3 10l4-4M3 10l4 4" />
+                </svg>
+                Restore
+              </button>
+            )}
           </div>
 
           {/* Resume Attachment Indicator */}

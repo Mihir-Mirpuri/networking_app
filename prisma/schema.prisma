@@ -80,6 +80,9 @@ model User {
   searchLogs                 SearchLog[]
   invitations                Invitation[]
   groqUsageLogs              GroqUsageLog[]
+  referralLinkId             String?
+  referralLink               ReferralLink?   @relation("ReferredViaLink", fields: [referralLinkId], references: [id], onDelete: SetNull)
+  ambassadorLinks            ReferralLink[]  @relation("AmbassadorLinks")
 }
 
 model VerificationToken {
@@ -609,6 +612,30 @@ model CompanyAlias {
   updatedAt     DateTime @default(now()) @updatedAt
 
   @@index([canonicalName])
+}
+
+enum ReferralLinkType {
+  AMBASSADOR
+  QR_CODE
+}
+
+model ReferralLink {
+  id          String           @id @default(cuid())
+  code        String           @unique
+  type        ReferralLinkType
+  label       String
+  userId      String?
+  isActive    Boolean          @default(true)
+  clickCount  Int              @default(0)
+  signupCount Int              @default(0)
+  paidCount   Int              @default(0)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @default(now()) @updatedAt
+
+  user    User?  @relation("AmbassadorLinks", fields: [userId], references: [id], onDelete: SetNull)
+  signups User[] @relation("ReferredViaLink")
+
+  @@index([type])
 }
 
 enum GroqAction {

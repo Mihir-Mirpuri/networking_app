@@ -1618,6 +1618,7 @@ export async function regenerateDraftAction(input: {
         referenceTemplate: placeholderDraft,
         sentEmailExamples,
         customInstructions: user.emailInstructions || undefined,
+        userId,
       });
     } catch (err) {
       console.warn('[RegenerateDraft] LLM generation failed, using placeholder:', err);
@@ -1707,6 +1708,7 @@ export async function generateLLMDraftAction(input: {
       referenceTemplate: placeholderDraft,
       sentEmailExamples,
       customInstructions: user.emailInstructions || undefined,
+      userId,
     });
 
     // Save to DB so subsequent visits show the LLM draft
@@ -1762,6 +1764,7 @@ export async function refineDraftAction(input: {
         company: person.company,
         role: person.role,
       },
+      userId: session.user.id,
     });
 
     return { success: true, subject: result.subject, body: result.body };
