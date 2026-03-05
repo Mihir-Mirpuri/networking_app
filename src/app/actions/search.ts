@@ -151,6 +151,37 @@ interface PersonWithSource {
   }>;
 }
 
+/**
+ * Interleave ranked results by company for multi-company searches.
+ * Round-robins through companies so results are mixed rather than clustered.
+ * Preserves relative ranking within each company.
+ */
+function interleaveByCompany<T extends { candidate: { company: string } }>(
+  ranked: T[]
+): T[] {
+  // Group by normalized company name, preserving order within each group
+  const buckets = new Map<string, T[]>();
+  for (const item of ranked) {
+    const key = item.candidate.company.toLowerCase().trim();
+    if (!buckets.has(key)) buckets.set(key, []);
+    buckets.get(key)!.push(item);
+  }
+
+  // Round-robin across buckets
+  const result: T[] = [];
+  const iterators = Array.from(buckets.values()).map(b => ({ items: b, idx: 0 }));
+  let remaining = ranked.length;
+  while (remaining > 0) {
+    for (const it of iterators) {
+      if (it.idx < it.items.length) {
+        result.push(it.items[it.idx++]);
+        remaining--;
+      }
+    }
+  }
+  return result;
+}
+
 /** Resolved template shape used by generateEmailDraft */
 interface ResolvedTemplate {
   id: string;
@@ -507,6 +538,7 @@ export async function searchPeopleAction(
       console.log(`[Search] Guest user search`);
     }
 
+    console.log(`[Search] Input: companies=${JSON.stringify(companyList)}, role=${input.role}, limit=${input.limit}, isMultiCompany=${isMultiCompany}`);
     // Merge sent/hidden IDs with already-displayed IDs for a single DB-level NOT IN
     const allExcludedIds = input.excludePersonIds
       ? [...excludedIds, ...input.excludePersonIds]
@@ -525,6 +557,8 @@ export async function searchPeopleAction(
     }
 
     // ===== STEP 1: Query DB, enrich only if needed =====
+    // Overfetch for multi-company so each company gets representation before interleaving
+    const dbLimit = isMultiCompany ? input.limit * companyList.length : input.limit;
     const filters: PersonFilters = {
       company: primaryCompany,
       companies: isMultiCompany ? companyList : undefined,
@@ -534,12 +568,12 @@ export async function searchPeopleAction(
       university: input.university,
       requireEmail: false,
       excludePersonIds: allExcludedIds,
-      limit: input.limit,
+      limit: dbLimit,
     };
 
     // Query DB first — try free pattern enrichment if we don't have enough results
     let people = await findPeopleByFilters(filters);
-    console.log(`[Search] Found ${people.length} people in DB (need ${input.limit})`);
+    console.log(`[Search] Found ${people.length} people in DB (need ${dbLimit} for interleave, showing ${input.limit})`);
 
     if (people.length < input.limit) {
       // Not enough results — try free pattern enrichment, then re-query
@@ -649,6 +683,13 @@ export async function searchPeopleAction(
       );
       console.log(`[Search] Fallback mode: ranked top ${rankedPeople.length} candidates`);
     }
+
+    // ===== STEP 3b: Interleave companies for multi-company searches =====
+    if (isMultiCompany && rankedPeople.length > 1) {
+      rankedPeople = interleaveByCompany(rankedPeople);
+    }
+    // Slice to actual limit after interleaving (we overfetched for company diversity)
+    rankedPeople = rankedPeople.slice(0, input.limit);
 
     // ===== STEP 4: Build results with drafts =====
     let template: ResolvedTemplate;
@@ -1008,6 +1049,7 @@ export async function loadMorePeopleAction(
       allAliases = resolved.aliases;
     }
 
+    const dbLimit = isMultiCompany ? input.limit * companyList.length : input.limit;
     const filters: PersonFilters = {
       company: primaryCompany,
       companies: isMultiCompany ? companyList : undefined,
@@ -1017,7 +1059,7 @@ export async function loadMorePeopleAction(
       university: input.university,
       requireEmail: false,
       excludePersonIds: allExcludedIds,
-      limit: input.limit,
+      limit: dbLimit,
     };
 
     // Query DB first — try free pattern enrichment if not enough results
@@ -1072,6 +1114,12 @@ export async function loadMorePeopleAction(
       );
       console.log(`[LoadMore] Fallback mode: ranked top ${rankedPeople.length} candidates`);
     }
+
+    // Interleave companies for multi-company searches
+    if (isMultiCompany && rankedPeople.length > 1) {
+      rankedPeople = interleaveByCompany(rankedPeople);
+    }
+    rankedPeople = rankedPeople.slice(0, input.limit);
 
     // Build results with drafts
     const template = await resolveTemplateForUser(userId, input.templateId);
