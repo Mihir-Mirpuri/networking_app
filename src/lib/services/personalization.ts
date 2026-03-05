@@ -703,8 +703,12 @@ RESPONSE: [your brief, natural response to the user about what you changed]`;
 
   // Parse the response - handle various separator formats from LLM
   const subjectMatch = text.match(/SUBJECT:\s*([^\n]+)/);
-  const bodyMatch = text.match(/BODY:\s*([\s\S]*?)(?=\n---+\s*\n?RESPONSE:|\nRESPONSE:|\n---+\s*$|$)/);
-  const responseMatch = text.match(/RESPONSE:\s*([\s\S]+)$/);
+  // Match BODY content up to any separator line (---, RESPONSE:, or end)
+  const bodyMatch = text.match(/BODY:\s*([\s\S]*?)(?=\n---+|\nRESPONSE:|$)/);
+  // Match RESPONSE: with or without --- prefix
+  const responseMatch = text.match(/(?:---+\s*\n?)?RESPONSE:\s*([\s\S]+)$/);
+  // Also try to capture any text after --- if RESPONSE: is missing
+  const fallbackResponseMatch = !responseMatch ? text.match(/\n---+\s*\n([\s\S]+)$/) : null;
 
   const newSubject = subjectMatch?.[1]?.trim() || subject;
   let newBody = bodyMatch?.[1]?.trim() || body;
@@ -715,7 +719,12 @@ RESPONSE: [your brief, natural response to the user about what you changed]`;
     newBody = newBody.substring(0, responseLeakIdx).replace(/\n?---+\s*$/, '').trim();
   }
 
-  const assistantMessage = responseMatch?.[1]?.trim() || "I've updated your email.";
+  // Also strip any trailing --- and explanatory notes (LLM sometimes adds these without RESPONSE: prefix)
+  newBody = newBody.replace(/\n---+\s*[\s\S]*$/, '').trim();
+  // Strip any trailing "I shortened..." type notes that leaked without separator
+  newBody = newBody.replace(/\n+I (?:shortened|made|updated|changed|removed|added|edited|rewrote|revised)[\s\S]*$/i, '').trim();
+
+  const assistantMessage = responseMatch?.[1]?.trim() || fallbackResponseMatch?.[1]?.trim() || "I've updated your email.";
 
   return {
     subject: newSubject,
