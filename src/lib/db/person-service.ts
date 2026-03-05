@@ -591,6 +591,7 @@ const ROLE_ALIAS_GROUPS: string[][] = [
   ['project leader', 'pl'],
   ['associate principal', 'ap'],
   ['associate consultant', 'assoc consultant', 'assoc. consultant'],
+  ['consultant', 'consulting'],
 
   // Consulting — seniority variations (sr/senior/jr/junior)
   ['junior consultant', 'jr consultant', 'jr. consultant'],
@@ -845,11 +846,20 @@ export async function findPeopleByFilters(filters: PersonFilters): Promise<Perso
   if (role && role.trim() && isVectorRoleMatchingEnabled()) {
     const searchEmbedding = await getSearchRoleEmbedding(role);
     if (searchEmbedding) {
+      console.log(`[PersonService] Using VECTOR path for role="${role}" | company="${company}" | aliases=${filters.companyAliases?.length ?? 0} | limit=${limit}`);
       return findPeopleByFiltersVector(filters, searchEmbedding);
     }
+    console.warn(`[PersonService] Embedding FAILED for role="${role}" — falling back to ILIKE path`);
+  } else if (role && role.trim()) {
+    console.log(`[PersonService] Vector matching disabled (OPENAI_API_KEY=${!!process.env.OPENAI_API_KEY}, USE_VECTOR_ROLE_MATCHING=${process.env.USE_VECTOR_ROLE_MATCHING}) — using ILIKE path`);
+  } else {
+    console.log(`[PersonService] No role filter — using ILIKE path`);
   }
 
   // Fallback: existing Prisma path
+  const roleTerms = role ? getRoleSearchTerms(role) : [];
+  console.log(`[PersonService] ILIKE path: role="${role}" → terms=${JSON.stringify(roleTerms)} | company="${company}" | aliases=${filters.companyAliases?.length ?? 0} | limit=${limit}`);
+
   const schoolMatchIds = filters.university?.trim() ? await getSchoolMatchIds(filters.university) : undefined;
   const where = buildPersonWhereClause(filters, schoolMatchIds);
 
@@ -897,6 +907,8 @@ export async function findPeopleByFilters(filters: PersonFilters): Promise<Perso
     ],
     take: limit * 2, // Overfetch to compensate for post-query filtering
   });
+
+  console.log(`[ILIKEQuery] Raw rows returned: ${people.length}${people.length > 0 ? ` | top roles: ${people.slice(0, 3).map(p => p.role).join(', ')}` : ''}`);
 
   // If pre-resolved aliases were used, exact-match DB query is sufficient — skip post-filter
   if (filters.companyAliases && filters.companyAliases.length > 0) {
@@ -975,6 +987,8 @@ async function findPeopleByFiltersVector(
   const whereClause = Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}`;
   const fetchLimit = limit * 2; // Overfetch for post-query company filtering
 
+  console.log(`[VectorQuery] Filters: company=${company}, aliases=${filters.companyAliases?.length ?? 0}, location=${location}, university=${university}, requireEmail=${requireEmail}, excludeIds=${excludePersonIds?.length ?? 0}, threshold=0.50, fetchLimit=${fetchLimit}`);
+
   const rows = await prisma.$queryRaw<Array<{
     id: string;
     fullName: string;
@@ -1037,6 +1051,13 @@ async function findPeopleByFiltersVector(
       p."emailConfidence" DESC NULLS LAST
     LIMIT ${fetchLimit}
   `);
+
+  console.log(`[VectorQuery] Raw rows returned: ${rows.length}${rows.length > 0 ? ` | distance range: ${Number(rows[0].role_distance).toFixed(4)} → ${Number(rows[rows.length - 1].role_distance).toFixed(4)}` : ''}`);
+  if (rows.length > 0 && rows.length <= 5) {
+    console.log(`[VectorQuery] All results: ${rows.map(r => `${r.role}@${r.company}(d=${Number(r.role_distance).toFixed(3)})`).join(', ')}`);
+  } else if (rows.length > 5) {
+    console.log(`[VectorQuery] Top 3: ${rows.slice(0, 3).map(r => `${r.role}@${r.company}(d=${Number(r.role_distance).toFixed(3)})`).join(', ')}`);
+  }
 
   // If pre-resolved aliases were used, exact-match DB query is sufficient — skip post-filter
   const filtered = (filters.companyAliases && filters.companyAliases.length > 0)

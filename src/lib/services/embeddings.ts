@@ -30,15 +30,25 @@ function getOpenAIClient(): OpenAI | null {
  */
 export async function generateRoleEmbedding(role: string): Promise<number[] | null> {
   const client = getOpenAIClient();
-  if (!client) return null;
+  if (!client) {
+    console.warn(`[Embeddings] No OpenAI client (OPENAI_API_KEY missing)`);
+    return null;
+  }
 
-  const response = await client.embeddings.create({
-    model: MODEL,
-    input: role.trim(),
-    dimensions: DIMENSIONS,
-  });
-
-  return response.data[0].embedding;
+  try {
+    const start = Date.now();
+    const response = await client.embeddings.create({
+      model: MODEL,
+      input: role.trim(),
+      dimensions: DIMENSIONS,
+    });
+    console.log(`[Embeddings] Generated embedding for "${role}" in ${Date.now() - start}ms`);
+    return response.data[0].embedding;
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error(`[Embeddings] OpenAI API error for role="${role}": ${msg}`);
+    return null;
+  }
 }
 
 /**
