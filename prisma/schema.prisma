@@ -142,9 +142,10 @@ model Search {
   role                  String?
   university            String?
   location              String?
+  queryHash             String?        // SHA-256 hash of exact Serper query string for dedup
   // Scrape progress tracking
-  lastCsePageScraped    Int            @default(0)     // 0=none, 1=page1, 11=page2, 21=page3
-  cseExhausted          Boolean        @default(false)  // true when CSE returned <5 valid profiles
+  lastCsePageScraped    Int            @default(0)     // Now stores Serper page number (1,2,3...) not CSE start offset
+  cseExhausted          Boolean        @default(false)  // true when exhaustion detected
   // API usage stats (analytics)
   apolloCallsMade       Int            @default(0)
   apolloCacheHits       Int            @default(0)
@@ -160,6 +161,7 @@ model Search {
 
   @@index([createdAt])
   @@index([completedAt])
+  @@index([queryHash])
   @@index([company, name, role, university, location]) // Composite for param lookup
 }
 

@@ -7,6 +7,7 @@ import { areRolesAliased } from '@/lib/db/person-service';
 
 export interface SearchCriteria {
   company?: string;
+  companies?: string[];
   role?: string;
   location?: string;
   university?: string;
@@ -100,22 +101,28 @@ function jaccardSimilarity(set1: Set<string>, set2: Set<string>): number {
  * - Contains (either direction): 0.7
  * - No match: 0
  */
-export function scoreCompanyMatch(search: string | undefined, apollo: string | null): number {
-  if (!search || !search.trim()) return 0; // No search criteria
-  if (!apollo) return 0; // No Apollo data
+export function scoreCompanyMatch(search: string | string[] | undefined, apollo: string | null): number {
+  if (!search) return 0;
+  if (!apollo) return 0;
 
-  const searchNorm = normalize(search);
+  const searches = Array.isArray(search) ? search : [search];
   const apolloNorm = normalize(apollo);
+  let best = 0;
 
-  // Exact match
-  if (searchNorm === apolloNorm) return 1.0;
+  for (const s of searches) {
+    if (!s.trim()) continue;
+    const sn = normalize(s);
 
-  // Contains match (handles "Bain" vs "Bain & Company")
-  if (apolloNorm.includes(searchNorm) || searchNorm.includes(apolloNorm)) {
-    return 0.7;
+    // Exact match
+    if (sn === apolloNorm) return 1.0;
+
+    // Contains match (handles "Bain" vs "Bain & Company")
+    if (apolloNorm.includes(sn) || sn.includes(apolloNorm)) {
+      best = Math.max(best, 0.7);
+    }
   }
 
-  return 0;
+  return best;
 }
 
 /**
@@ -322,7 +329,7 @@ export function scoreCandidate(
   const weights = options?.vectorRoleMatching ? VECTOR_WEIGHTS : WEIGHTS;
 
   const breakdown: ScoreBreakdown = {
-    company: scoreCompanyMatch(criteria.company, candidate.company),
+    company: scoreCompanyMatch(criteria.companies || criteria.company, candidate.company),
     role: scoreRoleMatch(criteria.role, candidate.role),
     location: scoreLocationMatch(criteria.location, candidate.city, candidate.state, candidate.country),
     university: scoreUniversityMatch(criteria.university, candidate.educationSchool),

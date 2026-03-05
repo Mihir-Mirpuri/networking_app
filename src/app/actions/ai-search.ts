@@ -7,6 +7,7 @@ import { GroqAction } from '@prisma/client';
 
 export interface ParsedFilters {
   company?: string;
+  companies?: string[]; // Multiple companies for category queries (e.g., "top consulting firms")
   role?: string;
   university?: string;
   location?: string;
@@ -27,6 +28,7 @@ export interface ExtractFiltersInput {
 interface LLMResponse {
   filters: {
     company: string | null;
+    companies: string[] | null;
     role: string | null;
     university: string | null;
     location: string | null;
@@ -40,8 +42,9 @@ export type ExtractFiltersResult =
 
 const SYSTEM_PROMPT = `You are a search filter extraction assistant. Your job is to extract structured search filters from natural language queries about finding professional contacts.
 
-You must extract up to 4 filters:
-- company: The company/organization name (e.g., "Google", "McKinsey", "Goldman Sachs")
+You must extract up to 5 filters:
+- company: A single company/organization name (e.g., "Google", "McKinsey", "Goldman Sachs")
+- companies: An array of company names when the user asks about a category/industry (e.g., "top consulting firms" → ["McKinsey", "BCG", "Bain", "Deloitte", "Accenture"]). Max 5 companies.
 - role: The job role/title (e.g., "Product Manager", "Software Engineer", "Analyst")
 - university: The university/school name (e.g., "UT Austin", "Stanford", "MIT")
 - location: The city, state, or region (e.g., "Austin", "New York", "San Francisco")
@@ -50,12 +53,16 @@ RULES:
 1. Extract filters from the user's message. If a filter was previously set and the user doesn't mention it, KEEP the previous value.
 2. If the user says something like "try X instead" or "change to X", replace the relevant filter.
 3. If the user says "remove the role filter" or "any role", set that filter to null.
-4. If no company is extracted and none was previously set, your message MUST ask the user to specify a company.
+4. If no company or companies is extracted and none was previously set, your message MUST ask the user to specify a company.
 5. Be smart about interpreting queries: "PMs" = "Product Manager", "SWEs" = "Software Engineer", "bankers" = role in banking context.
-6. For university abbreviations: "UT" = "UT Austin", "MIT" = "MIT", "Stanford" = "Stanford University".
-7. Your message should be a brief, friendly confirmation of what you're searching for, or a clarifying question.
+6. "at [X]" almost always means company (e.g., "engineers at Meta" → company: "Meta"). "from [X]" almost always means university (e.g., "from Stanford" → university: "Stanford University").
+7. For university abbreviations: "UT" = "UT Austin", "MIT" = "MIT", "Stanford" = "Stanford University".
+8. Your message should be a brief, friendly confirmation of what you're searching for, or a clarifying question.
+9. Use "companies" (array) when the user mentions an industry or category like "consulting firms", "big tech", "investment banks", "FAANG", etc. Use "company" (single) when they name a specific company. When "companies" is set, "company" should be null.
+10. Max 5 companies in the array.
+11. IMPORTANT: Always extract a company when one is clearly mentioned. "at Meta", "at Google", "at McKinsey" = company. Never drop a clearly stated company.
 
-Respond with JSON: { "filters": { "company": string|null, "role": string|null, "university": string|null, "location": string|null }, "message": string }`;
+Respond with JSON: { "filters": { "company": string|null, "companies": string[]|null, "role": string|null, "university": string|null, "location": string|null }, "message": string }`;
 
 function buildUserPrompt(input: ExtractFiltersInput): string {
   const parts: string[] = [];
@@ -97,7 +104,7 @@ export async function extractSearchFiltersAction(
       options: {
         model: 'llama-3.1-8b-instant',
         temperature: 0.1,
-        maxTokens: 256,
+        maxTokens: 512,
       },
       metadata: {
         userId: session.user.id,
@@ -110,6 +117,12 @@ export async function extractSearchFiltersAction(
     // Convert nulls to undefined for clean filter objects
     const parsedFilters: ParsedFilters = {};
     if (filters.company) parsedFilters.company = filters.company;
+    if (filters.companies && Array.isArray(filters.companies) && filters.companies.length > 0) {
+      // Enforce max 5 companies guardrail
+      parsedFilters.companies = filters.companies.slice(0, 5);
+      // When companies is set, company should be cleared
+      delete parsedFilters.company;
+    }
     if (filters.role) parsedFilters.role = filters.role;
     if (filters.university) parsedFilters.university = filters.university;
     if (filters.location) parsedFilters.location = filters.location;

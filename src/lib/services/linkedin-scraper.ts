@@ -32,7 +32,7 @@ const MAX_CONCURRENT = 1; // Sequential batches (faster than concurrent due to a
  * School name normalization map
  * Maps sub-schools/business schools to their parent university
  */
-const SCHOOL_ALIASES: Record<string, string> = {
+export const SCHOOL_ALIASES: Record<string, string> = {
   // University of Chicago
   'booth school of business': 'University of Chicago',
   'the university of chicago booth school of business': 'University of Chicago',
@@ -140,7 +140,7 @@ const SCHOOL_ALIASES: Record<string, string> = {
 /**
  * Normalize school name to parent university
  */
-function normalizeSchool(schoolName: string): string {
+export function normalizeSchool(schoolName: string): string {
   if (!schoolName) return schoolName;
 
   let name = schoolName.trim();
