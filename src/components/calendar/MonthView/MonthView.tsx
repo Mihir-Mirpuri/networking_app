@@ -41,7 +41,7 @@ export function MonthView({
   });
 
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
+    <div className="bg-surface-100 rounded-lg shadow overflow-hidden">
       {/* Day name headers */}
       <div className="grid grid-cols-7 border-b border-gray-200">
         {DAY_NAMES.map((name) => (

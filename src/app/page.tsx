@@ -1,9 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { Header } from '@/components/Header';
-import { HomeTabs } from '@/components/home/HomeTabs';
-import { LandingPage } from '@/components/landing/LandingPage';
+import { AppWrapper } from '@/components/layout/AppWrapper';
 import prisma from '@/lib/prisma';
 
 const DAILY_LIMIT = 30;
@@ -29,12 +27,12 @@ async function getRemainingDailyLimit(userId: string): Promise<number> {
 export default async function HomePage() {
   const session = await getServerSession(authOptions);
 
+  // For unauthenticated users, show the app with welcome modal
   if (!session?.user?.id) {
-    return <LandingPage />;
+    return <AppWrapper initialRemainingDaily={0} />;
   }
 
-  // For testing: Force re-authentication if Account record doesn't exist
-  // This ensures users get new OAuth tokens with updated scopes
+  // For authenticated users, check account and onboarding
   const account = await prisma.account.findFirst({
     where: {
       userId: session.user.id,
@@ -62,12 +60,5 @@ export default async function HomePage() {
 
   const remainingDaily = await getRemainingDailyLimit(session.user.id);
 
-  return (
-    <div className="min-h-screen bg-surface-50">
-      <Header />
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <HomeTabs initialRemainingDaily={remainingDaily} />
-      </main>
-    </div>
-  );
+  return <AppWrapper initialRemainingDaily={remainingDaily} />;
 }

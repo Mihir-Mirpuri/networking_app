@@ -16,6 +16,43 @@ import {
   UserCircleIcon,
 } from '@heroicons/react/24/outline';
 
+// Mascot SVG component (light background version)
+function MascotSVG({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="60" cy="60" r="54" fill="url(#mascotBgHeader)"/>
+      <path
+        d="M18 60 Q25 42 32 60 Q39 78 46 60 Q53 42 60 60 Q67 78 74 60 Q81 42 88 60 Q95 78 102 60"
+        stroke="url(#waveGradHeader)"
+        strokeWidth="4.5"
+        strokeLinecap="round"
+        fill="none"
+      />
+      <circle cx="52" cy="52" r="5" fill="white"/>
+      <circle cx="68" cy="52" r="5" fill="white"/>
+      <circle cx="53.5" cy="53.5" r="2.5" fill="#1e293b"/>
+      <circle cx="69.5" cy="53.5" r="2.5" fill="#1e293b"/>
+      <circle cx="54.5" cy="52.5" r="1" fill="white" opacity="0.8"/>
+      <circle cx="70.5" cy="52.5" r="1" fill="white" opacity="0.8"/>
+      <path d="M52 70 Q60 77 68 70" stroke="white" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
+      <line x1="60" y1="6" x2="60" y2="22" stroke="#6366f1" strokeWidth="2.5" strokeLinecap="round"/>
+      <circle cx="60" cy="5" r="3.5" fill="#6366f1"/>
+      <circle cx="60" cy="5" r="6" fill="rgba(99,102,241,0.3)"/>
+      <defs>
+        <linearGradient id="waveGradHeader" x1="18" y1="60" x2="102" y2="60" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#4f46e5"/>
+          <stop offset="50%" stopColor="#6366f1"/>
+          <stop offset="100%" stopColor="#4f46e5"/>
+        </linearGradient>
+        <radialGradient id="mascotBgHeader" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#4f46e5"/>
+          <stop offset="100%" stopColor="#3730a3"/>
+        </radialGradient>
+      </defs>
+    </svg>
+  );
+}
+
 interface CreditStatus {
   dailyUsed: number;
   dailyLimit: number;
@@ -120,8 +157,8 @@ export function Header() {
                   <span
                     className={`absolute -top-1.5 -right-1.5 min-w-[20px] h-[20px] flex items-center justify-center text-xs font-bold rounded-full shadow-sm ${
                       isActive
-                        ? 'bg-white text-primary-600'
-                        : 'bg-accent-500 text-white'
+                        ? 'bg-surface-900 text-primary-600'
+                        : 'bg-accent-500 text-surface-900'
                     }`}
                   >
                     {tab.badge! > 99 ? '99+' : tab.badge}
@@ -159,19 +196,17 @@ export function Header() {
   const progress = getProgressInfo();
 
   return (
-    <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-subtle">
+    <header className="sticky top-0 z-40 bg-surface-100/80 backdrop-blur-subtle">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center gap-3 md:gap-6">
             <Link href="/" className="flex items-center gap-2 group">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow">
-                <span className="text-white font-bold text-sm">S</span>
-              </div>
               <span className="text-xl font-bold text-surface-900 group-hover:text-primary-600 transition-colors">
                 Signl
               </span>
+              <MascotSVG className="w-8 h-8" />
               {progress?.isPro && (
-                <span className="inline-flex items-center px-1.5 py-0.5 bg-gradient-to-r from-primary-500 to-primary-700 rounded text-white font-semibold text-[10px] leading-tight">
+                <span className="inline-flex items-center px-1.5 py-0.5 bg-gradient-to-r from-surface-400 to-surface-500 rounded text-surface-100 font-semibold text-[10px] leading-tight">
                   PRO
                 </span>
               )}

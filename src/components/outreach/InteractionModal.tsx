@@ -72,9 +72,9 @@ export function InteractionModal({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-        <h3 className="text-lg font-semibold mb-4">
-          Log Interaction {contactName && <span className="text-gray-500">with {contactName}</span>}
+      <div className="bg-[#2a2a2a] rounded-lg shadow-xl max-w-md w-full p-6">
+        <h3 className="text-lg font-semibold text-[#E0E0E0] mb-4">
+          Log Interaction {contactName && <span className="text-[#707070]">with {contactName}</span>}
         </h3>
 
         <div className="mb-4">
@@ -83,20 +83,20 @@ export function InteractionModal({
               type="checkbox"
               checked={spokeToThem}
               onChange={(e) => setSpokeToThem(e.target.checked)}
-              className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+              className="w-4 h-4 text-[#808080] border-[#404040] rounded focus:ring-[#606060]"
             />
-            <span className="text-sm font-medium text-gray-700">Spoke to them</span>
+            <span className="text-sm font-medium text-[#A0A0A0]">Spoke to them</span>
           </label>
         </div>
 
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-[#A0A0A0] mb-2">
             Interaction Type
           </label>
           <select
             value={interactionType}
             onChange={(e) => setInteractionType(e.target.value as InteractionType)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="w-full px-3 py-2 border border-[#404040] rounded-md bg-[#1a1a1a] text-[#E0E0E0] focus:outline-none focus:ring-2 focus:ring-[#606060]"
           >
             {INTERACTION_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
@@ -107,19 +107,19 @@ export function InteractionModal({
         </div>
 
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-[#A0A0A0] mb-2">
             Date (optional)
           </label>
           <input
             type="date"
             value={interactionDate}
             onChange={(e) => setInteractionDate(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="w-full px-3 py-2 border border-[#404040] rounded-md bg-[#1a1a1a] text-[#E0E0E0] focus:outline-none focus:ring-2 focus:ring-[#606060]"
           />
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-100 text-red-800 rounded-md text-sm">
+          <div className="mb-4 p-3 bg-red-900/30 text-red-400 rounded-md text-sm">
             {error}
           </div>
         )}
@@ -128,7 +128,7 @@ export function InteractionModal({
           <button
             onClick={handleClear}
             disabled={isSaving || (!currentSpokeToThem && currentInteractionType === 'NONE')}
-            className="px-4 py-2 text-sm text-red-600 hover:text-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 text-sm text-red-400 hover:text-red-300 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Clear
           </button>
@@ -136,14 +136,14 @@ export function InteractionModal({
             <button
               onClick={onClose}
               disabled={isSaving}
-              className="px-4 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50"
+              className="px-4 py-2 text-sm border border-[#404040] text-[#A0A0A0] rounded-md hover:bg-[#333333] disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               onClick={handleSave}
               disabled={isSaving}
-              className="px-4 py-2 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 text-sm bg-[#505050] text-[#E0E0E0] rounded-md hover:bg-[#606060] focus:outline-none focus:ring-2 focus:ring-[#606060] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSaving ? 'Saving...' : 'Save'}
             </button>

@@ -590,3 +590,124 @@ BODY:
     body: followUpBody,
   };
 }
+
+// ===== Conversational Email Refinement =====
+
+export interface ConversationalRefineInput {
+  subject: string;
+  body: string;
+  userMessage: string;
+  conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }>;
+  person: {
+    firstName: string | null;
+    company: string;
+    role: string | null;
+  };
+  userId: string;
+}
+
+export interface ConversationalRefineResult {
+  subject: string;
+  body: string;
+  assistantMessage: string;
+}
+
+/**
+ * Refine an email through conversational interaction.
+ * Maintains conversation context for natural back-and-forth editing.
+ * Uses llama-3.1-8b-instant for speed and cost efficiency.
+ */
+export async function refineEmailConversational(
+  input: ConversationalRefineInput
+): Promise<ConversationalRefineResult> {
+  const { subject, body, userMessage, conversationHistory, person, userId } = input;
+
+  const personName = person.firstName || 'the recipient';
+
+  // Truncate email if too long (cost optimization)
+  const truncatedBody = body.length > 1000 ? body.slice(0, 1000) + '...' : body;
+
+  const systemPrompt = `You are an AI assistant helping a college student refine their cold outreach email. You have a natural, conversational style.
+
+CURRENT EMAIL:
+Subject: ${subject}
+Body:
+${truncatedBody}
+
+RECIPIENT: ${personName}${person.role ? `, ${person.role}` : ''} at ${person.company}
+
+YOUR ROLE:
+1. Make the requested changes to the email
+2. Respond naturally to the user - acknowledge what you changed
+3. Keep responses brief but friendly
+4. If the request is unclear, ask for clarification
+5. Don't over-explain changes - just make them and briefly confirm
+
+IMPORTANT RULES:
+- Only modify what the user asks for
+- Keep the same greeting and sign-off unless explicitly asked to change
+- Sound like a real college student - casual but respectful
+- NO corporate speak or excessive enthusiasm
+
+Return in this EXACT format:
+
+SUBJECT: [updated subject line]
+BODY:
+[updated email body]
+---
+RESPONSE: [your brief, natural response to the user about what you changed]`;
+
+  // Build conversation messages (last 6 turns for context)
+  const messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }> = [
+    { role: 'system', content: systemPrompt },
+  ];
+
+  // Add recent conversation history
+  for (const msg of conversationHistory.slice(-6)) {
+    messages.push({
+      role: msg.role,
+      content: msg.content,
+    });
+  }
+
+  // Add current user message
+  messages.push({ role: 'user', content: userMessage });
+
+  const response = await complete({
+    systemPrompt,
+    userPrompt: userMessage,
+    options: {
+      model: 'llama-3.1-8b-instant', // Fast and cheap
+      temperature: 0.5,
+      maxTokens: 400,
+    },
+    metadata: {
+      userId,
+      action: 'EMAIL_REFINEMENT',
+    },
+  });
+
+  const text = response.content;
+
+  // Parse the response - handle various separator formats from LLM
+  const subjectMatch = text.match(/SUBJECT:\s*([^\n]+)/);
+  const bodyMatch = text.match(/BODY:\s*([\s\S]*?)(?=\n---+\s*\n?RESPONSE:|\nRESPONSE:|\n---+\s*$|$)/);
+  const responseMatch = text.match(/RESPONSE:\s*([\s\S]+)$/);
+
+  const newSubject = subjectMatch?.[1]?.trim() || subject;
+  let newBody = bodyMatch?.[1]?.trim() || body;
+
+  // Safety: strip any RESPONSE: text that leaked into the body
+  const responseLeakIdx = newBody.indexOf('RESPONSE:');
+  if (responseLeakIdx !== -1) {
+    newBody = newBody.substring(0, responseLeakIdx).replace(/\n?---+\s*$/, '').trim();
+  }
+
+  const assistantMessage = responseMatch?.[1]?.trim() || "I've updated your email.";
+
+  return {
+    subject: newSubject,
+    body: newBody,
+    assistantMessage,
+  };
+}

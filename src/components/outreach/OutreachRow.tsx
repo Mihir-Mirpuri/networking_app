@@ -138,7 +138,7 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onRowClick, isEven = 
           onBlur={() => handleSaveEdit(field)}
           onKeyDown={(e) => handleKeyDown(e, field)}
           autoFocus
-          className="w-full px-2 py-1 text-sm border border-primary-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/30 bg-white"
+          className="w-full px-2 py-1 text-sm border border-[#505050] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#606060]/30 bg-[#2a2a2a] text-[#E0E0E0]"
         />
       );
     }
@@ -146,19 +146,19 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onRowClick, isEven = 
     return (
       <button
         onClick={() => handleStartEdit(field, value)}
-        className="w-full text-left truncate hover:text-primary-600 cursor-pointer transition-colors flex items-center gap-1 group/edit"
+        className="w-full text-left truncate hover:text-[#c0c0c0] cursor-pointer transition-colors flex items-center gap-1 group/edit"
         title={value || 'Click to edit'}
       >
-        <span className="truncate">{value || <span className="text-surface-300">--</span>}</span>
-        <svg className="w-3 h-3 text-surface-300 opacity-0 group-hover/edit:opacity-100 shrink-0 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <span className="truncate">{value || <span className="text-[#505050]">--</span>}</span>
+        <svg className="w-3 h-3 text-[#505050] opacity-0 group-hover/edit:opacity-100 shrink-0 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
         </svg>
       </button>
     );
   };
 
-  const cellClass = "px-4 py-3 text-sm border-r border-surface-100 last:border-r-0";
-  const rowBg = isEven ? 'bg-white' : 'bg-surface-50/30';
+  const cellClass = "px-4 py-3 text-sm border-r border-[#333333] last:border-r-0";
+  const rowBg = isEven ? 'bg-[#2a2a2a]' : 'bg-[#252525]/30';
 
   const renderNameCell = () => {
     const nameContent = (
@@ -176,7 +176,7 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onRowClick, isEven = 
           href={tracker.linkedinUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-primary-600 hover:text-primary-800 hover:underline"
+          className="text-[#E0E0E0] hover:text-white hover:underline"
           title="View LinkedIn"
         >
           {nameContent}
@@ -187,7 +187,7 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onRowClick, isEven = 
     return (
       <button
         onClick={() => handleStartEdit('contactName', tracker.contactName)}
-        className="text-left hover:text-primary-600"
+        className="text-left hover:text-[#c0c0c0]"
       >
         {nameContent}
       </button>
@@ -206,15 +206,15 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onRowClick, isEven = 
   return (
     <>
       <tr
-        className={`group ${rowBg} hover:bg-primary-50/60 cursor-pointer transition-colors`}
+        className={`group ${rowBg} hover:bg-[#333333] cursor-pointer transition-colors`}
         onClick={handleRowClick}
       >
         {/* Name */}
         <td className={cellClass}>
-          <div className="truncate font-semibold text-surface-900">
+          <div className="truncate font-semibold text-[#E0E0E0]">
             {renderNameCell()}
           </div>
-          <div className="text-xs text-surface-400 truncate mt-0.5">{tracker.contactEmail}</div>
+          <div className="text-xs text-[#606060] truncate mt-0.5">{tracker.contactEmail}</div>
         </td>
 
         {/* Status */}
@@ -228,28 +228,28 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onRowClick, isEven = 
 
         {/* Company */}
         <td className={cellClass}>
-          <div className="truncate text-surface-700">
+          <div className="truncate text-[#A0A0A0]">
             {renderEditableCell('company', tracker.company)}
           </div>
         </td>
 
         {/* Role */}
         <td className={cellClass}>
-          <div className="truncate text-surface-700">
+          <div className="truncate text-[#A0A0A0]">
             {renderEditableCell('role', tracker.role)}
           </div>
         </td>
 
         {/* Location */}
         <td className={cellClass}>
-          <div className="truncate text-surface-700">
+          <div className="truncate text-[#A0A0A0]">
             {renderEditableCell('location', tracker.location)}
           </div>
         </td>
 
         {/* Date Emailed */}
         <td
-          className={`${cellClass} text-surface-600 whitespace-nowrap`}
+          className={`${cellClass} text-[#808080] whitespace-nowrap`}
           title={formatFullDate(tracker.dateEmailed)}
         >
           {formatRelativeDate(tracker.dateEmailed)}
@@ -261,8 +261,8 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onRowClick, isEven = 
             onClick={() => setShowInteractionModal(true)}
             className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
               tracker.spokeToThem
-                ? 'bg-emerald-100 text-emerald-700'
-                : 'text-surface-300 hover:text-surface-500 hover:bg-surface-100'
+                ? 'bg-[#404040] text-[#c0c0c0]'
+                : 'text-[#505050] hover:text-[#707070] hover:bg-[#333333]'
             }`}
             title={tracker.spokeToThem ? getInteractionLabel(tracker.interactionType) : 'Log interaction'}
           >
@@ -278,13 +278,13 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onRowClick, isEven = 
         <td className={cellClass} onClick={(e) => e.stopPropagation()}>
           <button
             onClick={() => setShowNotesModal(true)}
-            className="w-full text-left text-surface-700 hover:text-primary-600 truncate transition-colors flex items-center gap-1 group/notes"
+            className="w-full text-left text-[#A0A0A0] hover:text-[#c0c0c0] truncate transition-colors flex items-center gap-1 group/notes"
             title={tracker.notes || 'Add notes'}
           >
             {tracker.notes ? (
               <span className="truncate">{tracker.notes}</span>
             ) : (
-              <svg className="w-4 h-4 text-surface-300 group-hover/notes:text-primary-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 text-[#505050] group-hover/notes:text-[#808080] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
               </svg>
             )}
@@ -295,7 +295,7 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onRowClick, isEven = 
         <td className={cellClass} onClick={(e) => e.stopPropagation()}>
           <button
             onClick={() => setShowDeleteConfirm(true)}
-            className="p-1.5 text-surface-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            className="p-1.5 text-[#505050] hover:text-red-400 hover:bg-red-900/20 rounded-lg transition-colors"
             title="Delete"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -331,17 +331,17 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onRowClick, isEven = 
 
       {/* Delete Confirmation */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-surface-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-soft-xl max-w-sm w-full p-6 animate-scale-in">
-            <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-red-100 flex items-center justify-center">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-[#2a2a2a] rounded-2xl shadow-soft-xl max-w-sm w-full p-6 animate-scale-in">
+            <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-red-900/30 flex items-center justify-center">
               <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
             </div>
-            <h3 className="text-lg font-semibold text-center text-surface-900 mb-2">Delete Contact</h3>
-            <p className="text-surface-600 text-center mb-6">
+            <h3 className="text-lg font-semibold text-center text-[#E0E0E0] mb-2">Delete Contact</h3>
+            <p className="text-[#808080] text-center mb-6">
               Are you sure you want to delete{' '}
-              <span className="font-medium text-surface-900">{tracker.contactName || tracker.contactEmail}</span>?
+              <span className="font-medium text-[#E0E0E0]">{tracker.contactName || tracker.contactEmail}</span>?
               This cannot be undone.
             </p>
             <div className="flex gap-3 justify-center">

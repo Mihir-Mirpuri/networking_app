@@ -58,7 +58,7 @@ export function PastEmailsSidebar({ isOpen, onToggle }: PastEmailsSidebarProps) 
 
       {/* Sidebar */}
       <div
-        className={`fixed right-0 top-0 h-full w-80 bg-white shadow-soft-xl transform transition-transform duration-300 z-50 ${
+        className={`fixed right-0 top-0 h-full w-80 bg-surface-100 shadow-soft-xl transform transition-transform duration-300 z-50 ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
@@ -131,8 +131,8 @@ export function PastEmailsSidebar({ isOpen, onToggle }: PastEmailsSidebarProps) 
                         <span
                           className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                             log.status === 'SUCCESS'
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : 'bg-red-100 text-red-700'
+                              ? 'bg-emerald-900/30 text-emerald-400'
+                              : 'bg-red-900/30 text-red-400'
                           }`}
                         >
                           {log.status === 'SUCCESS' ? 'Sent' : 'Failed'}

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { SearchResultWithDraft, loadMorePeopleAction, regenerateDraftAction } from '@/app/actions/search';
 import { sendSingleEmailAction, sendEmailsAction, PersonToSend } from '@/app/actions/send';
-import { getTemplatesAction, TemplateData } from '@/app/actions/profile';
+import { getTemplatesAction, getAutoPersonalizeAction, TemplateData } from '@/app/actions/profile';
 import { hidePersonAction } from '@/app/actions/search';
 import { EMAIL_TEMPLATES } from '@/lib/constants';
 import { LimitReachedModal, dispatchCreditsChanged } from '@/components/credits';
@@ -46,6 +46,7 @@ export function useSearchResults({ initialRemainingDaily }: UseSearchResultsOpti
   const [templates, setTemplates] = useState<TemplateData[]>([]);
   const [defaultTemplateId, setDefaultTemplateId] = useState<string>(EMAIL_TEMPLATES[0].id);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [autoPersonalize, setAutoPersonalize] = useState(false);
 
   // Pagination state
   const [totalLoaded, setTotalLoaded] = useState(0);
@@ -66,10 +67,11 @@ export function useSearchResults({ initialRemainingDaily }: UseSearchResultsOpti
     };
   }, []);
 
-  // Load templates when session is ready
+  // Load templates and user preferences when session is ready
   useEffect(() => {
     if (sessionStatus !== 'authenticated') return;
-    const loadTemplates = async () => {
+    const loadTemplatesAndPrefs = async () => {
+      // Load templates
       const result = await getTemplatesAction();
       const hardcoded = EMAIL_TEMPLATES[0];
       if (result.success) {
@@ -84,8 +86,11 @@ export function useSearchResults({ initialRemainingDaily }: UseSearchResultsOpti
         setTemplates([{ id: hardcoded.id, name: hardcoded.name, subject: hardcoded.subject, body: hardcoded.body, isDefault: false, attachResume: false, resumeId: null, createdAt: new Date() }]);
         setDefaultTemplateId(hardcoded.id);
       }
+      // Load autoPersonalize preference
+      const autoPersonalizePref = await getAutoPersonalizeAction();
+      setAutoPersonalize(autoPersonalizePref);
     };
-    loadTemplates();
+    loadTemplatesAndPrefs();
   }, [sessionStatus]);
 
   // Reset all results state for a new search
@@ -151,6 +156,9 @@ export function useSearchResults({ initialRemainingDaily }: UseSearchResultsOpti
     } else if (result.error === 'LIMIT_REACHED') {
       setShowLimitModal(true);
       setLimitReached(true);
+    } else if (result.error === 'Not authenticated') {
+      // Don't show error for unauthenticated users - they should be redirected to sign in
+      return false;
     } else {
       setSendErrors((prev) => new Map(prev).set(person.id, result.error || 'Failed to send email'));
     }
@@ -223,7 +231,8 @@ export function useSearchResults({ initialRemainingDaily }: UseSearchResultsOpti
     if (result.success) {
       setResults((prev) => prev.filter((r) => r.userCandidateId !== userCandidateId));
       setHiddenCount((prev) => prev + 1);
-    } else {
+    } else if (result.error !== 'Not authenticated') {
+      // Don't show error for unauthenticated users
       setToast({ message: result.error || 'Failed to hide person', type: 'error' });
     }
   };
@@ -246,7 +255,8 @@ export function useSearchResults({ initialRemainingDaily }: UseSearchResultsOpti
             : r
         )
       );
-    } else {
+    } else if (result.error !== 'Not authenticated') {
+      // Don't show error for unauthenticated users
       setToast({ message: result.error || 'Failed to regenerate draft', type: 'error' });
     }
     setIsRegenerating(false);
@@ -309,7 +319,8 @@ export function useSearchResults({ initialRemainingDaily }: UseSearchResultsOpti
           setHasMore(false);
           retryCountRef.current = 0;
         }
-      } else {
+      } else if (result.error !== 'Not authenticated') {
+        // Don't show error for unauthenticated users
         setToast({ message: result.error || 'Failed to load more profiles', type: 'error' });
       }
     } catch (err) {
@@ -348,6 +359,7 @@ export function useSearchResults({ initialRemainingDaily }: UseSearchResultsOpti
     templates,
     defaultTemplateId,
     isRegenerating,
+    autoPersonalize,
     totalLoaded,
     setTotalLoaded,
     hasMore,

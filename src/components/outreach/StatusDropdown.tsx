@@ -10,15 +10,15 @@ interface StatusDropdownProps {
 }
 
 const STATUS_CONFIG: Record<OutreachStatus, { label: string; color: string; bg: string }> = {
-  NOT_STARTED: { label: 'Not Started', color: 'text-gray-700', bg: 'bg-gray-100' },
-  SENT: { label: 'Sent', color: 'text-primary-700', bg: 'bg-primary-100' },
-  WAITING: { label: 'Waiting', color: 'text-yellow-700', bg: 'bg-yellow-100' },
-  RESPONDED: { label: 'Responded', color: 'text-green-700', bg: 'bg-green-100' },
-  SCHEDULED_CALL: { label: 'Scheduled Call', color: 'text-purple-700', bg: 'bg-purple-100' },
-  HAD_CALL: { label: 'Had Call', color: 'text-indigo-700', bg: 'bg-indigo-100' },
-  GHOSTED: { label: 'Ghosted', color: 'text-red-700', bg: 'bg-red-100' },
-  NOT_INTERESTED: { label: 'Not Interested', color: 'text-orange-700', bg: 'bg-orange-100' },
-  CONNECTED: { label: 'Connected', color: 'text-emerald-700', bg: 'bg-emerald-100' },
+  NOT_STARTED: { label: 'Not Started', color: 'text-[#606060]', bg: 'bg-[#2a2a2a]' },
+  SENT: { label: 'Sent', color: 'text-[#909090]', bg: 'bg-[#353535]' },
+  WAITING: { label: 'Waiting', color: 'text-[#A0A0A0]', bg: 'bg-[#3a3a3a]' },
+  RESPONDED: { label: 'Responded', color: 'text-[#c0c0c0]', bg: 'bg-[#404040]' },
+  SCHEDULED_CALL: { label: 'Scheduled Call', color: 'text-[#c0c0c0]', bg: 'bg-[#404040]' },
+  HAD_CALL: { label: 'Had Call', color: 'text-[#d0d0d0]', bg: 'bg-[#454545]' },
+  GHOSTED: { label: 'Ghosted', color: 'text-[#707070]', bg: 'bg-[#2a2a2a]' },
+  NOT_INTERESTED: { label: 'Not Interested', color: 'text-[#707070]', bg: 'bg-[#2a2a2a]' },
+  CONNECTED: { label: 'Connected', color: 'text-[#E0E0E0]', bg: 'bg-[#505050]' },
 };
 
 export function StatusDropdown({ value, onChange, disabled }: StatusDropdownProps) {
@@ -57,7 +57,7 @@ export function StatusDropdown({ value, onChange, disabled }: StatusDropdownProp
       </button>
 
       {isOpen && (
-        <div className="absolute z-50 mt-1 w-40 bg-white rounded-md shadow-lg border border-gray-200">
+        <div className="absolute z-50 mt-1 w-40 bg-[#2a2a2a] rounded-md shadow-lg border border-[#404040]">
           <div className="py-1">
             {Object.entries(STATUS_CONFIG).map(([status, statusConfig]) => (
               <button
@@ -66,8 +66,8 @@ export function StatusDropdown({ value, onChange, disabled }: StatusDropdownProp
                   onChange(status as OutreachStatus);
                   setIsOpen(false);
                 }}
-                className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center ${
-                  status === value ? 'bg-gray-50' : ''
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-[#383838] flex items-center ${
+                  status === value ? 'bg-[#383838]' : ''
                 }`}
               >
                 <span

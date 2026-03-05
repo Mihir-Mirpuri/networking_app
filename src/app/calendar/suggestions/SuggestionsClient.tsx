@@ -112,7 +112,7 @@ export function SuggestionsClient() {
       )}
 
       {suggestions.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-lg shadow">
+        <div className="text-center py-16 bg-surface-100 rounded-lg shadow">
           <svg
             className="mx-auto h-12 w-12 text-gray-400"
             fill="none"

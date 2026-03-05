@@ -1,12 +1,14 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { SearchResultWithDraft, refineDraftAction, generateLLMDraftAction } from '@/app/actions/search';
+import { signIn } from 'next-auth/react';
+import { SearchResultWithDraft, generateLLMDraftAction } from '@/app/actions/search';
 import { scheduleEmailAction } from '@/app/actions/send';
 // import { CompanyResearchPanel } from '@/components/compose/CompanyResearchPanel';
 import { SearchableCombobox } from './SearchableCombobox';
 import { LoadingDots } from './LoadingSpinner';
 import { TemplateData } from '@/app/actions/profile';
+import { useEmailChat } from '@/contexts/EmailChatContext';
 
 interface ExpandedReviewProps {
   results: SearchResultWithDraft[];
@@ -19,9 +21,12 @@ interface ExpandedReviewProps {
   defaultTemplateId?: string;
   onTemplateChange?: (templateId: string, personIndex: number) => void;
   isRegenerating?: boolean;
+  autoPersonalize?: boolean;
   limitReached?: boolean;
   onLimitReached?: () => void;
   onDraftGenerated?: (personIndex: number, subject: string, body: string) => void;
+  isAuthenticated?: boolean;
+  onLoginRequired?: () => void;
 }
 
 function SendFailureAnimation({ message }: { message: string }) {
@@ -80,7 +85,7 @@ function SendSuccessAnimation() {
           d="M14.1 27.2l7.1 7.2 16.7-16.8"
         />
       </svg>
-      <p className="mt-3 text-sm font-medium text-emerald-700">Email sent!</p>
+      <p className="mt-3 text-sm font-medium text-emerald-400">Email sent!</p>
     </div>
   );
 }
@@ -96,14 +101,17 @@ export function ExpandedReview({
   defaultTemplateId,
   onTemplateChange,
   isRegenerating,
+  autoPersonalize = false,
   limitReached,
   onLimitReached,
   onDraftGenerated,
+  isAuthenticated = true,
+  onLoginRequired,
 }: ExpandedReviewProps) {
   const person = results[currentIndex];
-  const initialDraft = person?.llmDraftGenerated || !person?.userCandidateId;
-  const [subject, setSubject] = useState(initialDraft ? (person?.draftSubject || '') : '');
-  const [body, setBody] = useState(initialDraft ? (person?.draftBody || '') : '');
+  // Start with template - auto-personalization is optional via profile setting
+  const [subject, setSubject] = useState(person?.draftSubject || '');
+  const [body, setBody] = useState(person?.draftBody || '');
   const [isSending, setIsSending] = useState(false);
   const [internalIndex, setInternalIndex] = useState(currentIndex);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
@@ -112,35 +120,32 @@ export function ExpandedReview({
   const [isScheduling, setIsScheduling] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [showFailure, setShowFailure] = useState(false);
+  const [showMobileChat, setShowMobileChat] = useState(false);
+  const [isGeneratingDraft, setIsGeneratingDraft] = useState(false);
 
   const currentPerson = results[internalIndex];
   const status = currentPerson ? sendStatuses.get(currentPerson.id) : undefined;
 
   // const [researchCollapsed, setResearchCollapsed] = useState(true);
   const [selectedTemplateId, setSelectedTemplateId] = useState(defaultTemplateId || '');
-  const [refineInstruction, setRefineInstruction] = useState('');
-  const [isRefining, setIsRefining] = useState(false);
-  const [isGeneratingDraft, setIsGeneratingDraft] = useState(false);
   const userEditedRef = useRef(false);
 
-  // Synchronous state reset when person changes (avoids one-frame flash of stale draft)
+  // Email chat context for sidebar chat integration
+  const { openEmailChat, closeEmailChat, currentEmail, updateEmail } = useEmailChat();
+
+  // Synchronous state reset when person changes - always use template
   const [prevIndex, setPrevIndex] = useState(internalIndex);
   if (internalIndex !== prevIndex) {
     setPrevIndex(internalIndex);
     const nextPerson = results[internalIndex];
-    if (nextPerson?.llmDraftGenerated || !nextPerson?.userCandidateId) {
-      setSubject(nextPerson?.draftSubject || '');
-      setBody(nextPerson?.draftBody || '');
-    } else {
-      setSubject('');
-      setBody('');
-    }
-    setRefineInstruction('');
+    setSubject(nextPerson?.draftSubject || '');
+    setBody(nextPerson?.draftBody || '');
     userEditedRef.current = false;
   }
 
-  // Trigger LLM generation for current person
+  // Auto-personalize email with LLM (only if enabled in profile)
   useEffect(() => {
+    if (!autoPersonalize) return;
     if (currentPerson && !currentPerson.llmDraftGenerated && currentPerson.userCandidateId) {
       setIsGeneratingDraft(true);
       const personId = currentPerson.id;
@@ -155,17 +160,47 @@ export function ExpandedReview({
           onDraftGenerated?.(idx, result.subject, result.body);
         }
       }).catch((err) => {
-        console.warn('[Draft] LLM generation failed, using placeholder:', err);
-        const fallback = results[idx];
-        if (fallback && !userEditedRef.current && personId === fallback.id) {
-          setSubject(fallback.draftSubject);
-          setBody(fallback.draftBody);
-        }
+        console.warn('[Draft] LLM generation failed, using template:', err);
       }).finally(() => {
         setIsGeneratingDraft(false);
       });
     }
-  }, [internalIndex]);
+  }, [internalIndex, autoPersonalize]);
+
+  // Open email chat when person changes
+  useEffect(() => {
+    if (currentPerson && subject && body) {
+      openEmailChat(currentPerson.id, currentPerson.fullName, subject, body);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPerson?.id, openEmailChat]);
+
+  // Keep chat context in sync when user edits subject/body locally
+  useEffect(() => {
+    if (currentPerson && subject && body) {
+      updateEmail(subject, body);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subject, body]);
+
+  // Sync email from chat context to local state (when AI refines the email)
+  useEffect(() => {
+    if (currentEmail && currentPerson) {
+      if (currentEmail.subject !== subject || currentEmail.body !== body) {
+        setSubject(currentEmail.subject);
+        setBody(currentEmail.body);
+        userEditedRef.current = true;
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentEmail]);
+
+  // Close email chat when component unmounts
+  useEffect(() => {
+    return () => {
+      closeEmailChat();
+    };
+  }, [closeEmailChat]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -195,6 +230,12 @@ export function ExpandedReview({
 
   const handleSend = async () => {
     if (!currentPerson) return;
+
+    // Redirect to sign in if not authenticated
+    if (!isAuthenticated) {
+      signIn('google', { callbackUrl: '/' });
+      return;
+    }
 
     setIsSending(true);
     const success = await onSend(internalIndex, subject, body);
@@ -320,30 +361,6 @@ export function ExpandedReview({
   //   setBody(lines.join('\n'));
   // };
 
-  const handleRefine = async () => {
-    if (!currentPerson || !refineInstruction.trim() || isRefining) return;
-
-    setIsRefining(true);
-    try {
-      const result = await refineDraftAction({
-        subject,
-        body,
-        instruction: refineInstruction.trim(),
-        personId: currentPerson.id,
-      });
-
-      if (result.success) {
-        setSubject(result.subject);
-        setBody(result.body);
-        setRefineInstruction('');
-      }
-    } catch (err) {
-      console.error('Refine error:', err);
-    } finally {
-      setIsRefining(false);
-    }
-  };
-
   if (!currentPerson) {
     return null;
   }
@@ -351,267 +368,181 @@ export function ExpandedReview({
   const canSend = !status && !showSuccess && !limitReached;
 
   return (
-    <div className="fixed inset-0 bg-surface-900/50 flex items-center justify-center z-50 p-4 animate-fade-in" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="bg-white rounded-lg shadow-soft-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-scale-in relative">
+    <div className="fixed inset-0 lg:left-80 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in" onMouseDown={(e) => { if (e.target === e.currentTarget) (e.currentTarget as HTMLDivElement).dataset.backdropMouseDown = 'true'; }} onMouseUp={(e) => { if (e.target === e.currentTarget && (e.currentTarget as HTMLDivElement).dataset.backdropMouseDown === 'true') onClose(); delete (e.currentTarget as HTMLDivElement).dataset.backdropMouseDown; }} onClick={() => {}}>
+      <div className="bg-[#1e1e1e] rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-scale-in relative border border-[#333] [&_*]:focus-visible:ring-0 [&_*]:focus-visible:ring-offset-0">
         {/* Success animation overlay */}
         {showSuccess && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/90 rounded-lg">
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#1e1e1e]/90 rounded-xl">
             <SendSuccessAnimation />
           </div>
         )}
 
         {/* Failure animation overlay */}
         {showFailure && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/90 rounded-lg">
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#1e1e1e]/90 rounded-xl">
             <SendFailureAnimation message={sendErrors?.get(currentPerson.id) || 'Failed to send email'} />
           </div>
         )}
 
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b">
-          <div>
-            <h2 className="text-lg font-semibold">{currentPerson.fullName}</h2>
-            <p className="text-sm text-surface-600">
-              {currentPerson.role ? `${currentPerson.role} at ` : ''}
-              {currentPerson.company}
-            </p>
-            {currentPerson.linkedinUrl && (
-              <a
-                href={currentPerson.linkedinUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 mt-2 text-sm text-primary-600 hover:text-primary-800 hover:underline"
-                aria-label="View LinkedIn profile"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
-                </svg>
-                View LinkedIn Profile
-              </a>
-            )}
+        {/* Header bar */}
+        <div className="flex items-center justify-between px-4 py-2.5 bg-[#252525] rounded-t-xl border-b border-[#333]">
+          <div className="flex items-center gap-3 min-w-0">
+            <h2 className="text-sm font-medium text-[#E0E0E0] truncate">New Message</h2>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-surface-500">
-              {internalIndex + 1} of {results.length}
-            </span>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {/* Mobile chat button */}
+            <button
+              onClick={() => setShowMobileChat(true)}
+              className="lg:hidden p-1 hover:bg-[#404040] rounded text-[#808080] hover:text-[#E0E0E0] transition-colors"
+              aria-label="Open AI chat"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" />
+              </svg>
+            </button>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-surface-100 rounded-full"
+              className="p-1 hover:bg-[#404040] rounded text-[#808080] hover:text-[#E0E0E0] transition-colors"
+              aria-label="Close"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                  clipRule="evenodd"
-                />
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
               </svg>
             </button>
           </div>
         </div>
 
-
-        {/* Email Form */}
-        <div className="flex-1 overflow-y-auto p-4">
-          {/* Company Research — disabled (too general for personalization)
-          {currentPerson.company && (
-            <div className="mb-4">
-              <button
-                type="button"
-                onClick={() => setResearchCollapsed(!researchCollapsed)}
-                className="flex items-center gap-2 text-sm font-medium text-surface-700 hover:text-surface-900 mb-2"
-              >
-                <svg
-                  className={`w-4 h-4 transition-transform ${researchCollapsed ? '' : 'rotate-90'}`}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+        {/* Fields */}
+        <div className="flex-1 overflow-y-auto bg-[#1e1e1e]">
+          {/* To field (read-only, showing recipient) */}
+          <div className="flex items-center border-b border-[#333] px-4">
+            <span className="text-sm text-[#808080] w-10 flex-shrink-0">To</span>
+            <span className="flex-1 py-2.5 text-sm text-[#E0E0E0]">
+              {currentPerson.linkedinUrl ? (
+                <a
+                  href={currentPerson.linkedinUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-[#0A66C2] transition-colors"
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-                {currentPerson.company} Recent Events
-              </button>
-              {!researchCollapsed && (
-                <CompanyResearchPanel
-                  key={internalIndex}
-                  company={currentPerson.company}
-                  role={currentPerson.role}
-                  personName={currentPerson.fullName}
-                  body={body}
-                  onUseTalkingPoint={handleUseTalkingPoint}
-                />
+                  {currentPerson.fullName}
+                </a>
+              ) : (
+                currentPerson.fullName
               )}
-            </div>
-          )}
-          */}
+              {currentPerson.email && (
+                <span className="text-[#808080] ml-1">&lt;{currentPerson.email}&gt;</span>
+              )}
+              {(currentPerson.role || currentPerson.company) && (
+                <span className="text-[#606060] ml-2 text-xs">
+                  {currentPerson.role ? `${currentPerson.role} at ` : ''}{currentPerson.company}
+                </span>
+              )}
+            </span>
+          </div>
 
-          {/* Template Selector */}
-          {templates && templates.length > 0 && onTemplateChange && (
-            <div className="mb-4">
-              <SearchableCombobox
-                options={templates.map((t) => ({
-                  label: t.name + (t.isDefault ? ' (Default)' : ''),
-                  value: t.id,
-                }))}
-                value={selectedTemplateId}
-                onChange={(newId) => {
-                  setSelectedTemplateId(newId);
-                  onTemplateChange(newId, internalIndex);
-                }}
-                label="Template"
-                placeholder="Select a template..."
-                id="review-template"
-                disabled={!canSend || isRegenerating}
-              />
-            </div>
-          )}
-
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-surface-700 mb-1">
-              Subject
-            </label>
+          {/* Subject field */}
+          <div className="flex items-center border-b border-[#333] px-4">
             <input
               type="text"
               value={subject}
               onChange={(e) => { userEditedRef.current = true; setSubject(e.target.value); }}
-              className={`input text-sm${isRegenerating || isGeneratingDraft ? ' opacity-50' : ''}`}
+              placeholder="Subject"
+              className={`flex-1 py-2.5 text-sm text-[#E0E0E0] bg-transparent outline-none placeholder-[#606060] focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 ${isRegenerating || isGeneratingDraft ? 'opacity-50' : ''}`}
             />
+            {isGeneratingDraft && (
+              <span className="text-xs text-[#808080] flex items-center gap-1 flex-shrink-0">
+                <LoadingDots className="text-[#808080]" /> Personalizing
+              </span>
+            )}
           </div>
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <label className="block text-sm font-medium text-surface-700">
-                Body
-              </label>
-              {isGeneratingDraft && (
-                <span className="text-xs text-primary-500 flex items-center gap-1">
-                  <LoadingDots className="text-primary-500" /> Personalizing
-                </span>
-              )}
-            </div>
+
+          {/* Body */}
+          <div className="px-4 pt-3">
             <textarea
               value={body}
               onChange={(e) => { userEditedRef.current = true; setBody(e.target.value); }}
-              rows={10}
-              className={`input resize-none text-sm${isRegenerating || isGeneratingDraft ? ' opacity-50' : ''}`}
+              rows={12}
+              placeholder=""
+              className={`w-full text-sm text-[#E0E0E0] bg-transparent outline-none resize-none leading-relaxed focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 ${isRegenerating || isGeneratingDraft ? 'opacity-50' : ''}`}
             />
           </div>
 
-          {/* Refine with AI */}
-          <div className="mt-3 flex items-center gap-2">
-            <div className="relative flex-1">
-              <input
-                type="text"
-                value={refineInstruction}
-                onChange={(e) => setRefineInstruction(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey) {
-                    e.preventDefault();
-                    handleRefine();
-                  }
-                }}
-                placeholder="Refine: e.g. &quot;make it shorter&quot; or &quot;add a question about their team&quot;"
-                disabled={isRefining}
-                className="input text-sm pr-10 w-full"
-              />
-              {isRefining && (
-                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                  <LoadingDots className="text-primary-500" />
-                </div>
-              )}
-            </div>
-            <button
-              onClick={handleRefine}
-              disabled={isRefining || !refineInstruction.trim()}
-              className="btn-secondary text-sm flex items-center gap-1.5 shrink-0 disabled:opacity-50"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-              </svg>
-              Refine
-            </button>
-          </div>
-
-          {/* Resume Attachment Indicator */}
+          {/* Resume attachment chip */}
           {currentPerson.resumeId && (
-            <div className="mt-4 flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-md">
-              <svg
-                className="w-5 h-5 text-emerald-700"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
-                />
-              </svg>
-              <span className="text-sm font-medium text-emerald-700">
-                Resume will be attached
-              </span>
+            <div className="px-4 pb-2">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#252525] border border-[#404040] rounded-lg">
+                <svg className="w-4 h-4 text-emerald-400" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" />
+                </svg>
+                <span className="text-xs text-[#A0A0A0]">Resume attached</span>
+              </div>
             </div>
           )}
+
+          {/* Refine hint */}
+          <div className="px-4 pb-2 hidden lg:flex items-center gap-2 text-xs text-[#606060]">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" />
+            </svg>
+            <span>Use the sidebar chat to refine with AI</span>
+          </div>
         </div>
 
-        {/* Footer */}
-        <div className="border-t bg-surface-50">
-          <div className="flex items-center justify-between p-4">
-            <div className="flex gap-2">
-              <button
-                onClick={handlePrevious}
-                disabled={internalIndex === 0}
-                className="btn-secondary text-sm"
-              >
-                Previous
-              </button>
-              <button
-                onClick={handleNext}
-                disabled={internalIndex === results.length - 1}
-                className="btn-secondary text-sm"
-              >
-                Next
-              </button>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={limitReached ? () => onLimitReached?.() : () => setShowScheduleModal(true)}
-                disabled={!canSend || isSending}
-                className={`px-4 py-2 text-sm border border-primary-600 text-primary-600 rounded-md hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed${limitReached ? ' opacity-50 cursor-not-allowed' : ''}`}
-              >
-                Schedule
-              </button>
-              <button
-                onClick={limitReached ? () => onLimitReached?.() : handleSend}
-                disabled={limitReached ? false : (!canSend || isSending)}
-                className={`btn-primary text-sm${limitReached ? ' opacity-50 cursor-not-allowed' : ''}`}
-              >
-                {isSending ? 'Sending...' : limitReached ? 'Daily limit reached' : 'Send & Next'}
-              </button>
-            </div>
-          </div>
-          <p className="text-xs text-surface-400 text-center pb-3">Esc to close · Cmd/Ctrl+Enter to send</p>
+        {/* Bottom toolbar */}
+        <div className="flex items-center gap-0.5 px-3 py-2 bg-[#252525] border-t border-[#333]">
+          {/* Template selector */}
+          {templates && templates.length > 0 && onTemplateChange && (
+            <select
+              value={selectedTemplateId}
+              onChange={(e) => {
+                setSelectedTemplateId(e.target.value);
+                onTemplateChange(e.target.value, internalIndex);
+              }}
+              disabled={!canSend || isRegenerating}
+              className="py-1.5 px-2 text-sm text-[#A0A0A0] bg-[#333] rounded-lg border border-[#404040] outline-none cursor-pointer disabled:opacity-50 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 hover:bg-[#3a3a3a]"
+            >
+              {templates.map((t) => (
+                <option key={t.id} value={t.id} className="bg-[#2a2a2a] text-[#E0E0E0]">
+                  {t.name}{t.isDefault ? ' (Default)' : ''}
+                </option>
+              ))}
+            </select>
+          )}
+
+          <div className="flex-1" />
+
+          {/* Schedule */}
+          <button
+            onClick={limitReached ? () => onLimitReached?.() : () => setShowScheduleModal(true)}
+            disabled={!canSend || isSending}
+            className="p-2 rounded-full text-[#808080] hover:bg-[#333] hover:text-[#E0E0E0] transition-colors disabled:opacity-30"
+            title="Schedule send"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z" />
+            </svg>
+          </button>
+
+          {/* Send button */}
+          <button
+            onClick={limitReached ? () => onLimitReached?.() : handleSend}
+            disabled={limitReached ? false : (!canSend || isSending)}
+            className="btn-primary text-sm rounded-full px-5 py-2 disabled:opacity-50"
+          >
+            {isSending ? 'Sending...' : limitReached ? 'Limit reached' : 'Send'}
+          </button>
         </div>
       </div>
 
       {/* Schedule Modal */}
       {showScheduleModal && (
-        <div className="fixed inset-0 bg-surface-900/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-soft-xl max-w-md w-full p-6">
-            <h3 className="text-lg font-semibold mb-4">Schedule Email</h3>
+        <div className="fixed inset-0 lg:left-80 bg-black/40 flex items-center justify-center z-[60] p-4">
+          <div className="bg-[#2a2a2a] rounded-xl shadow-2xl border border-[#404040] max-w-sm w-full p-6">
+            <h3 className="text-base font-semibold text-[#E0E0E0] mb-4">Schedule send</h3>
 
             <div className="mb-4">
-              <label className="block text-sm font-medium text-surface-700 mb-2">
+              <label className="block text-sm font-medium text-[#A0A0A0] mb-2">
                 Date & Time
               </label>
               <input
@@ -624,13 +555,13 @@ export function ExpandedReview({
                 min={new Date(new Date().getTime() + 5 * 60 * 1000).toISOString().slice(0, 16)}
                 className="input text-sm"
               />
-              <p className="mt-1 text-xs text-surface-500">
+              <p className="mt-1 text-xs text-[#707070]">
                 Minimum: 5 minutes from now
               </p>
             </div>
 
             {scheduleError && (
-              <div className="mb-4 p-3 bg-red-100 text-red-800 rounded-md text-sm">
+              <div className="mb-4 p-3 bg-red-900/30 text-red-400 rounded-lg text-sm">
                 {scheduleError}
               </div>
             )}
@@ -658,6 +589,154 @@ export function ExpandedReview({
           </div>
         </div>
       )}
+
+      {/* Mobile Chat Panel - Slide up from bottom */}
+      {showMobileChat && (
+        <MobileChatPanel onClose={() => setShowMobileChat(false)} />
+      )}
+    </div>
+  );
+}
+
+// Mobile chat panel component
+function MobileChatPanel({ onClose }: { onClose: () => void }) {
+  const {
+    currentPersonName,
+    currentEmail,
+    messages,
+    isProcessing,
+    sendMessage,
+  } = useEmailChat();
+
+  const [inputValue, setInputValue] = useState('');
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isProcessing]);
+
+  // Focus input on mount
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  const handleSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    const message = inputValue.trim();
+    if (!message || isProcessing) return;
+
+    setInputValue('');
+    await sendMessage(message);
+  };
+
+  return (
+    <div className="lg:hidden fixed inset-0 z-[60] flex flex-col">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+      />
+
+      {/* Slide-up panel */}
+      <div className="mt-auto relative bg-[#181818] rounded-t-2xl border-t border-[#2a2a2a] max-h-[70vh] flex flex-col animate-slide-up">
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[#2a2a2a]">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-full bg-[#2a2a2a] flex items-center justify-center">
+              <svg className="w-3.5 h-3.5 text-[#808080]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-[#c0c0c0]">AI Editor</p>
+              <p className="text-xs text-[#606060]">Email to {currentPersonName}</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-[#606060] hover:text-[#a0a0a0] hover:bg-[#2a2a2a] transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Current email preview */}
+        {currentEmail && (
+          <div className="px-4 py-2 border-b border-[#2a2a2a]">
+            <p className="text-xs text-[#505050] mb-0.5">Subject:</p>
+            <p className="text-sm text-[#909090] truncate">{currentEmail.subject}</p>
+          </div>
+        )}
+
+        {/* Messages area */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[200px]">
+          {/* Welcome message if no messages */}
+          {messages.length === 0 && !isProcessing && (
+            <div className="text-center py-4">
+              <p className="text-sm text-[#707070]">How should I refine the email?</p>
+              <p className="text-xs text-[#505050] mt-1">e.g. &quot;Make it shorter&quot;</p>
+            </div>
+          )}
+
+          {/* Chat messages */}
+          {messages.map((message) => (
+            <div
+              key={message.id}
+              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            >
+              <div
+                className={`max-w-[85%] rounded-xl px-3 py-2 ${
+                  message.role === 'user'
+                    ? 'bg-[#404040] text-[#e0e0e0]'
+                    : 'bg-[#1a1a1a] border border-[#2a2a2a] text-[#c0c0c0]'
+                }`}
+              >
+                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+              </div>
+            </div>
+          ))}
+
+          {/* Processing indicator */}
+          {isProcessing && (
+            <div className="flex justify-start">
+              <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2">
+                <LoadingDots className="text-[#808080]" />
+              </div>
+            </div>
+          )}
+
+          <div ref={chatEndRef} />
+        </div>
+
+        {/* Input area */}
+        <div className="p-3 border-t border-[#2a2a2a]">
+          <form onSubmit={handleSubmit} className="flex items-center gap-2">
+            <div className="flex-1 flex items-center gap-2 bg-[#111111] rounded-lg px-3 py-2">
+              <input
+                ref={inputRef}
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                placeholder="How should I change it?"
+                disabled={isProcessing}
+                className="flex-1 min-w-0 text-sm bg-transparent border-none text-[#c0c0c0] placeholder:text-[#505050] focus:outline-none disabled:opacity-60"
+              />
+              <button
+                type="submit"
+                disabled={!inputValue.trim() || isProcessing}
+                className="flex-shrink-0 w-7 h-7 rounded-md flex items-center justify-center text-[#505050] hover:text-[#a0a0a0] disabled:opacity-40 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />
+                </svg>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
   );
 }

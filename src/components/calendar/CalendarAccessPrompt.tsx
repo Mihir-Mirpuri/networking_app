@@ -18,7 +18,7 @@ export function CalendarAccessPrompt({ onConnectStart }: CalendarAccessPromptPro
   return (
     <div className="card p-8">
       <div className="text-center">
-        <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
+        <div className="w-16 h-16 bg-primary-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
           <svg
             className="w-8 h-8 text-primary-600"
             fill="none"

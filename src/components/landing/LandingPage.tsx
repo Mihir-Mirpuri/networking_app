@@ -2,500 +2,1218 @@
 
 import { signIn } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
-import {
-  MagnifyingGlassIcon,
-  EnvelopeIcon,
-  PaperAirplaneIcon,
-  BuildingOfficeIcon,
-  AcademicCapIcon,
-  MapPinIcon,
-} from '@heroicons/react/24/outline';
+import { useEffect } from 'react';
 
-// ---------------------------------------------------------------------------
-// Mock data
-// ---------------------------------------------------------------------------
-
-const MOCK_PEOPLE = [
-  {
-    name: 'Sarah Chen',
-    initials: 'SC',
-    role: 'IB Analyst',
-    company: 'Goldman Sachs',
-    university: 'UT Austin',
-    location: 'New York, NY',
-    gradient: 'from-primary-400 to-primary-600',
-  },
-  {
-    name: 'Michael Torres',
-    initials: 'MT',
-    role: 'Strategy Consultant',
-    company: 'McKinsey',
-    university: 'Rice University',
-    location: 'Houston, TX',
-    gradient: 'from-teal-400 to-teal-600',
-  },
-  {
-    name: 'Priya Patel',
-    initials: 'PP',
-    role: 'Product Manager',
-    company: 'Google',
-    university: 'Stanford',
-    location: 'San Francisco, CA',
-    gradient: 'from-violet-400 to-violet-600',
-  },
+// Company/university logos for trusted-by section
+const TRUSTED_BY = [
+  { name: 'Duke University', domain: 'duke.edu' },
+  { name: 'University of Oxford', domain: 'ox.ac.uk' },
+  { name: 'UT Austin', domain: 'utexas.edu' },
+  { name: 'Google', domain: 'google.com' },
+  { name: 'Princeton University', domain: 'princeton.edu' },
+  { name: 'Goldman Sachs', domain: 'goldmansachs.com' },
+  { name: 'McKinsey', domain: 'mckinsey.com' },
+  { name: 'Amazon', domain: 'amazon.com' },
+  { name: 'Apple', domain: 'apple.com' },
+  { name: 'JPMorgan', domain: 'jpmorgan.com' },
 ];
 
-const STEPS = [
-  {
-    icon: MagnifyingGlassIcon,
-    title: 'Search',
-    description:
-      'Filter by company, role, university, or location to find the right contacts.',
-  },
-  {
-    icon: EnvelopeIcon,
-    title: 'Personalize',
-    description:
-      'Review auto-generated emails personalized to each recipient\u2019s background.',
-  },
-  {
-    icon: PaperAirplaneIcon,
-    title: 'Send',
-    description:
-      'Send directly from your Gmail with one click and track results.',
-  },
-];
-
-// ---------------------------------------------------------------------------
-// Sub-components
-// ---------------------------------------------------------------------------
-
-function NavBar({ callbackUrl }: { callbackUrl: string }) {
+// Mascot SVG component
+function MascotSVG({ className }: { className?: string }) {
   return (
-    <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-subtle border-b border-surface-200/60">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shadow-sm">
-              <span className="text-white font-bold text-sm">S</span>
-            </div>
-            <span className="text-xl font-bold text-surface-900">Signl</span>
-          </div>
-          <button
-            onClick={() => signIn('google', { callbackUrl })}
-            className="text-sm font-medium text-surface-600 hover:text-surface-900 transition-colors"
-          >
-            Sign In
-          </button>
-        </div>
-      </div>
-    </header>
+    <svg className={className} viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="60" cy="60" r="54" fill="url(#mascotBg)" opacity="0.9"/>
+      <path
+        d="M18 60 Q25 42 32 60 Q39 78 46 60 Q53 42 60 60 Q67 78 74 60 Q81 42 88 60 Q95 78 102 60"
+        stroke="url(#waveGrad)"
+        strokeWidth="4.5"
+        strokeLinecap="round"
+        fill="none"
+        className="wave-path"
+      />
+      <circle cx="52" cy="52" r="5" fill="white"/>
+      <circle cx="68" cy="52" r="5" fill="white"/>
+      <circle cx="53.5" cy="53.5" r="2.5" fill="#0A0E1A"/>
+      <circle cx="69.5" cy="53.5" r="2.5" fill="#0A0E1A"/>
+      <circle cx="54.5" cy="52.5" r="1" fill="white" opacity="0.8"/>
+      <circle cx="70.5" cy="52.5" r="1" fill="white" opacity="0.8"/>
+      <path d="M52 70 Q60 77 68 70" stroke="white" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
+      <line x1="60" y1="6" x2="60" y2="22" stroke="#6364FF" strokeWidth="2.5" strokeLinecap="round"/>
+      <circle cx="60" cy="5" r="3.5" fill="#6364FF"/>
+      <circle cx="60" cy="5" r="6" fill="rgba(99,100,255,0.2)"/>
+      <defs>
+        <linearGradient id="waveGrad" x1="18" y1="60" x2="102" y2="60" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#0053CC"/>
+          <stop offset="50%" stopColor="#6364FF"/>
+          <stop offset="100%" stopColor="#0053CC"/>
+        </linearGradient>
+        <radialGradient id="mascotBg" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#1E3B8A" stopOpacity="0.9"/>
+          <stop offset="100%" stopColor="#0A0E1A" stopOpacity="0.95"/>
+        </radialGradient>
+      </defs>
+    </svg>
   );
 }
 
-function AuthError({ error }: { error: string }) {
-  const message =
-    error === 'OAuthCallback'
-      ? 'There was a problem with Google sign-in. Please try again.'
-      : error === 'OAuthAccountNotLinked'
-      ? 'This email is already linked to another account.'
-      : error === 'AccessDenied'
-      ? 'Access was denied. Please grant the required permissions.'
-      : `Authentication error: ${error}`;
-
+// Checkmark icon for pricing features
+function CheckIcon() {
   return (
-    <div className="max-w-md mx-auto mb-8 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm animate-fade-in">
-      <p className="font-semibold flex items-center justify-center gap-2">
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        Authentication failed
-      </p>
-      <p className="mt-1 text-red-600 text-center">{message}</p>
-    </div>
+    <svg viewBox="0 0 10 10" fill="none" className="w-2 h-2">
+      <path d="M2 5l2.5 2.5L8 3" stroke="#6364FF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
   );
 }
 
-function Hero({ callbackUrl, error }: { callbackUrl: string; error: string | null }) {
+// Trusted-by logo component
+function TrustedLogo({ name, domain }: { name: string; domain: string }) {
   return (
-    <section className="relative pt-20 pb-16 sm:pt-28 sm:pb-20 text-center px-4">
-      {error && <AuthError error={error} />}
-      <h1
-        className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-surface-900 animate-fade-in-up"
-      >
-        Find the right people.{' '}
-        <span className="text-gradient">Send the right email.</span>
-      </h1>
-      <p
-        className="mt-6 max-w-2xl mx-auto text-lg sm:text-xl text-surface-500 animate-fade-in-up"
-        style={{ animationDelay: '75ms' }}
-      >
-        Signl helps you discover professionals at top firms and send
-        personalized outreach&nbsp;&mdash;&nbsp;in seconds.
-      </p>
-      <div className="mt-10 animate-fade-in-up" style={{ animationDelay: '150ms' }}>
-        <button
-          onClick={() => signIn('google', { callbackUrl })}
-          className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-primary-600 to-primary-500 text-white font-semibold text-lg rounded-xl shadow-md hover:shadow-glow hover:from-primary-700 hover:to-primary-600 transition-all duration-200"
-        >
-          {/* Google "G" icon */}
-          <svg className="w-5 h-5" viewBox="0 0 24 24">
-            <path
-              fill="currentColor"
-              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
-            />
-            <path
-              fill="currentColor"
-              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-            />
-            <path
-              fill="currentColor"
-              d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18A10.96 10.96 0 0 0 1 12c0 1.78.43 3.46 1.18 4.93l3.66-2.84z"
-            />
-            <path
-              fill="currentColor"
-              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-            />
-          </svg>
-          Get Started with Google
-        </button>
-        <p className="mt-4 text-sm text-surface-400">
-          Free to use &middot; No credit card required
-        </p>
-      </div>
-    </section>
-  );
-}
-
-function MockSearchForm() {
-  return (
-    <div className="card p-6 mb-6">
-      <h2 className="text-xl font-bold text-surface-900 mb-4">Find People</h2>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-5 mb-6">
-        <div>
-          <label className="block text-sm font-medium text-surface-700 mb-1">
-            Company
-          </label>
-          <div className="input text-sm text-surface-800">Goldman Sachs</div>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-surface-700 mb-1">
-            Role
-          </label>
-          <div className="input text-sm text-surface-800">Analyst</div>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-surface-700 mb-1">
-            University
-          </label>
-          <div className="input text-sm text-surface-800">UT Austin</div>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-surface-700 mb-1">
-            Location
-          </label>
-          <div className="input text-sm text-surface-400">Any Location</div>
-        </div>
-      </div>
-      <button className="btn-primary" tabIndex={-1}>Search</button>
-    </div>
-  );
-}
-
-function MockPersonCard({ person }: { person: typeof MOCK_PEOPLE[number] }) {
-  return (
-    <div className="card-hover p-5 flex flex-col items-center text-center">
-      {/* Avatar */}
-      <div className="mb-4">
-        <div
-          className={`w-16 h-16 rounded-full bg-gradient-to-br ${person.gradient} flex items-center justify-center shadow-md`}
-        >
-          <span className="text-white font-semibold text-lg">
-            {person.initials}
-          </span>
-        </div>
-      </div>
-
-      {/* Name + LinkedIn badge */}
-      <div className="mb-1 flex items-center gap-2">
-        <h3 className="font-semibold text-surface-900 text-base">
-          {person.name}
-        </h3>
-        <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-semibold text-white bg-[#0A66C2] rounded">
-          in
-        </span>
-      </div>
-
-      {/* Role */}
-      <p className="text-sm text-primary-600 font-medium mb-4 truncate w-full">
-        {person.role}
-      </p>
-
-      {/* Details */}
-      <div className="w-full space-y-2 text-left mb-4">
-        <div className="flex items-center gap-2">
-          <BuildingOfficeIcon className="w-4 h-4 text-surface-400 flex-shrink-0" />
-          <p className="text-sm text-surface-700 truncate">{person.company}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <AcademicCapIcon className="w-4 h-4 text-surface-400 flex-shrink-0" />
-          <p className="text-sm text-surface-500 truncate">
-            {person.university}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <MapPinIcon className="w-4 h-4 text-surface-400 flex-shrink-0" />
-          <p className="text-sm text-surface-500 truncate">{person.location}</p>
-        </div>
-      </div>
-
-      {/* CTA */}
-      <div className="w-full mt-auto">
-        <button className="text-sm w-full justify-center btn-primary" tabIndex={-1}>
-          <EnvelopeIcon className="w-4 h-4 mr-1.5" />
-          Send Email
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function MockEmailModal() {
-  return (
-    <>
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-surface-900/30 rounded-2xl" />
-
-      {/* Modal */}
-      <div className="absolute top-[12%] right-[4%] sm:right-[8%] w-[88%] sm:w-[60%] max-w-lg bg-white rounded-lg shadow-soft-xl flex flex-col z-10">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b">
-          <div>
-            <h2 className="text-lg font-semibold">Sarah Chen</h2>
-            <p className="text-sm text-surface-600">
-              IB Analyst at Goldman Sachs
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-surface-500">1 of 3</span>
-            <div className="p-2 hover:bg-surface-100 rounded-full">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5 text-surface-500"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </div>
-          </div>
-        </div>
-
-        {/* Form */}
-        <div className="flex-1 p-4 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-surface-700 mb-1">
-              Subject
-            </label>
-            <div className="input text-sm">
-              UT Austin Senior interested in IB at Goldman Sachs
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-surface-700 mb-1">
-              Body
-            </label>
-            <div className="input text-sm whitespace-pre-line min-h-[180px] leading-relaxed">
-              {`Hello Sarah,
-
-I hope you are doing well! My name is Alex and I am a Senior studying Finance at UT Austin. I'm very interested in Investment Banking and would love to connect to hear about your experience at Goldman Sachs.
-
-Would you be open to a brief 15-minute call sometime this week?
-
-Warm regards,
-Alex`}
-            </div>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="border-t bg-surface-50 rounded-b-lg">
-          <div className="flex items-center justify-between p-4">
-            <div className="flex gap-2">
-              <span className="btn-secondary text-sm opacity-50">
-                Previous
-              </span>
-              <span className="btn-secondary text-sm">Next</span>
-            </div>
-            <span className="btn-primary text-sm">Send &amp; Next</span>
-          </div>
-          <p className="text-xs text-surface-400 text-center pb-3">
-            Esc to close &middot; Cmd/Ctrl+Enter to send
-          </p>
-        </div>
-      </div>
-    </>
-  );
-}
-
-function AppPreview() {
-  return (
-    <section
-      className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-20 animate-fade-in-up"
-      style={{ animationDelay: '200ms' }}
-    >
-      {/* Desktop / tablet: full mockup */}
-      <div
-        className="hidden md:block relative rounded-2xl border border-surface-200/60 shadow-soft-xl bg-surface-50 overflow-hidden"
-        style={{
-          perspective: '1200px',
+    <div className="trusted-logo-item">
+      <img
+        className="trusted-logo-img"
+        src={`https://logo.clearbit.com/${domain}`}
+        alt={name}
+        onError={(e) => {
+          const target = e.target as HTMLImageElement;
+          if (!target.src.includes('google.com')) {
+            target.src = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
+          }
         }}
-      >
-        <div
-          className="pointer-events-none select-none p-6 lg:p-8"
-          style={{
-            transform: 'perspective(1200px) rotateX(2deg)',
-            transformOrigin: 'center top',
-          }}
-        >
-          {/* Header bar inside mockup */}
-          <div className="flex items-center gap-2 mb-6">
-            <div className="w-6 h-6 rounded-md bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center">
-              <span className="text-white font-bold text-[10px]">S</span>
-            </div>
-            <span className="text-sm font-bold text-surface-900">Signl</span>
-          </div>
-
-          {/* Search form */}
-          <MockSearchForm />
-
-          {/* Results header */}
-          <div className="flex items-center gap-2 mb-4">
-            <h3 className="text-lg font-semibold text-surface-900">
-              3 Results Found
-            </h3>
-          </div>
-
-          {/* Results grid + email overlay */}
-          <div className="relative">
-            <div className="grid grid-cols-3 gap-4">
-              {MOCK_PEOPLE.map((person) => (
-                <MockPersonCard key={person.name} person={person} />
-              ))}
-            </div>
-
-            {/* Email compose overlay */}
-            <MockEmailModal />
-          </div>
-        </div>
-
-        {/* Bottom fade */}
-        <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-white to-transparent pointer-events-none" />
-      </div>
-
-      {/* Mobile: simplified mockup (2 stacked cards, no modal) */}
-      <div className="md:hidden relative rounded-2xl border border-surface-200/60 shadow-soft-xl bg-surface-50 overflow-hidden">
-        <div className="pointer-events-none select-none p-4">
-          {/* Mini header */}
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-6 h-6 rounded-md bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center">
-              <span className="text-white font-bold text-[10px]">S</span>
-            </div>
-            <span className="text-sm font-bold text-surface-900">Signl</span>
-          </div>
-
-          {/* Compact search */}
-          <MockSearchForm />
-
-          {/* Results */}
-          <div className="flex items-center gap-2 mb-4">
-            <h3 className="text-base font-semibold text-surface-900">
-              3 Results Found
-            </h3>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            {MOCK_PEOPLE.slice(0, 2).map((person) => (
-              <MockPersonCard key={person.name} person={person} />
-            ))}
-          </div>
-        </div>
-
-        {/* Bottom fade */}
-        <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-white to-transparent pointer-events-none" />
-      </div>
-    </section>
+      />
+    </div>
   );
 }
 
-function HowItWorks() {
+// Pricing card component
+function PricingCard({
+  name,
+  price,
+  period,
+  features,
+  featured = false,
+  buttonText,
+  onButtonClick,
+  delay = '0s'
+}: {
+  name: string;
+  price: string;
+  period: string;
+  features: string[];
+  featured?: boolean;
+  buttonText: string;
+  onButtonClick: () => void;
+  delay?: string;
+}) {
   return (
-    <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-      <h2 className="text-2xl sm:text-3xl font-bold text-surface-900 text-center mb-12">
-        How It Works
-      </h2>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-        {STEPS.map((step, i) => (
-          <div
-            key={step.title}
-            className="card p-6 text-center animate-fade-in-up"
-            style={{ animationDelay: `${300 + i * 75}ms` }}
-          >
-            <div className="flex items-center justify-center mb-4">
-              <div className="w-10 h-10 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center font-bold text-sm">
-                {i + 1}
-              </div>
+    <div
+      className={`pricing-card reveal ${featured ? 'featured' : ''}`}
+      style={{ transitionDelay: delay }}
+    >
+      {featured && <div className="popular-badge">Most Popular</div>}
+      <div className="plan-name">{name}</div>
+      <div className="plan-price" dangerouslySetInnerHTML={{ __html: price }} />
+      <div className="plan-period">{period}</div>
+      <div className="plan-divider" />
+      <ul className="plan-features">
+        {features.map((feature, i) => (
+          <li key={i} className="plan-feature">
+            <div className="plan-feature-icon">
+              <CheckIcon />
             </div>
-            <step.icon className="w-8 h-8 mx-auto text-primary-500 mb-3" />
-            <h3 className="text-lg font-semibold text-surface-900 mb-2">
-              {step.title}
-            </h3>
-            <p className="text-sm text-surface-500 leading-relaxed">
-              {step.description}
-            </p>
-          </div>
+            {feature}
+          </li>
         ))}
-      </div>
-    </section>
+      </ul>
+      <button
+        className={`plan-btn ${featured ? 'plan-btn-primary' : 'plan-btn-outline'}`}
+        onClick={onButtonClick}
+      >
+        {buttonText}
+      </button>
+    </div>
   );
 }
-
-function Footer() {
-  return (
-    <footer className="border-t border-surface-200/60 py-8 text-center">
-      <div className="flex items-center justify-center gap-4 text-sm text-surface-400">
-        <a href="/privacy" className="hover:text-surface-600 transition-colors">
-          Privacy Policy
-        </a>
-        <span>&middot;</span>
-        <a href="/terms" className="hover:text-surface-600 transition-colors">
-          Terms of Service
-        </a>
-      </div>
-    </footer>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Main export
-// ---------------------------------------------------------------------------
 
 export function LandingPage() {
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get('callbackUrl') || '/';
-  const error = searchParams.get('error');
+
+  // Set up intersection observer for reveal animations
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((e) => {
+          if (e.isIntersecting) e.target.classList.add('visible');
+        });
+      },
+      { threshold: 0.1 }
+    );
+    document.querySelectorAll('.reveal').forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, []);
+
+  const handleSignIn = () => signIn('google', { callbackUrl });
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-surface-50 via-white to-primary-50/30">
-      <NavBar callbackUrl={callbackUrl} />
-      <Hero callbackUrl={callbackUrl} error={error} />
-      <AppPreview />
-      <HowItWorks />
-      <Footer />
-    </div>
+    <>
+      <style jsx global>{`
+        :root {
+          --black: #000000;
+          --blue-deep: #1E3B8A;
+          --blue-mid: #324095;
+          --blue-bright: #0053CC;
+          --blue-electric: #6364FF;
+          --white: #FFFFFF;
+          --gray: #8A8FA8;
+          --surface: #000000;
+          --surface2: #0a0a0a;
+        }
+
+        .landing-page * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        .landing-page {
+          background: var(--black);
+          color: var(--white);
+          font-family: 'Inter', sans-serif;
+          overflow-x: hidden;
+          min-height: 100vh;
+        }
+
+        .landing-page::before {
+          content: '';
+          position: fixed;
+          inset: 0;
+          background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+          pointer-events: none;
+          z-index: 1000;
+          opacity: 0.4;
+        }
+
+        /* NAV */
+        .landing-nav {
+          position: fixed;
+          top: 0; left: 0; right: 0;
+          z-index: 100;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 20px 48px;
+          background: rgba(0,0,0,0.7);
+          backdrop-filter: blur(12px);
+          border-bottom: 1px solid rgba(99,100,255,0.1);
+        }
+
+        .nav-logo-group {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .nav-logo {
+          font-size: 22px;
+          font-weight: 900;
+          letter-spacing: 1px;
+          color: var(--white);
+          text-transform: uppercase;
+        }
+
+        .nav-logo .p { color: var(--blue-electric); }
+
+        /* UT BADGE */
+        .ut-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          background: rgba(191,87,0,0.1);
+          border: 1px solid rgba(191,87,0,0.25);
+          color: #FF9D45;
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 1px;
+          text-transform: uppercase;
+          padding: 6px 12px;
+          border-radius: 100px;
+          white-space: nowrap;
+        }
+
+        /* HERO */
+        .hero {
+          min-height: 100vh;
+          display: flex;
+          flex-direction: column;
+          position: relative;
+          overflow: hidden;
+          padding-top: 72px;
+        }
+
+        .hero-main {
+          flex: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 80px;
+          padding: 60px 80px;
+          position: relative;
+          z-index: 2;
+        }
+
+        .hero::after {
+          content: '';
+          position: absolute;
+          width: 700px; height: 700px;
+          background: radial-gradient(circle, rgba(99,100,255,0.09) 0%, transparent 70%);
+          top: 40%; left: 50%;
+          transform: translate(-50%, -50%);
+          pointer-events: none;
+        }
+
+        .hero-grid-bg {
+          position: absolute;
+          inset: 0;
+          background-image:
+            linear-gradient(rgba(99,100,255,0.04) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(99,100,255,0.04) 1px, transparent 1px);
+          background-size: 60px 60px;
+          mask-image: radial-gradient(ellipse at center, black 30%, transparent 80%);
+          -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 80%);
+        }
+
+        /* MASCOT */
+        .hero-mascot-side {
+          flex: 0 0 auto;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          position: relative;
+        }
+
+        .mascot-wrapper {
+          position: relative;
+          z-index: 2;
+        }
+
+        .mascot-svg {
+          width: 280px; height: 280px;
+          filter: drop-shadow(0 0 40px rgba(99,100,255,0.5));
+          animation: mascot-float 3s ease-in-out infinite;
+        }
+
+        @keyframes mascot-float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-16px); }
+        }
+
+        .mascot-ring {
+          position: absolute;
+          top: 50%; left: 50%;
+          transform: translate(-50%, -50%);
+          width: 300px; height: 300px;
+          border-radius: 50%;
+          border: 1px solid rgba(99,100,255,0.2);
+          animation: ring-pulse 2.5s ease-out infinite;
+        }
+
+        .mascot-ring:nth-child(2) { animation-delay: 0.8s; }
+        .mascot-ring:nth-child(3) { animation-delay: 1.6s; }
+
+        @keyframes ring-pulse {
+          0% { transform: translate(-50%, -50%) scale(1); opacity: 0.4; }
+          100% { transform: translate(-50%, -50%) scale(1.8); opacity: 0; }
+        }
+
+        /* TEXT */
+        .hero-text-side {
+          flex: 0 0 auto;
+          max-width: 500px;
+          z-index: 2;
+        }
+
+        .hero-headline {
+          font-size: clamp(44px, 5vw, 72px);
+          font-weight: 900;
+          line-height: 1.0;
+          letter-spacing: -3px;
+          animation: fade-up 0.6s ease forwards;
+          opacity: 0;
+          animation-delay: 0.1s;
+          margin-bottom: 0;
+        }
+
+        .hero-headline .gradient-text {
+          background: linear-gradient(135deg, #6364FF 0%, #0053CC 50%, #6364FF 100%);
+          background-size: 200% 200%;
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+          animation: gradient-shift 4s ease infinite;
+        }
+
+        @keyframes gradient-shift {
+          0%, 100% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+        }
+
+        .hero-actions {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          margin-top: 36px;
+          animation: fade-up 0.6s ease forwards;
+          opacity: 0;
+          animation-delay: 0.25s;
+          max-width: 360px;
+        }
+
+        .btn-primary {
+          background: var(--blue-electric);
+          color: white;
+          border: none;
+          padding: 16px 34px;
+          border-radius: 12px;
+          font-size: 16px;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.2s;
+          font-family: 'Inter', sans-serif;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          width: 100%;
+        }
+
+        .btn-primary:hover {
+          background: #7879ff;
+          transform: translateY(-2px);
+          box-shadow: 0 8px 30px rgba(99,100,255,0.35);
+        }
+
+        .btn-secondary {
+          background: transparent;
+          color: var(--blue-electric);
+          border: 2px solid var(--blue-electric);
+          padding: 14px 34px;
+          border-radius: 12px;
+          font-size: 16px;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.2s;
+          font-family: 'Inter', sans-serif;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          width: 100%;
+        }
+
+        .btn-secondary:hover {
+          background: rgba(99,100,255,0.08);
+        }
+
+        @keyframes fade-up {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* TRUSTED BY */
+        .hero-ticker {
+          border-top: 1px solid rgba(255,255,255,0.07);
+          background: rgba(10,14,26,0.85);
+          backdrop-filter: blur(8px);
+          padding: 32px 0 36px;
+          overflow: hidden;
+          position: relative;
+          z-index: 2;
+        }
+
+        .hero-ticker-label {
+          text-align: center;
+          font-size: 14px;
+          font-weight: 600;
+          letter-spacing: 0.5px;
+          color: rgba(99,100,255,0.7);
+          margin-bottom: 28px;
+        }
+
+        .trusted-logos-row {
+          position: relative;
+          overflow: hidden;
+        }
+
+        .trusted-track {
+          display: flex;
+          align-items: center;
+          width: max-content;
+          animation: ticker-scroll 35s linear infinite;
+        }
+
+        .trusted-track:hover { animation-play-state: paused; }
+
+        @keyframes ticker-scroll {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+
+        .trusted-logo-item {
+          flex-shrink: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0 40px;
+        }
+
+        .trusted-logo-img {
+          height: 40px;
+          width: auto;
+          max-width: 140px;
+          object-fit: contain;
+          filter: grayscale(100%) brightness(0.6);
+          opacity: 0.5;
+          transition: all 0.3s ease;
+        }
+
+        .trusted-logo-item:hover .trusted-logo-img {
+          filter: grayscale(0%) brightness(1);
+          opacity: 0.9;
+        }
+
+        .trusted-fade-left, .trusted-fade-right {
+          position: absolute;
+          top: 0; bottom: 0;
+          width: 120px;
+          z-index: 2;
+          pointer-events: none;
+        }
+
+        .trusted-fade-left { left: 0; background: linear-gradient(to right, rgba(10,14,26,0.85), transparent); }
+        .trusted-fade-right { right: 0; background: linear-gradient(to left, rgba(10,14,26,0.85), transparent); }
+
+        /* HOW IT WORKS */
+        .how-split {
+          background: var(--surface);
+          padding: 0 80px;
+          border-top: 1px solid rgba(99,100,255,0.08);
+          min-height: 100vh;
+          display: flex;
+          align-items: center;
+        }
+
+        .how-split-inner {
+          max-width: 1100px;
+          margin: 0 auto;
+          display: grid;
+          grid-template-columns: 420px 1fr;
+          gap: 80px;
+          align-items: center;
+          width: 100%;
+        }
+
+        .section-label {
+          font-size: 52px;
+          letter-spacing: -2px;
+          font-weight: 900;
+          color: white;
+          line-height: 1;
+          white-space: nowrap;
+        }
+
+        .how-split-title {
+          font-size: clamp(16px, 1.8vw, 22px);
+          font-weight: 600;
+          letter-spacing: -0.3px;
+          line-height: 1.8;
+          margin-top: 14px;
+          color: var(--gray);
+        }
+
+        .video-chrome {
+          background: #0d1220;
+          border: 1px solid rgba(99,100,255,0.15);
+          border-bottom: none;
+          border-radius: 12px 12px 0 0;
+          padding: 12px 16px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .chrome-dot { width: 12px; height: 12px; border-radius: 50%; }
+
+        .chrome-bar {
+          flex: 1;
+          height: 26px;
+          background: rgba(255,255,255,0.04);
+          border-radius: 6px;
+          margin: 0 8px;
+          display: flex; align-items: center;
+          padding: 0 12px;
+        }
+
+        .chrome-url { font-size: 12px; color: var(--gray); font-family: monospace; }
+
+        .video-placeholder {
+          width: 100%;
+          aspect-ratio: 16/9;
+          background: var(--surface2);
+          border: 1px solid rgba(99,100,255,0.15);
+          border-radius: 0 0 12px 12px;
+          position: relative;
+          overflow: hidden;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+        }
+
+        .video-placeholder::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(135deg, rgba(99,100,255,0.05) 0%, transparent 60%);
+        }
+
+        .video-placeholder::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: repeating-linear-gradient(
+            0deg, transparent, transparent 2px,
+            rgba(99,100,255,0.015) 2px, rgba(99,100,255,0.015) 4px
+          );
+        }
+
+        .video-play-btn {
+          position: relative;
+          z-index: 2;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 16px;
+        }
+
+        .play-circle {
+          width: 72px; height: 72px;
+          background: rgba(99,100,255,0.15);
+          border: 2px solid rgba(99,100,255,0.4);
+          border-radius: 50%;
+          display: flex; align-items: center; justify-content: center;
+          transition: all 0.2s;
+          backdrop-filter: blur(8px);
+        }
+
+        .video-placeholder:hover .play-circle {
+          background: rgba(99,100,255,0.25);
+          border-color: var(--blue-electric);
+          transform: scale(1.08);
+        }
+
+        .play-triangle {
+          width: 0; height: 0;
+          border-top: 11px solid transparent;
+          border-bottom: 11px solid transparent;
+          border-left: 18px solid var(--blue-electric);
+          margin-left: 4px;
+        }
+
+        .video-label { font-size: 14px; font-weight: 600; color: var(--gray); letter-spacing: 0.5px; }
+
+        /* PROOF SECTION */
+        .proof-section {
+          background: var(--black);
+          padding: 100px 80px;
+          border-top: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .proof-inner {
+          max-width: 1100px;
+          margin: 0 auto;
+          display: grid;
+          grid-template-columns: 1.2fr 1fr;
+          gap: 80px;
+          align-items: center;
+        }
+
+        .proof-right {
+          display: flex;
+          flex-direction: column;
+          gap: 0;
+          padding-left: 48px;
+        }
+
+        .vstat {
+          padding: 28px 0;
+        }
+
+        .vstat-num {
+          font-size: 48px;
+          font-weight: 900;
+          color: var(--blue-electric);
+          letter-spacing: -2px;
+          line-height: 1;
+        }
+
+        .vstat-label {
+          font-size: 14px;
+          font-weight: 700;
+          color: var(--white);
+          margin-top: 6px;
+          letter-spacing: -0.3px;
+        }
+
+        .vstat-context {
+          font-size: 12px;
+          color: var(--gray);
+          margin-top: 3px;
+          font-style: italic;
+        }
+
+        .vstat-line {
+          height: 1px;
+          background: rgba(255,255,255,0.07);
+          width: 100%;
+        }
+
+        /* EMAIL MOCKUP */
+        .email-mockup {
+          background: var(--surface2);
+          border: 1px solid rgba(99,100,255,0.15);
+          border-radius: 16px;
+          padding: 28px;
+          position: relative;
+        }
+
+        .email-mockup::before {
+          content: '';
+          position: absolute;
+          inset: -1px;
+          border-radius: 16px;
+          background: linear-gradient(135deg, rgba(99,100,255,0.15), transparent 50%);
+          pointer-events: none;
+        }
+
+        .email-header {
+          display: flex; align-items: center; gap: 12px;
+          margin-bottom: 20px;
+          padding-bottom: 14px;
+          border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+
+        .email-avatar {
+          width: 34px; height: 34px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #6364FF, #0053CC);
+          display: flex; align-items: center; justify-content: center;
+          font-size: 13px; font-weight: 700;
+        }
+
+        .email-meta { flex: 1; }
+        .email-name { font-size: 13px; font-weight: 700; }
+        .email-addr { font-size: 11px; color: var(--gray); }
+
+        .email-badge {
+          background: rgba(99,100,255,0.12);
+          color: var(--blue-electric);
+          font-size: 10px; font-weight: 700;
+          padding: 4px 9px; border-radius: 20px;
+        }
+
+        .email-body p { font-size: 13px; color: #ccc; line-height: 1.7; margin-bottom: 10px; }
+
+        .email-highlight {
+          background: rgba(99,100,255,0.08);
+          border-left: 2px solid var(--blue-electric);
+          padding: 9px 13px;
+          border-radius: 0 6px 6px 0;
+          margin: 14px 0;
+          font-size: 12px; color: #aab; font-style: italic;
+        }
+
+        /* PRICING */
+        .pricing {
+          background: var(--surface);
+          padding: 60px 48px;
+        }
+
+        .pricing-inner { max-width: 1000px; margin: 0 auto; }
+
+        .pricing-header { text-align: center; margin-bottom: 32px; }
+
+        .section-title {
+          font-size: clamp(40px, 5vw, 72px);
+          font-weight: 900;
+          letter-spacing: -3px;
+          line-height: 1.05;
+        }
+
+        .pricing-cards {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 2px;
+        }
+
+        .pricing-card {
+          background: var(--surface2);
+          padding: 28px 24px;
+          position: relative;
+          transition: background 0.3s;
+        }
+
+        .pricing-card:first-child { border-radius: 16px 0 0 16px; }
+        .pricing-card:last-child { border-radius: 0 16px 16px 0; }
+
+        .pricing-card.featured {
+          background: #0d1630;
+          border: 1px solid rgba(99,100,255,0.35);
+          border-radius: 16px;
+          z-index: 2;
+          transform: translateY(-6px);
+          box-shadow: 0 0 40px rgba(99,100,255,0.12);
+        }
+
+        .pricing-card:hover { background: #121828; }
+        .pricing-card.featured:hover { background: #0f1835; }
+
+        .popular-badge {
+          display: inline-block;
+          background: var(--blue-electric);
+          color: white;
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: 1px;
+          text-transform: uppercase;
+          padding: 4px 10px;
+          border-radius: 20px;
+          margin-bottom: 12px;
+        }
+
+        .plan-name {
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 2px;
+          text-transform: uppercase;
+          color: var(--gray);
+          margin-bottom: 8px;
+        }
+
+        .plan-price {
+          font-size: 36px;
+          font-weight: 900;
+          letter-spacing: -2px;
+          line-height: 1;
+          margin-bottom: 4px;
+        }
+
+        .plan-price span {
+          font-size: 15px;
+          font-weight: 600;
+          color: var(--gray);
+          letter-spacing: 0;
+        }
+
+        .plan-period {
+          font-size: 12px;
+          color: var(--gray);
+          margin-bottom: 18px;
+        }
+
+        .plan-divider {
+          height: 1px;
+          background: rgba(255,255,255,0.06);
+          margin-bottom: 16px;
+        }
+
+        .plan-features { list-style: none; display: flex; flex-direction: column; gap: 9px; margin-bottom: 20px; }
+
+        .plan-feature {
+          display: flex;
+          align-items: flex-start;
+          gap: 10px;
+          font-size: 12px;
+          color: #ccc;
+          line-height: 1.4;
+        }
+
+        .plan-feature-icon {
+          width: 15px; height: 15px;
+          border-radius: 50%;
+          background: rgba(99,100,255,0.15);
+          display: flex; align-items: center; justify-content: center;
+          flex-shrink: 0;
+          margin-top: 1px;
+        }
+
+        .plan-btn {
+          width: 100%;
+          padding: 10px;
+          border-radius: 10px;
+          font-size: 13px;
+          font-weight: 700;
+          cursor: pointer;
+          font-family: 'Inter', sans-serif;
+          transition: all 0.2s;
+          border: none;
+        }
+
+        .plan-btn-outline {
+          background: transparent;
+          border: 1px solid rgba(255,255,255,0.15);
+          color: var(--white);
+        }
+
+        .plan-btn-outline:hover {
+          border-color: rgba(255,255,255,0.3);
+          background: rgba(255,255,255,0.04);
+        }
+
+        .plan-btn-primary {
+          background: var(--blue-electric);
+          color: white;
+        }
+
+        .plan-btn-primary:hover {
+          background: #7879ff;
+          transform: translateY(-1px);
+          box-shadow: 0 6px 20px rgba(99,100,255,0.3);
+        }
+
+        .guarantee {
+          margin-top: 16px;
+          border: 1px solid rgba(99,100,255,0.2);
+          border-radius: 14px;
+          padding: 18px 28px;
+          background: rgba(99,100,255,0.05);
+        }
+
+        .guarantee-inner {
+          display: flex;
+          align-items: center;
+          gap: 18px;
+          max-width: 560px;
+          margin: 0 auto;
+        }
+
+        .guarantee-icon { font-size: 28px; flex-shrink: 0; }
+
+        .guarantee-title {
+          font-size: 15px;
+          font-weight: 800;
+          color: var(--white);
+          margin-bottom: 4px;
+          letter-spacing: -0.3px;
+        }
+
+        .guarantee-desc {
+          font-size: 13px;
+          color: var(--gray);
+          line-height: 1.5;
+        }
+
+        /* FOOTER */
+        .landing-footer {
+          padding: 36px 48px;
+          border-top: 1px solid rgba(255,255,255,0.06);
+          display: flex; align-items: center; justify-content: space-between;
+        }
+
+        .footer-logo { font-size: 15px; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; }
+        .footer-logo .p { color: var(--blue-electric); }
+        .footer-copy { font-size: 13px; color: var(--gray); }
+
+        /* REVEAL ANIMATIONS */
+        .reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.7s ease, transform 0.7s ease; }
+        .reveal.visible { opacity: 1; transform: translateY(0); }
+
+        /* RESPONSIVE */
+        @media (max-width: 1024px) {
+          .hero-main {
+            flex-direction: column;
+            gap: 40px;
+            padding: 40px 24px;
+          }
+          .hero-text-side {
+            text-align: center;
+            max-width: 100%;
+          }
+          .hero-actions {
+            margin: 36px auto 0;
+          }
+          .how-split {
+            padding: 60px 24px;
+            min-height: auto;
+          }
+          .how-split-inner {
+            grid-template-columns: 1fr;
+            gap: 40px;
+          }
+          .how-split-text {
+            text-align: center;
+          }
+          .section-label {
+            font-size: 36px;
+          }
+          .proof-section {
+            padding: 60px 24px;
+          }
+          .proof-inner {
+            grid-template-columns: 1fr;
+            gap: 40px;
+          }
+          .proof-right {
+            padding-left: 0;
+          }
+          .pricing {
+            padding: 60px 24px;
+          }
+          .pricing-cards {
+            grid-template-columns: 1fr;
+            gap: 16px;
+          }
+          .pricing-card:first-child,
+          .pricing-card:last-child {
+            border-radius: 16px;
+          }
+          .pricing-card.featured {
+            transform: none;
+          }
+          .landing-nav {
+            padding: 16px 24px;
+          }
+          .ut-badge {
+            display: none;
+          }
+          .landing-footer {
+            flex-direction: column;
+            gap: 12px;
+            text-align: center;
+          }
+        }
+
+        @media (max-width: 640px) {
+          .mascot-svg {
+            width: 200px;
+            height: 200px;
+          }
+          .mascot-ring {
+            width: 220px;
+            height: 220px;
+          }
+          .hero-headline {
+            font-size: 36px;
+            letter-spacing: -2px;
+          }
+        }
+      `}</style>
+
+      <div className="landing-page">
+        {/* NAV */}
+        <nav className="landing-nav">
+          <div className="nav-logo-group">
+            <div className="nav-logo">SIG<span className="p">N</span><span className="p">L</span></div>
+            <div className="ut-badge">Exclusive to UT Austin Students</div>
+          </div>
+        </nav>
+
+        {/* HERO */}
+        <div className="hero">
+          <div className="hero-grid-bg" />
+
+          <div className="hero-main">
+            {/* LEFT: Mascot */}
+            <div className="hero-mascot-side">
+              <div className="mascot-wrapper">
+                <div className="mascot-ring" />
+                <div className="mascot-ring" />
+                <div className="mascot-ring" />
+                <MascotSVG className="mascot-svg" />
+              </div>
+            </div>
+
+            {/* RIGHT: Text */}
+            <div className="hero-text-side">
+              <h1 className="hero-headline">
+                Outreach<br/>
+                <span className="gradient-text">Made Simple.</span>
+              </h1>
+              <div className="hero-actions">
+                <button className="btn-primary" onClick={handleSignIn}>GET STARTED</button>
+                <button className="btn-secondary" onClick={handleSignIn}>I ALREADY HAVE AN ACCOUNT</button>
+              </div>
+            </div>
+          </div>
+
+          {/* BOTTOM: Trusted by logos */}
+          <div className="hero-ticker">
+            <p className="hero-ticker-label">Trusted by students and professionals at...</p>
+            <div className="trusted-logos-row">
+              <div className="trusted-fade-left" />
+              <div className="trusted-fade-right" />
+              <div className="trusted-track">
+                {[...TRUSTED_BY, ...TRUSTED_BY].map((company, i) => (
+                  <TrustedLogo key={`${company.name}-${i}`} name={company.name} domain={company.domain} />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* HOW IT WORKS */}
+        <div className="how-split" id="how">
+          <div className="how-split-inner">
+            <div className="how-split-text reveal">
+              <p className="section-label">How it works</p>
+              <h2 className="how-split-title">
+                Find the right connections.<br/>
+                Personalize the email.<br/>
+                Send at scale.
+              </h2>
+            </div>
+
+            <div className="how-split-video reveal" style={{ transitionDelay: '0.2s' }}>
+              <div className="video-chrome">
+                <div className="chrome-dot" style={{ background: '#FF5F57' }} />
+                <div className="chrome-dot" style={{ background: '#FFBD2E' }} />
+                <div className="chrome-dot" style={{ background: '#28C840' }} />
+                <div className="chrome-bar">
+                  <span className="chrome-url">signl.app</span>
+                </div>
+              </div>
+              <div className="video-placeholder">
+                <div className="video-play-btn">
+                  <div className="play-circle">
+                    <div className="play-triangle" />
+                  </div>
+                  <span className="video-label">Watch Signl in action — 60 seconds</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* SOCIAL PROOF */}
+        <section className="proof-section">
+          <div className="proof-inner">
+            <div className="proof-left reveal">
+              <div className="email-mockup">
+                <div className="email-header">
+                  <div className="email-avatar">JK</div>
+                  <div className="email-meta">
+                    <div className="email-name">Jordan Kim</div>
+                    <div className="email-addr">jordan.kim@stripe.com</div>
+                  </div>
+                  <div className="email-badge">AI Personalized</div>
+                </div>
+                <div className="email-body">
+                  <p>Hi Jordan,</p>
+                  <div className="email-highlight">
+                    🎯 Signl found: Both UT Austin CS. Jordan led fintech infra at JPMorgan before Stripe.
+                  </div>
+                  <p>
+                    I came across your work on Stripe&apos;s infrastructure team — the path from JPMorgan&apos;s
+                    fintech division to Stripe is something I find genuinely interesting, especially as a
+                    CS senior at UT Austin trying to figure out where to take my backend experience.
+                  </p>
+                  <p>
+                    Would love 20 minutes to hear how you made that transition. Happy to work around your schedule.
+                  </p>
+                  <p style={{ color: '#555', fontSize: '12px', marginTop: '18px' }}>
+                    — Alex Rivera · alex@utexas.edu
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="proof-right reveal" style={{ transitionDelay: '0.2s' }}>
+              <div className="vstat">
+                <div className="vstat-num">~20s</div>
+                <div className="vstat-label">Per personalized email</div>
+                <div className="vstat-context">vs. 5–10 min manually</div>
+              </div>
+              <div className="vstat-line" />
+              <div className="vstat">
+                <div className="vstat-num">1</div>
+                <div className="vstat-label">Tool instead of four</div>
+                <div className="vstat-context">LinkedIn · Apollo · ChatGPT · Gmail</div>
+              </div>
+              <div className="vstat-line" />
+              <div className="vstat">
+                <div className="vstat-num">0</div>
+                <div className="vstat-label">AI-generated slop</div>
+                <div className="vstat-context">Emails that actually sound like you</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* PRICING */}
+        <section className="pricing" id="pricing">
+          <div className="pricing-inner">
+            <div className="pricing-header reveal">
+              <h2 className="section-title">Pricing</h2>
+            </div>
+            <div className="pricing-cards">
+              <PricingCard
+                name="Free"
+                price="$0"
+                period="forever"
+                features={[
+                  '10 emails per day',
+                  'AI personalization',
+                  'Find verified emails',
+                  'Send emails from Signl',
+                  '+10 bonus emails/day for each referral',
+                ]}
+                buttonText="Get Started Free"
+                onButtonClick={handleSignIn}
+              />
+              <PricingCard
+                name="Basic"
+                price="$12<span>/mo</span>"
+                period="billed monthly"
+                features={[
+                  '20 emails per day',
+                  'AI personalization',
+                  'Find verified emails',
+                  'Send emails from Signl',
+                  '+10 bonus emails/day for each referral',
+                ]}
+                buttonText="Get Started"
+                onButtonClick={handleSignIn}
+                delay="0.15s"
+              />
+              <PricingCard
+                name="Unlimited"
+                price="$20<span>/mo</span>"
+                period="billed monthly"
+                features={[
+                  'Unlimited emails per day',
+                  'AI personalization',
+                  'Find verified emails',
+                  'Send emails from Signl',
+                  '+10 bonus emails/day for each referral',
+                ]}
+                featured
+                buttonText="Get Unlimited"
+                onButtonClick={handleSignIn}
+                delay="0.3s"
+              />
+            </div>
+
+            <div className="guarantee reveal">
+              <div className="guarantee-inner">
+                <span className="guarantee-icon">🛡️</span>
+                <div>
+                  <div className="guarantee-title">Money-back guarantee</div>
+                  <div className="guarantee-desc">
+                    If you don&apos;t get 15 coffee chats in your first 2 weeks, we&apos;ll refund you. No questions asked.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* FOOTER */}
+        <footer className="landing-footer">
+          <div className="footer-logo">SIG<span className="p">N</span><span className="p">L</span></div>
+          <div className="footer-copy">© 2026 Signl. Built at UT Austin. 🤘</div>
+        </footer>
+      </div>
+    </>
   );
 }

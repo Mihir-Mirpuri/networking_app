@@ -8,8 +8,8 @@ export const metadata: Metadata = {
 
 export default function TermsPage() {
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-3xl mx-auto bg-white rounded-lg shadow-sm p-8">
+    <div className="min-h-screen bg-surface-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-3xl mx-auto bg-surface-100 rounded-lg shadow-sm p-8">
         <Link
           href="/"
           className="text-blue-600 hover:text-blue-800 text-sm mb-6 inline-block"

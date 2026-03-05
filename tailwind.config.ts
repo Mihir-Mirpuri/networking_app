@@ -9,54 +9,54 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Refined primary palette - a sophisticated indigo
+        // Primary palette - purple/violet for brand & navigation
         primary: {
-          50: '#eef2ff',
-          100: '#e0e7ff',
-          200: '#c7d2fe',
-          300: '#a5b4fc',
-          400: '#818cf8',
-          500: '#6366f1',
-          600: '#4f46e5',
-          700: '#4338ca',
-          800: '#3730a3',
-          900: '#312e81',
-          950: '#1e1b4b',
+          50: '#f0edff',
+          100: '#e0dbff',
+          200: '#c4b5fe',
+          300: '#a78bfa',
+          400: '#8b5cf6',
+          500: '#7c3aed',
+          600: '#6d28d9',
+          700: '#5b21b6',
+          800: '#4c1d95',
+          900: '#3b0f7a',
+          950: '#1e0a3e',
         },
-        // Warm accent for CTAs and highlights
+        // Green accent for CTAs and action buttons
         accent: {
-          50: '#fff7ed',
-          100: '#ffedd5',
-          200: '#fed7aa',
-          300: '#fdba74',
-          400: '#fb923c',
-          500: '#f97316',
-          600: '#ea580c',
-          700: '#c2410c',
-          800: '#9a3412',
-          900: '#7c2d12',
+          50: '#ecfdf5',
+          100: '#d1fae5',
+          200: '#a7f3d0',
+          300: '#6ee7b7',
+          400: '#34d399',
+          500: '#10b981',
+          600: '#059669',
+          700: '#047857',
+          800: '#065f46',
+          900: '#064e3b',
         },
-        // Refined neutral grays with slight warmth
+        // Dark theme surface palette - navy-tinted (inverted)
         surface: {
-          50: '#fafafa',
-          100: '#f5f5f4',
-          200: '#e7e5e4',
-          300: '#d6d3d1',
-          400: '#a8a29e',
-          500: '#78716c',
-          600: '#57534e',
-          700: '#44403c',
-          800: '#292524',
-          900: '#1c1917',
+          50: '#06060f',   // Deep navy - main background
+          100: '#0c0c1a',  // Card backgrounds
+          200: '#151528',  // Borders
+          300: '#1e1e33',  // Elevated surfaces
+          400: '#7b82a0',  // Muted text
+          500: '#9299b2',  // Medium text
+          600: '#b0b6c9',  // Secondary text
+          700: '#cdd2de',  // Body text
+          800: '#e2e5ed',  // Strong text
+          900: '#ffffff',  // Headings
         },
       },
       boxShadow: {
-        'soft': '0 2px 8px -2px rgba(0, 0, 0, 0.05), 0 4px 16px -4px rgba(0, 0, 0, 0.1)',
-        'soft-lg': '0 4px 12px -2px rgba(0, 0, 0, 0.08), 0 8px 24px -4px rgba(0, 0, 0, 0.12)',
-        'soft-xl': '0 8px 24px -4px rgba(0, 0, 0, 0.1), 0 16px 48px -8px rgba(0, 0, 0, 0.15)',
-        'inner-soft': 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.04)',
-        'glow': '0 0 20px -5px rgba(99, 102, 241, 0.4)',
-        'glow-lg': '0 0 40px -10px rgba(99, 102, 241, 0.5)',
+        'soft': '0 0 1px rgba(0,0,0,0.3), 0 0 20px -5px rgba(0,0,0,0.15)',
+        'soft-lg': '0 0 1px rgba(0,0,0,0.4), 0 0 30px -5px rgba(0,0,0,0.2)',
+        'soft-xl': '0 0 1px rgba(0,0,0,0.5), 0 0 40px -5px rgba(0,0,0,0.25)',
+        'inner-soft': 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.2)',
+        'glow': '0 0 20px -5px rgba(0, 0, 0, 0.4)',
+        'glow-lg': '0 0 40px -10px rgba(0, 0, 0, 0.5)',
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',

@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { OutreachStatus } from '@prisma/client';
 import {
   OutreachTrackerEntry,
   OutreachStats,
@@ -34,7 +33,6 @@ export function OutreachTrackerClient({
   const [hasMore, setHasMore] = useState(initialHasMore);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<OutreachStatus[]>([]);
   const [sortField, setSortField] = useState<SortField>('createdAt');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
@@ -48,7 +46,6 @@ export function OutreachTrackerClient({
       try {
         const result = await getOutreachTrackers({
           search: searchQuery || undefined,
-          status: statusFilter.length > 0 ? statusFilter : undefined,
           sortField,
           sortDirection,
           cursor: resetCursor ? undefined : cursor || undefined,
@@ -69,7 +66,7 @@ export function OutreachTrackerClient({
         setIsLoading(false);
       }
     },
-    [searchQuery, statusFilter, sortField, sortDirection, cursor]
+    [searchQuery, sortField, sortDirection, cursor]
   );
 
   const handleSearch = () => {
@@ -82,7 +79,6 @@ export function OutreachTrackerClient({
     try {
       const result = await getOutreachTrackers({
         search: searchQuery || undefined,
-        status: statusFilter.length > 0 ? statusFilter : undefined,
         sortField,
         sortDirection,
         cursor,
@@ -146,36 +142,13 @@ export function OutreachTrackerClient({
     <div>
       {/* Header */}
       <div className="mb-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
-          <div>
-            <h1 className="text-2xl font-bold text-surface-900">Outreach Tracker</h1>
-            <p className="text-surface-500 mt-0.5 text-sm">Track and manage your networking outreach</p>
-          </div>
-
-          {/* Compact Stats */}
-          <div className="flex items-center gap-1 text-sm">
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-50 text-primary-700">
-              <span className="font-semibold">{stats.sent ?? 0}</span>
-              <span className="text-primary-500">sent</span>
-            </div>
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 text-amber-700">
-              <span className="font-semibold">{stats.waiting ?? 0}</span>
-              <span className="text-amber-500">waiting</span>
-            </div>
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700">
-              <span className="font-semibold">{stats.ongoingConversations ?? 0}</span>
-              <span className="text-emerald-500">replied</span>
-            </div>
-          </div>
-        </div>
+        <h1 className="text-2xl font-bold text-[#E0E0E0] mb-4">History</h1>
 
         {/* Filters */}
         <OutreachFilters
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           onSearch={handleSearch}
-          statusFilter={statusFilter}
-          onStatusFilterChange={setStatusFilter}
           isLoading={isLoading}
         />
       </div>
@@ -183,7 +156,7 @@ export function OutreachTrackerClient({
       {/* Result count */}
       {trackers.length > 0 && (
         <div className="flex items-center justify-between mb-3">
-          <p className="text-xs text-surface-400">
+          <p className="text-xs text-[#606060]">
             Showing {trackers.length}{stats.total ? ` of ${stats.total}` : ''} contacts
           </p>
         </div>
@@ -192,7 +165,7 @@ export function OutreachTrackerClient({
       {/* Table */}
       {isLoading && trackers.length === 0 ? (
         <div className="flex items-center justify-center h-64">
-          <div className="flex items-center gap-3 text-surface-500">
+          <div className="flex items-center gap-3 text-[#707070]">
             <LoadingSpinner size="md" />
             Loading...
           </div>

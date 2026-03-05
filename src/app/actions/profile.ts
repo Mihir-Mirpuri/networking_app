@@ -11,6 +11,7 @@ export interface UserProfile {
   university: string | null;
   career: string | null;
   emailInstructions: string | null;
+  autoPersonalize: boolean;
 }
 
 export interface TemplateData {
@@ -47,6 +48,7 @@ export async function getProfileAction(): Promise<
         university: true,
         career: true,
         emailInstructions: true,
+        autoPersonalize: true,
       },
     });
 
@@ -54,7 +56,7 @@ export async function getProfileAction(): Promise<
       return { success: false, error: 'User not found' };
     }
 
-    return { success: true, profile: user };
+    return { success: true, profile: { ...user, autoPersonalize: user.autoPersonalize ?? false } };
   } catch (error) {
     console.error('Error fetching profile:', error);
     return { success: false, error: 'Failed to fetch profile' };
@@ -80,6 +82,7 @@ export async function updateProfileAction(
         university: profile.university,
         career: profile.career,
         emailInstructions: profile.emailInstructions,
+        autoPersonalize: profile.autoPersonalize,
       },
     });
 
@@ -87,6 +90,28 @@ export async function updateProfileAction(
   } catch (error) {
     console.error('Error updating profile:', error);
     return { success: false, error: 'Failed to update profile' };
+  }
+}
+
+// ============================================================================
+// User Preferences Actions
+// ============================================================================
+
+/**
+ * Get user's autoPersonalize setting
+ */
+export async function getAutoPersonalizeAction(): Promise<boolean> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) return false;
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { autoPersonalize: true },
+    });
+    return user?.autoPersonalize ?? false;
+  } catch {
+    return false;
   }
 }
 

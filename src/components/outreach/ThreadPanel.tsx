@@ -69,26 +69,26 @@ export function ThreadPanel({ tracker, isOpen, onClose }: ThreadPanelProps) {
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-surface-900/40 backdrop-blur-sm z-40 animate-fade-in"
+        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 animate-fade-in"
         onClick={onClose}
       />
 
       {/* Panel */}
-      <div className="fixed right-0 top-0 h-full w-full max-w-2xl bg-white shadow-soft-xl z-50 flex flex-col animate-slide-in-right">
+      <div className="fixed right-0 top-0 h-full w-full max-w-2xl bg-[#2a2a2a] shadow-soft-xl z-50 flex flex-col animate-slide-in-right">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-surface-200">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#404040]">
           <div>
-            <h2 className="text-lg font-semibold text-surface-900">
+            <h2 className="text-lg font-semibold text-[#E0E0E0]">
               {tracker.contactName || tracker.contactEmail}
             </h2>
-            <p className="text-sm text-surface-500">{tracker.contactEmail}</p>
+            <p className="text-sm text-[#707070]">{tracker.contactEmail}</p>
             {tracker.company && (
-              <p className="text-sm text-surface-500">{tracker.company}</p>
+              <p className="text-sm text-[#707070]">{tracker.company}</p>
             )}
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-surface-400 hover:text-surface-600 rounded-lg hover:bg-surface-100 transition-colors"
+            className="p-2 text-[#606060] hover:text-[#A0A0A0] rounded-lg hover:bg-[#333333] transition-colors"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -99,7 +99,7 @@ export function ThreadPanel({ tracker, isOpen, onClose }: ThreadPanelProps) {
         {/* Messages */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {isLoading ? (
-            <div className="flex items-center justify-center h-full gap-2 text-surface-500">
+            <div className="flex items-center justify-center h-full gap-2 text-[#707070]">
               <LoadingSpinner size="md" />
               <span>Loading messages...</span>
             </div>
@@ -108,7 +108,7 @@ export function ThreadPanel({ tracker, isOpen, onClose }: ThreadPanelProps) {
               <p className="text-red-500">{error}</p>
             </div>
           ) : messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-surface-500">
+            <div className="flex flex-col items-center justify-center h-full text-[#707070]">
               <p>No messages in this thread yet.</p>
               <p className="text-sm mt-1">Send an email to start the conversation.</p>
             </div>
@@ -119,42 +119,42 @@ export function ThreadPanel({ tracker, isOpen, onClose }: ThreadPanelProps) {
                   key={message.messageId}
                   className={`rounded-xl border ${
                     message.direction === 'SENT'
-                      ? 'bg-primary-50 border-primary-200'
-                      : 'bg-surface-50 border-surface-200'
+                      ? 'bg-blue-900/20 border-[#404040]'
+                      : 'bg-[#252525] border-[#404040]'
                   }`}
                 >
-                  <div className="px-4 py-3 border-b border-surface-200">
+                  <div className="px-4 py-3 border-b border-[#404040]">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className={`text-sm font-medium ${
-                          message.direction === 'SENT' ? 'text-primary-700' : 'text-surface-700'
+                          message.direction === 'SENT' ? 'text-blue-400' : 'text-[#A0A0A0]'
                         }`}>
                           {message.direction === 'SENT' ? 'You' : formatSender(message.sender)}
                         </span>
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                           message.direction === 'SENT'
-                            ? 'bg-primary-100 text-primary-600'
-                            : 'bg-emerald-100 text-emerald-600'
+                            ? 'bg-blue-900/30 text-blue-400'
+                            : 'bg-emerald-900/30 text-emerald-400'
                         }`}>
                           {message.direction === 'SENT' ? 'Sent' : 'Received'}
                         </span>
                       </div>
-                      <span className="text-xs text-surface-500">
+                      <span className="text-xs text-[#707070]">
                         {formatDate(message.receivedAt)}
                       </span>
                     </div>
                     {message.subject && (
-                      <p className="text-sm text-surface-600 mt-1">{message.subject}</p>
+                      <p className="text-sm text-[#808080] mt-1">{message.subject}</p>
                     )}
                   </div>
                   <div className="px-4 py-3">
                     {message.bodyHtml ? (
                       <div
-                        className="text-sm text-surface-700 prose prose-sm max-w-none"
+                        className="text-sm text-[#A0A0A0] prose prose-sm prose-invert max-w-none"
                         dangerouslySetInnerHTML={{ __html: message.bodyHtml }}
                       />
                     ) : (
-                      <p className="text-sm text-surface-700 whitespace-pre-wrap">
+                      <p className="text-sm text-[#A0A0A0] whitespace-pre-wrap">
                         {message.bodyText || '(No content)'}
                       </p>
                     )}
@@ -167,32 +167,32 @@ export function ThreadPanel({ tracker, isOpen, onClose }: ThreadPanelProps) {
         </div>
 
         {/* Contact Details */}
-        <div className="border-t border-surface-200 px-6 py-4 space-y-3 bg-surface-50">
-          <h3 className="text-sm font-semibold text-surface-900">Contact Details</h3>
+        <div className="border-t border-[#404040] px-6 py-4 space-y-3 bg-[#252525]">
+          <h3 className="text-sm font-semibold text-[#E0E0E0]">Contact Details</h3>
           <div className="flex flex-wrap gap-2 items-center">
             <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${statusConfig.bg} ${statusConfig.color}`}>
               {statusConfig.label}
             </span>
             {tracker.dateEmailed && (
-              <span className="text-xs text-surface-500">
+              <span className="text-xs text-[#707070]">
                 Emailed {formatDate(tracker.dateEmailed)}
               </span>
             )}
           </div>
           {(tracker.role || tracker.company) && (
-            <p className="text-sm text-surface-700">
+            <p className="text-sm text-[#A0A0A0]">
               {tracker.role}{tracker.role && tracker.company ? ' @ ' : ''}{tracker.company}
             </p>
           )}
           {tracker.location && (
-            <p className="text-sm text-surface-500">{tracker.location}</p>
+            <p className="text-sm text-[#707070]">{tracker.location}</p>
           )}
           {tracker.linkedinUrl && (
             <a
               href={tracker.linkedinUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700"
+              className="inline-flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300"
             >
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
@@ -202,8 +202,8 @@ export function ThreadPanel({ tracker, isOpen, onClose }: ThreadPanelProps) {
           )}
           {tracker.notes && (
             <div className="mt-2">
-              <p className="text-xs font-medium text-surface-500 mb-1">Notes</p>
-              <p className="text-sm text-surface-700 whitespace-pre-wrap">{tracker.notes}</p>
+              <p className="text-xs font-medium text-[#707070] mb-1">Notes</p>
+              <p className="text-sm text-[#A0A0A0] whitespace-pre-wrap">{tracker.notes}</p>
             </div>
           )}
         </div>

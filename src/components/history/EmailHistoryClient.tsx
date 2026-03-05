@@ -386,7 +386,7 @@ export function EmailHistoryClient({
             onClick={() => setActiveTab('all')}
             className={`flex items-center gap-1.5 px-5 py-2.5 text-sm font-medium rounded-lg transition-all ${
               activeTab === 'all'
-                ? 'bg-white text-primary-700 shadow-soft'
+                ? 'bg-surface-100 text-primary-700 shadow-soft'
                 : 'text-surface-600 hover:text-surface-900'
             }`}
           >
@@ -401,14 +401,14 @@ export function EmailHistoryClient({
             onClick={() => setActiveTab('ongoing')}
             className={`flex items-center gap-1.5 px-5 py-2.5 text-sm font-medium rounded-lg transition-all ${
               activeTab === 'ongoing'
-                ? 'bg-white text-primary-700 shadow-soft'
+                ? 'bg-surface-100 text-primary-700 shadow-soft'
                 : 'text-surface-600 hover:text-surface-900'
             }`}
           >
             Ongoing
             {ongoingCount > 0 && (
               <span className={`px-2 py-0.5 text-xs rounded-full ${
-                activeTab === 'ongoing' ? 'bg-green-100 text-green-700' : 'bg-surface-200 text-surface-600'
+                activeTab === 'ongoing' ? 'bg-green-900/30 text-green-400' : 'bg-surface-200 text-surface-600'
               }`}>
                 {ongoingCount}
               </span>
@@ -418,7 +418,7 @@ export function EmailHistoryClient({
             onClick={() => setActiveTab('no-response')}
             className={`flex items-center gap-1.5 px-5 py-2.5 text-sm font-medium rounded-lg transition-all ${
               activeTab === 'no-response'
-                ? 'bg-white text-primary-700 shadow-soft'
+                ? 'bg-surface-100 text-primary-700 shadow-soft'
                 : 'text-surface-600 hover:text-surface-900'
             }`}
           >
@@ -622,7 +622,7 @@ export function EmailHistoryClient({
                   {groupedLogs[dateKey].map((log) => (
                     <div
                       key={log.id}
-                      className="bg-white px-4 py-3 hover:bg-surface-50"
+                      className="bg-surface-100 px-4 py-3 hover:bg-surface-50"
                     >
                       <button
                         onClick={() =>
@@ -632,7 +632,7 @@ export function EmailHistoryClient({
                       >
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-3">
-                            <span className="font-medium text-surface-900">
+                            <span className="font-medium text-[#e0e0e0]">
                               {log.toName || log.toEmail}
                             </span>
                             {log.isDirectSend && (
@@ -648,8 +648,8 @@ export function EmailHistoryClient({
                               <span
                                 className={`text-xs px-2 py-0.5 rounded-full ${
                                   log.status === 'SUCCESS'
-                                    ? 'bg-green-100 text-green-800'
-                                    : 'bg-red-100 text-red-800'
+                                    ? 'bg-green-900/30 text-green-400'
+                                    : 'bg-red-900/30 text-red-400'
                                 }`}
                               >
                                 {log.status === 'SUCCESS' ? 'Sent' : 'Failed'}
@@ -665,7 +665,7 @@ export function EmailHistoryClient({
                               <span
                                 className={`text-xs px-2 py-0.5 rounded-full ${
                                   log.hasResponse
-                                    ? 'bg-green-100 text-green-800'
+                                    ? 'bg-green-900/30 text-green-400'
                                     : 'bg-orange-100 text-orange-800'
                                 }`}
                               >
@@ -733,7 +733,7 @@ export function EmailHistoryClient({
                                     setEditScheduleError(null);
                                   }
                                 }}
-                                className="px-3 py-1.5 text-sm border border-primary-600 text-primary-600 rounded-md hover:bg-primary-50"
+                                className="px-3 py-1.5 text-sm border border-primary-600 text-primary-600 rounded-md hover:bg-primary-500/10"
                               >
                                 Edit Time
                               </button>
@@ -772,7 +772,7 @@ export function EmailHistoryClient({
       {/* Edit Schedule Modal */}
       {editingScheduleId && (
         <div className="fixed inset-0 bg-surface-900/50 flex items-center justify-center z-50 p-4 animate-fade-in" onClick={(e) => { if (e.target === e.currentTarget) { setEditingScheduleId(null); setEditScheduledDateTime(''); setEditScheduleError(null); } }}>
-          <div className="bg-white rounded-lg shadow-soft-xl max-w-md w-full p-6 animate-scale-in">
+          <div className="bg-surface-100 rounded-lg shadow-soft-xl max-w-md w-full p-6 animate-scale-in">
             <h3 className="text-lg font-semibold mb-4">Edit Scheduled Time</h3>
 
             <div className="mb-4">
@@ -795,7 +795,7 @@ export function EmailHistoryClient({
             </div>
 
             {editScheduleError && (
-              <div className="mb-4 p-3 bg-red-100 text-red-800 rounded-md text-sm">
+              <div className="mb-4 p-3 bg-red-900/30 text-red-400 rounded-md text-sm">
                 {editScheduleError}
               </div>
             )}
@@ -827,7 +827,7 @@ export function EmailHistoryClient({
       {/* Follow Up Modal */}
       {followUpData && (
         <div className="fixed inset-0 bg-surface-900/50 flex items-center justify-center z-50 p-4 animate-fade-in" onClick={(e) => { if (e.target === e.currentTarget) { setFollowUpData(null); setFollowUpError(null); } }}>
-          <div className="bg-white rounded-lg shadow-soft-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto animate-scale-in">
+          <div className="bg-surface-100 rounded-lg shadow-soft-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto animate-scale-in">
             <h3 className="text-lg font-semibold mb-4">Follow Up Email</h3>
 
             <div className="mb-4">
@@ -862,7 +862,7 @@ export function EmailHistoryClient({
             </div>
 
             {followUpError && (
-              <div className="mb-4 p-3 bg-red-100 text-red-800 rounded-md text-sm">
+              <div className="mb-4 p-3 bg-red-900/30 text-red-400 rounded-md text-sm">
                 {followUpError}
               </div>
             )}

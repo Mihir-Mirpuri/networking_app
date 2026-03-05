@@ -237,7 +237,7 @@ function parseTemplatePrompt(prompt: string): { subject: string; body: string } 
 function generateEmailDraft(
   template: { subject: string; body: string },
   person: { firstName: string | null; company: string; role: string | null },
-  user: { name: string | null; university: string | null; classification: string | null; major: string | null; career: string | null }
+  user: { name: string | null; university: string | null; classification: string | null; major: string | null; career: string | null } | null
 ): { subject: string; body: string } {
   // Replace placeholders
   let subject: string = template.subject;
@@ -247,12 +247,12 @@ function generateEmailDraft(
     '{first_name}': person.firstName || 'there',
     '{company}': person.company,
     '{role}': person.role || 'your role',
-    '{user_name}': user.name || 'A student',
-    '{university}': user.university || 'my university',
-    '{classification}': user.classification || 'student',
-    '{major}': user.major || 'my major',
-    '{career}': user.career || 'your industry',
-    '{industry}': user.career || 'your industry',
+    '{user_name}': user?.name || 'A student',
+    '{university}': user?.university || 'my university',
+    '{classification}': user?.classification || 'student',
+    '{major}': user?.major || 'my major',
+    '{career}': user?.career || 'your industry',
+    '{industry}': user?.career || 'your industry',
   };
 
   for (const [placeholder, value] of Object.entries(replacements)) {
@@ -335,46 +335,67 @@ async function enrichPeopleWithPatterns(
  */
 async function buildResultsWithDrafts(
   rankedPeople: Array<{ candidate: PersonWithSource; score: number; breakdown: ScoreBreakdown }>,
-  userId: string,
+  userId: string | null,
   template: ResolvedTemplate,
-  user: { name: string | null; university: string | null; classification: string | null; major: string | null; career: string | null }
+  user: { name: string | null; university: string | null; classification: string | null; major: string | null; career: string | null } | null
 ): Promise<SearchResultWithDraft[]> {
   return Promise.all(
     rankedPeople.map(async ({ candidate: person, score, breakdown }) => {
-      const userCandidate = await prisma.userCandidate.upsert({
-        where: {
-          userId_personId: { userId, personId: person.id },
-        },
-        create: {
-          userId,
-          personId: person.id,
-          email: person.email,
-          emailStatus: (person.emailStatus as any) || 'MISSING',
-          emailConfidence: person.emailConfidence,
-        },
-        update: {},
-        select: { id: true },
-      });
+      let userCandidateId: string | null = null;
+      let draftSubject = '';
+      let draftBody = '';
 
-      // Generate placeholder-filled template (LLM generation happens on-demand when user opens profile)
-      const draft = generateEmailDraft(
-        template,
-        { firstName: person.firstName, company: person.company, role: person.role },
-        user
-      );
+      if (userId) {
+        // Authenticated user: create UserCandidate and EmailDraft records
+        const userCandidate = await prisma.userCandidate.upsert({
+          where: {
+            userId_personId: { userId, personId: person.id },
+          },
+          create: {
+            userId,
+            personId: person.id,
+            email: person.email,
+            emailStatus: (person.emailStatus as any) || 'MISSING',
+            emailConfidence: person.emailConfidence,
+          },
+          update: {},
+          select: { id: true },
+        });
 
-      const isHardcodedTemplate = EMAIL_TEMPLATES.some(t => t.id === template.id);
-      const emailDraft = await prisma.emailDraft.upsert({
-        where: { userCandidateId: userCandidate.id },
-        create: {
-          userCandidateId: userCandidate.id,
-          templateId: isHardcodedTemplate ? null : template.id,
-          subject: draft.subject,
-          body: draft.body,
-          status: 'APPROVED',
-        },
-        update: {},
-      });
+        userCandidateId = userCandidate.id;
+
+        // Generate placeholder-filled template (LLM generation happens on-demand when user opens profile)
+        const draft = generateEmailDraft(
+          template,
+          { firstName: person.firstName, company: person.company, role: person.role },
+          user
+        );
+
+        const isHardcodedTemplate = EMAIL_TEMPLATES.some(t => t.id === template.id);
+        const emailDraft = await prisma.emailDraft.upsert({
+          where: { userCandidateId: userCandidate.id },
+          create: {
+            userCandidateId: userCandidate.id,
+            templateId: isHardcodedTemplate ? null : template.id,
+            subject: draft.subject,
+            body: draft.body,
+            status: 'APPROVED',
+          },
+          update: {},
+        });
+
+        draftSubject = emailDraft.subject;
+        draftBody = emailDraft.body;
+      } else {
+        // Guest user: generate a simple placeholder draft without saving
+        const draft = generateEmailDraft(
+          template,
+          { firstName: person.firstName, company: person.company, role: person.role },
+          null
+        );
+        draftSubject = draft.subject;
+        draftBody = draft.body;
+      }
 
       const sourceLink = person.sourceLinks[0];
 
@@ -403,9 +424,9 @@ async function buildResultsWithDrafts(
         sourceTitle: sourceLink?.title || null,
         sourceSnippet: sourceLink?.snippet || null,
         sourceDomain: sourceLink?.domain || null,
-        draftSubject: emailDraft.subject,
-        draftBody: emailDraft.body,
-        userCandidateId: userCandidate.id,
+        draftSubject,
+        draftBody,
+        userCandidateId,
         resumeId: template.attachResume ? template.resumeId : null,
         score,
         scoreBreakdown: breakdown,
@@ -427,51 +448,56 @@ export async function searchPeopleAction(
   input: SearchInput
 ): Promise<SearchActionResult> {
   const session = await getServerSession(authOptions);
-
-  if (!session?.user?.id) {
-    return { success: false, error: 'Not authenticated' };
-  }
+  const userId = session?.user?.id || null;
+  const isGuest = !userId;
 
   if (!input.company || !input.company.trim()) {
     return { success: false, error: 'Company is required' };
   }
 
   try {
-    const userId = session.user.id;
+    let user = null;
+    let remainingDaily = 0;
+    let hiddenCount = 0;
+    let excludedIds: string[] = [];
 
-    // Get user info for template
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        name: true,
-        university: true,
-        classification: true,
-        major: true,
-        career: true,
-        dailySendCount: true,
-        lastSendDate: true,
-      },
-    });
+    if (userId) {
+      // Authenticated user: get their info
+      user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          name: true,
+          university: true,
+          classification: true,
+          major: true,
+          career: true,
+          dailySendCount: true,
+          lastSendDate: true,
+        },
+      });
 
-    if (!user) {
-      return { success: false, error: 'User not found' };
+      if (!user) {
+        return { success: false, error: 'User not found' };
+      }
+
+      // Calculate remaining daily sends
+      const today = new Date().toDateString();
+      const lastSendDay = user.lastSendDate?.toDateString();
+      const dailyLimit = 30;
+      remainingDaily =
+        lastSendDay === today ? Math.max(0, dailyLimit - user.dailySendCount) : dailyLimit;
+
+      // Count hidden people for the UI bar
+      hiddenCount = await prisma.userCandidate.count({
+        where: { userId, doNotShow: true },
+      });
+
+      // Get excluded people (already sent or hidden)
+      excludedIds = await getExcludedPersonIds(userId);
+      console.log(`[Search] User has ${excludedIds.length} excluded people (sent/hidden).`);
+    } else {
+      console.log(`[Search] Guest user search`);
     }
-
-    // Calculate remaining daily sends
-    const today = new Date().toDateString();
-    const lastSendDay = user.lastSendDate?.toDateString();
-    const dailyLimit = 30;
-    const remainingDaily =
-      lastSendDay === today ? Math.max(0, dailyLimit - user.dailySendCount) : dailyLimit;
-
-    // Count hidden people for the UI bar
-    const hiddenCount = await prisma.userCandidate.count({
-      where: { userId, doNotShow: true },
-    });
-
-    // Get excluded people (already sent or hidden)
-    const excludedIds = await getExcludedPersonIds(userId);
-    console.log(`[Search] User has ${excludedIds.length} excluded people (sent/hidden).`);
 
     // Merge sent/hidden IDs with already-displayed IDs for a single DB-level NOT IN
     const allExcludedIds = input.excludePersonIds
@@ -596,8 +622,22 @@ export async function searchPeopleAction(
     }
 
     // ===== STEP 4: Build results with drafts =====
-    const template = await resolveTemplateForUser(userId, input.templateId);
-    console.log(`[Search] Resolved template: id=${template.id}, attachResume=${template.attachResume}, resumeId=${template.resumeId || '(none)'}`);
+    let template: ResolvedTemplate;
+    if (userId) {
+      template = await resolveTemplateForUser(userId, input.templateId);
+      console.log(`[Search] Resolved template: id=${template.id}, attachResume=${template.attachResume}, resumeId=${template.resumeId || '(none)'}`);
+    } else {
+      // Guest user: use a basic template
+      const defaultTemplate = EMAIL_TEMPLATES[0];
+      template = {
+        id: defaultTemplate.id,
+        subject: defaultTemplate.subject,
+        body: defaultTemplate.body,
+        attachResume: false,
+        resumeId: null,
+      };
+      console.log(`[Search] Guest user: using default template`);
+    }
     const results = await buildResultsWithDrafts(rankedPeople, userId, template, user);
 
     // ===== STEP 5: Compute hasMore =====
@@ -609,18 +649,20 @@ export async function searchPeopleAction(
       `[Search] Returning ${results.length} results (hasMore=${hasMore}, cseHasMore=${cseHasMorePages})`
     );
 
-    // Log the search for analytics
-    await prisma.searchLog.create({
-      data: {
-        userId,
-        company: input.company || null,
-        role: input.role || null,
-        university: input.university || null,
-        location: input.location || null,
-        resultsCount: results.length,
-        fromCache: false, // No longer using cache — kept for schema compatibility
-      },
-    });
+    // Log the search for analytics (only for authenticated users)
+    if (userId) {
+      await prisma.searchLog.create({
+        data: {
+          userId,
+          company: input.company || null,
+          role: input.role || null,
+          university: input.university || null,
+          location: input.location || null,
+          resultsCount: results.length,
+          fromCache: false, // No longer using cache — kept for schema compatibility
+        },
+      });
+    }
 
     return {
       success: true,

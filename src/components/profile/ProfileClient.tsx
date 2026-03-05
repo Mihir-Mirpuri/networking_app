@@ -69,6 +69,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
     university: null,
     career: null,
     emailInstructions: null,
+    autoPersonalize: false,
   });
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
@@ -354,7 +355,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4" style={{ alignItems: 'start' }}>
 
         {/* Profile Card */}
-        <section className="bg-white p-6 rounded-2xl border border-surface-200 card-shadow">
+        <section className="bg-surface-100 p-6 rounded-2xl border border-surface-200 card-shadow">
           <div className="flex items-center gap-4 mb-6">
             {userImage ? (
               <img
@@ -371,7 +372,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
               <h2 className="text-xl font-bold text-surface-900">{profile.name || userName}</h2>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <span className="text-sm text-surface-500">{userEmail}</span>
-                <span className="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 bg-green-100 text-green-700 rounded">
+                <span className="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 bg-green-900/30 text-green-400 rounded">
                   Google Connected
                 </span>
               </div>
@@ -498,6 +499,33 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                   />
                   <p className="text-xs text-surface-400">These instructions will be applied to every AI-generated email.</p>
                 </div>
+
+                {/* Auto-Personalize Toggle */}
+                <div className="md:col-span-2 flex items-center justify-between p-4 bg-surface-50 rounded-lg">
+                  <div className="space-y-0.5">
+                    <label className="text-sm font-semibold text-surface-900">
+                      Auto-Personalize Emails
+                    </label>
+                    <p className="text-xs text-surface-500">
+                      Automatically personalize emails with AI when opening the review modal
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={profile.autoPersonalize}
+                    onClick={() => setProfile({ ...profile, autoPersonalize: !profile.autoPersonalize })}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      profile.autoPersonalize ? 'bg-primary-500' : 'bg-surface-300'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        profile.autoPersonalize ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
               </div>
 
               <button
@@ -512,7 +540,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
         </section>
 
         {/* Resume Card */}
-        <section className="bg-white p-6 rounded-2xl border border-surface-200 card-shadow">
+        <section className="bg-surface-100 p-6 rounded-2xl border border-surface-200 card-shadow">
           <h3 className="text-lg font-bold text-surface-900 mb-4">Resume</h3>
 
           {resumeSuccess && (
@@ -560,10 +588,10 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                 <div
                   key={resume.id}
                   className={`p-3 rounded-xl flex items-center gap-3 ${
-                    resume.isActive ? 'bg-primary-50' : 'bg-surface-50'
+                    resume.isActive ? 'bg-primary-500/10' : 'bg-surface-50'
                   }`}
                 >
-                  <div className="bg-white p-3 rounded-lg shadow-sm">
+                  <div className="bg-surface-100 p-3 rounded-lg shadow-sm">
                     <svg className="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm-1 2l5 5h-5V4zM6 20V4h6v6h6v10H6z"/>
                     </svg>
@@ -620,7 +648,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
         </section>
 
         {/* Email Templates Card */}
-        <section className="bg-white p-6 rounded-2xl border border-surface-200 card-shadow">
+        <section className="bg-surface-100 p-6 rounded-2xl border border-surface-200 card-shadow">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-bold text-surface-900">Email Templates</h3>
             {!isCreating && (
@@ -649,7 +677,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
               {/* Built-in AI Personalized Template (always shown) */}
               <button
                 onClick={() => setShowDefaultTemplate(true)}
-                className="group w-full text-left bg-white border border-surface-200 p-4 rounded-xl hover:border-primary-500/50 transition-all"
+                className="group w-full text-left bg-surface-100 border border-surface-200 p-4 rounded-xl hover:border-primary-500/50 transition-all"
               >
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center gap-2">
@@ -673,7 +701,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
               {templates.map((template) => (
                 <div
                   key={template.id}
-                  className="group relative bg-white border border-surface-200 p-4 rounded-xl hover:border-primary-500/50 transition-all"
+                  className="group relative bg-surface-100 border border-surface-200 p-4 rounded-xl hover:border-primary-500/50 transition-all"
                 >
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-2">
@@ -684,7 +712,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                         </span>
                       )}
                       {template.attachResume && (
-                        <span className="bg-green-100 text-green-700 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">
+                        <span className="bg-green-900/30 text-green-400 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">
                           Resume
                         </span>
                       )}
@@ -729,7 +757,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
 
           {/* Create Template Form */}
           {isCreating && (
-            <div className="mt-3 p-4 border border-primary-200 rounded-xl bg-primary-50/50">
+            <div className="mt-3 p-4 border border-primary-200 rounded-xl bg-primary-50">
               <h4 className="font-semibold text-surface-900 mb-4">New Template</h4>
               <div className="space-y-4">
                 <div className="space-y-1.5">
@@ -738,7 +766,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                     type="text"
                     value={newTemplate.name}
                     onChange={(e) => setNewTemplate({ ...newTemplate, name: e.target.value })}
-                    className="w-full bg-white border-none rounded-lg focus:ring-2 focus:ring-primary-500 text-sm p-3"
+                    className="w-full bg-surface-100 border-none rounded-lg focus:ring-2 focus:ring-primary-500 text-sm p-3"
                     placeholder="Template name"
                   />
                 </div>
@@ -748,7 +776,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                     type="text"
                     value={newTemplate.subject}
                     onChange={(e) => setNewTemplate({ ...newTemplate, subject: e.target.value })}
-                    className="w-full bg-white border-none rounded-lg focus:ring-2 focus:ring-primary-500 text-sm p-3"
+                    className="w-full bg-surface-100 border-none rounded-lg focus:ring-2 focus:ring-primary-500 text-sm p-3"
                     placeholder="Email subject"
                   />
                 </div>
@@ -758,7 +786,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                     value={newTemplate.body}
                     onChange={(e) => setNewTemplate({ ...newTemplate, body: e.target.value })}
                     rows={4}
-                    className="w-full bg-white border-none rounded-lg focus:ring-2 focus:ring-primary-500 text-sm p-3 resize-none"
+                    className="w-full bg-surface-100 border-none rounded-lg focus:ring-2 focus:ring-primary-500 text-sm p-3 resize-none"
                     placeholder="Email body"
                   />
                 </div>
@@ -800,7 +828,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                       <select
                         value={newTemplate.resumeId || ''}
                         onChange={(e) => setNewTemplate({ ...newTemplate, resumeId: e.target.value || null })}
-                        className="w-full bg-white border border-surface-200 rounded-lg text-sm p-2"
+                        className="w-full bg-surface-100 border border-surface-200 rounded-lg text-sm p-2"
                       >
                         {resumes.map((resume) => (
                           <option key={resume.id} value={resume.id}>
@@ -835,7 +863,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
         </section>
 
         {/* Plan & Billing Card */}
-        <section className="bg-white p-6 rounded-2xl border border-surface-200 card-shadow">
+        <section className="bg-surface-100 p-6 rounded-2xl border border-surface-200 card-shadow">
           <h3 className="text-lg font-bold text-surface-900 mb-4">Plan & Billing</h3>
           {isLoadingSubscription ? (
             <div className="text-center py-4 text-surface-500 text-sm">Loading plan details...</div>
@@ -900,7 +928,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
         </section>
 
         {/* Account Settings Card */}
-        <section className="bg-white p-6 rounded-2xl border border-surface-200 card-shadow">
+        <section className="bg-surface-100 p-6 rounded-2xl border border-surface-200 card-shadow">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-lg font-bold text-surface-900">Account</h3>
@@ -922,7 +950,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
       {/* Template Modal */}
       {(selectedTemplate || showDefaultTemplate) && (
         <div className="fixed inset-0 bg-surface-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-surface-100 rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex items-center justify-between mb-6 pb-4 border-b border-surface-200">
                 <h3 className="text-lg font-bold text-surface-900">
@@ -1034,7 +1062,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                         <select
                           value={editingTemplate.resumeId || ''}
                           onChange={(e) => setEditingTemplate({ ...editingTemplate, resumeId: e.target.value || null })}
-                          className="w-full bg-white border border-surface-200 rounded-lg text-sm p-2"
+                          className="w-full bg-surface-100 border border-surface-200 rounded-lg text-sm p-2"
                         >
                           {resumes.map((resume) => (
                             <option key={resume.id} value={resume.id}>
@@ -1071,7 +1099,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                       <span className="bg-primary-100 text-primary-700 text-[10px] px-2.5 py-1 rounded-full font-bold uppercase">Default</span>
                     )}
                     {selectedTemplate.attachResume && (
-                      <span className="bg-green-100 text-green-700 text-[10px] px-2.5 py-1 rounded-full font-bold uppercase">Resume</span>
+                      <span className="bg-green-900/30 text-green-400 text-[10px] px-2.5 py-1 rounded-full font-bold uppercase">Resume</span>
                     )}
                   </div>
                   <div className="space-y-1.5">

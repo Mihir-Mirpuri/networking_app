@@ -95,7 +95,7 @@ export function PersonCard({
       {onHide && person.userCandidateId && (
         <button
           onClick={onHide}
-          className="absolute top-3 right-3 p-1.5 text-surface-400 hover:text-surface-600 hover:bg-surface-100 rounded-lg opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all"
+          className="absolute top-3 right-3 p-1.5 text-[#707070] hover:text-[#A0A0A0] hover:bg-[#404040] rounded-lg opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all"
           title="Don't show again"
         >
           <svg
@@ -143,7 +143,7 @@ export function PersonCard({
 
       {/* Name and LinkedIn */}
       <div className="mb-1 flex items-center gap-2">
-        <h3 className="font-semibold text-surface-900 text-base">{person.fullName}</h3>
+        <h3 className="font-semibold text-[#E0E0E0] text-base">{person.fullName}</h3>
         {person.linkedinUrl && (
           <a
             href={person.linkedinUrl}
@@ -166,7 +166,7 @@ export function PersonCard({
       )}
 
       {/* Role */}
-      <p className="text-sm text-primary-600 font-medium mb-4 truncate w-full" title={person.role || 'Professional'}>
+      <p className="text-sm text-[#A0A0A0] font-medium mb-4 truncate w-full" title={person.role || 'Professional'}>
         {person.role || 'Professional'}
       </p>
 
@@ -174,15 +174,15 @@ export function PersonCard({
       <div className="w-full space-y-2 text-left mb-4">
         {/* Company */}
         <div className="flex items-center gap-2">
-          <BuildingOfficeIcon className="w-4 h-4 text-surface-400 flex-shrink-0" />
-          <p className="text-sm text-surface-700 truncate">{person.company}</p>
+          <BuildingOfficeIcon className="w-4 h-4 text-[#707070] flex-shrink-0" />
+          <p className="text-sm text-[#707070] truncate">{person.company}</p>
         </div>
 
         {/* University */}
         {person.educationSchool && (
           <div className="flex items-center gap-2">
-            <AcademicCapIcon className="w-4 h-4 text-surface-400 flex-shrink-0" />
-            <p className="text-sm text-surface-500 truncate">
+            <AcademicCapIcon className="w-4 h-4 text-[#707070] flex-shrink-0" />
+            <p className="text-sm text-[#707070] truncate">
               {person.educationSchool}
             </p>
           </div>
@@ -191,8 +191,8 @@ export function PersonCard({
         {/* Location */}
         {(person.city || person.state || person.country) && (
           <div className="flex items-center gap-2">
-            <MapPinIcon className="w-4 h-4 text-surface-400 flex-shrink-0" />
-            <p className="text-sm text-surface-500 truncate">
+            <MapPinIcon className="w-4 h-4 text-[#707070] flex-shrink-0" />
+            <p className="text-sm text-[#707070] truncate">
               {[person.city, person.state].filter(Boolean).join(', ') || person.country}
             </p>
           </div>

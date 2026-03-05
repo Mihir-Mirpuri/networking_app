@@ -45,17 +45,17 @@ export function OutreachTable({
     if (!field) return null;
     if (sortField !== field) {
       return (
-        <svg className="w-4 h-4 text-surface-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-4 h-4 text-[#606060]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
         </svg>
       );
     }
     return sortDirection === 'asc' ? (
-      <svg className="w-4 h-4 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg className="w-4 h-4 text-[#808080]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
       </svg>
     ) : (
-      <svg className="w-4 h-4 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg className="w-4 h-4 text-[#808080]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
       </svg>
     );
@@ -63,9 +63,9 @@ export function OutreachTable({
 
   if (trackers.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-surface-500">
-        <div className="w-16 h-16 mb-4 rounded-2xl bg-surface-100 flex items-center justify-center">
-          <svg className="w-8 h-8 text-surface-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="flex flex-col items-center justify-center py-16 text-[#707070]">
+        <div className="w-16 h-16 mb-4 rounded-2xl bg-[#2a2a2a] flex items-center justify-center">
+          <svg className="w-8 h-8 text-[#606060]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -74,8 +74,8 @@ export function OutreachTable({
             />
           </svg>
         </div>
-        <p className="text-lg font-semibold text-surface-700">No outreach contacts yet</p>
-        <p className="text-sm mt-1 text-surface-500">
+        <p className="text-lg font-semibold text-[#A0A0A0]">No outreach contacts yet</p>
+        <p className="text-sm mt-1 text-[#707070]">
           Send an email through the app to automatically track your outreach
         </p>
       </div>
@@ -83,21 +83,21 @@ export function OutreachTable({
   }
 
   return (
-    <div className="border border-surface-200 rounded-xl overflow-hidden shadow-soft overflow-x-auto">
+    <div className="border border-[#404040] rounded-xl overflow-hidden shadow-soft overflow-x-auto">
       <table className="w-full border-collapse md:table-fixed">
         <thead className="sticky top-0 z-10">
-          <tr className="bg-surface-50">
+          <tr className="bg-[#252525]">
             {COLUMNS.map((column, index) => (
               <th
                 key={index}
-                className={`px-4 py-3 text-left text-xs font-semibold text-surface-500 uppercase tracking-wider border-b border-surface-200 ${
-                  index < COLUMNS.length - 1 ? 'border-r border-surface-100' : ''
+                className={`px-4 py-3 text-left text-xs font-semibold text-[#707070] uppercase tracking-wider border-b border-[#404040] ${
+                  index < COLUMNS.length - 1 ? 'border-r border-[#333333]' : ''
                 } ${column.className || ''}`}
               >
                 {column.sortable && column.key ? (
                   <button
                     onClick={() => onSort(column.key!)}
-                    className="flex items-center gap-1.5 hover:text-surface-900 transition-colors"
+                    className="flex items-center gap-1.5 hover:text-[#E0E0E0] transition-colors"
                   >
                     {column.label}
                     {renderSortIcon(column.key)}
@@ -109,7 +109,7 @@ export function OutreachTable({
             ))}
           </tr>
         </thead>
-        <tbody className="bg-white divide-y divide-surface-100">
+        <tbody className="bg-[#2a2a2a] divide-y divide-[#333333]">
           {trackers.map((tracker, index) => (
             <OutreachRow
               key={tracker.id}

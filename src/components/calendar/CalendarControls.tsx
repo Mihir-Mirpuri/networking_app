@@ -79,7 +79,7 @@ export function CalendarControls({
             onClick={() => onViewModeChange('week')}
             className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
               viewMode === 'week'
-                ? 'bg-primary-100 text-primary-700'
+                ? 'bg-primary-500/20 text-primary-400'
                 : 'text-surface-600 hover:bg-surface-100'
             }`}
           >
@@ -89,7 +89,7 @@ export function CalendarControls({
             onClick={() => onViewModeChange('month')}
             className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
               viewMode === 'month'
-                ? 'bg-primary-100 text-primary-700'
+                ? 'bg-primary-500/20 text-primary-400'
                 : 'text-surface-600 hover:bg-surface-100'
             }`}
           >

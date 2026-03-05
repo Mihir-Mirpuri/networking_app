@@ -43,7 +43,7 @@ export function HomeTabs({ initialRemainingDaily }: HomeTabsProps) {
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-2 px-5 py-2.5 text-sm font-medium rounded-lg transition-all ${
                   activeTab === tab.id
-                    ? 'bg-white text-primary-700 shadow-soft'
+                    ? 'bg-surface-100 text-primary-700 shadow-soft'
                     : 'text-surface-600 hover:text-surface-900'
                 }`}
               >

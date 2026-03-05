@@ -1,22 +1,13 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { redirect } from 'next/navigation';
-import { Header } from '@/components/Header';
+import { NewHeader } from '@/components/layout/NewHeader';
 import { OutreachTrackerClient } from '@/components/outreach/OutreachTrackerClient';
 import { getInitialOutreachTrackers, getOutreachStats } from '@/app/actions/outreach';
+import { HistoryEmptyState } from '@/components/history/HistoryEmptyState';
 
 export default async function HistoryPage() {
   const session = await getServerSession(authOptions);
-
-  if (!session?.user) {
-    redirect('/');
-  }
-
-  // Fetch initial outreach data on the server
-  const [trackersResult, statsResult] = await Promise.all([
-    getInitialOutreachTrackers(session.user.id),
-    getOutreachStats(),
-  ]);
+  const isAuthenticated = !!session?.user;
 
   const defaultStats = {
     total: 0,
@@ -25,9 +16,27 @@ export default async function HistoryPage() {
     ongoingConversations: 0,
   };
 
+  // Show empty state for guests
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-[#212121]">
+        <NewHeader isAuthenticated={false} />
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <HistoryEmptyState />
+        </main>
+      </div>
+    );
+  }
+
+  // Fetch initial outreach data on the server for authenticated users
+  const [trackersResult, statsResult] = await Promise.all([
+    getInitialOutreachTrackers(session.user.id),
+    getOutreachStats(),
+  ]);
+
   return (
-    <div className="min-h-screen bg-surface-50">
-      <Header />
+    <div className="min-h-screen bg-[#212121]">
+      <NewHeader isAuthenticated={true} />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <OutreachTrackerClient
           initialTrackers={trackersResult.success ? trackersResult.trackers : []}

@@ -13,7 +13,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { lookupPersonAction, SearchResultWithDraft, regenerateDraftAction } from '@/app/actions/search';
 import { sendSingleEmailAction, PersonToSend } from '@/app/actions/send';
-import { getTemplatesAction, TemplateData } from '@/app/actions/profile';
+import { getTemplatesAction, getAutoPersonalizeAction, TemplateData } from '@/app/actions/profile';
 import { ExpandedReview } from './ExpandedReview';
 import { Toast } from '@/components/ui/Toast';
 import { LimitReachedModal, dispatchCreditsChanged } from '@/components/credits';
@@ -32,6 +32,7 @@ export function PersonLookup() {
   const [templates, setTemplates] = useState<TemplateData[]>([]);
   const [defaultTemplateId, setDefaultTemplateId] = useState<string>(EMAIL_TEMPLATES[0].id);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [autoPersonalize, setAutoPersonalize] = useState(false);
 
   // ExpandedReview state
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
@@ -41,10 +42,10 @@ export function PersonLookup() {
   const [showLimitModal, setShowLimitModal] = useState(false);
   const [limitReached, setLimitReached] = useState(false);
 
-  // Load templates on mount
+  // Load templates and preferences on mount
   useEffect(() => {
     if (status !== 'authenticated') return;
-    const loadTemplates = async () => {
+    const loadTemplatesAndPrefs = async () => {
       const result = await getTemplatesAction();
       const hardcoded = EMAIL_TEMPLATES[0];
       if (result.success) {
@@ -59,8 +60,11 @@ export function PersonLookup() {
         setTemplates([{ id: hardcoded.id, name: hardcoded.name, subject: hardcoded.subject, body: hardcoded.body, isDefault: false, attachResume: false, resumeId: null, createdAt: new Date() }]);
         setDefaultTemplateId(hardcoded.id);
       }
+      // Load autoPersonalize preference
+      const autoPersonalizePref = await getAutoPersonalizeAction();
+      setAutoPersonalize(autoPersonalizePref);
     };
-    loadTemplates();
+    loadTemplatesAndPrefs();
   }, [status]);
 
   const canSearch = name.trim().length >= 2 && !limitReached;
@@ -128,6 +132,9 @@ export function PersonLookup() {
     } else if (result.error === 'LIMIT_REACHED') {
       setShowLimitModal(true);
       setLimitReached(true);
+    } else if (result.error === 'Not authenticated') {
+      // Don't show error for unauthenticated users - they should be redirected to sign in
+      return false;
     } else {
       setSendErrors((prev) => new Map(prev).set(person.id, result.error || 'Failed to send email'));
     }
@@ -152,7 +159,8 @@ export function PersonLookup() {
             : r
         )
       );
-    } else {
+    } else if (result.error !== 'Not authenticated') {
+      // Don't show error for unauthenticated users
       setToast({ message: result.error || 'Failed to regenerate draft', type: 'error' });
     }
     setIsRegenerating(false);
@@ -173,6 +181,7 @@ export function PersonLookup() {
           defaultTemplateId={defaultTemplateId}
           onTemplateChange={handleTemplateChange}
           isRegenerating={isRegenerating}
+          autoPersonalize={autoPersonalize}
           limitReached={limitReached}
           onLimitReached={() => setShowLimitModal(true)}
           onDraftGenerated={(idx, subject, body) => {
@@ -200,7 +209,7 @@ export function PersonLookup() {
       {/* Hero section */}
       <div className="card p-8 mb-6">
         <div className="max-w-xl mx-auto text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-primary-50 mb-4">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-primary-500/10 mb-4">
             <UserIcon className="w-6 h-6 text-primary-600" />
           </div>
           <h2 className="text-xl font-bold text-surface-900 mb-2">
@@ -224,7 +233,7 @@ export function PersonLookup() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Full name (e.g. Jane Smith)"
-              className="w-full pl-12 pr-4 py-3.5 bg-white border-2 border-surface-200 rounded-xl text-surface-900 placeholder:text-surface-400 hover:border-surface-300 focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 focus:outline-none transition-all text-base"
+              className="w-full pl-12 pr-4 py-3.5 bg-surface-100 border-2 border-surface-200 rounded-xl text-surface-900 placeholder:text-surface-400 hover:border-surface-300 focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 focus:outline-none transition-all text-base"
               autoFocus
             />
           </div>
@@ -239,7 +248,7 @@ export function PersonLookup() {
               value={company}
               onChange={(e) => setCompany(e.target.value)}
               placeholder="Company (optional — helps narrow results)"
-              className="w-full pl-12 pr-4 py-2.5 bg-surface-50 border border-surface-200 rounded-lg text-surface-800 text-sm placeholder:text-surface-400 hover:border-surface-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 focus:outline-none focus:bg-white transition-all"
+              className="w-full pl-12 pr-4 py-2.5 bg-surface-50 border border-surface-200 rounded-lg text-surface-800 text-sm placeholder:text-surface-400 hover:border-surface-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 focus:outline-none focus:bg-surface-100 transition-all"
             />
           </div>
 
@@ -272,7 +281,7 @@ export function PersonLookup() {
       {isSearching && <LookupLoadingState name={name} />}
 
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+        <div className="bg-red-900/30 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
           {error}
         </div>
       )}
@@ -319,7 +328,7 @@ function LookupLoadingState({ name }: { name: string }) {
         <div className="relative flex items-center justify-center mb-5" style={{ width: 64, height: 64 }}>
           <div className="absolute w-10 h-10 rounded-full border-2 border-primary-400/30 animate-ripple" />
           <div className="absolute w-10 h-10 rounded-full border-[1.5px] border-primary-300/20 animate-ripple [animation-delay:0.7s]" />
-          <div className="relative w-10 h-10 rounded-full bg-primary-50 flex items-center justify-center">
+          <div className="relative w-10 h-10 rounded-full bg-primary-500/10 flex items-center justify-center">
             <MagnifyingGlassIcon className="w-5 h-5 text-primary-600" />
           </div>
         </div>

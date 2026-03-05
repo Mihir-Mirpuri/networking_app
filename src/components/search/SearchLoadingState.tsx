@@ -2,93 +2,150 @@
 
 import { useState, useEffect } from 'react';
 
-const SEARCH_STEPS = [
-  'Scanning profiles...',
-  'Matching your criteria...',
-  'Finding contact details...',
-  'Verifying email addresses...',
-  'Drafting personalized emails...',
-];
+function BouncingMascot() {
+  const [position, setPosition] = useState({ x: 20, y: 20 });
+  const [direction, setDirection] = useState({ x: 1, y: 1 });
+  const [bounce, setBounce] = useState(0);
 
-export function SearchLoadingState() {
-  const [stepIndex, setStepIndex] = useState(0);
+  // Define the text area boundaries (center region where text lives)
+  const textBox = { left: 25, right: 75, top: 35, bottom: 65 };
+  const charSize = 12; // Character size in percentage units
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setStepIndex((prev) => (prev + 1) % SEARCH_STEPS.length);
-    }, 4000);
-    return () => clearInterval(interval);
-  }, []);
+    const moveInterval = setInterval(() => {
+      setPosition((prev) => {
+        let newX = prev.x + direction.x * 1.5;
+        let newY = prev.y + direction.y * 1.0;
+        let newDirX = direction.x;
+        let newDirY = direction.y;
+
+        // Bounce off edges
+        if (newX <= 5 || newX >= 95) {
+          newDirX = -direction.x;
+          newX = Math.max(5, Math.min(95, newX));
+        }
+        if (newY <= 5 || newY >= 95) {
+          newDirY = -direction.y;
+          newY = Math.max(5, Math.min(95, newY));
+        }
+
+        // Bounce off the center text area
+        const charLeft = newX - charSize / 2;
+        const charRight = newX + charSize / 2;
+        const charTop = newY - charSize / 2;
+        const charBottom = newY + charSize / 2;
+
+        const isOverlappingX = charRight > textBox.left && charLeft < textBox.right;
+        const isOverlappingY = charBottom > textBox.top && charTop < textBox.bottom;
+
+        if (isOverlappingX && isOverlappingY) {
+          const prevX = prev.x;
+          const prevY = prev.y;
+          const prevLeft = prevX - charSize / 2;
+          const prevRight = prevX + charSize / 2;
+          const prevTop = prevY - charSize / 2;
+          const prevBottom = prevY + charSize / 2;
+
+          const wasOverlappingX = prevRight > textBox.left && prevLeft < textBox.right;
+          const wasOverlappingY = prevBottom > textBox.top && prevTop < textBox.bottom;
+
+          if (!wasOverlappingX && isOverlappingX) {
+            newDirX = -direction.x;
+            newX = direction.x > 0 ? textBox.left - charSize / 2 : textBox.right + charSize / 2;
+          }
+          if (!wasOverlappingY && isOverlappingY) {
+            newDirY = -direction.y;
+            newY = direction.y > 0 ? textBox.top - charSize / 2 : textBox.bottom + charSize / 2;
+          }
+        }
+
+        // Occasional random direction change
+        if (Math.random() < 0.015) {
+          newDirX = Math.random() > 0.5 ? 1 : -1;
+          newDirY = Math.random() > 0.5 ? 1 : -1;
+        }
+
+        setDirection({ x: newDirX, y: newDirY });
+        return { x: newX, y: newY };
+      });
+    }, 40);
+
+    const bounceInterval = setInterval(() => {
+      setBounce((prev) => (prev + 1) % 360);
+    }, 25);
+
+    return () => {
+      clearInterval(moveInterval);
+      clearInterval(bounceInterval);
+    };
+  }, [direction]);
+
+  const bounceOffset = Math.sin((bounce * Math.PI) / 180) * 5;
+  const rotation = Math.sin((bounce * Math.PI) / 90) * 6;
 
   return (
-    <div className="py-8">
-      {/* Header with ripple animation */}
-      <div className="flex flex-col items-center mb-8">
-        <div className="relative flex items-center justify-center mb-4" style={{ width: 80, height: 80 }}>
-          <div className="absolute w-12 h-12 rounded-full border-2 border-primary-400/30 animate-ripple" />
-          <div className="absolute w-12 h-12 rounded-full border-[1.5px] border-primary-300/20 animate-ripple [animation-delay:0.7s]" />
-          <div className="relative w-12 h-12 rounded-full bg-primary-50 flex items-center justify-center">
-            <svg className="w-6 h-6 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
-            </svg>
-          </div>
-        </div>
-
-        <p className="text-base font-medium text-surface-800 mb-1">Discovering people</p>
-        <p className="text-sm text-surface-500">{SEARCH_STEPS[stepIndex]}</p>
-
-        {/* Step indicators - active one expands into a pill */}
-        <div className="flex items-center gap-1.5 mt-3">
-          {SEARCH_STEPS.map((_, i) => (
-            <div
-              key={i}
-              className={`rounded-full transition-all duration-500 ${
-                i === stepIndex
-                  ? 'w-5 h-1.5 bg-primary-500'
-                  : 'w-1.5 h-1.5 bg-surface-200'
-              }`}
-            />
-          ))}
-        </div>
-
-        <p className="text-xs text-surface-400 mt-3">This can take up to 30 seconds</p>
-      </div>
-
-      {/* Skeleton cards matching PersonCard layout */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {[0, 1, 2, 3, 4, 5].map((i) => (
-          <SkeletonPersonCard key={i} delay={i * 0.15} />
-        ))}
-      </div>
+    <div
+      className="absolute transition-all duration-75 ease-linear pointer-events-none"
+      style={{
+        left: `${position.x}%`,
+        top: `${position.y}%`,
+        transform: `translate(-50%, -50%) translateY(${bounceOffset}px) rotate(${rotation}deg)`,
+      }}
+    >
+      <svg className="w-20 h-20 drop-shadow-lg" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="60" cy="60" r="54" fill="url(#mascotBgBounceLoading)"/>
+        <path
+          d="M18 60 Q25 42 32 60 Q39 78 46 60 Q53 42 60 60 Q67 78 74 60 Q81 42 88 60 Q95 78 102 60"
+          stroke="url(#waveGradBounceLoading)"
+          strokeWidth="4.5"
+          strokeLinecap="round"
+          fill="none"
+        />
+        <circle cx="52" cy="52" r="5" fill="#e0e0e0"/>
+        <circle cx="68" cy="52" r="5" fill="#e0e0e0"/>
+        <circle cx="53.5" cy="53.5" r="2.5" fill="#1a1a1a"/>
+        <circle cx="69.5" cy="53.5" r="2.5" fill="#1a1a1a"/>
+        <circle cx="54.5" cy="52.5" r="1" fill="white" opacity="0.8"/>
+        <circle cx="70.5" cy="52.5" r="1" fill="white" opacity="0.8"/>
+        <path d="M52 70 Q60 77 68 70" stroke="#e0e0e0" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
+        <line x1="60" y1="6" x2="60" y2="22" stroke="#808080" strokeWidth="2.5" strokeLinecap="round"/>
+        <circle cx="60" cy="5" r="3.5" fill="#a0a0a0"/>
+        <circle cx="60" cy="5" r="6" fill="rgba(160,160,160,0.3)"/>
+        <defs>
+          <linearGradient id="waveGradBounceLoading" x1="18" y1="60" x2="102" y2="60" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="#505050"/>
+            <stop offset="50%" stopColor="#808080"/>
+            <stop offset="100%" stopColor="#505050"/>
+          </linearGradient>
+          <radialGradient id="mascotBgBounceLoading" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#3a3a3a"/>
+            <stop offset="100%" stopColor="#252525"/>
+          </radialGradient>
+        </defs>
+      </svg>
     </div>
   );
 }
 
-function SkeletonPersonCard({ delay }: { delay: number }) {
+export function SearchLoadingState() {
   return (
-    <div
-      className="card p-5 flex flex-col items-center animate-pulse"
-      style={{ animationDelay: `${delay}s` }}
-    >
-      {/* Avatar */}
-      <div className="w-16 h-16 rounded-full bg-surface-200 mb-4" />
-      {/* Name */}
-      <div className="h-4 bg-surface-200 rounded-md w-32 mb-2" />
-      {/* Role */}
-      <div className="h-3 bg-surface-100 rounded-md w-24 mb-4" />
-      {/* Info rows */}
-      <div className="w-full space-y-2.5 text-left mb-4">
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded bg-surface-100 flex-shrink-0" />
-          <div className="h-3 bg-surface-100 rounded-md w-3/4" />
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded bg-surface-100 flex-shrink-0" />
-          <div className="h-3 bg-surface-100 rounded-md w-1/2" />
-        </div>
+    <div className="relative min-h-[60vh]">
+      {/* Bouncing mascot */}
+      <div className="absolute inset-0 overflow-hidden">
+        <BouncingMascot />
       </div>
-      {/* Button placeholder */}
-      <div className="w-full h-9 bg-surface-200 rounded-lg mt-auto" />
+
+      {/* Centered text content */}
+      <div className="relative z-10 flex flex-col items-center justify-center min-h-[60vh] pointer-events-none">
+        <p className="text-3xl font-medium text-[#707070] flex items-center gap-1">
+          Searching
+          <span className="flex gap-1 ml-1">
+            <span className="w-2 h-2 rounded-full bg-[#505050] animate-bounce" style={{ animationDelay: '0ms' }} />
+            <span className="w-2 h-2 rounded-full bg-[#505050] animate-bounce" style={{ animationDelay: '150ms' }} />
+            <span className="w-2 h-2 rounded-full bg-[#505050] animate-bounce" style={{ animationDelay: '300ms' }} />
+          </span>
+        </p>
+      </div>
     </div>
   );
 }

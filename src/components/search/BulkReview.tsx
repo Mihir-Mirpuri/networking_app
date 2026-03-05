@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { signIn } from 'next-auth/react';
 import { SearchResultWithDraft } from '@/app/actions/search';
 import { TemplateData } from '@/app/actions/profile';
 import { SearchableCombobox } from './SearchableCombobox';
@@ -13,6 +14,8 @@ interface BulkReviewProps {
   templates?: TemplateData[];
   onApplyTemplateToAll?: (templateId: string) => Promise<void>;
   isRegenerating?: boolean;
+  isAuthenticated?: boolean;
+  onLoginRequired?: () => void;
 }
 
 interface EmailDraft {
@@ -28,6 +31,8 @@ export function BulkReview({
   templates,
   onApplyTemplateToAll,
   isRegenerating,
+  isAuthenticated = true,
+  onLoginRequired,
 }: BulkReviewProps) {
   const [drafts, setDrafts] = useState<Map<number, EmailDraft>>(new Map());
   const [isSending, setIsSending] = useState(false);
@@ -79,6 +84,12 @@ export function BulkReview({
   };
 
   const handleSendAll = async () => {
+    // Redirect to sign in if not authenticated
+    if (!isAuthenticated) {
+      signIn('google', { callbackUrl: '/' });
+      return;
+    }
+
     const emailsToSend = sendableResults
       .filter(({ index }) => {
         const draft = drafts.get(index);
@@ -100,7 +111,7 @@ export function BulkReview({
 
   return (
     <div className="fixed inset-0 bg-surface-900/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-soft-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-surface-100 rounded-lg shadow-soft-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-surface-200">
           <div className="flex items-center gap-4">

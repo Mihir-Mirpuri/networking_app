@@ -67,8 +67,8 @@ export function SearchForm({ onSearch, isLoading, initialParams, disabled, onDis
 
   return (
     <form onSubmit={handleSubmit} className="card p-6 mb-6">
-      <h2 className="text-xl font-bold text-surface-900 mb-4">Find People</h2>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-5 mb-6">
+      <h2 className="text-xl font-bold text-surface-900 mb-4 text-center">Find People</h2>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-5 mb-6 max-w-3xl mx-auto">
         {/* Company */}
         <div>
           <SearchableCombobox
@@ -77,13 +77,7 @@ export function SearchForm({ onSearch, isLoading, initialParams, disabled, onDis
               ...COMPANIES.map((c) => ({ label: c, value: c })),
             ]}
             value={company}
-            onChange={(val) => {
-              setCompany(val);
-              // Only reset role when the new company has its own predefined roles
-              if (val && ROLES_BY_COMPANY[val]) {
-                setRole('');
-              }
-            }}
+            onChange={setCompany}
             label="Company"
             placeholder="Type or select a company..."
             id="company"
@@ -144,7 +138,7 @@ export function SearchForm({ onSearch, isLoading, initialParams, disabled, onDis
         </div>
       </div>
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-center">
         <div className="flex items-center gap-4">
           <button
             type="submit"

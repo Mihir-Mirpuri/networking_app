@@ -6,9 +6,73 @@ import { getProfileAction, getTemplatesAction, TemplateData, UserProfile } from 
 import { getResumesAction, ResumeData } from '@/app/actions/resume';
 import { EMAIL_TEMPLATES } from '@/lib/constants';
 import { LoadingSpinner } from '@/components/search/LoadingSpinner';
-// import { CompanyResearchPanel } from '@/components/compose/CompanyResearchPanel';
 import { LimitReachedModal, dispatchCreditsChanged } from '@/components/credits';
 import { Toast } from '@/components/ui/Toast';
+
+// Gmail-style toolbar icons
+function IconAttach({ className = 'w-5 h-5' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M21.58 12.58l-9-9a6.53 6.53 0 00-9.19 9.19l1.2 1.2a3.06 3.06 0 004.24 0l6.36-6.36a1.53 1.53 0 00-2.12-2.12L6.7 11.86a.75.75 0 001.06 1.06l6.36-6.36a3.06 3.06 0 014.24 4.24l-6.36 6.36a4.59 4.59 0 01-6.36-6.36l.71-.71-1.06-1.06-.71.71a6.12 6.12 0 008.49 8.49l6.36-6.36a4.53 4.53 0 000-6.36z" />
+    </svg>
+  );
+}
+
+function IconLink({ className = 'w-5 h-5' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z" />
+    </svg>
+  );
+}
+
+function IconEmoji({ className = 'w-5 h-5' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z" />
+    </svg>
+  );
+}
+
+function IconDelete({ className = 'w-5 h-5' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M15 4V3H9v1H4v2h1v13c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V6h1V4h-5zm2 15H7V6h10v13z" />
+    </svg>
+  );
+}
+
+function IconResume({ className = 'w-5 h-5' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" />
+    </svg>
+  );
+}
+
+function IconVideo({ className = 'w-5 h-5' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z" />
+    </svg>
+  );
+}
+
+function IconTemplate({ className = 'w-5 h-5' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM7 12h2v5H7zm4-3h2v8h-2zm4-3h2v11h-2z" />
+    </svg>
+  );
+}
+
+function IconDropdown({ className = 'w-4 h-4' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M7 10l5 5 5-5z" />
+    </svg>
+  );
+}
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const MAX_ATTACHMENTS = 5;
@@ -36,11 +100,10 @@ export function ComposeEmailModal({
 }: ComposeEmailModalProps) {
   const [recipientEmail, setRecipientEmail] = useState('');
   const [recipientName, setRecipientName] = useState('');
-  const [recipientCompany, setRecipientCompany] = useState('');
-  const [recipientRole, setRecipientRole] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
+  const [videoLink, setVideoLink] = useState('');
   const [attachResume, setAttachResume] = useState(false);
   const [selectedResumeId, setSelectedResumeId] = useState<string>('');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
@@ -319,11 +382,17 @@ export function ComposeEmailModal({
         });
       }
 
+      // Append video link to body if provided
+      let finalBody = body;
+      if (videoLink.trim()) {
+        finalBody = `${body}\n\n---\nI recorded a quick video introduction for you:\n${videoLink.trim()}`;
+      }
+
       const result = await sendComposedEmailAction({
         recipientEmail,
         recipientName: recipientName.trim() || undefined,
         subject,
-        body,
+        body: finalBody,
         attachResume,
         resumeId: attachResume ? selectedResumeId : undefined,
         attachments: attachments.length > 0 ? attachments : undefined,
@@ -358,11 +427,10 @@ export function ComposeEmailModal({
     // Reset form
     setRecipientEmail('');
     setRecipientName('');
-    setRecipientCompany('');
-    setRecipientRole('');
     setShowSuccess(false);
     setSubject('');
     setBody('');
+    setVideoLink('');
     setAttachResume(false);
     setSelectedTemplateId('');
     setFileAttachments([]);
@@ -394,12 +462,29 @@ export function ComposeEmailModal({
   //   setBody(lines.join('\n'));
   // };
 
+  const [showTemplateDropdown, setShowTemplateDropdown] = useState(false);
+  const [showVideoInput, setShowVideoInput] = useState(!!videoLink);
+  const templateDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close template dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (templateDropdownRef.current && !templateDropdownRef.current.contains(e.target as Node)) {
+        setShowTemplateDropdown(false);
+      }
+    };
+    if (showTemplateDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showTemplateDropdown]);
+
   return (
     <div
       className={
         isEmbedded
-          ? 'bg-white rounded-lg shadow max-w-3xl w-full overflow-hidden flex flex-col'
-          : 'fixed inset-0 bg-surface-900/50 flex items-center justify-center z-50 p-4 animate-fade-in'
+          ? 'bg-white rounded-lg shadow-lg max-w-3xl w-full overflow-hidden flex flex-col'
+          : 'fixed inset-0 lg:left-80 bg-black/60 backdrop-blur-sm flex items-end justify-end z-50 p-4 sm:p-6 animate-fade-in'
       }
       onClick={!isEmbedded ? (e) => { if (e.target === e.currentTarget) handleClose(); } : undefined}
     >
@@ -407,77 +492,46 @@ export function ComposeEmailModal({
         className={
           isEmbedded
             ? 'flex flex-col'
-            : 'bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-scale-in'
+            : 'bg-white rounded-t-lg shadow-2xl w-full max-w-[580px] max-h-[85vh] overflow-hidden flex flex-col animate-scale-in'
         }
+        style={!isEmbedded ? { boxShadow: '0 8px 40px rgba(0,0,0,0.35)' } : undefined}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="text-lg font-semibold">Compose Email</h2>
-          {!isEmbedded && (
-            <button
-              onClick={handleClose}
-              className="p-2 hover:bg-surface-100 rounded-full"
-              aria-label="Close"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5"
-                viewBox="0 0 20 20"
-                fill="currentColor"
+        {/* Gmail-style header bar */}
+        <div className="flex items-center justify-between px-4 py-2 bg-[#404040] rounded-t-lg">
+          <h2 className="text-sm font-medium text-white">New Message</h2>
+          <div className="flex items-center gap-1">
+            {!isEmbedded && (
+              <button
+                onClick={handleClose}
+                className="p-1 hover:bg-[#555] rounded text-[#ccc] hover:text-white transition-colors"
+                aria-label="Close"
               >
-                <path
-                  fillRule="evenodd"
-                  d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </button>
-          )}
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Form */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {showSuccess ? (
-            <div className="flex flex-col items-center justify-center h-32 animate-fade-in">
-              <svg className="w-12 h-12 text-green-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <p className="text-lg font-medium text-green-700">Email sent!</p>
-            </div>
-          ) : isLoadingData ? (
-            <div className="flex items-center justify-center h-32">
-              <LoadingSpinner size="lg" />
-            </div>
-          ) : (
-            <>
-              {/* Template Selector */}
-              <div>
-                <label className="block text-sm font-medium text-surface-700 mb-1">
-                  Template (optional)
-                </label>
-                <select
-                  value={selectedTemplateId}
-                  onChange={(e) => handleTemplateChange(e.target.value)}
-                  disabled={isLoadingData}
-                  className="input"
-                >
-                  {isLoadingData ? (
-                    <option value="">Loading templates...</option>
-                  ) : (
-                    templates.map((template) => (
-                      <option key={template.id} value={template.id}>
-                        {template.name} {template.isDefault ? '(Default)' : ''}
-                      </option>
-                    ))
-                  )}
-                </select>
-              </div>
-
-              {/* To Field */}
-              <div>
-                <label className="block text-sm font-medium text-surface-700 mb-1">
-                  To <span className="text-red-500">*</span>
-                </label>
+        {showSuccess ? (
+          <div className="flex flex-col items-center justify-center h-48 bg-white animate-fade-in">
+            <svg className="w-12 h-12 text-green-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p className="text-lg font-medium text-green-600">Email sent!</p>
+          </div>
+        ) : isLoadingData ? (
+          <div className="flex items-center justify-center h-48 bg-white">
+            <LoadingSpinner size="lg" />
+          </div>
+        ) : (
+          <>
+            {/* Gmail-style fields */}
+            <div className="flex-1 overflow-y-auto bg-white">
+              {/* To field */}
+              <div className="flex items-center border-b border-[#e0e0e0] px-4">
+                <span className="text-sm text-[#666] w-10 flex-shrink-0">To</span>
                 <input
                   type="email"
                   value={recipientEmail}
@@ -486,240 +540,247 @@ export function ComposeEmailModal({
                     if (emailError) setEmailError(null);
                   }}
                   onBlur={handleEmailBlur}
-                  placeholder="recipient@example.com"
-                  className={`input ${emailError ? 'border-red-500' : ''}`}
+                  placeholder=""
+                  className={`flex-1 py-2.5 text-sm text-[#202124] bg-transparent outline-none ${emailError ? 'text-red-600' : ''}`}
                 />
-                {emailError && (
-                  <p className="mt-1 text-sm text-red-600">{emailError}</p>
-                )}
               </div>
+              {emailError && (
+                <div className="px-4 py-1 text-xs text-red-600 bg-red-50 border-b border-red-200">{emailError}</div>
+              )}
 
-              {/* Recipient Name */}
-              <div>
-                <label className="block text-sm font-medium text-surface-700 mb-1">
-                  Recipient Name
-                </label>
+              {/* Recipient Name field */}
+              <div className="flex items-center border-b border-[#e0e0e0] px-4">
+                <span className="text-sm text-[#666] w-10 flex-shrink-0">Name</span>
                 <input
                   type="text"
                   value={recipientName}
                   onChange={(e) => setRecipientName(e.target.value)}
-                  placeholder="Jane Smith"
-                  className="input"
+                  placeholder=""
+                  className="flex-1 py-2.5 text-sm text-[#202124] bg-transparent outline-none"
                 />
               </div>
 
-              {/* Company */}
-              <div>
-                <label className="block text-sm font-medium text-surface-700 mb-1">
-                  Company
-                </label>
-                <input
-                  type="text"
-                  value={recipientCompany}
-                  onChange={(e) => setRecipientCompany(e.target.value)}
-                  placeholder="Acme Inc."
-                  className="input"
-                />
-              </div>
-
-              {/* Company Research — disabled (too general for personalization)
-              {recipientCompany && (
-                <CompanyResearchPanel
-                  company={recipientCompany}
-                  role={recipientRole}
-                  body={body}
-                  onUseTalkingPoint={handleUseTalkingPoint}
-                />
-              )}
-              */}
-
-              {/* Subject */}
-              <div>
-                <label className="block text-sm font-medium text-surface-700 mb-1">
-                  Subject <span className="text-red-500">*</span>
-                </label>
+              {/* Subject field */}
+              <div className="flex items-center border-b border-[#e0e0e0] px-4">
                 <input
                   type="text"
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
-                  placeholder="Email subject"
-                  className="input"
+                  placeholder="Subject"
+                  className="flex-1 py-2.5 text-sm text-[#202124] bg-transparent outline-none placeholder-[#666]"
                 />
               </div>
 
               {/* Body */}
-              <div>
-                <label className="block text-sm font-medium text-surface-700 mb-1">
-                  Message <span className="text-red-500">*</span>
-                </label>
+              <div className="px-4 pt-3">
                 <textarea
                   value={body}
                   onChange={(e) => setBody(e.target.value)}
-                  rows={12}
-                  placeholder="Write your message here..."
-                  className="input resize-none"
+                  rows={14}
+                  placeholder=""
+                  className="w-full text-sm text-[#202124] bg-transparent outline-none resize-none leading-relaxed"
                 />
               </div>
 
-              {/* Resume Attachment */}
-              {resumes.length > 0 && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="attachResume"
-                      checked={attachResume}
-                      onChange={(e) => setAttachResume(e.target.checked)}
-                      className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-surface-300 rounded"
-                    />
-                    <label htmlFor="attachResume" className="text-sm font-medium text-surface-700">
-                      Attach Resume
-                    </label>
-                  </div>
-
-                  {attachResume && (
-                    <select
-                      value={selectedResumeId}
-                      onChange={(e) => setSelectedResumeId(e.target.value)}
-                      className="input"
-                    >
-                      <option value="">Select a resume...</option>
-                      {resumes.map((resume) => (
-                        <option key={resume.id} value={resume.id}>
-                          {resume.filename} {resume.isActive ? '(Active)' : ''}
-                        </option>
-                      ))}
-                    </select>
-                  )}
+              {/* Video link input (toggle) */}
+              {showVideoInput && (
+                <div className="flex items-center border-t border-[#e0e0e0] px-4 mx-4 mt-1">
+                  <IconVideo className="w-4 h-4 text-[#666] mr-2 flex-shrink-0" />
+                  <input
+                    type="url"
+                    value={videoLink}
+                    onChange={(e) => setVideoLink(e.target.value)}
+                    placeholder="Paste Loom or video link..."
+                    className="flex-1 py-2 text-sm text-[#202124] bg-transparent outline-none placeholder-[#999]"
+                  />
+                  <button
+                    onClick={() => { setShowVideoInput(false); setVideoLink(''); }}
+                    className="p-1 text-[#999] hover:text-[#333] transition-colors"
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                    </svg>
+                  </button>
                 </div>
               )}
 
-              {/* File Attachments */}
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-surface-700">
-                  Attachments
-                </label>
-
-                {/* File list */}
-                {fileAttachments.length > 0 && (
-                  <div className="space-y-2">
-                    {fileAttachments.map((attachment) => (
-                      <div
-                        key={attachment.id}
-                        className="flex items-center justify-between px-3 py-2 bg-surface-50 border border-surface-200 rounded-md"
+              {/* File attachments display */}
+              {(fileAttachments.length > 0 || (attachResume && selectedResumeId)) && (
+                <div className="px-4 pb-2 pt-1 space-y-1.5">
+                  {attachResume && selectedResumeId && (
+                    <div className="flex items-center gap-2 px-3 py-2 bg-[#f8f9fa] border border-[#e0e0e0] rounded-lg">
+                      <IconResume className="w-4 h-4 text-[#1a73e8] flex-shrink-0" />
+                      <span className="text-xs text-[#202124] truncate flex-1">
+                        {resumes.find(r => r.id === selectedResumeId)?.filename || 'Resume'}
+                      </span>
+                      <button
+                        onClick={() => setAttachResume(false)}
+                        className="p-0.5 text-[#999] hover:text-[#333] transition-colors"
                       >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <svg
-                            className="w-4 h-4 text-surface-500 flex-shrink-0"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
-                            />
-                          </svg>
-                          <span className="text-sm text-surface-700 truncate">
-                            {attachment.name}
-                          </span>
-                          <span className="text-xs text-surface-500 flex-shrink-0">
-                            ({formatFileSize(attachment.size)})
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveFile(attachment.id)}
-                          className="p-1 text-surface-400 hover:text-red-500"
-                          aria-label={`Remove ${attachment.name}`}
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M6 18L18 6M6 6l12 12"
-                            />
-                          </svg>
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Add file button */}
-                {fileAttachments.length < MAX_ATTACHMENTS && (
-                  <>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      multiple
-                      onChange={handleFileSelect}
-                      className="hidden"
-                      id="file-attachment-input"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="btn-secondary text-sm gap-2"
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+                  {fileAttachments.map((attachment) => (
+                    <div
+                      key={attachment.id}
+                      className="flex items-center gap-2 px-3 py-2 bg-[#f8f9fa] border border-[#e0e0e0] rounded-lg"
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M12 4v16m8-8H4"
-                        />
-                      </svg>
-                      Add File
-                    </button>
-                    <p className="text-xs text-surface-500">
-                      Max {MAX_ATTACHMENTS} files, 10MB each
-                    </p>
-                  </>
-                )}
-              </div>
-            </>
-          )}
-
-          {/* Error Display */}
-          {error && (
-            <div className="p-3 bg-red-100 text-red-800 rounded-md text-sm">
-              {error}
+                      <IconAttach className="w-4 h-4 text-[#5f6368] flex-shrink-0" />
+                      <span className="text-xs text-[#202124] truncate flex-1">
+                        {attachment.name}
+                      </span>
+                      <span className="text-[10px] text-[#999] flex-shrink-0">
+                        {formatFileSize(attachment.size)}
+                      </span>
+                      <button
+                        onClick={() => handleRemoveFile(attachment.id)}
+                        className="p-0.5 text-[#999] hover:text-[#333] transition-colors"
+                      >
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
-        </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-2 p-4 border-t bg-surface-50">
-          {!isEmbedded && (
-            <button
-              onClick={handleClose}
-              disabled={isSending}
-              className="btn-secondary text-sm"
-            >
-              Cancel
-            </button>
-          )}
-          <button
-            onClick={limitReached ? () => setShowLimitModal(true) : handleSend}
-            disabled={limitReached ? false : (isSending || isLoadingData)}
-            className={`btn-primary text-sm${limitReached ? ' opacity-50 cursor-not-allowed' : ''}`}
-          >
-            {isSending ? (
-              <span className="flex items-center gap-2">
-                <LoadingSpinner size="sm" />
-                Sending...
-              </span>
-            ) : limitReached ? (
-              'Daily limit reached'
-            ) : (
-              'Send'
+            {/* Error Display */}
+            {error && (
+              <div className="px-4 py-2 bg-red-50 text-red-600 text-sm border-t border-red-200">
+                {error}
+              </div>
             )}
-          </button>
-        </div>
+
+            {/* Gmail-style bottom toolbar */}
+            <div className="flex items-center gap-0.5 px-3 py-2 bg-[#f8f9fa] border-t border-[#e0e0e0]">
+              {/* Send button with dropdown */}
+              <button
+                onClick={limitReached ? () => setShowLimitModal(true) : handleSend}
+                disabled={limitReached ? false : (isSending || isLoadingData)}
+                className="flex items-center gap-0 rounded-l-full bg-[#0b57d0] hover:bg-[#0842a0] text-white text-sm font-medium pl-5 pr-3 py-2 transition-colors disabled:opacity-50"
+              >
+                {isSending ? (
+                  <span className="flex items-center gap-2">
+                    <LoadingSpinner size="sm" />
+                    Sending...
+                  </span>
+                ) : limitReached ? (
+                  'Limit reached'
+                ) : (
+                  'Send'
+                )}
+              </button>
+              <button className="rounded-r-full bg-[#0b57d0] hover:bg-[#0842a0] text-white px-2 py-2 border-l border-[#1a68d4] transition-colors">
+                <IconDropdown className="w-4 h-4" />
+              </button>
+
+              <div className="w-px h-5 bg-[#dadce0] mx-2" />
+
+              {/* Toolbar icons */}
+              <div className="flex items-center gap-0.5">
+                {/* Attach file */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  onChange={handleFileSelect}
+                  className="hidden"
+                  id="file-attachment-input"
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="p-2 rounded-full text-[#444746] hover:bg-[#e8eaed] transition-colors"
+                  title="Attach files"
+                  disabled={fileAttachments.length >= MAX_ATTACHMENTS}
+                >
+                  <IconAttach className="w-5 h-5" />
+                </button>
+
+                {/* Link */}
+                <button
+                  onClick={() => setShowVideoInput(!showVideoInput)}
+                  className={`p-2 rounded-full transition-colors ${showVideoInput ? 'bg-[#e8eaed] text-[#0b57d0]' : 'text-[#444746] hover:bg-[#e8eaed]'}`}
+                  title="Insert video link"
+                >
+                  <IconLink className="w-5 h-5" />
+                </button>
+
+                {/* Emoji */}
+                <button className="p-2 rounded-full text-[#444746] hover:bg-[#e8eaed] transition-colors" title="Insert emoji">
+                  <IconEmoji className="w-5 h-5" />
+                </button>
+
+                {/* Resume */}
+                {resumes.length > 0 && (
+                  <button
+                    onClick={() => {
+                      if (attachResume) {
+                        setAttachResume(false);
+                      } else {
+                        setAttachResume(true);
+                        if (!selectedResumeId) {
+                          const activeResume = resumes.find(r => r.isActive);
+                          if (activeResume) setSelectedResumeId(activeResume.id);
+                          else if (resumes[0]) setSelectedResumeId(resumes[0].id);
+                        }
+                      }
+                    }}
+                    className={`p-2 rounded-full transition-colors ${attachResume ? 'bg-[#e8eaed] text-[#0b57d0]' : 'text-[#444746] hover:bg-[#e8eaed]'}`}
+                    title={attachResume ? 'Remove resume' : 'Attach resume'}
+                  >
+                    <IconResume className="w-5 h-5" />
+                  </button>
+                )}
+
+                {/* Template selector */}
+                <div className="relative" ref={templateDropdownRef}>
+                  <button
+                    onClick={() => setShowTemplateDropdown(!showTemplateDropdown)}
+                    className={`p-2 rounded-full transition-colors ${showTemplateDropdown ? 'bg-[#e8eaed] text-[#0b57d0]' : 'text-[#444746] hover:bg-[#e8eaed]'}`}
+                    title="Choose template"
+                  >
+                    <IconTemplate className="w-5 h-5" />
+                  </button>
+                  {showTemplateDropdown && (
+                    <div className="absolute bottom-full left-0 mb-2 w-56 bg-white rounded-lg shadow-lg border border-[#e0e0e0] py-1 z-10">
+                      {templates.map((template) => (
+                        <button
+                          key={template.id}
+                          onClick={() => {
+                            handleTemplateChange(template.id);
+                            setShowTemplateDropdown(false);
+                          }}
+                          className={`w-full text-left px-4 py-2 text-sm hover:bg-[#f1f3f4] transition-colors ${
+                            selectedTemplateId === template.id ? 'text-[#0b57d0] font-medium bg-[#e8f0fe]' : 'text-[#202124]'
+                          }`}
+                        >
+                          {template.name} {template.isDefault ? '(Default)' : ''}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Spacer */}
+              <div className="flex-1" />
+
+              {/* Delete/discard */}
+              <button
+                onClick={handleClose}
+                className="p-2 rounded-full text-[#444746] hover:bg-[#e8eaed] transition-colors"
+                title="Discard"
+              >
+                <IconDelete className="w-5 h-5" />
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       <LimitReachedModal

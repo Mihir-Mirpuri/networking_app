@@ -54,6 +54,7 @@ model User {
   apolloCallsMade            Int                          @default(0)
   referralCode               String?                      @unique
   referredById               String?
+  referralLinkId             String?
   // Stripe subscription fields
   stripeCustomerId           String?                      @unique
   stripeSubscriptionId       String?                      @unique
@@ -61,8 +62,11 @@ model User {
   subscriptionStatus         String?
   timezone                   String?                      // e.g., "America/Chicago"
   emailInstructions          String?                      // Free-text custom instructions for LLM email generation
+  autoPersonalize            Boolean                      @default(false) // Auto-personalize emails with AI when opening review modal
   referredBy                 User?                        @relation("Referrals", fields: [referredById], references: [id])
   referrals                  User[]                       @relation("Referrals")
+  referralLink               ReferralLink?                @relation("UserReferralLink", fields: [referralLinkId], references: [id])
+  referralLinksCreated       ReferralLink[]               @relation("ReferralLinkCreator")
   createdAt                  DateTime                     @default(now())
   updatedAt                  DateTime                     @updatedAt
   accounts                   Account[]
@@ -139,6 +143,7 @@ model Search {
   role                  String?
   university            String?
   location              String?
+  queryHash             String?        // Legacy field for query deduplication
   // Scrape progress tracking
   lastCsePageScraped    Int            @default(0)     // 0=none, 1=page1, 11=page2, 21=page3
   cseExhausted          Boolean        @default(false)  // true when CSE returned <5 valid profiles
@@ -654,4 +659,28 @@ model CompanyResearch {
 
   @@unique([company, role])
   @@index([company])
+}
+
+enum ReferralLinkType {
+  AMBASSADOR
+  QR_CODE
+}
+
+model ReferralLink {
+  id            String           @id
+  code          String           @unique
+  type          ReferralLinkType
+  label         String
+  userId        String?
+  isActive      Boolean          @default(true)
+  clickCount    Int              @default(0)
+  signupCount   Int              @default(0)
+  paidCount     Int              @default(0)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @default(now())
+
+  user          User?            @relation("ReferralLinkCreator", fields: [userId], references: [id])
+  usersReferred User[]           @relation("UserReferralLink")
+
+  @@index([type])
 }
