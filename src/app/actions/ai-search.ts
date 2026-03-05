@@ -127,6 +127,8 @@ export async function extractSearchFiltersAction(
     if (filters.university) parsedFilters.university = filters.university;
     if (filters.location) parsedFilters.location = filters.location;
 
+    console.log(`[AI Search] Extracted filters: ${JSON.stringify(parsedFilters)}`);
+
     return {
       success: true,
       filters: parsedFilters,
