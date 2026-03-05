@@ -668,7 +668,7 @@ enum ReferralLinkType {
 }
 
 model ReferralLink {
-  id          String           @id
+  id          String           @id @default(cuid())
   code        String           @unique
   type        ReferralLinkType
   label       String
@@ -680,8 +680,8 @@ model ReferralLink {
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @default(now())
 
-  user          User?  @relation("ReferralLinkCreator", fields: [userId], references: [id])
-  usersReferred User[] @relation("UserReferralLink")
+  user    User?  @relation("ReferralLinkCreator", fields: [userId], references: [id])
+  signups User[] @relation("UserReferralLink")
 
   @@index([type])
 }

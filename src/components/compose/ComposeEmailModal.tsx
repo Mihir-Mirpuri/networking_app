@@ -121,6 +121,9 @@ export function ComposeEmailModal({
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const templateDropdownRef = useRef<HTMLDivElement>(null);
+  const [showTemplateDropdown, setShowTemplateDropdown] = useState(false);
+  const [showVideoInput, setShowVideoInput] = useState(false);
 
   // Load templates and resumes on mount
   useEffect(() => {
@@ -451,21 +454,6 @@ export function ComposeEmailModal({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, variant]);
 
-  if (!isOpen) return null;
-
-  const isEmbedded = variant === 'embedded';
-
-  // const handleUseTalkingPoint = (point: string) => {
-  //   const lines = body.split('\n');
-  //   const insertIdx = lines.findIndex(l => l.trim() === '') + 1 || 1;
-  //   lines.splice(insertIdx, 0, `\nI saw that ${point.charAt(0).toLowerCase() + point.slice(1)} — really cool.\n`);
-  //   setBody(lines.join('\n'));
-  // };
-
-  const [showTemplateDropdown, setShowTemplateDropdown] = useState(false);
-  const [showVideoInput, setShowVideoInput] = useState(!!videoLink);
-  const templateDropdownRef = useRef<HTMLDivElement>(null);
-
   // Close template dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -478,6 +466,10 @@ export function ComposeEmailModal({
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
   }, [showTemplateDropdown]);
+
+  if (!isOpen) return null;
+
+  const isEmbedded = variant === 'embedded';
 
   return (
     <div
