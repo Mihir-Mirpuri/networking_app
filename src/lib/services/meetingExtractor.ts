@@ -208,6 +208,7 @@ export async function extractMeetingFromThread(
       thread,
       userEmail,
       userTimezone,
+      userId,
     });
 
     if (!parseResult.success) {
@@ -339,6 +340,7 @@ export async function extractMeetingFromEmail(
       receivedAt,
       userTimezone,
       preFilterResult,
+      userId,
     });
 
     if (!parseResult.success) {

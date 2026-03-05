@@ -650,7 +650,8 @@ export function areRolesAliased(role1: string, role2: string): boolean {
  * Filter criteria for querying Person table
  */
 export interface PersonFilters {
-  company: string;           // Required - ILIKE match
+  company: string;           // Required - ILIKE match (primary company or first for multi)
+  companies?: string[];      // All searched companies (for multi-company post-filter)
   companyAliases?: string[]; // Pre-resolved aliases (exact match, skips post-query filter)
   location?: string;         // Optional - city ILIKE match
   role?: string;             // Optional - role ILIKE match
@@ -782,14 +783,16 @@ async function getSchoolMatchIds(university: string): Promise<string[]> {
  */
 export function applyPostQueryFilters<T extends { company: string }>(
   people: T[],
-  searchCompany: string | undefined
+  searchCompany: string | string[] | undefined
 ): T[] {
-  const normalizedSearchCompany = searchCompany ? normalizeCompanyForMatch(searchCompany) : null;
-  if (!normalizedSearchCompany) return people;
+  if (!searchCompany) return people;
+  const companies = Array.isArray(searchCompany) ? searchCompany : [searchCompany];
+  const normalized = companies.map(c => normalizeCompanyForMatch(c)).filter(Boolean);
+  if (normalized.length === 0) return people;
 
   return people.filter((person) => {
-    const normalizedPersonCompany = normalizeCompanyForMatch(person.company);
-    return companiesMatch(normalizedPersonCompany, normalizedSearchCompany);
+    const np = normalizeCompanyForMatch(person.company);
+    return normalized.some(nsc => companiesMatch(np, nsc));
   });
 }
 
@@ -899,7 +902,7 @@ export async function findPeopleByFilters(filters: PersonFilters): Promise<Perso
   if (filters.companyAliases && filters.companyAliases.length > 0) {
     return people.slice(0, limit);
   }
-  const filtered = applyPostQueryFilters(people, company);
+  const filtered = applyPostQueryFilters(people, filters.companies || company);
   return filtered.slice(0, limit);
 }
 
@@ -1038,7 +1041,7 @@ async function findPeopleByFiltersVector(
   // If pre-resolved aliases were used, exact-match DB query is sufficient — skip post-filter
   const filtered = (filters.companyAliases && filters.companyAliases.length > 0)
     ? rows
-    : applyPostQueryFilters(rows, company);
+    : applyPostQueryFilters(rows, filters.companies || company);
   const limited = filtered.slice(0, limit);
 
   if (limited.length === 0) return [];

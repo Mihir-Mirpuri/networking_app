@@ -113,6 +113,7 @@ export interface CalendarParserInput {
   receivedAt: Date;
   userTimezone?: string; // e.g., 'America/Los_Angeles'
   preFilterResult?: MeetingDetectionResult; // Optional pre-filter context
+  userId?: string;
 }
 
 export interface CalendarParserOutput {
@@ -146,6 +147,7 @@ export interface ThreadParserInput {
   thread: ThreadMessage[];  // Full conversation, chronological order
   userEmail: string;        // To identify which messages are from the user
   userTimezone?: string;
+  userId?: string;
 }
 
 /**
@@ -502,7 +504,7 @@ export async function parseCalendarFromEmail(
   input: CalendarParserInput
 ): Promise<CalendarParserOutput> {
   const startTime = Date.now();
-  const { messageId, subject, bodyText, sender, receivedAt, userTimezone, preFilterResult } = input;
+  const { messageId, subject, bodyText, sender, receivedAt, userTimezone, preFilterResult, userId } = input;
 
   console.log(`[CalendarParser] Processing message ${messageId}`);
 
@@ -538,6 +540,7 @@ export async function parseCalendarFromEmail(
         temperature: 0.2, // Low temperature for consistent extraction
         maxTokens: 1024,
       },
+      metadata: { userId, action: 'CALENDAR_PARSE' },
     });
 
     const llmResult = response.content;
@@ -870,6 +873,7 @@ export async function parseCalendarFromThread(
         temperature: 0.2,
         maxTokens: 1500,
       },
+      metadata: { userId: input.userId, action: 'CALENDAR_THREAD_PARSE' },
     });
 
     const llmResult = response.content;

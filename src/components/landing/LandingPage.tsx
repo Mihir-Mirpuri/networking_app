@@ -1,8 +1,8 @@
 'use client';
 
+import { useEffect } from 'react';
 import { signIn } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
-import { useEffect } from 'react';
 
 // Company/university logos for trusted-by section
 const TRUSTED_BY = [
@@ -137,6 +137,7 @@ function PricingCard({
 export function LandingPage() {
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get('callbackUrl') || '/';
+  const ref = searchParams.get('ref');
 
   // Set up intersection observer for reveal animations
   useEffect(() => {
@@ -151,6 +152,17 @@ export function LandingPage() {
     document.querySelectorAll('.reveal').forEach((el) => observer.observe(el));
     return () => observer.disconnect();
   }, []);
+
+  // Track referral clicks
+  useEffect(() => {
+    if (!ref) return;
+    document.cookie = `signl_ref=${encodeURIComponent(ref)}; path=/; max-age=${30 * 24 * 60 * 60}; SameSite=Lax`;
+    fetch('/api/referral/click', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: ref }),
+    }).catch(() => {});
+  }, [ref]);
 
   const handleSignIn = () => signIn('google', { callbackUrl });
 

@@ -81,6 +81,7 @@ export async function applyFoundInfoAction(
     const result = await personalizeWithFoundInfo({
       ...input,
       senderName,
+      userId: session.user.id,
     });
 
     return {
@@ -159,6 +160,7 @@ export async function generateFollowUpAction(
       personCompany: person.company,
       personRole: person.role || undefined,
       senderName,
+      userId: session.user.id,
     });
 
     return {

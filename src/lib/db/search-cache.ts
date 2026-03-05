@@ -1,9 +1,10 @@
 import prisma from '@/lib/prisma';
+import { createHash } from 'crypto';
 
 const CACHE_TTL_HOURS = 168; // 7 days
 const PERSON_CACHE_TTL_DAYS = 60; // 60 days - then check for staleness (email bounce)
 const SCRAPE_PROGRESS_TTL_DAYS = 30; // After 30 days, allow re-scraping from page 1
-const CSE_EXHAUSTED_THRESHOLD = 5; // CSE is exhausted when it returns fewer than this many valid profiles
+const CSE_EXHAUSTED_THRESHOLD = 5; // Exhausted when fewer than this many valid profiles returned
 
 export interface NormalizedSearchParams {
   name: string | null;
@@ -366,23 +367,26 @@ export interface ScrapeProgress {
   prescrapeStatus: string | null;
 }
 
-// Hard cap: 3 total pages (1 sync + 2 prescrape). Page 3 = start 21.
-const MAX_CSE_PAGE_START = 21;
+// Hard cap: 10 total Serper pages. Serper uses 1-based page numbers (1, 2, 3, ...).
+// DB field is still named lastCsePageScraped for additive-only migration rule,
+// but now stores Serper page numbers instead of CSE start offsets.
+const MAX_SERPER_PAGE = 10;
 
 /**
- * Compute the next CSE page start value based on scrape progress.
- * Returns null if CSE is exhausted or the 5-page cap has been reached.
+ * Compute the next Serper page number based on scrape progress.
+ * Returns null if exhausted or the page cap has been reached.
  *
- * CSE pagination: page 1 = start 1, page 2 = start 11, page 3 = start 21, etc.
+ * Serper pagination: page 1, 2, 3, ... (not CSE's 1, 11, 21)
+ * The DB field lastCsePageScraped now stores Serper page numbers.
  */
 export function getNextCsePageStart(
   lastCsePageScraped: number,
   cseExhausted: boolean
 ): number | null {
   if (cseExhausted) return null;
-  if (lastCsePageScraped >= MAX_CSE_PAGE_START) return null;
+  if (lastCsePageScraped >= MAX_SERPER_PAGE) return null;
   if (lastCsePageScraped === 0) return 1;
-  return lastCsePageScraped + 10;
+  return lastCsePageScraped + 1;
 }
 
 /**
@@ -501,4 +505,102 @@ export async function updateScrapeProgress(
       }),
     },
   });
+}
+
+// ===== QUERY HASH CACHING =====
+// Hash-based lookup for exact Serper query strings.
+// Supplements the existing param-based lookup (findOrCreateScrapeProgress).
+
+/**
+ * Build the exact Serper query string from search filters.
+ * Must produce the same string as discoverLinkedInProfiles() in discovery.ts.
+ */
+export function buildSerperQuery(params: {
+  company?: string | null;
+  university?: string | null;
+  role?: string | null;
+  location?: string | null;
+  name?: string | null;
+}): string {
+  const queryParts: string[] = [];
+  if (params.company && params.company.trim()) queryParts.push(`"${params.company.trim()}"`);
+  if (params.university && params.university.trim() && params.university.trim().toLowerCase() !== 'any') {
+    queryParts.push(`"${params.university.trim()}"`);
+  }
+  if (params.role && params.role.trim()) queryParts.push(params.role.trim());
+  if (params.location && params.location.trim()) queryParts.push(params.location.trim());
+  if (params.name && params.name.trim()) queryParts.push(params.name.trim());
+
+  return `site:linkedin.com/in ${queryParts.join(' ')}`;
+}
+
+/**
+ * Compute SHA-256 hash of a query string.
+ */
+export function computeQueryHash(query: string): string {
+  return createHash('sha256').update(query).digest('hex');
+}
+
+/**
+ * Find scrape progress by query hash.
+ * Returns null if no matching record found or if it's stale.
+ */
+export async function findScrapeProgressByQueryHash(
+  queryHash: string
+): Promise<ScrapeProgress | null> {
+  const results = await prisma.$queryRaw<
+    Array<{
+      id: string;
+      lastCsePageScraped: number;
+      cseExhausted: boolean;
+      prescrapeStatus: string | null;
+      updatedAt: Date;
+    }>
+  >`
+    SELECT "id", "lastCsePageScraped", "cseExhausted", "prescrapeStatus", "updatedAt"
+    FROM "Search"
+    WHERE "queryHash" = ${queryHash}
+    ORDER BY "updatedAt" DESC
+    LIMIT 1
+  `;
+
+  if (results.length === 0) return null;
+
+  const record = results[0];
+
+  // Check if stale
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - SCRAPE_PROGRESS_TTL_DAYS);
+  if (record.updatedAt < cutoff) return null;
+
+  return {
+    id: record.id,
+    lastCsePageScraped: record.lastCsePageScraped,
+    cseExhausted: record.cseExhausted,
+    prescrapeStatus: record.prescrapeStatus,
+  };
+}
+
+/**
+ * Find or create scrape progress, using query hash as primary lookup.
+ * Falls back to param-based lookup if no hash match found.
+ */
+export async function findOrCreateScrapeProgressWithHash(
+  params: NormalizedSearchParams,
+  queryHash: string
+): Promise<ScrapeProgress> {
+  // Try hash-based lookup first
+  const hashMatch = await findScrapeProgressByQueryHash(queryHash);
+  if (hashMatch) return hashMatch;
+
+  // Fall back to param-based lookup (and store the hash)
+  const progress = await findOrCreateScrapeProgress(params);
+
+  // Backfill the query hash on the record
+  await prisma.search.update({
+    where: { id: progress.id },
+    data: { queryHash },
+  });
+
+  return progress;
 }

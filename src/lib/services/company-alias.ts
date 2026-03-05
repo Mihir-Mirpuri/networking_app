@@ -82,6 +82,7 @@ export async function resolveCompanyAliases(input: string): Promise<ResolvedComp
         temperature: 0.1,
         maxTokens: 200,
       },
+      metadata: { action: 'COMPANY_ALIAS' },
     });
 
     const canonicalName = response.content.canonicalName || input;
@@ -114,4 +115,18 @@ export async function resolveCompanyAliases(input: string): Promise<ResolvedComp
     console.log(`[CompanyAlias] Falling back to input: "${input}" → ["${fallbackAlias}"]`);
     return { canonicalName: input, aliases: [fallbackAlias] };
   }
+}
+
+/**
+ * Resolve aliases for multiple companies in parallel, deduplicating results.
+ */
+export async function resolveMultiCompanyAliases(
+  companies: string[]
+): Promise<{ allAliases: string[] }> {
+  const results = await Promise.all(companies.map(c => resolveCompanyAliases(c)));
+  const aliasSet = new Set<string>();
+  for (const r of results) {
+    for (const alias of r.aliases) aliasSet.add(alias);
+  }
+  return { allAliases: Array.from(aliasSet) };
 }

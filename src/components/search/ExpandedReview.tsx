@@ -129,6 +129,9 @@ export function ExpandedReview({
   // const [researchCollapsed, setResearchCollapsed] = useState(true);
   const [selectedTemplateId, setSelectedTemplateId] = useState(defaultTemplateId || '');
   const userEditedRef = useRef(false);
+  const [originalSubject, setOriginalSubject] = useState(person?.draftSubject || '');
+  const [originalBody, setOriginalBody] = useState(person?.draftBody || '');
+  const [hasRefined, setHasRefined] = useState(false);
 
   // Email chat context for sidebar chat integration
   const { openEmailChat, closeEmailChat, currentEmail, updateEmail } = useEmailChat();
@@ -141,6 +144,9 @@ export function ExpandedReview({
     setSubject(nextPerson?.draftSubject || '');
     setBody(nextPerson?.draftBody || '');
     userEditedRef.current = false;
+    setOriginalSubject(nextPerson?.draftSubject || '');
+    setOriginalBody(nextPerson?.draftBody || '');
+    setHasRefined(false);
   }
 
   // Auto-personalize email with LLM (only if enabled in profile)
@@ -157,6 +163,9 @@ export function ExpandedReview({
         if (result.success && !userEditedRef.current && personId === results[idx]?.id) {
           setSubject(result.subject);
           setBody(result.body);
+          setOriginalSubject(result.subject);
+          setOriginalBody(result.body);
+          setHasRefined(false);
           onDraftGenerated?.(idx, result.subject, result.body);
         }
       }).catch((err) => {

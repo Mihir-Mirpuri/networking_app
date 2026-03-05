@@ -41,7 +41,7 @@ interface AISearchPageState {
   totalLoaded?: number;
   hasMore?: boolean;
   hiddenCount?: number;
-  searchParams?: { company?: string; role?: string; university?: string; location?: string; limit: number };
+  searchParams?: { company?: string; companies?: string[]; role?: string; university?: string; location?: string; limit: number };
   savedAt: number;
 }
 
@@ -49,7 +49,7 @@ const EXAMPLE_QUERIES = [
   'Product managers at Google in Austin',
   'Software engineers at Meta from Stanford',
   'Analysts at Goldman Sachs in New York',
-  'Consultants at McKinsey from UT Austin',
+  'Consultants at top consulting firms from UT Austin',
 ];
 
 export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClientProps) {
@@ -128,36 +128,50 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
   }, [messages, currentFilters, hook.results, hook.expandedIndex, hook.sendStatuses, hook.showBulkReview, hook.generatingStatuses, hook.totalLoaded, hook.hasMore, hook.hiddenCount, hook.searchParams]);
 
   const runSearch = useCallback(async (filters: ParsedFilters) => {
-    if (!filters.company) return;
+    // Need either a single company or multiple companies
+    if (!filters.company && (!filters.companies || filters.companies.length === 0)) return;
 
     setIsSearching(true);
     hook.resetResults();
 
-    const params = {
-      company: filters.company,
+    const companiesToSearch = filters.companies?.length ? filters.companies : [filters.company!];
+    const isMultiCompany = companiesToSearch.length > 1;
+    const limit = 6;
+
+    // Single server action call — handles multi-company internally
+    const result = await searchPeopleAction({
+      companies: isMultiCompany ? companiesToSearch : undefined,
+      company: isMultiCompany ? companiesToSearch[0] : filters.company,
       role: filters.role,
       university: filters.university,
       location: filters.location,
-      limit: 6,
-    };
-
-    const result = await searchPeopleAction(params);
+      limit,
+    });
 
     if (result.success) {
-      hook.applySearchResults(result.results, result.searchMeta, result.hiddenCount, params);
+      hook.applySearchResults(result.results, result.searchMeta, result.hiddenCount, {
+        company: isMultiCompany ? companiesToSearch[0] : filters.company,
+        companies: isMultiCompany ? companiesToSearch : undefined,
+        role: filters.role,
+        university: filters.university,
+        location: filters.location,
+        limit,
+      });
 
-      // Fire-and-forget prescrape. Server-side dedup (findOrCreateScrapeProgress)
-      // handles the case where a prescrape already ran or is running for these params.
-      fetch('/api/prescrape', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          company: filters.company,
-          role: filters.role,
-          university: filters.university,
-          location: filters.location,
-        }),
-      }).catch(err => console.error('[Prescrape] Error:', err));
+      // Fire-and-forget prescrape PER COMPANY (each needs own Search record)
+      for (const company of companiesToSearch) {
+        fetch('/api/prescrape', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            company,
+            role: filters.role,
+            university: filters.university,
+            location: filters.location,
+            ...(isMultiCompany ? { maxPages: 1 } : {}),
+          }),
+        }).catch(err => console.error('[Prescrape] Error:', err));
+      }
     }
 
     setIsSearching(false);
@@ -206,8 +220,8 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
 
     const { filters, assistantMessage } = extractResult;
 
-    // If no company, ask the user to specify one
-    if (!filters.company) {
+    // If no company or companies, ask the user to specify one
+    if (!filters.company && (!filters.companies || filters.companies.length === 0)) {
       setMessages(prev =>
         prev.map(m =>
           m.id === assistantMsgId
@@ -239,7 +253,10 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
     delete updated[key];
     setCurrentFilters(updated);
 
-    if (key === 'company') {
+    if (key === 'company' || key === 'companies') {
+      // Also clear the other company field
+      delete updated.company;
+      delete updated.companies;
       // Can't search without company — clear results
       hook.resetResults();
       setMessages(prev => [
@@ -263,7 +280,16 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
     }
   };
 
-  const activeFilterEntries = Object.entries(currentFilters).filter(([, v]) => v) as [string, string][];
+  // Build filter entries for display, showing companies array as a joined string
+  const activeFilterEntries: [string, string][] = [];
+  for (const [key, value] of Object.entries(currentFilters)) {
+    if (!value) continue;
+    if (key === 'companies' && Array.isArray(value) && value.length > 0) {
+      activeFilterEntries.push(['companies', value.join(', ')]);
+    } else if (key !== 'companies' && typeof value === 'string') {
+      activeFilterEntries.push([key, value]);
+    }
+  }
   const hasResults = hook.results.length > 0;
   const showChat = hook.expandedIndex === null && !hook.showBulkReview;
 

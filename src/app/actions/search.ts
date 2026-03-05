@@ -25,15 +25,19 @@ import {
 import {
   normalizeSearchParams,
   findOrCreateScrapeProgress,
+  findOrCreateScrapeProgressWithHash,
   updateScrapeProgress,
   getNextCsePageStart,
+  buildSerperQuery,
+  computeQueryHash,
   ApiUsageStats,
 } from '@/lib/db/search-cache';
 import {
   getCompanyPattern,
   generateEmailFromPattern,
 } from '@/lib/services/email-pattern';
-import { resolveCompanyAliases } from '@/lib/services/company-alias';
+import { resolveCompanyAliases, resolveMultiCompanyAliases } from '@/lib/services/company-alias';
+import { preFilterUrls } from '@/lib/services/snippet-filter';
 import { generateEmailWithLLM, getUserResumeSummary, getRecentSentEmails, refineEmailWithLLM } from '@/lib/services/personalization';
 
 export interface RecentSearch {
@@ -48,6 +52,7 @@ export interface RecentSearch {
 export interface SearchInput {
   name?: string;
   company?: string;
+  companies?: string[];       // Multiple companies for multi-company search
   role?: string;
   university?: string;
   location?: string;
@@ -451,9 +456,12 @@ export async function searchPeopleAction(
   const userId = session?.user?.id || null;
   const isGuest = !userId;
 
-  if (!input.company || !input.company.trim()) {
+  const companyList = input.companies?.length ? input.companies : input.company ? [input.company] : [];
+  if (companyList.length === 0) {
     return { success: false, error: 'Company is required' };
   }
+  const isMultiCompany = companyList.length > 1;
+  const primaryCompany = companyList[0];
 
   try {
     let user = null;
@@ -504,22 +512,23 @@ export async function searchPeopleAction(
       ? [...excludedIds, ...input.excludePersonIds]
       : excludedIds;
 
-    const normalizedParams = normalizeSearchParams({
-      name: input.name,
-      company: input.company,
-      role: input.role,
-      university: input.university,
-      location: input.location,
-    });
-
-    // Resolve company aliases (hardcoded → DB → LLM) for richer matching
-    const resolved = await resolveCompanyAliases(input.company);
-    console.log(`[Search] Resolved company "${input.company}" → ${resolved.aliases.length} aliases`);
+    // Resolve company aliases — multi or single
+    let allAliases: string[];
+    if (isMultiCompany) {
+      const resolved = await resolveMultiCompanyAliases(companyList);
+      allAliases = resolved.allAliases;
+      console.log(`[Search] Resolved ${companyList.length} companies → ${allAliases.length} aliases`);
+    } else {
+      const resolved = await resolveCompanyAliases(primaryCompany);
+      allAliases = resolved.aliases;
+      console.log(`[Search] Resolved company "${primaryCompany}" → ${allAliases.length} aliases`);
+    }
 
     // ===== STEP 1: Query DB, enrich only if needed =====
     const filters: PersonFilters = {
-      company: input.company,
-      companyAliases: resolved.aliases,
+      company: primaryCompany,
+      companies: isMultiCompany ? companyList : undefined,
+      companyAliases: allAliases,
       location: input.location,
       role: input.role,
       university: input.university,
@@ -535,7 +544,7 @@ export async function searchPeopleAction(
     if (people.length < input.limit) {
       // Not enough results — try free pattern enrichment, then re-query
       console.log(`[Search] Under limit, enriching with patterns`);
-      await enrichPeopleWithPatterns(filters, input.company);
+      await enrichPeopleWithPatterns(filters, primaryCompany);
       people = await findPeopleByFilters(filters);
       console.log(`[Search] After enrichment: ${people.length} people`);
     }
@@ -545,6 +554,14 @@ export async function searchPeopleAction(
     let cseHasMorePages = false;
 
     // ===== STEP 2: Check CSE state + sync scrape if 0 results =====
+    // For multi-company, check primary company for sync scrape; prescrape handles all per-company
+    const normalizedParams = normalizeSearchParams({
+      name: input.name,
+      company: primaryCompany,
+      role: input.role,
+      university: input.university,
+      location: input.location,
+    });
     const progress = await findOrCreateScrapeProgress(normalizedParams);
     const nextPage = getNextCsePageStart(progress.lastCsePageScraped, progress.cseExhausted);
 
@@ -552,9 +569,10 @@ export async function searchPeopleAction(
       cseHasMorePages = true;
 
       if (people.length === 0) {
-        // 0 results → scrape synchronously (user expects to wait)
-        console.log(`[Search] 0 results, scraping CSE page ${nextPage} synchronously`);
-        const batch = await processRefreshBatch(input, nextPage, 'SyncScrape');
+        // 0 results → scrape synchronously for primary company (user expects to wait)
+        console.log(`[Search] 0 results, scraping CSE page ${nextPage} synchronously for "${primaryCompany}"`);
+        const syncInput = { ...input, company: primaryCompany };
+        const batch = await processRefreshBatch(syncInput, nextPage, 'SyncScrape');
         cseCallsMade = 1;
 
         await updateScrapeProgress(progress.id, nextPage, batch.urlsFromCse, {
@@ -566,13 +584,23 @@ export async function searchPeopleAction(
         });
 
         // Enrich newly scraped people with patterns before re-querying
-        await enrichPeopleWithPatterns(filters, input.company);
+        await enrichPeopleWithPatterns(filters, primaryCompany);
 
         // Re-query DB after scraping + enrichment added new people
         people = await findPeopleByFilters(filters);
         console.log(`[Search] After scrape+enrich: ${people.length} results`);
       }
       // 1+ results: return as-is, prescrape will populate DB in background
+    }
+
+    // For multi-company, also check if ANY other company has more pages
+    if (isMultiCompany && !cseHasMorePages) {
+      for (const company of companyList.slice(1)) {
+        const params = normalizeSearchParams({ company, role: input.role, university: input.university, location: input.location });
+        const prog = await findOrCreateScrapeProgress(params);
+        const np = getNextCsePageStart(prog.lastCsePageScraped, prog.cseExhausted);
+        if (np !== null) { cseHasMorePages = true; break; }
+      }
     }
 
     // ===== STEP 3: Rank candidates =====
@@ -597,7 +625,8 @@ export async function searchPeopleAction(
     } else {
       // Fallback: keyword-based ranking
       const searchCriteria: SearchCriteria = {
-        company: input.company,
+        company: primaryCompany,
+        companies: isMultiCompany ? companyList : undefined,
         role: input.role,
         university: input.university,
         location: input.location,
@@ -654,7 +683,7 @@ export async function searchPeopleAction(
       await prisma.searchLog.create({
         data: {
           userId,
-          company: input.company || null,
+          company: companyList.join(', '),
           role: input.role || null,
           university: input.university || null,
           location: input.location || null,
@@ -908,7 +937,8 @@ export async function unhidePersonAction(
 // ===== LOAD MORE (pure DB read + enrichment, no scraping) =====
 
 export interface LoadMoreInput {
-  company: string;
+  company?: string;
+  companies?: string[];
   role?: string;
   university?: string;
   location?: string;
@@ -945,9 +975,12 @@ export async function loadMorePeopleAction(
     return { success: false, error: 'Not authenticated' };
   }
 
-  if (!input.company || !input.company.trim()) {
+  const companyList = input.companies?.length ? input.companies : input.company ? [input.company] : [];
+  if (companyList.length === 0) {
     return { success: false, error: 'Company is required' };
   }
+  const isMultiCompany = companyList.length > 1;
+  const primaryCompany = companyList[0];
 
   try {
     const userId = session.user.id;
@@ -965,12 +998,20 @@ export async function loadMorePeopleAction(
     const excludedIds = await getExcludedPersonIds(userId);
     const allExcludedIds = [...excludedIds, ...input.excludePersonIds];
 
-    // Resolve company aliases (hardcoded → DB → LLM) for richer matching
-    const resolved = await resolveCompanyAliases(input.company);
+    // Resolve company aliases — multi or single
+    let allAliases: string[];
+    if (isMultiCompany) {
+      const resolved = await resolveMultiCompanyAliases(companyList);
+      allAliases = resolved.allAliases;
+    } else {
+      const resolved = await resolveCompanyAliases(primaryCompany);
+      allAliases = resolved.aliases;
+    }
 
     const filters: PersonFilters = {
-      company: input.company,
-      companyAliases: resolved.aliases,
+      company: primaryCompany,
+      companies: isMultiCompany ? companyList : undefined,
+      companyAliases: allAliases,
       location: input.location,
       role: input.role,
       university: input.university,
@@ -986,7 +1027,7 @@ export async function loadMorePeopleAction(
     if (people.length < input.limit) {
       // Not enough results — try free pattern enrichment, then re-query
       console.log(`[LoadMore] Under limit, enriching with patterns`);
-      await enrichPeopleWithPatterns(filters, input.company);
+      await enrichPeopleWithPatterns(filters, primaryCompany);
       people = await findPeopleByFilters(filters);
       console.log(`[LoadMore] After enrichment: ${people.length} people`);
     }
@@ -1007,7 +1048,8 @@ export async function loadMorePeopleAction(
     } else {
       // Fallback: keyword-based ranking
       const searchCriteria: SearchCriteria = {
-        company: input.company,
+        company: primaryCompany,
+        companies: isMultiCompany ? companyList : undefined,
         role: input.role,
         university: input.university,
         location: input.location,
@@ -1035,16 +1077,22 @@ export async function loadMorePeopleAction(
     const template = await resolveTemplateForUser(userId, input.templateId);
     const results = await buildResultsWithDrafts(rankedPeople, userId, template, user);
 
-    // Check prescrape status
-    const normalizedParams = normalizeSearchParams({
-      name: input.name,
-      company: input.company,
-      role: input.role,
-      university: input.university,
-      location: input.location,
-    });
-    const progress = await findOrCreateScrapeProgress(normalizedParams);
-    const prescrapeRunning = progress.prescrapeStatus === 'RUNNING';
+    // Check prescrape status across all companies
+    let prescrapeRunning = false;
+    for (const company of companyList) {
+      const normalizedParams = normalizeSearchParams({
+        name: input.name,
+        company,
+        role: input.role,
+        university: input.university,
+        location: input.location,
+      });
+      const progress = await findOrCreateScrapeProgress(normalizedParams);
+      if (progress.prescrapeStatus === 'RUNNING') {
+        prescrapeRunning = true;
+        break;
+      }
+    }
 
     // hasMore = got a full page (probably more in DB) OR prescrape still running (more may appear)
     const hasMore = people.length >= input.limit || prescrapeRunning;
@@ -1122,43 +1170,22 @@ async function processRefreshBatch(
 
   const cseResultMap = new Map(cseResults.map((r) => [r.linkedinUrl, r]));
 
-  // ===== STEP 2.5: PRE-FILTER BY CSE COMPANY METATAG =====
-  let csePrefiltered = 0;
-  if (input.company) {
-    const normalizedSearchCompany = normalizeCompanyForMatch(input.company);
-    // Resolve aliases (hardcoded → DB → LLM) for richer matching
-    const resolved = await resolveCompanyAliases(input.company);
-    const resolvedNormalized = resolved.aliases.map(a => normalizeCompanyForMatch(a));
-
-    const beforeCount = urlsToScrape.length;
-    urlsToScrape = urlsToScrape.filter((url) => {
-      const cseResult = cseResultMap.get(url);
-      if (!cseResult?.cseCompany) return true; // Keep if no metatag (conservative)
-      const normalizedCseCompany = normalizeCompanyForMatch(cseResult.cseCompany);
-
-      // Check against resolved aliases first
-      const aliasMatch = resolvedNormalized.some(alias =>
-        normalizedCseCompany === alias ||
-        normalizedCseCompany.startsWith(alias + ' ') ||
-        normalizedCseCompany.startsWith(alias + '-') ||
-        alias.startsWith(normalizedCseCompany + ' ') ||
-        alias.startsWith(normalizedCseCompany + '-')
-      );
-      if (aliasMatch) return true;
-
-      // Fallback: companiesMatch handles bidirectional substring for cases
-      // like "Pfizer" vs "Pfizer Inc." that don't need aliases
-      const fallbackMatch = companiesMatch(normalizedCseCompany, normalizedSearchCompany);
-      if (!fallbackMatch) {
-        console.log(`[Refresh ${batchLabel}] Pre-filtered: "${cseResult.cseFirstName} ${cseResult.cseLastName}" — CSE company "${cseResult.cseCompany}" doesn't match "${input.company}"`);
-      }
-      return fallbackMatch;
-    });
-    csePrefiltered = beforeCount - urlsToScrape.length;
-    if (csePrefiltered > 0) {
-      console.log(`[Refresh ${batchLabel}] Pre-filtered ${csePrefiltered}/${beforeCount} profiles by CSE company mismatch`);
-    }
+  // ===== STEP 2.5: PRE-FILTER BY SNIPPET METADATA =====
+  // Uses company, school, and location from Serper snippets to reject
+  // mismatches before paying for Apify scraping.
+  const snippetMap = new Map(
+    cseResults.map(r => [r.linkedinUrl, { snippet: r.sourceSnippet, company: r.cseCompany }])
+  );
+  const { filteredUrls: preFilteredUrls, prefilteredCount: snippetPrefiltered } = await preFilterUrls(
+    urlsToScrape,
+    snippetMap,
+    { company: input.company, university: input.university, location: input.location }
+  );
+  if (snippetPrefiltered > 0) {
+    console.log(`[Refresh ${batchLabel}] Pre-filtered ${snippetPrefiltered}/${urlsToScrape.length} profiles by snippet mismatch`);
   }
+  urlsToScrape = preFilteredUrls;
+  const csePrefiltered = snippetPrefiltered;
 
   console.log(`[Refresh ${batchLabel}] Need to scrape ${urlsToScrape.length} new profiles`);
 
@@ -1212,7 +1239,9 @@ async function processRefreshBatch(
   return { newPeopleCount, matchedCount, emailsGenerated: 0, apolloCallsMade: 0, savedPersonIds, urlsScraped: urlsToScrape.length, urlsFromCse: cseResults.length, csePrefiltered };
 }
 
-const MAX_PRESCRAPE_PAGES = 2;
+const MAX_PRESCRAPE_PAGES = 5;
+const WEAK_PAGE_THRESHOLD = 3; // Pages with fewer than this many new valid profiles are "weak"
+const MAX_CONSECUTIVE_WEAK_PAGES = 2; // Stop after this many consecutive weak pages
 
 /**
  * Background prescrape: scrape all remaining CSE pages (up to 4 total) for a search.
@@ -1226,6 +1255,7 @@ export async function prescrapeAction(
     university?: string;
     location?: string;
     name?: string;
+    maxPages?: number;
   }
 ): Promise<{ success: true; pagesScraped: number } | { success: false; error: string }> {
   const session = await getServerSession(authOptions);
@@ -1247,10 +1277,14 @@ export async function prescrapeAction(
       location: input.location,
     });
 
+    // Compute query hash for dedup
+    const serperQuery = buildSerperQuery(normalizedParams);
+    const queryHash = computeQueryHash(serperQuery);
+
     let pagesScraped = 0;
 
     // Bail out if a prescrape is already running for these params
-    const initialProgress = await findOrCreateScrapeProgress(normalizedParams);
+    const initialProgress = await findOrCreateScrapeProgressWithHash(normalizedParams, queryHash);
     if (initialProgress.prescrapeStatus === 'RUNNING') {
       console.log(`[Prescrape] Already running for "${input.company}", skipping`);
       return { success: true, pagesScraped: 0 };
@@ -1261,18 +1295,24 @@ export async function prescrapeAction(
       data: { prescrapeStatus: 'RUNNING' },
     });
 
-    while (pagesScraped < MAX_PRESCRAPE_PAGES) {
+    let consecutiveWeakPages = 0;
+    const pageLimit = input.maxPages ?? MAX_PRESCRAPE_PAGES;
+
+    while (pagesScraped < pageLimit) {
       // Re-fetch progress each iteration (updated by previous iteration)
       const progress = await findOrCreateScrapeProgress(normalizedParams);
       const nextPage = getNextCsePageStart(progress.lastCsePageScraped, progress.cseExhausted);
 
       if (nextPage === null) {
-        console.log(`[Prescrape] CSE exhausted after ${pagesScraped} pages for "${input.company}"`);
+        console.log(`[Prescrape] Exhausted after ${pagesScraped} pages for "${input.company}"`);
         break;
       }
 
-      console.log(`[Prescrape] Scraping CSE page ${nextPage} for "${input.company}" (${pagesScraped + 1}/${MAX_PRESCRAPE_PAGES})`);
+      console.log(`[Prescrape] Scraping page ${nextPage} for "${input.company}" (${pagesScraped + 1}/${pageLimit})`);
       const batch = await processRefreshBatch(input, nextPage, `Prescrape-${pagesScraped + 1}`);
+
+      // New valid profiles = scraped + matched (excludes deduped and prefiltered)
+      const newValidCount = batch.newPeopleCount;
 
       await updateScrapeProgress(progress.id, nextPage, batch.urlsFromCse, {
         cseCallsMade: 1,
@@ -1284,9 +1324,26 @@ export async function prescrapeAction(
 
       pagesScraped++;
 
-      // CSE returned fewer than threshold — no more pages
+      // Adaptive exhaustion: track consecutive weak pages
+      if (newValidCount < WEAK_PAGE_THRESHOLD) {
+        consecutiveWeakPages++;
+        console.log(`[Prescrape] Weak page (${newValidCount} new valid profiles), consecutive: ${consecutiveWeakPages}/${MAX_CONSECUTIVE_WEAK_PAGES}`);
+        if (consecutiveWeakPages >= MAX_CONSECUTIVE_WEAK_PAGES) {
+          console.log(`[Prescrape] Exhausted (${MAX_CONSECUTIVE_WEAK_PAGES} consecutive weak pages) after ${pagesScraped} pages`);
+          // Mark as exhausted in DB
+          await prisma.search.update({
+            where: { id: progress.id },
+            data: { cseExhausted: true },
+          });
+          break;
+        }
+      } else {
+        consecutiveWeakPages = 0;
+      }
+
+      // Also stop if Serper returned very few results (no more pages available)
       if (batch.urlsFromCse < 5) {
-        console.log(`[Prescrape] CSE exhausted (${batch.urlsFromCse} URLs) after ${pagesScraped} pages`);
+        console.log(`[Prescrape] Serper exhausted (${batch.urlsFromCse} URLs) after ${pagesScraped} pages`);
         break;
       }
     }
@@ -1660,6 +1717,7 @@ export async function regenerateDraftAction(input: {
         referenceTemplate: placeholderDraft,
         sentEmailExamples,
         customInstructions: user.emailInstructions || undefined,
+        userId,
       });
     } catch (err) {
       console.warn('[RegenerateDraft] LLM generation failed, using placeholder:', err);
@@ -1749,6 +1807,7 @@ export async function generateLLMDraftAction(input: {
       referenceTemplate: placeholderDraft,
       sentEmailExamples,
       customInstructions: user.emailInstructions || undefined,
+      userId,
     });
 
     // Save to DB so subsequent visits show the LLM draft
@@ -1804,6 +1863,7 @@ export async function refineDraftAction(input: {
         company: person.company,
         role: person.role,
       },
+      userId: session.user.id,
     });
 
     return { success: true, subject: result.subject, body: result.body };

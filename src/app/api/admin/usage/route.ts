@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
+import { GroqAction } from '@prisma/client';
 
 /**
- * Admin endpoint to view Apollo API usage statistics
+ * Admin endpoint to view API usage statistics (Apollo + Groq)
  * GET - Returns usage stats for today, this week, this month, and all-time
  */
 
@@ -104,6 +105,42 @@ export async function GET() {
       where: { email: { not: null } },
     });
 
+    // ── Groq usage stats ──
+    const groqLogs = await prisma.groqUsageLog.findMany({
+      select: {
+        action: true,
+        promptTokens: true,
+        completionTokens: true,
+        totalTokens: true,
+        error: true,
+        createdAt: true,
+      },
+    });
+
+    const calculateGroqStats = (logs: typeof groqLogs) => {
+      const totalCalls = logs.length;
+      const errorCalls = logs.filter(l => l.error).length;
+      const totalTokens = logs.reduce((sum, l) => sum + l.totalTokens, 0);
+      const promptTokens = logs.reduce((sum, l) => sum + l.promptTokens, 0);
+      const completionTokens = logs.reduce((sum, l) => sum + l.completionTokens, 0);
+
+      const byAction: Record<string, { calls: number; tokens: number; errors: number }> = {};
+      for (const log of logs) {
+        if (!byAction[log.action]) {
+          byAction[log.action] = { calls: 0, tokens: 0, errors: 0 };
+        }
+        byAction[log.action].calls++;
+        byAction[log.action].tokens += log.totalTokens;
+        if (log.error) byAction[log.action].errors++;
+      }
+
+      return { totalCalls, errorCalls, totalTokens, promptTokens, completionTokens, byAction };
+    };
+
+    const groqToday = groqLogs.filter(l => l.createdAt >= startOfToday);
+    const groqWeek = groqLogs.filter(l => l.createdAt >= startOfWeek);
+    const groqMonth = groqLogs.filter(l => l.createdAt >= startOfMonth);
+
     return NextResponse.json({
       status: 'ok',
       generatedAt: now.toISOString(),
@@ -112,6 +149,12 @@ export async function GET() {
         thisWeek: calculateStats(weekSearches),
         thisMonth: calculateStats(monthSearches),
         allTime: calculateStats(searches),
+      },
+      groq: {
+        today: calculateGroqStats(groqToday),
+        thisWeek: calculateGroqStats(groqWeek),
+        thisMonth: calculateGroqStats(groqMonth),
+        allTime: calculateGroqStats(groqLogs),
       },
       recentSearches,
       database: {

@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Summarize resume in background (don't block upload response)
-    summarizeResume(fileUrl, file.type)
+    summarizeResume(fileUrl, file.type, session.user.id)
       .then(async (summary) => {
         await prisma.userResume.update({
           where: { id: resume.id },

@@ -1,11 +1,6 @@
-import Groq from 'groq-sdk';
 import prisma from '@/lib/prisma';
 import { ResumeSummary } from './resume-summary';
 import { complete } from '@/lib/services/groq';
-
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-});
 
 // ===== LLM Email Generation =====
 
@@ -38,6 +33,7 @@ export interface LLMEmailInput {
   referenceTemplate: { subject: string; body: string };
   sentEmailExamples?: SentEmailExample[];
   customInstructions?: string;
+  userId?: string;
 }
 
 /**
@@ -66,7 +62,7 @@ export async function getRecentSentEmails(userId: string): Promise<SentEmailExam
 export async function generateEmailWithLLM(
   input: LLMEmailInput
 ): Promise<{ subject: string; body: string }> {
-  const { person, user, resumeSummary, referenceTemplate, sentEmailExamples, customInstructions } = input;
+  const { person, user, resumeSummary, referenceTemplate, sentEmailExamples, customInstructions, userId } = input;
 
   const personName = [person.firstName, person.lastName].filter(Boolean).join(' ') || 'the recipient';
   const location = [person.city, person.state, person.country].filter(Boolean).join(', ');
@@ -150,6 +146,7 @@ ${referenceTemplate.body}`;
       temperature: 0.7,
       maxTokens: 300,
     },
+    metadata: { userId, action: 'EMAIL_GENERATION' },
   });
 
   const text = response.content;
@@ -177,6 +174,7 @@ export interface RefineEmailInput {
     company: string;
     role: string | null;
   };
+  userId?: string;
 }
 
 /**
@@ -215,6 +213,7 @@ REQUESTED CHANGE: ${instruction}`;
       temperature: 0.5,
       maxTokens: 300,
     },
+    metadata: { userId: input.userId, action: 'EMAIL_REFINEMENT' },
   });
 
   const text = response.content;
@@ -344,14 +343,17 @@ SUBJECT: [subject line]
 BODY:
 [email body]`;
 
-  const completion = await groq.chat.completions.create({
-    messages: [{ role: 'user', content: prompt }],
-    model: 'llama-3.3-70b-versatile',
-    temperature: 0.7,
-    max_tokens: 400, // Reduced for speed
+  const completion = await complete({
+    userPrompt: prompt,
+    options: {
+      model: 'llama-3.3-70b-versatile',
+      temperature: 0.7,
+      maxTokens: 400,
+    },
+    metadata: { userId, action: 'PERSONALIZATION' },
   });
 
-  const response = completion.choices[0]?.message?.content || '';
+  const response = completion.content;
 
   // Parse the response
   const similarityMatch = response.match(/SIMILARITY_FOUND:\s*(yes|no)/i);
@@ -433,6 +435,7 @@ export interface UseFoundInfoInput {
   personCompany: string;
   personRole?: string;
   senderName: string;
+  userId?: string;
 }
 
 export interface UseFoundInfoResult {
@@ -455,6 +458,7 @@ export async function personalizeWithFoundInfo(
     personCompany,
     personRole,
     senderName,
+    userId,
   } = input;
 
   const prompt = `You are a college student personalizing a cold outreach email. Use the info provided about the recipient to add a personal touch.
@@ -485,14 +489,17 @@ SUBJECT: [subject line]
 BODY:
 [email body]`;
 
-  const completion = await groq.chat.completions.create({
-    messages: [{ role: 'user', content: prompt }],
-    model: 'llama-3.3-70b-versatile',
-    temperature: 0.7,
-    max_tokens: 400,
+  const completion = await complete({
+    userPrompt: prompt,
+    options: {
+      model: 'llama-3.3-70b-versatile',
+      temperature: 0.7,
+      maxTokens: 400,
+    },
+    metadata: { userId, action: 'PERSONALIZATION_FOUND_INFO' },
   });
 
-  const response = completion.choices[0]?.message?.content || '';
+  const response = completion.content;
 
   // Parse the response
   const changesMatch = response.match(/CHANGES:\s*([^\n]+)/);
@@ -519,6 +526,7 @@ export interface FollowUpInput {
   personCompany: string;
   personRole?: string;
   senderName: string;
+  userId?: string;
 }
 
 export interface FollowUpResult {
@@ -539,6 +547,7 @@ export async function generateFollowUpEmail(
     personCompany,
     personRole,
     senderName,
+    userId,
   } = input;
 
   const prompt = `You are a college student writing a follow-up email. You previously sent an email to someone and haven't heard back. Write a brief, polite follow-up.
@@ -569,14 +578,17 @@ SUBJECT: [subject line - should be "Re: original subject"]
 BODY:
 [email body - just the follow-up text, no greeting repetition needed]`;
 
-  const completion = await groq.chat.completions.create({
-    messages: [{ role: 'user', content: prompt }],
-    model: 'llama-3.3-70b-versatile',
-    temperature: 0.7,
-    max_tokens: 300,
+  const completion = await complete({
+    userPrompt: prompt,
+    options: {
+      model: 'llama-3.3-70b-versatile',
+      temperature: 0.7,
+      maxTokens: 300,
+    },
+    metadata: { userId, action: 'FOLLOW_UP' },
   });
 
-  const response = completion.choices[0]?.message?.content || '';
+  const response = completion.content;
 
   // Parse the response
   const subjectMatch = response.match(/SUBJECT:\s*([^\n]+)/);

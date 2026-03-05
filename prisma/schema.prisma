@@ -60,8 +60,8 @@ model User {
   stripeSubscriptionId       String?                      @unique
   stripeCurrentPeriodEnd     DateTime?
   subscriptionStatus         String?
-  timezone                   String?                      // e.g., "America/Chicago"
-  emailInstructions          String?                      // Free-text custom instructions for LLM email generation
+  timezone                   String? // e.g., "America/Chicago"
+  emailInstructions          String? // Free-text custom instructions for LLM email generation
   autoPersonalize            Boolean                      @default(false) // Auto-personalize emails with AI when opening review modal
   referredBy                 User?                        @relation("Referrals", fields: [referredById], references: [id])
   referrals                  User[]                       @relation("Referrals")
@@ -95,45 +95,45 @@ model VerificationToken {
 }
 
 model Person {
-  id               String          @id @default(cuid())
-  fullName         String
-  firstName        String?
-  lastName         String?
-  company          String
-  role             String?
-  linkedinUrl      String?
+  id                      String                       @id @default(cuid())
+  fullName                String
+  firstName               String?
+  lastName                String?
+  company                 String
+  role                    String?
+  linkedinUrl             String?
   email                   String?
   emailStatus             EmailStatus?
   emailConfidence         Float?
   emailLastUpdated        DateTime?
-  emailDeliverable        Boolean?        // Emailable verification result (null = unchecked)
-  emailVerifiedAt         DateTime?       // When Emailable last verified this email
-  emailVerificationReason String?         // Emailable reason (e.g., "accepted_email", "invalid_domain")
-  apolloEnrichedAt        DateTime?       // Track when Apollo data was last fetched (legacy)
-  apolloStatus     ApolloStatus?   // Track the result of the last Apollo call (legacy)
-  scrapedAt        DateTime?       // Track when LinkedIn data was last scraped
-  city             String?
-  state            String?
-  country          String?
-  educationSchool  String?
-  educationDegree  String?
-  educationField   String?
-  educationYear    String?
-  schools          Json?             // Array of all schools (normalized)
-  role_embedding   Unsupported("vector(1536)")?  // pgvector embedding for semantic role matching
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
-  sourceLinks      SourceLink[]
-  userCandidates   UserCandidate[]
-  searchPeople     SearchPerson[]
+  emailDeliverable        Boolean? // Emailable verification result (null = unchecked)
+  emailVerifiedAt         DateTime? // When Emailable last verified this email
+  emailVerificationReason String? // Emailable reason (e.g., "accepted_email", "invalid_domain")
+  apolloEnrichedAt        DateTime? // Track when Apollo data was last fetched (legacy)
+  apolloStatus            ApolloStatus? // Track the result of the last Apollo call (legacy)
+  scrapedAt               DateTime? // Track when LinkedIn data was last scraped
+  city                    String?
+  state                   String?
+  country                 String?
+  educationSchool         String?
+  educationDegree         String?
+  educationField          String?
+  educationYear           String?
+  schools                 Json? // Array of all schools (normalized)
+  role_embedding          Unsupported("vector(1536)")? // pgvector embedding for semantic role matching
+  createdAt               DateTime                     @default(now())
+  updatedAt               DateTime                     @updatedAt
+  sourceLinks             SourceLink[]
+  userCandidates          UserCandidate[]
+  searchPeople            SearchPerson[]
 
   @@unique([fullName, company])
   @@index([fullName, company])
   @@index([emailStatus])
-  @@index([apolloEnrichedAt])       // For TTL queries (legacy)
-  @@index([apolloStatus])           // For filtering by enrichment status (legacy)
-  @@index([scrapedAt])              // For TTL queries - check if data is stale
-  @@index([linkedinUrl])            // For cache lookup by LinkedIn URL
+  @@index([apolloEnrichedAt]) // For TTL queries (legacy)
+  @@index([apolloStatus]) // For filtering by enrichment status (legacy)
+  @@index([scrapedAt]) // For TTL queries - check if data is stale
+  @@index([linkedinUrl]) // For cache lookup by LinkedIn URL
 }
 
 model Search {
@@ -143,25 +143,26 @@ model Search {
   role                  String?
   university            String?
   location              String?
-  queryHash             String?        // Legacy field for query deduplication
+  queryHash             String? // SHA-256 hash of exact Serper query string for dedup
   // Scrape progress tracking
-  lastCsePageScraped    Int            @default(0)     // 0=none, 1=page1, 11=page2, 21=page3
-  cseExhausted          Boolean        @default(false)  // true when CSE returned <5 valid profiles
+  lastCsePageScraped    Int            @default(0) // Now stores Serper page number (1,2,3...) not CSE start offset
+  cseExhausted          Boolean        @default(false) // true when exhaustion detected
   // API usage stats (analytics)
   apolloCallsMade       Int            @default(0)
   apolloCacheHits       Int            @default(0)
   cseCallsMade          Int            @default(0)
   linkedinScraperCalls  Int            @default(0)
-  profilesAdded         Int            @default(0)      // New Person records created
-  profilesMatchedSearch Int            @default(0)      // Of those added, how many matched role/uni/location filters
-  prescrapeStatus       String?          // null=not started, 'RUNNING'=in progress, 'DONE'=completed
-  completedAt     DateTime?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @default(now()) @updatedAt
-  searchPeople    SearchPerson[] // Kept for production compatibility — no longer used by new code
+  profilesAdded         Int            @default(0) // New Person records created
+  profilesMatchedSearch Int            @default(0) // Of those added, how many matched role/uni/location filters
+  prescrapeStatus       String? // null=not started, 'RUNNING'=in progress, 'DONE'=completed
+  completedAt           DateTime?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @default(now()) @updatedAt
+  searchPeople          SearchPerson[] // Kept for production compatibility — no longer used by new code
 
   @@index([createdAt])
   @@index([completedAt])
+  @@index([queryHash])
   @@index([company, name, role, university, location]) // Composite for param lookup
 }
 
@@ -351,10 +352,10 @@ enum EmailStatus {
 }
 
 enum ApolloStatus {
-  SUCCESS      // Apollo returned data (person found, even if no email)
-  NOT_FOUND    // Apollo couldn't find the person
-  API_ERROR    // Apollo API failed (rate limit, out of credits, network error)
-  SKIPPED      // Apollo call was skipped (no API key, missing required fields)
+  SUCCESS // Apollo returned data (person found, even if no email)
+  NOT_FOUND // Apollo couldn't find the person
+  API_ERROR // Apollo API failed (rate limit, out of credits, network error)
+  SKIPPED // Apollo call was skipped (no API key, missing required fields)
 }
 
 enum SourceLinkKind {
@@ -476,17 +477,17 @@ enum MeetingSuggestionStatus {
 }
 
 model ExtractedMeetingSuggestion {
-  id            String                   @id @default(cuid())
+  id            String                  @id @default(cuid())
   userId        String
-  messageId     String                   @unique
-  status        MeetingSuggestionStatus  @default(PENDING)
+  messageId     String                  @unique
+  status        MeetingSuggestionStatus @default(PENDING)
   extractedData Json
   confidence    Float
-  createdAt     DateTime                 @default(now())
-  updatedAt     DateTime                 @updatedAt
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
 
-  user          User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  message       messages                 @relation(fields: [messageId], references: [messageId], onDelete: Cascade)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  message messages @relation(fields: [messageId], references: [messageId], onDelete: Cascade)
 
   @@index([userId, status])
   @@index([userId, createdAt])
@@ -521,11 +522,11 @@ model messages {
 
 model CompanyEmailPattern {
   id                String   @id @default(cuid())
-  company           String   // normalized company name (lowercase, no punctuation)
-  domain            String   // email domain (e.g., "zs.com")
-  pattern           String   // pattern type: "first.last", "firstlast", "flast", "f.last", "first_last", "first"
-  confidence        Float    // 0-1 based on consistency
-  sampleSize        Int      // number of emails used to determine pattern
+  company           String // normalized company name (lowercase, no punctuation)
+  domain            String // email domain (e.g., "zs.com")
+  pattern           String // pattern type: "first.last", "firstlast", "flast", "f.last", "first_last", "first"
+  confidence        Float // 0-1 based on consistency
+  sampleSize        Int // number of emails used to determine pattern
   acceptAll         Boolean? // true = catch-all domain (can't verify individual emails), false = can verify, null = unchecked
   unverifiable      Boolean  @default(false) // true = SMTP blocks verification (unavailable_smtp), trust pattern
   searchable        Boolean  @default(false) // true = users can search this company
@@ -539,15 +540,15 @@ model CompanyEmailPattern {
 }
 
 model SearchLog {
-  id          String   @id @default(cuid())
-  userId      String
-  company     String?
-  role        String?
-  university  String?
-  location    String?
-  resultsCount Int     @default(0)  // How many results were returned
-  fromCache   Boolean  @default(false)
-  searchedAt  DateTime @default(now())
+  id           String   @id @default(cuid())
+  userId       String
+  company      String?
+  role         String?
+  university   String?
+  location     String?
+  resultsCount Int      @default(0) // How many results were returned
+  fromCache    Boolean  @default(false)
+  searchedAt   DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -607,7 +608,7 @@ model OutreachTracker {
 
 model CompanyAlias {
   id            String   @id @default(cuid())
-  canonicalName String   // "Procter & Gamble"
+  canonicalName String // "Procter & Gamble"
   aliases       String[] // ["p&g", "procter & gamble", "procter and gamble"]
   source        String   @default("LLM") // "LLM" or "MANUAL"
   createdAt     DateTime @default(now())
@@ -667,20 +668,20 @@ enum ReferralLinkType {
 }
 
 model ReferralLink {
-  id            String           @id
-  code          String           @unique
-  type          ReferralLinkType
-  label         String
-  userId        String?
-  isActive      Boolean          @default(true)
-  clickCount    Int              @default(0)
-  signupCount   Int              @default(0)
-  paidCount     Int              @default(0)
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @default(now())
+  id          String           @id
+  code        String           @unique
+  type        ReferralLinkType
+  label       String
+  userId      String?
+  isActive    Boolean          @default(true)
+  clickCount  Int              @default(0)
+  signupCount Int              @default(0)
+  paidCount   Int              @default(0)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @default(now())
 
-  user          User?            @relation("ReferralLinkCreator", fields: [userId], references: [id])
-  usersReferred User[]           @relation("UserReferralLink")
+  user          User?  @relation("ReferralLinkCreator", fields: [userId], references: [id])
+  usersReferred User[] @relation("UserReferralLink")
 
   @@index([type])
 }
