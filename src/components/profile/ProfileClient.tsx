@@ -34,7 +34,7 @@ interface ProfileClientProps {
 }
 
 const DEFAULT_TEMPLATE = {
-  name: 'AI Personalized',
+  name: 'Default Template',
   subject: '{university} {classification} interested in {industry} at {company}',
   body: `Hi {first_name},
 
@@ -361,10 +361,10 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
               <img
                 src={userImage}
                 alt={userName || 'Profile'}
-                className="w-16 h-16 rounded-full ring-2 ring-primary-500/20"
+                className="w-16 h-16 rounded-full ring-2 ring-surface-500/20"
               />
             ) : (
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center ring-2 ring-primary-500/20">
+              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-surface-400 to-surface-600 flex items-center justify-center ring-2 ring-surface-500/20">
                 <span className="text-xl text-white font-semibold">{initials}</span>
               </div>
             )}
@@ -380,7 +380,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
           </div>
 
           {profileSaved && (
-            <div className="mb-6 px-4 py-3 bg-green-50 text-green-700 rounded-lg text-sm flex items-center gap-2">
+            <div className="mb-6 px-4 py-3 bg-green-900/30 text-green-400 rounded-lg text-sm flex items-center gap-2">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
@@ -389,7 +389,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
           )}
 
           {profileError && (
-            <div className="mb-6 px-4 py-3 bg-red-50 text-red-700 rounded-lg text-sm">
+            <div className="mb-6 px-4 py-3 bg-red-900/30 text-red-400 rounded-lg text-sm">
               {profileError}
             </div>
           )}
@@ -425,7 +425,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                     type="text"
                     value={profile.name || ''}
                     onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-                    className="w-full bg-surface-50 border-none rounded-lg focus:ring-2 focus:ring-primary-500 text-sm p-3"
+                    className="w-full bg-surface-50 border-none rounded-lg focus:ring-2 focus:ring-surface-500 text-sm p-3"
                     placeholder="Your full name"
                   />
                 </div>
@@ -437,7 +437,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                   <select
                     value={profile.classification || ''}
                     onChange={(e) => setProfile({ ...profile, classification: e.target.value })}
-                    className="w-full bg-surface-50 border-none rounded-lg focus:ring-2 focus:ring-primary-500 text-sm p-3"
+                    className="w-full bg-surface-50 border-none rounded-lg focus:ring-2 focus:ring-surface-500 text-sm p-3"
                   >
                     <option value="">Select classification</option>
                     {CLASSIFICATIONS.map((c) => (
@@ -454,7 +454,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                     type="text"
                     value={profile.major || ''}
                     onChange={(e) => setProfile({ ...profile, major: e.target.value })}
-                    className="w-full bg-surface-50 border-none rounded-lg focus:ring-2 focus:ring-primary-500 text-sm p-3"
+                    className="w-full bg-surface-50 border-none rounded-lg focus:ring-2 focus:ring-surface-500 text-sm p-3"
                     placeholder="e.g., Computer Science"
                   />
                 </div>
@@ -481,7 +481,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                     type="text"
                     value={profile.career || ''}
                     onChange={(e) => setProfile({ ...profile, career: e.target.value })}
-                    className="w-full bg-surface-50 border-none rounded-lg focus:ring-2 focus:ring-primary-500 text-sm p-3"
+                    className="w-full bg-surface-50 border-none rounded-lg focus:ring-2 focus:ring-surface-500 text-sm p-3"
                     placeholder="e.g., Investment Banking, Consulting"
                   />
                 </div>
@@ -494,7 +494,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                     value={profile.emailInstructions || ''}
                     onChange={(e) => setProfile({ ...profile, emailInstructions: e.target.value || null })}
                     rows={3}
-                    className="w-full bg-surface-50 border-none rounded-lg focus:ring-2 focus:ring-primary-500 text-sm p-3 resize-none"
+                    className="w-full bg-surface-50 border-none rounded-lg focus:ring-2 focus:ring-surface-500 text-sm p-3 resize-none"
                     placeholder="e.g. Keep emails under 3 sentences. Always mention I'm looking for a summer internship. Don't include my resume."
                   />
                   <p className="text-xs text-surface-400">These instructions will be applied to every AI-generated email.</p>
@@ -516,7 +516,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                     aria-checked={profile.autoPersonalize}
                     onClick={() => setProfile({ ...profile, autoPersonalize: !profile.autoPersonalize })}
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      profile.autoPersonalize ? 'bg-primary-500' : 'bg-surface-300'
+                      profile.autoPersonalize ? 'bg-[#505050]' : 'bg-surface-300'
                     }`}
                   >
                     <span
@@ -531,7 +531,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
               <button
                 onClick={handleSaveProfile}
                 disabled={isSavingProfile}
-                className="mt-6 w-full md:w-auto bg-primary-500 text-white px-6 py-2.5 rounded-xl font-semibold hover:bg-primary-600 transition-all disabled:opacity-50"
+                className="mt-6 w-full md:w-auto bg-[#505050] text-white px-6 py-2.5 rounded-xl font-semibold hover:bg-[#606060] transition-all disabled:opacity-50"
               >
                 {isSavingProfile ? 'Saving...' : 'Save Profile'}
               </button>
@@ -544,20 +544,20 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
           <h3 className="text-lg font-bold text-surface-900 mb-4">Resume</h3>
 
           {resumeSuccess && (
-            <div className="mb-4 px-4 py-3 bg-green-50 text-green-700 rounded-lg text-sm">
+            <div className="mb-4 px-4 py-3 bg-green-900/30 text-green-400 rounded-lg text-sm">
               Resume uploaded successfully!
             </div>
           )}
 
           {resumeError && (
-            <div className="mb-4 px-4 py-3 bg-red-50 text-red-700 rounded-lg text-sm">
+            <div className="mb-4 px-4 py-3 bg-red-900/30 text-red-400 rounded-lg text-sm">
               {resumeError}
             </div>
           )}
 
           {/* Upload Area */}
-          <label className="border-2 border-dashed border-surface-200 rounded-xl p-4 flex items-center gap-4 group hover:border-primary-500 transition-colors cursor-pointer mb-4 block">
-            <div className="bg-primary-500/10 p-3 rounded-full text-primary-500 group-hover:scale-110 transition-transform">
+          <label className="border-2 border-dashed border-surface-200 rounded-xl p-4 flex items-center gap-4 group hover:border-surface-400 transition-colors cursor-pointer mb-4 block">
+            <div className="bg-surface-500/10 p-3 rounded-full text-surface-400 group-hover:scale-110 transition-transform">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
@@ -588,7 +588,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                 <div
                   key={resume.id}
                   className={`p-3 rounded-xl flex items-center gap-3 ${
-                    resume.isActive ? 'bg-primary-500/10' : 'bg-surface-50'
+                    resume.isActive ? 'bg-surface-500/10' : 'bg-surface-50'
                   }`}
                 >
                   <div className="bg-surface-100 p-3 rounded-lg shadow-sm">
@@ -600,7 +600,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                     <p className="font-semibold text-sm text-surface-900 truncate">
                       {resume.filename}
                       {resume.isActive && (
-                        <span className="ml-2 text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 bg-primary-100 text-primary-700 rounded">
+                        <span className="ml-2 text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 bg-surface-500/20 text-surface-400 rounded">
                           Active
                         </span>
                       )}
@@ -634,7 +634,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                     </a>
                     <button
                       onClick={() => handleDeleteResume(resume.id)}
-                      className="p-2 hover:bg-red-50 rounded-lg text-surface-400 hover:text-red-500 transition-colors"
+                      className="p-2 hover:bg-red-900/30 rounded-lg text-surface-400 hover:text-red-400 transition-colors"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -654,7 +654,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
             {!isCreating && (
               <button
                 onClick={() => setIsCreating(true)}
-                className="text-primary-500 text-sm font-semibold flex items-center gap-1 hover:underline"
+                className="text-surface-400 text-sm font-semibold flex items-center gap-1 hover:underline"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -665,7 +665,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
           </div>
 
           {templateError && (
-            <div className="mb-4 px-4 py-3 bg-red-50 text-red-700 rounded-lg text-sm">
+            <div className="mb-4 px-4 py-3 bg-red-900/30 text-red-400 rounded-lg text-sm">
               {templateError}
             </div>
           )}
@@ -674,19 +674,19 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
             <div className="text-center py-4 text-surface-500 text-sm">Loading templates...</div>
           ) : (
             <div className="space-y-3">
-              {/* Built-in AI Personalized Template (always shown) */}
+              {/* Built-in Default Template Template (always shown) */}
               <button
                 onClick={() => setShowDefaultTemplate(true)}
-                className="group w-full text-left bg-surface-100 border border-surface-200 p-4 rounded-xl hover:border-primary-500/50 transition-all"
+                className="group w-full text-left bg-surface-100 border border-surface-200 p-4 rounded-xl hover:border-surface-400/50 transition-all"
               >
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <h4 className="font-semibold text-surface-900">AI Personalized</h4>
-                    <span className="bg-primary-500/10 text-primary-500 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">
+                    <h4 className="font-semibold text-surface-900">Default Template</h4>
+                    <span className="bg-surface-500/10 text-surface-400 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">
                       Built-in
                     </span>
                     {!templates.some(t => t.isDefault) && (
-                      <span className="bg-primary-500/10 text-primary-500 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">
+                      <span className="bg-surface-500/10 text-surface-400 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">
                         Default
                       </span>
                     )}
@@ -701,13 +701,13 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
               {templates.map((template) => (
                 <div
                   key={template.id}
-                  className="group relative bg-surface-100 border border-surface-200 p-4 rounded-xl hover:border-primary-500/50 transition-all"
+                  className="group relative bg-surface-100 border border-surface-200 p-4 rounded-xl hover:border-surface-400/50 transition-all"
                 >
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <h4 className="font-semibold text-surface-900">{template.name}</h4>
                       {template.isDefault && (
-                        <span className="bg-primary-500/10 text-primary-500 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">
+                        <span className="bg-surface-500/10 text-surface-400 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">
                           Default
                         </span>
                       )}
@@ -728,7 +728,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                       </button>
                       <button
                         onClick={() => handleDeleteTemplate(template.id)}
-                        className="p-1.5 hover:bg-red-50 rounded-lg text-surface-400 hover:text-red-500"
+                        className="p-1.5 hover:bg-red-900/30 rounded-lg text-surface-400 hover:text-red-400"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -744,7 +744,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
               {!isCreating && (
                 <button
                   onClick={() => setIsCreating(true)}
-                  className="w-full py-3 border-2 border-dashed border-surface-200 rounded-xl text-surface-400 hover:text-primary-500 hover:border-primary-500 transition-all flex items-center justify-center gap-2 font-medium text-sm"
+                  className="w-full py-3 border-2 border-dashed border-surface-200 rounded-xl text-surface-400 hover:text-surface-300 hover:border-surface-400 transition-all flex items-center justify-center gap-2 font-medium text-sm"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -757,7 +757,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
 
           {/* Create Template Form */}
           {isCreating && (
-            <div className="mt-3 p-4 border border-primary-200 rounded-xl bg-primary-50">
+            <div className="mt-3 p-4 border border-surface-200 rounded-xl bg-surface-100">
               <h4 className="font-semibold text-surface-900 mb-4">New Template</h4>
               <div className="space-y-4">
                 <div className="space-y-1.5">
@@ -766,7 +766,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                     type="text"
                     value={newTemplate.name}
                     onChange={(e) => setNewTemplate({ ...newTemplate, name: e.target.value })}
-                    className="w-full bg-surface-100 border-none rounded-lg focus:ring-2 focus:ring-primary-500 text-sm p-3"
+                    className="w-full bg-surface-100 border-none rounded-lg focus:ring-2 focus:ring-surface-500 text-sm p-3"
                     placeholder="Template name"
                   />
                 </div>
@@ -776,7 +776,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                     type="text"
                     value={newTemplate.subject}
                     onChange={(e) => setNewTemplate({ ...newTemplate, subject: e.target.value })}
-                    className="w-full bg-surface-100 border-none rounded-lg focus:ring-2 focus:ring-primary-500 text-sm p-3"
+                    className="w-full bg-surface-100 border-none rounded-lg focus:ring-2 focus:ring-surface-500 text-sm p-3"
                     placeholder="Email subject"
                   />
                 </div>
@@ -786,11 +786,11 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                     value={newTemplate.body}
                     onChange={(e) => setNewTemplate({ ...newTemplate, body: e.target.value })}
                     rows={4}
-                    className="w-full bg-surface-100 border-none rounded-lg focus:ring-2 focus:ring-primary-500 text-sm p-3 resize-none"
+                    className="w-full bg-surface-100 border-none rounded-lg focus:ring-2 focus:ring-surface-500 text-sm p-3 resize-none"
                     placeholder="Email body"
                   />
                 </div>
-                <div className="p-3 bg-surface-100 rounded-xl">
+                <div className="p-3 bg-surface-50 rounded-xl">
                   <p className="text-xs font-semibold text-surface-700 mb-2">Available Placeholders:</p>
                   <div className="flex flex-wrap gap-1.5">
                     {DEFAULT_PLACEHOLDERS.map((p) => (
@@ -798,7 +798,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                         key={p}
                         type="button"
                         onClick={() => setNewTemplate({ ...newTemplate, body: newTemplate.body + p })}
-                        className="text-xs px-2.5 py-1 bg-primary-100 text-primary-700 rounded-full font-medium hover:bg-primary-200 transition-colors cursor-pointer"
+                        className="text-xs px-2.5 py-1 bg-surface-500/20 text-surface-400 rounded-full font-medium hover:bg-surface-500/30 transition-colors cursor-pointer"
                       >
                         {p}
                       </button>
@@ -820,7 +820,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                             resumeId: checked ? (activeResume?.id || resumes[0]?.id || null) : null,
                           });
                         }}
-                        className="w-4 h-4 text-primary-500 border-surface-300 rounded focus:ring-primary-500"
+                        className="w-4 h-4 text-surface-400 border-surface-300 rounded focus:ring-surface-500"
                       />
                       <span className="text-sm text-surface-700">Attach resume</span>
                     </label>
@@ -843,7 +843,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                   <button
                     onClick={handleCreateTemplate}
                     disabled={isSavingTemplate}
-                    className="bg-primary-500 text-white px-6 py-2.5 rounded-xl font-semibold hover:bg-primary-600 transition-all disabled:opacity-50 text-sm"
+                    className="bg-[#505050] text-white px-6 py-2.5 rounded-xl font-semibold hover:bg-[#606060] transition-all disabled:opacity-50 text-sm"
                   >
                     {isSavingTemplate ? 'Creating...' : 'Create'}
                   </button>
@@ -954,7 +954,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
             <div className="p-6">
               <div className="flex items-center justify-between mb-6 pb-4 border-b border-surface-200">
                 <h3 className="text-lg font-bold text-surface-900">
-                  {showDefaultTemplate ? 'AI Personalized' : selectedTemplate?.name}
+                  {showDefaultTemplate ? 'Default Template' : selectedTemplate?.name}
                 </h3>
                 <button
                   onClick={() => {
@@ -984,11 +984,11 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                       {DEFAULT_TEMPLATE.body}
                     </div>
                   </div>
-                  <div className="p-4 bg-surface-100 rounded-xl">
+                  <div className="p-4 bg-surface-50 rounded-xl">
                     <p className="text-xs font-semibold text-surface-700 mb-2">Available Placeholders:</p>
                     <div className="flex flex-wrap gap-1.5">
                       {DEFAULT_PLACEHOLDERS.map((p) => (
-                        <span key={p} className="text-xs px-2.5 py-1 bg-primary-100 text-primary-700 rounded-full font-medium">
+                        <span key={p} className="text-xs px-2.5 py-1 bg-surface-500/20 text-surface-400 rounded-full font-medium">
                           {p}
                         </span>
                       ))}
@@ -1003,7 +1003,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                       type="text"
                       value={editingTemplate.name}
                       onChange={(e) => setEditingTemplate({ ...editingTemplate, name: e.target.value })}
-                      className="w-full bg-surface-50 border-none rounded-lg focus:ring-2 focus:ring-primary-500 text-sm p-3"
+                      className="w-full bg-surface-50 border-none rounded-lg focus:ring-2 focus:ring-surface-500 text-sm p-3"
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -1012,7 +1012,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                       type="text"
                       value={editingTemplate.subject}
                       onChange={(e) => setEditingTemplate({ ...editingTemplate, subject: e.target.value })}
-                      className="w-full bg-surface-50 border-none rounded-lg focus:ring-2 focus:ring-primary-500 text-sm p-3"
+                      className="w-full bg-surface-50 border-none rounded-lg focus:ring-2 focus:ring-surface-500 text-sm p-3"
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -1021,10 +1021,10 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                       value={editingTemplate.body}
                       onChange={(e) => setEditingTemplate({ ...editingTemplate, body: e.target.value })}
                       rows={8}
-                      className="w-full bg-surface-50 border-none rounded-lg focus:ring-2 focus:ring-primary-500 text-sm p-3 resize-none"
+                      className="w-full bg-surface-50 border-none rounded-lg focus:ring-2 focus:ring-surface-500 text-sm p-3 resize-none"
                     />
                   </div>
-                  <div className="p-3 bg-surface-100 rounded-xl">
+                  <div className="p-3 bg-surface-50 rounded-xl">
                     <p className="text-xs font-semibold text-surface-700 mb-2">Available Placeholders:</p>
                     <div className="flex flex-wrap gap-1.5">
                       {DEFAULT_PLACEHOLDERS.map((p) => (
@@ -1032,7 +1032,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                           key={p}
                           type="button"
                           onClick={() => setEditingTemplate({ ...editingTemplate, body: editingTemplate.body + p })}
-                          className="text-xs px-2.5 py-1 bg-primary-100 text-primary-700 rounded-full font-medium hover:bg-primary-200 transition-colors cursor-pointer"
+                          className="text-xs px-2.5 py-1 bg-surface-500/20 text-surface-400 rounded-full font-medium hover:bg-surface-500/30 transition-colors cursor-pointer"
                         >
                           {p}
                         </button>
@@ -1054,7 +1054,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                               resumeId: checked ? (editingTemplate.resumeId || activeResume?.id || resumes[0]?.id || null) : null,
                             });
                           }}
-                          className="w-4 h-4 text-primary-500 border-surface-300 rounded"
+                          className="w-4 h-4 text-surface-400 border-surface-300 rounded"
                         />
                         <span className="text-sm text-surface-700">Attach resume</span>
                       </label>
@@ -1080,7 +1080,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                         if (!templateError) setSelectedTemplate({ ...editingTemplate });
                       }}
                       disabled={isSavingTemplate}
-                      className="bg-primary-500 text-white px-6 py-2.5 rounded-xl font-semibold hover:bg-primary-600 transition-all disabled:opacity-50"
+                      className="bg-[#505050] text-white px-6 py-2.5 rounded-xl font-semibold hover:bg-[#606060] transition-all disabled:opacity-50"
                     >
                       {isSavingTemplate ? 'Saving...' : 'Save Changes'}
                     </button>
@@ -1096,7 +1096,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                 <div className="space-y-5">
                   <div className="flex items-center gap-2">
                     {selectedTemplate.isDefault && (
-                      <span className="bg-primary-100 text-primary-700 text-[10px] px-2.5 py-1 rounded-full font-bold uppercase">Default</span>
+                      <span className="bg-surface-500/20 text-surface-400 text-[10px] px-2.5 py-1 rounded-full font-bold uppercase">Default</span>
                     )}
                     {selectedTemplate.attachResume && (
                       <span className="bg-green-900/30 text-green-400 text-[10px] px-2.5 py-1 rounded-full font-bold uppercase">Resume</span>
@@ -1117,7 +1117,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                   <div className="flex flex-wrap gap-3 pt-5 border-t border-surface-200">
                     <button
                       onClick={() => setEditingTemplate(selectedTemplate)}
-                      className="bg-primary-500 text-white px-6 py-2.5 rounded-xl font-semibold hover:bg-primary-600 transition-all"
+                      className="bg-[#505050] text-white px-6 py-2.5 rounded-xl font-semibold hover:bg-[#606060] transition-all"
                     >
                       Edit Template
                     </button>
@@ -1134,7 +1134,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                         handleDeleteTemplate(selectedTemplate.id);
                         setSelectedTemplate(null);
                       }}
-                      className="px-6 py-2.5 rounded-xl font-semibold border border-red-200 hover:bg-red-50 transition-all text-red-600"
+                      className="px-6 py-2.5 rounded-xl font-semibold border border-red-900/50 hover:bg-red-900/30 transition-all text-red-400"
                     >
                       Delete
                     </button>

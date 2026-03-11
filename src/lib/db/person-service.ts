@@ -1466,6 +1466,8 @@ export async function saveScrapedProfile(
         country: profile.country,
         schools: schools.length > 0 ? schools : undefined,
         educationSchool,
+        experienceHistory: profile.experienceHistory?.length ? profile.experienceHistory : undefined,
+        educationHistory: profile.educationHistory?.length ? profile.educationHistory : undefined,
         scrapedAt: new Date(),
       },
     });
@@ -1505,6 +1507,8 @@ export async function saveScrapedProfile(
         country: profile.country,
         schools: schools.length > 0 ? schools : undefined,
         educationSchool: educationSchool || undefined,
+        experienceHistory: profile.experienceHistory?.length ? profile.experienceHistory : undefined,
+        educationHistory: profile.educationHistory?.length ? profile.educationHistory : undefined,
         scrapedAt: new Date(),
       },
     });
@@ -1535,6 +1539,8 @@ export async function saveScrapedProfile(
       country: profile.country,
       schools: schools.length > 0 ? schools : undefined,
       educationSchool,
+      experienceHistory: profile.experienceHistory?.length ? profile.experienceHistory : undefined,
+      educationHistory: profile.educationHistory?.length ? profile.educationHistory : undefined,
       scrapedAt: new Date(),
     },
   });

@@ -476,7 +476,7 @@ export function ComposeEmailModal({
       className={
         isEmbedded
           ? 'bg-white rounded-lg shadow-lg max-w-3xl w-full overflow-hidden flex flex-col'
-          : 'fixed inset-0 lg:left-80 bg-black/60 backdrop-blur-sm flex items-end justify-end z-50 p-4 sm:p-6 animate-fade-in'
+          : 'fixed inset-0 lg:left-80 flex items-end justify-end z-50 p-4 sm:p-6 animate-fade-in'
       }
       onClick={!isEmbedded ? (e) => { if (e.target === e.currentTarget) handleClose(); } : undefined}
     >
@@ -596,50 +596,51 @@ export function ComposeEmailModal({
                 </div>
               )}
 
-              {/* File attachments display */}
-              {(fileAttachments.length > 0 || (attachResume && selectedResumeId)) && (
-                <div className="px-4 pb-2 pt-1 space-y-1.5">
-                  {attachResume && selectedResumeId && (
-                    <div className="flex items-center gap-2 px-3 py-2 bg-[#f8f9fa] border border-[#e0e0e0] rounded-lg">
-                      <IconResume className="w-4 h-4 text-[#1a73e8] flex-shrink-0" />
-                      <span className="text-xs text-[#202124] truncate flex-1">
-                        {resumes.find(r => r.id === selectedResumeId)?.filename || 'Resume'}
-                      </span>
-                      <button
-                        onClick={() => setAttachResume(false)}
-                        className="p-0.5 text-[#999] hover:text-[#333] transition-colors"
-                      >
-                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
-                        </svg>
-                      </button>
-                    </div>
-                  )}
-                  {fileAttachments.map((attachment) => (
-                    <div
-                      key={attachment.id}
-                      className="flex items-center gap-2 px-3 py-2 bg-[#f8f9fa] border border-[#e0e0e0] rounded-lg"
-                    >
-                      <IconAttach className="w-4 h-4 text-[#5f6368] flex-shrink-0" />
-                      <span className="text-xs text-[#202124] truncate flex-1">
-                        {attachment.name}
-                      </span>
-                      <span className="text-[10px] text-[#999] flex-shrink-0">
-                        {formatFileSize(attachment.size)}
-                      </span>
-                      <button
-                        onClick={() => handleRemoveFile(attachment.id)}
-                        className="p-0.5 text-[#999] hover:text-[#333] transition-colors"
-                      >
-                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
-                        </svg>
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
+
+            {/* Persistent attachment banner - always visible above toolbar */}
+            {(fileAttachments.length > 0 || (attachResume && selectedResumeId)) && (
+              <div className="px-3 py-2 bg-[#eaf1fb] border-t border-[#d3e3fd] flex flex-wrap items-center gap-2">
+                {attachResume && selectedResumeId && (
+                  <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-[#c2d7f0] rounded-full">
+                    <IconResume className="w-3.5 h-3.5 text-[#1a73e8] flex-shrink-0" />
+                    <span className="text-xs font-medium text-[#1a73e8] truncate max-w-[180px]">
+                      {resumes.find(r => r.id === selectedResumeId)?.filename || 'Resume'}
+                    </span>
+                    <button
+                      onClick={() => setAttachResume(false)}
+                      className="p-0.5 text-[#7baaf7] hover:text-[#1a73e8] transition-colors"
+                    >
+                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+                {fileAttachments.map((attachment) => (
+                  <div
+                    key={attachment.id}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-[#dadce0] rounded-full"
+                  >
+                    <IconAttach className="w-3.5 h-3.5 text-[#5f6368] flex-shrink-0" />
+                    <span className="text-xs text-[#202124] truncate max-w-[140px]">
+                      {attachment.name}
+                    </span>
+                    <span className="text-[10px] text-[#999] flex-shrink-0">
+                      {formatFileSize(attachment.size)}
+                    </span>
+                    <button
+                      onClick={() => handleRemoveFile(attachment.id)}
+                      className="p-0.5 text-[#999] hover:text-[#333] transition-colors"
+                    >
+                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Error Display */}
             {error && (
@@ -664,7 +665,15 @@ export function ComposeEmailModal({
                 ) : limitReached ? (
                   'Limit reached'
                 ) : (
-                  'Send'
+                  <span className="flex items-center gap-1.5">
+                    Send
+                    {(fileAttachments.length > 0 || (attachResume && selectedResumeId)) && (
+                      <span className="flex items-center gap-1 ml-0.5 px-1.5 py-0.5 bg-white/20 rounded-full text-[11px]">
+                        <IconAttach className="w-3 h-3" />
+                        {fileAttachments.length + (attachResume && selectedResumeId ? 1 : 0)}
+                      </span>
+                    )}
+                  </span>
                 )}
               </button>
               <button className="rounded-r-full bg-[#0b57d0] hover:bg-[#0842a0] text-white px-2 py-2 border-l border-[#1a68d4] transition-colors">

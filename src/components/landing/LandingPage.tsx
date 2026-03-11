@@ -1108,7 +1108,7 @@ export function LandingPage() {
                     <div className="email-name">Jordan Kim</div>
                     <div className="email-addr">jordan.kim@stripe.com</div>
                   </div>
-                  <div className="email-badge">AI Personalized</div>
+                  <div className="email-badge">Default Template</div>
                 </div>
                 <div className="email-body">
                   <p>Hi Jordan,</p>

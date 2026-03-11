@@ -23,11 +23,6 @@
     display: none;
   }
 
-  /* Global smooth transitions */
-  *, *::before, *::after {
-    @apply transition-colors duration-150;
-  }
-
   /* Better focus styles - dark theme */
   :focus-visible {
     @apply outline-none ring-2 ring-surface-500 ring-offset-2 ring-offset-surface-100;
@@ -103,7 +98,7 @@
   }
 
   .badge-primary {
-    @apply badge bg-primary-500/20 text-primary-400;
+    @apply badge bg-surface-500/20 text-surface-400;
   }
 
   .badge-success {
@@ -135,7 +130,7 @@
 @layer utilities {
   /* Text gradient utility - dark theme */
   .text-gradient {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary-400 to-primary-500;
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-surface-400 to-surface-300;
   }
 
   /* Subtle backdrop blur */

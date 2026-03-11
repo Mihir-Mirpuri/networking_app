@@ -121,18 +121,21 @@ export function useSearchResults({ initialRemainingDaily }: UseSearchResultsOpti
     setSearchParams(params);
   }, []);
 
-  const handleSendFromReview = async (index: number, subject: string, body: string): Promise<boolean> => {
+  const handleSendFromReview = async (index: number, subject: string, body: string, resumeIdOverride?: string | null): Promise<boolean> => {
     const person = results[index];
     if (!person.userCandidateId) return false;
 
     setSendStatuses((prev) => new Map(prev).set(person.id, 'pending'));
+
+    // Use override if provided (including null to remove), otherwise fall back to template's resumeId
+    const resumeId = resumeIdOverride !== undefined ? resumeIdOverride : person.resumeId;
 
     const personToSend: PersonToSend = {
       email: person.email || undefined,
       subject,
       body,
       userCandidateId: person.userCandidateId,
-      resumeId: person.resumeId ?? undefined,
+      resumeId: resumeId ?? undefined,
     };
 
     const result = await sendSingleEmailAction(personToSend);

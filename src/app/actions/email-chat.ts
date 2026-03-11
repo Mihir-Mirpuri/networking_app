@@ -16,6 +16,7 @@ export interface RefineEmailConversationalInput {
   userMessage: string;
   conversationHistory: ConversationMessage[];
   personId: string;
+  selectedInsights?: Array<{ label: string; detail: string; type: string }>;
 }
 
 export interface RefineEmailConversationalResult {
@@ -72,6 +73,7 @@ export async function refineEmailConversationalAction(
         role: person.role,
       },
       userId: session.user.id,
+      selectedInsights: input.selectedInsights,
     });
 
     return {

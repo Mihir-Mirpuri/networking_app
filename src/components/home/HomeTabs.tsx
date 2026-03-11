@@ -6,7 +6,8 @@ import { PersonLookup } from '@/components/search/PersonLookup';
 import { ComposeEmailModal } from '@/components/compose/ComposeEmailModal';
 import { Toast } from '@/components/ui/Toast';
 import { AISearchPageClient } from '@/components/search/AISearchPageClient';
-import { MagnifyingGlassIcon, UserIcon, PaperAirplaneIcon, ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, UserIcon, PaperAirplaneIcon, ChatBubbleLeftRightIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import { useDrafter } from '@/contexts/DrafterContext';
 
 type HomeTabId = 'find' | 'ai' | 'lookup' | 'quick';
 
@@ -24,6 +25,7 @@ const TABS: { id: HomeTabId; label: string; icon: typeof MagnifyingGlassIcon }[]
 export function HomeTabs({ initialRemainingDaily }: HomeTabsProps) {
   const [activeTab, setActiveTab] = useState<HomeTabId>('find');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const { openDrafter } = useDrafter();
 
   const handleQuickSendSuccess = () => {
     setToast({ message: 'Email sent successfully!', type: 'success' });
@@ -32,7 +34,7 @@ export function HomeTabs({ initialRemainingDaily }: HomeTabsProps) {
   return (
     <div>
       {/* Tab Navigation */}
-      <div className="mb-8">
+      <div className="mb-8 flex items-center gap-4">
         <nav className="inline-flex p-1 bg-surface-100 rounded-xl" aria-label="Tabs">
           {TABS.map((tab) => {
             const Icon = tab.icon;
@@ -53,6 +55,16 @@ export function HomeTabs({ initialRemainingDaily }: HomeTabsProps) {
             );
           })}
         </nav>
+
+        {/* AI Draft Button */}
+        <button
+          type="button"
+          onClick={() => openDrafter()}
+          className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors shadow-sm"
+        >
+          <SparklesIcon className="w-4 h-4" />
+          AI Draft
+        </button>
       </div>
 
       {/* Tab Content */}

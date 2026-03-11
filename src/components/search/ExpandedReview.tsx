@@ -4,17 +4,19 @@ import { useState, useEffect, useRef } from 'react';
 import { signIn } from 'next-auth/react';
 import { SearchResultWithDraft, generateLLMDraftAction } from '@/app/actions/search';
 import { scheduleEmailAction } from '@/app/actions/send';
+import { getResumesAction, ResumeData } from '@/app/actions/resume';
 // import { CompanyResearchPanel } from '@/components/compose/CompanyResearchPanel';
 import { SearchableCombobox } from './SearchableCombobox';
 import { LoadingDots } from './LoadingSpinner';
 import { TemplateData } from '@/app/actions/profile';
 import { useEmailChat } from '@/contexts/EmailChatContext';
+import { InsightsSection } from '@/components/sidebar/EmailChatPanel';
 
 interface ExpandedReviewProps {
   results: SearchResultWithDraft[];
   currentIndex: number;
   onClose: () => void;
-  onSend: (index: number, subject: string, body: string) => Promise<boolean>;
+  onSend: (index: number, subject: string, body: string, resumeIdOverride?: string | null) => Promise<boolean>;
   sendStatuses: Map<string, 'success' | 'failed' | 'pending'>;
   sendErrors?: Map<string, string>;
   templates?: TemplateData[];
@@ -122,6 +124,10 @@ export function ExpandedReview({
   const [showFailure, setShowFailure] = useState(false);
   const [showMobileChat, setShowMobileChat] = useState(false);
   const [isGeneratingDraft, setIsGeneratingDraft] = useState(false);
+  const [resumes, setResumes] = useState<ResumeData[]>([]);
+  const [selectedResumeId, setSelectedResumeId] = useState<string | null>(null);
+  const [showResumeDropdown, setShowResumeDropdown] = useState(false);
+  const resumeDropdownRef = useRef<HTMLDivElement>(null);
 
   const currentPerson = results[internalIndex];
   const status = currentPerson ? sendStatuses.get(currentPerson.id) : undefined;
@@ -134,7 +140,10 @@ export function ExpandedReview({
   const [hasRefined, setHasRefined] = useState(false);
 
   // Email chat context for sidebar chat integration
-  const { openEmailChat, closeEmailChat, currentEmail, updateEmail } = useEmailChat();
+  const { openEmailChat, closeEmailChat, currentEmail, updateEmail, fetchInsights } = useEmailChat();
+
+  // Track when we're pushing local changes to context to prevent sync loop
+  const isPushingToContextRef = useRef(false);
 
   // Synchronous state reset when person changes - always use template
   const [prevIndex, setPrevIndex] = useState(internalIndex);
@@ -147,7 +156,37 @@ export function ExpandedReview({
     setOriginalSubject(nextPerson?.draftSubject || '');
     setOriginalBody(nextPerson?.draftBody || '');
     setHasRefined(false);
+    // Reset resume selection when switching person (will be initialized below)
+    setSelectedResumeId(nextPerson?.resumeId || null);
   }
+
+  // Fetch resumes on mount
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    getResumesAction().then((result) => {
+      if (result.success) {
+        setResumes(result.resumes);
+      }
+    });
+  }, [isAuthenticated]);
+
+  // Initialize selectedResumeId from currentPerson's template setting
+  useEffect(() => {
+    setSelectedResumeId(currentPerson?.resumeId || null);
+  }, [currentPerson?.id]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (resumeDropdownRef.current && !resumeDropdownRef.current.contains(e.target as Node)) {
+        setShowResumeDropdown(false);
+      }
+    };
+    if (showResumeDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showResumeDropdown]);
 
   // Auto-personalize email with LLM (only if enabled in profile)
   useEffect(() => {
@@ -184,16 +223,32 @@ export function ExpandedReview({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPerson?.id, openEmailChat]);
 
+  // Fetch person insights when person changes
+  useEffect(() => {
+    if (currentPerson?.id) {
+      fetchInsights(currentPerson.id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPerson?.id, fetchInsights]);
+
   // Keep chat context in sync when user edits subject/body locally
   useEffect(() => {
     if (currentPerson && subject && body) {
+      isPushingToContextRef.current = true;
       updateEmail(subject, body);
+      // Reset flag after a tick to allow context-initiated updates
+      requestAnimationFrame(() => {
+        isPushingToContextRef.current = false;
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subject, body]);
 
   // Sync email from chat context to local state (when AI refines the email)
   useEffect(() => {
+    // Skip if we just pushed local changes to context (prevents loop)
+    if (isPushingToContextRef.current) return;
+
     if (currentEmail && currentPerson) {
       if (currentEmail.subject !== subject || currentEmail.body !== body) {
         setSubject(currentEmail.subject);
@@ -247,7 +302,7 @@ export function ExpandedReview({
     }
 
     setIsSending(true);
-    const success = await onSend(internalIndex, subject, body);
+    const success = await onSend(internalIndex, subject, body, selectedResumeId);
     setIsSending(false);
 
     if (!success) {
@@ -325,7 +380,7 @@ export function ExpandedReview({
         subject,
         body,
         userCandidateId: currentPerson.userCandidateId,
-        resumeId: currentPerson.resumeId ?? undefined,
+        resumeId: selectedResumeId ?? undefined,
         scheduledFor: selectedDate,
       });
 
@@ -377,18 +432,18 @@ export function ExpandedReview({
   const canSend = !status && !showSuccess && !limitReached;
 
   return (
-    <div className="fixed inset-0 lg:left-80 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in" onMouseDown={(e) => { if (e.target === e.currentTarget) (e.currentTarget as HTMLDivElement).dataset.backdropMouseDown = 'true'; }} onMouseUp={(e) => { if (e.target === e.currentTarget && (e.currentTarget as HTMLDivElement).dataset.backdropMouseDown === 'true') onClose(); delete (e.currentTarget as HTMLDivElement).dataset.backdropMouseDown; }} onClick={() => {}}>
-      <div className="bg-[#1e1e1e] rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-scale-in relative border border-[#333] [&_*]:focus-visible:ring-0 [&_*]:focus-visible:ring-offset-0">
+    <div className="fixed inset-0 lg:left-80 bg-[#212121] flex items-center justify-center z-50 p-4 animate-fade-in" onMouseDown={(e) => { if (e.target === e.currentTarget) (e.currentTarget as HTMLDivElement).dataset.backdropMouseDown = 'true'; }} onMouseUp={(e) => { if (e.target === e.currentTarget && (e.currentTarget as HTMLDivElement).dataset.backdropMouseDown === 'true') onClose(); delete (e.currentTarget as HTMLDivElement).dataset.backdropMouseDown; }} onClick={() => {}}>
+      <div className="bg-[#212121] rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-scale-in relative border border-[#333] [&_*]:focus-visible:ring-0 [&_*]:focus-visible:ring-offset-0">
         {/* Success animation overlay */}
         {showSuccess && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#1e1e1e]/90 rounded-xl">
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#212121]/90 rounded-xl">
             <SendSuccessAnimation />
           </div>
         )}
 
         {/* Failure animation overlay */}
         {showFailure && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#1e1e1e]/90 rounded-xl">
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#212121]/90 rounded-xl">
             <SendFailureAnimation message={sendErrors?.get(currentPerson.id) || 'Failed to send email'} />
           </div>
         )}
@@ -422,7 +477,7 @@ export function ExpandedReview({
         </div>
 
         {/* Fields */}
-        <div className="flex-1 overflow-y-auto bg-[#1e1e1e]">
+        <div className="flex-1 overflow-y-auto bg-[#212121]">
           {/* To field (read-only, showing recipient) */}
           <div className="flex items-center border-b border-[#333] px-4">
             <span className="text-sm text-[#808080] w-10 flex-shrink-0">To</span>
@@ -438,9 +493,6 @@ export function ExpandedReview({
                 </a>
               ) : (
                 currentPerson.fullName
-              )}
-              {currentPerson.email && (
-                <span className="text-[#808080] ml-1">&lt;{currentPerson.email}&gt;</span>
               )}
               {(currentPerson.role || currentPerson.company) && (
                 <span className="text-[#606060] ml-2 text-xs">
@@ -478,13 +530,24 @@ export function ExpandedReview({
           </div>
 
           {/* Resume attachment chip */}
-          {currentPerson.resumeId && (
+          {selectedResumeId && (
             <div className="px-4 pb-2">
               <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#252525] border border-[#404040] rounded-lg">
                 <svg className="w-4 h-4 text-emerald-400" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" />
                 </svg>
-                <span className="text-xs text-[#A0A0A0]">Resume attached</span>
+                <span className="text-xs text-[#A0A0A0]">
+                  {resumes.find(r => r.id === selectedResumeId)?.filename || 'Resume attached'}
+                </span>
+                <button
+                  onClick={() => setSelectedResumeId(null)}
+                  className="ml-1 text-[#606060] hover:text-[#A0A0A0]"
+                  title="Remove attachment"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
             </div>
           )}
@@ -517,6 +580,58 @@ export function ExpandedReview({
                 </option>
               ))}
             </select>
+          )}
+
+          {/* Resume attachment toggle */}
+          {isAuthenticated && resumes.length > 0 && (
+            <div className="relative" ref={resumeDropdownRef}>
+              <button
+                onClick={() => setShowResumeDropdown(!showResumeDropdown)}
+                disabled={!canSend || isSending}
+                className={`p-2 rounded-full transition-colors disabled:opacity-30 ${
+                  selectedResumeId
+                    ? 'bg-emerald-900/30 text-emerald-400 hover:bg-emerald-900/50'
+                    : 'text-[#808080] hover:bg-[#333] hover:text-[#E0E0E0]'
+                }`}
+                title={selectedResumeId ? 'Resume attached (click to change)' : 'Attach resume'}
+              >
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" />
+                </svg>
+              </button>
+
+              {/* Dropdown */}
+              {showResumeDropdown && (
+                <div className="absolute bottom-full left-0 mb-2 w-56 bg-[#2a2a2a] rounded-lg shadow-xl border border-[#404040] py-1 z-10">
+                  <button
+                    onClick={() => {
+                      setSelectedResumeId(null);
+                      setShowResumeDropdown(false);
+                    }}
+                    className={`w-full text-left px-3 py-2 text-sm hover:bg-[#333] ${
+                      !selectedResumeId ? 'text-[#E0E0E0] bg-[#333]' : 'text-[#A0A0A0]'
+                    }`}
+                  >
+                    No resume
+                  </button>
+                  {resumes.map((resume) => (
+                    <button
+                      key={resume.id}
+                      onClick={() => {
+                        setSelectedResumeId(resume.id);
+                        setShowResumeDropdown(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 text-sm hover:bg-[#333] truncate ${
+                        selectedResumeId === resume.id ? 'text-[#E0E0E0] bg-[#333]' : 'text-[#A0A0A0]'
+                      }`}
+                    >
+                      {resume.filename}
+                      {resume.isActive && <span className="text-emerald-400 ml-1">(Active)</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
 
           <div className="flex-1" />
@@ -680,6 +795,9 @@ function MobileChatPanel({ onClose }: { onClose: () => void }) {
             <p className="text-sm text-[#909090] truncate">{currentEmail.subject}</p>
           </div>
         )}
+
+        {/* Person insights checklist */}
+        <InsightsSection />
 
         {/* Messages area */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[200px]">

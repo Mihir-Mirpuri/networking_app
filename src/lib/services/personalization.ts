@@ -616,6 +616,7 @@ export interface ConversationalRefineInput {
     role: string | null;
   };
   userId: string;
+  selectedInsights?: Array<{ label: string; detail: string; type: string }>;
 }
 
 export interface ConversationalRefineResult {
@@ -632,12 +633,22 @@ export interface ConversationalRefineResult {
 export async function refineEmailConversational(
   input: ConversationalRefineInput
 ): Promise<ConversationalRefineResult> {
-  const { subject, body, userMessage, conversationHistory, person, userId } = input;
+  const { subject, body, userMessage, conversationHistory, person, userId, selectedInsights } = input;
 
   const personName = person.firstName || 'the recipient';
+  const hasInsights = selectedInsights && selectedInsights.length > 0;
 
-  // Truncate email if too long (cost optimization)
-  const truncatedBody = body.length > 1000 ? body.slice(0, 1000) + '...' : body;
+  // Truncate email - allow more when insights are present (need room for context)
+  const maxBodyLen = hasInsights ? 2500 : 1000;
+  const truncatedBody = body.length > maxBodyLen ? body.slice(0, maxBodyLen) + '...' : body;
+
+  // Build insights section for prompt
+  const insightsBlock = hasInsights
+    ? `\nPERSON INSIGHTS (selected by the sender to incorporate naturally into the email):
+${selectedInsights.map(i => `- ${i.label}: ${i.detail}`).join('\n')}
+
+When asked to incorporate these insights, weave them naturally into the email body. Do NOT list them as bullet points — integrate them conversationally as part of the email's narrative.\n`
+    : '';
 
   const systemPrompt = `You are an AI assistant helping a college student refine their cold outreach email. You have a natural, conversational style.
 
@@ -647,7 +658,7 @@ Body:
 ${truncatedBody}
 
 RECIPIENT: ${personName}${person.role ? `, ${person.role}` : ''} at ${person.company}
-
+${insightsBlock}
 YOUR ROLE:
 1. Make the requested changes to the email
 2. Respond naturally to the user - acknowledge what you changed
@@ -689,9 +700,9 @@ RESPONSE: [your brief, natural response to the user about what you changed]`;
     systemPrompt,
     userPrompt: userMessage,
     options: {
-      model: 'llama-3.1-8b-instant', // Fast and cheap
+      model: hasInsights ? 'llama-3.3-70b-versatile' : 'llama-3.1-8b-instant',
       temperature: 0.5,
-      maxTokens: 400,
+      maxTokens: hasInsights ? 600 : 400,
     },
     metadata: {
       userId,

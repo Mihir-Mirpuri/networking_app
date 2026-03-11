@@ -1562,6 +1562,8 @@ export async function lookupPersonAction(
               country: null,
               schools: [] as string[],
               educationSchool: null,
+              experienceHistory: [],
+              educationHistory: [],
             };
 
             const { personId } = await saveScrapedProfile(
@@ -1697,6 +1699,7 @@ export async function lookupPersonAction(
 export async function regenerateDraftAction(input: {
   userCandidateId: string;
   templateId: string;
+  useLLM?: boolean; // If true, regenerate with LLM (slow). Default false for fast template switching.
 }): Promise<
   { success: true; subject: string; body: string; resumeId: string | null } |
   { success: false; error: string }
@@ -1753,22 +1756,25 @@ export async function regenerateDraftAction(input: {
     );
     const resumeId = template.attachResume ? template.resumeId : null;
 
-    // Try LLM generation, fall back to placeholder draft on failure
+    // Use placeholder draft by default for fast template switching
+    // Only call LLM if explicitly requested
     let draft = placeholderDraft;
-    try {
-      const resumeSummary = await getUserResumeSummary(userId);
-      const sentEmailExamples = await getRecentSentEmails(userId);
-      draft = await generateEmailWithLLM({
-        person: uc.person,
-        user,
-        resumeSummary,
-        referenceTemplate: placeholderDraft,
-        sentEmailExamples,
-        customInstructions: user.emailInstructions || undefined,
-        userId,
-      });
-    } catch (err) {
-      console.warn('[RegenerateDraft] LLM generation failed, using placeholder:', err);
+    if (input.useLLM) {
+      try {
+        const resumeSummary = await getUserResumeSummary(userId);
+        const sentEmailExamples = await getRecentSentEmails(userId);
+        draft = await generateEmailWithLLM({
+          person: uc.person,
+          user,
+          resumeSummary,
+          referenceTemplate: placeholderDraft,
+          sentEmailExamples,
+          customInstructions: user.emailInstructions || undefined,
+          userId,
+        });
+      } catch (err) {
+        console.warn('[RegenerateDraft] LLM generation failed, using placeholder:', err);
+      }
     }
 
     const isHardcodedTemplate = EMAIL_TEMPLATES.some(t => t.id === template.id);

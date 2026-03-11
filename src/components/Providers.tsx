@@ -3,6 +3,8 @@
 import { SessionProvider } from 'next-auth/react';
 import { ReactNode } from 'react';
 import { useTimezone } from '@/hooks/useTimezone';
+import { DrafterProvider } from '@/contexts/DrafterContext';
+import { DrafterPanel } from '@/components/drafter/DrafterPanel';
 
 /**
  * Component that runs silent background tasks (like timezone sync)
@@ -16,8 +18,11 @@ function BackgroundTasks() {
 export function Providers({ children }: { children: ReactNode }) {
   return (
     <SessionProvider>
-      <BackgroundTasks />
-      {children}
+      <DrafterProvider>
+        <BackgroundTasks />
+        {children}
+        <DrafterPanel />
+      </DrafterProvider>
     </SessionProvider>
   );
 }

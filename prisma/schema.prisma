@@ -120,12 +120,15 @@ model Person {
   educationField          String?
   educationYear           String?
   schools                 Json? // Array of all schools (normalized)
+  experienceHistory       Json? // Full work history from LinkedIn [{ position, companyName, location }]
+  educationHistory        Json? // Full education from LinkedIn [{ schoolName, degree, fieldOfStudy }]
   role_embedding          Unsupported("vector(1536)")? // pgvector embedding for semantic role matching
   createdAt               DateTime                     @default(now())
   updatedAt               DateTime                     @updatedAt
   sourceLinks             SourceLink[]
   userCandidates          UserCandidate[]
   searchPeople            SearchPerson[]
+  insights                PersonInsight[]
 
   @@unique([fullName, company])
   @@index([fullName, company])
@@ -628,6 +631,10 @@ enum GroqAction {
   CALENDAR_PARSE
   CALENDAR_THREAD_PARSE
   SEARCH_FILTER_EXTRACTION
+  DRAFTER_GAP_ANALYSIS
+  DRAFTER_GENERATION
+  DRAFTER_REFINEMENT
+  PERSON_INSIGHT_EXTRACTION
 }
 
 model GroqUsageLog {
@@ -684,4 +691,19 @@ model ReferralLink {
   signups User[] @relation("UserReferralLink")
 
   @@index([type])
+}
+
+model PersonInsight {
+  id          String   @id @default(cuid())
+  personId    String
+  label       String
+  detail      String
+  type        String   // career | education | project | achievement | interest
+  source      String   // linkedin | google | website | database
+  confidence  String   // high | medium
+  sourceUrl   String?  // URL where this fact was found
+  extractedAt DateTime @default(now())
+  person      Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@index([personId])
 }

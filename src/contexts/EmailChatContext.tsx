@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { refineEmailConversationalAction } from '@/app/actions/email-chat';
+import { getPersonInsightsAction, PersonInsightResponse } from '@/app/actions/person-insights';
 
 export interface ChatMessage {
   id: string;
@@ -18,10 +19,18 @@ interface EmailChatContextValue {
   messages: ChatMessage[];
   isProcessing: boolean;
 
+  // Insights
+  insights: PersonInsightResponse[];
+  selectedInsightIds: Set<string>;
+  insightsLoading: boolean;
+  insightsError: string | null;
+
   openEmailChat: (personId: string, personName: string, subject: string, body: string) => void;
   closeEmailChat: () => void;
   sendMessage: (message: string) => Promise<void>;
   updateEmail: (subject: string, body: string) => void;
+  fetchInsights: (personId: string) => Promise<void>;
+  toggleInsight: (insightId: string) => void;
 }
 
 const EmailChatContext = createContext<EmailChatContextValue | null>(null);
@@ -46,13 +55,58 @@ export function EmailChatProvider({ children }: EmailChatProviderProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // Insights state
+  const [insights, setInsights] = useState<PersonInsightResponse[]>([]);
+  const [selectedInsightIds, setSelectedInsightIds] = useState<Set<string>>(new Set());
+  const [insightsLoading, setInsightsLoading] = useState(false);
+  const [insightsError, setInsightsError] = useState<string | null>(null);
+
+  const fetchInsights = useCallback(async (personId: string) => {
+    // Reset previous insights immediately so stale data doesn't linger
+    setInsights([]);
+    setSelectedInsightIds(new Set());
+    setInsightsLoading(true);
+    setInsightsError(null);
+    try {
+      const result = await getPersonInsightsAction(personId);
+      if (result.success) {
+        setInsights(result.insights);
+      } else {
+        setInsightsError(result.error || 'Failed to load insights');
+        setInsights([]);
+      }
+    } catch (err) {
+      console.error('[EmailChat] Failed to fetch insights:', err);
+      setInsightsError('Failed to load insights');
+      setInsights([]);
+    } finally {
+      setInsightsLoading(false);
+    }
+  }, []);
+
+  const toggleInsight = useCallback((insightId: string) => {
+    setSelectedInsightIds(prev => {
+      const next = new Set(prev);
+      if (next.has(insightId)) {
+        next.delete(insightId);
+      } else {
+        next.add(insightId);
+      }
+      return next;
+    });
+  }, []);
+
   const openEmailChat = useCallback((personId: string, personName: string, subject: string, body: string) => {
     setIsEmailReviewOpen(true);
-    setCurrentPersonId(personId);
+    setCurrentPersonId((prev) => {
+      if (prev !== personId) {
+        // New person — reset chat history only (insights are managed by fetchInsights)
+        setMessages([]);
+      }
+      return personId;
+    });
     setCurrentPersonName(personName);
     setCurrentEmail({ subject, body });
-    // Fresh start on each modal open - clear message history
-    setMessages([]);
   }, []);
 
   const closeEmailChat = useCallback(() => {
@@ -61,6 +115,9 @@ export function EmailChatProvider({ children }: EmailChatProviderProps) {
     setCurrentPersonName(null);
     setCurrentEmail(null);
     setMessages([]);
+    setInsights([]);
+    setSelectedInsightIds(new Set());
+    setInsightsError(null);
   }, []);
 
   const updateEmail = useCallback((subject: string, body: string) => {
@@ -88,12 +145,20 @@ export function EmailChatProvider({ children }: EmailChatProviderProps) {
         content: m.content,
       }));
 
+      // Build selected insights to pass to the server action
+      const selectedInsights = selectedInsightIds.size > 0
+        ? insights
+            .filter(i => selectedInsightIds.has(i.id))
+            .map(i => ({ label: i.label, detail: i.detail, type: i.type }))
+        : undefined;
+
       const result = await refineEmailConversationalAction({
         subject: currentEmail.subject,
         body: currentEmail.body,
         userMessage: content,
         conversationHistory,
         personId: currentPersonId,
+        selectedInsights,
       });
 
       if (result.success) {
@@ -133,7 +198,7 @@ export function EmailChatProvider({ children }: EmailChatProviderProps) {
     } finally {
       setIsProcessing(false);
     }
-  }, [currentEmail, currentPersonId, messages, isProcessing]);
+  }, [currentEmail, currentPersonId, messages, isProcessing, insights, selectedInsightIds]);
 
   // Limit messages to last 10 for memory efficiency
   const limitedMessages = messages.slice(-10);
@@ -147,10 +212,16 @@ export function EmailChatProvider({ children }: EmailChatProviderProps) {
         currentEmail,
         messages: limitedMessages,
         isProcessing,
+        insights,
+        selectedInsightIds,
+        insightsLoading,
+        insightsError,
         openEmailChat,
         closeEmailChat,
         sendMessage,
         updateEmail,
+        fetchInsights,
+        toggleInsight,
       }}
     >
       {children}

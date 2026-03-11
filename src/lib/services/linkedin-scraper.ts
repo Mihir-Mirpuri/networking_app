@@ -216,6 +216,9 @@ interface ApifyProfileResponse {
     position: string | null;
     companyName: string | null;
     location: string | null;
+    description: string | null;
+    startDate: string | null;
+    endDate: string | null;
   }>;
 
   // Education array
@@ -223,6 +226,11 @@ interface ApifyProfileResponse {
     schoolName: string;
     degree: string | null;
     fieldOfStudy: string | null;
+    description: string | null;
+    activities: string | null;
+    startDate: string | null;
+    endDate: string | null;
+    grade: string | null;
   }>;
 
   // Error response
@@ -245,6 +253,24 @@ export interface ScrapedProfile {
   country: string | null;
   schools: string[];  // All schools, normalized and deduplicated
   educationSchool: string | null;  // Primary school (first in list)
+  experienceHistory: Array<{
+    position: string | null;
+    companyName: string | null;
+    location: string | null;
+    description: string | null;
+    startDate: string | null;
+    endDate: string | null;
+  }>;
+  educationHistory: Array<{
+    schoolName: string;
+    degree: string | null;
+    fieldOfStudy: string | null;
+    description: string | null;
+    activities: string | null;
+    startDate: string | null;
+    endDate: string | null;
+    grade: string | null;
+  }>;
 }
 
 /**
@@ -452,6 +478,24 @@ function parseProfile(raw: ApifyProfileResponse): ScrapedProfile {
     country: location.country,
     schools,
     educationSchool: schools[0] || null,  // Primary school
+    experienceHistory: (raw.experience || []).map(e => ({
+      position: e.position || null,
+      companyName: e.companyName || null,
+      location: e.location || null,
+      description: e.description || null,
+      startDate: e.startDate || null,
+      endDate: e.endDate || null,
+    })),
+    educationHistory: (raw.education || []).map(e => ({
+      schoolName: e.schoolName,
+      degree: e.degree || null,
+      fieldOfStudy: e.fieldOfStudy || null,
+      description: e.description || null,
+      activities: e.activities || null,
+      startDate: e.startDate || null,
+      endDate: e.endDate || null,
+      grade: e.grade || null,
+    })),
   };
 }
 
