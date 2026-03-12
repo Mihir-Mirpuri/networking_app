@@ -44,7 +44,7 @@ export async function completeJsonAnthropic<T>(
   const {
     systemPrompt,
     userPrompt,
-    model = 'claude-sonnet-4-5-20250929',
+    model = 'claude-haiku-4-5-20251001',
     temperature = 0.3,
     maxTokens = 1500,
     metadata,

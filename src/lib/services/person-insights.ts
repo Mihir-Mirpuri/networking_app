@@ -153,7 +153,7 @@ ${serperSnippets || '(none)'}`;
     const response = await completeJsonAnthropic<InsightsLLMResponse>({
       systemPrompt,
       userPrompt,
-      model: 'claude-sonnet-4-5-20250929',
+      model: 'claude-haiku-4-5-20251001',
       temperature: 0.3,
       maxTokens: 1500,
       metadata: {

@@ -171,7 +171,7 @@ ${serperSnippets || '(none)'}`;
 
   const start = Date.now();
   const completion = await anthropic.messages.create({
-    model: 'claude-sonnet-4-5-20250929',
+    model: 'claude-haiku-4-5-20251001',
     system: systemPrompt,
     messages: [{ role: 'user', content: userPrompt }],
     temperature: 0.3,
