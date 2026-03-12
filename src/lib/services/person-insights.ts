@@ -1,5 +1,5 @@
 import prisma from '@/lib/prisma';
-import { completeJson } from '@/lib/services/groq';
+import { completeJsonAnthropic } from '@/lib/services/anthropic';
 import { GroqAction } from '@prisma/client';
 import { searchSerper } from '@/lib/services/serper';
 
@@ -117,12 +117,15 @@ export async function getOrExtractInsights(
 You have been given raw text from multiple sources about a specific person.
 Their confirmed identity is: Name: ${person.fullName}, Company: ${person.company}, Title: ${person.role || 'Unknown'}.
 
+IMPORTANT: The user can already see the following on the person's card: their name (${person.fullName}), company (${person.company}), role (${person.role || 'Unknown'}), and school (${person.educationSchool || 'Unknown'}). Do NOT return insights that merely restate this information — for example, "works at ${person.company}", "attended ${person.educationSchool}", or "is a ${person.role}". Only include facts that go beyond what is already visible on the card.
+
 Your job:
 1. Discard any content that is clearly not about this specific person.
-2. From the remaining content, extract interesting facts that would be useful for personalizing a cold email — career moves, projects, shared context, professional wins, published work, or anything that signals what they care about.
+2. From the remaining content, extract interesting facts that would be useful for personalizing a cold email — including personal interests, hobbies, sports, music, clubs, fraternity/sorority membership, volunteer work, as well as career moves, projects, shared context, professional wins, published work, or anything that signals what they care about beyond their job title.
 3. For each fact, assign a confidence score (high/medium) that it refers to the correct person. Discard anything low confidence.
 4. Do NOT include generic facts like "works at ${person.company}" or "has a LinkedIn profile".
-5. Return 4-8 specific, interesting facts.
+5. Exclude any insight that is redundant with what the user already sees: their current name, company, role, or school. Only surface information that adds NEW value.
+6. Return ALL specific, interesting facts you can find. Do not limit the number — extract every valuable piece of information.
 
 Return ONLY a JSON object with this format:
 {
@@ -147,21 +150,19 @@ ${sourceLinksText || '(none)'}
 Google search results:
 ${serperSnippets || '(none)'}`;
 
-    const response = await completeJson<InsightsLLMResponse>({
+    const response = await completeJsonAnthropic<InsightsLLMResponse>({
       systemPrompt,
       userPrompt,
-      options: {
-        model: 'llama-3.3-70b-versatile',
-        temperature: 0.3,
-        maxTokens: 800,
-      },
+      model: 'claude-sonnet-4-5-20250929',
+      temperature: 0.3,
+      maxTokens: 1500,
       metadata: {
         userId,
         action: GroqAction.PERSON_INSIGHT_EXTRACTION,
       },
     });
 
-    const extractedInsights = (response.content.insights || []).slice(0, 8);
+    const extractedInsights = response.content.insights || [];
 
     // 6. Persist to DB
     if (extractedInsights.length > 0) {

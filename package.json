@@ -19,6 +19,7 @@
     "backfill:embeddings": "tsx scripts/backfill-role-embeddings.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
     "@auth/prisma-adapter": "^2.0.0",
     "@headlessui/react": "^1.7.19",
     "@heroicons/react": "^2.2.0",
