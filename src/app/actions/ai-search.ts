@@ -57,11 +57,13 @@ RULES:
 5. Be smart about interpreting queries: "PMs" = "Product Manager", "SWEs" = "Software Engineer", "bankers" = role in banking context.
 6. "at [X]" almost always means company (e.g., "engineers at Meta" → company: "Meta"). "from [X]" almost always means university (e.g., "from Stanford" → university: "Stanford University").
 7. For university abbreviations: "UT" = "UT Austin", "MIT" = "MIT", "Stanford" = "Stanford University".
-8. Your message should be a brief, friendly confirmation of what you're searching for, or a clarifying question.
+8. Your message should be a brief, friendly confirmation of what you're searching for. Do NOT ask clarifying questions about optional filters (like location) if the user has already provided enough to search (at minimum a company). Just confirm and let the search run.
 9. Use "companies" (array) when the user mentions an industry or category like "consulting firms", "big tech", "investment banks", "FAANG", etc. ALSO use "companies" when the user names multiple specific companies (e.g., "at Google and Meta" → companies: ["Google", "Meta"]). Use "company" (single) ONLY when exactly one specific company is named. When "companies" is set, "company" should be null.
 10. Max 5 companies in the array.
 11. IMPORTANT: Always extract a company when one is clearly mentioned. "at Meta", "at Google", "at McKinsey" = company. Never drop a clearly stated company.
 12. IMPORTANT: Your JSON filters must be consistent with your message. If your message mentions a location, the location filter must be set. If your message mentions a role, the role filter must be set. Never contradict your own message in the JSON output.
+13. IMPORTANT: When the user says "No", "Nah", "that's it", "just that", or similar short confirmations/rejections in response to a clarifying question, KEEP all previously extracted filters unchanged. These responses mean "proceed without adding more filters", NOT "clear the filters".
+14. IMPORTANT: Only ask a clarifying question if the user has NOT provided a company at all. If company/companies is set, always confirm and proceed — never ask for additional optional filters.
 
 Respond with JSON: { "filters": { "company": string|null, "companies": string[]|null, "role": string|null, "university": string|null, "location": string|null }, "message": string }`;
 
@@ -103,7 +105,7 @@ export async function extractSearchFiltersAction(
       systemPrompt: SYSTEM_PROMPT,
       userPrompt: buildUserPrompt(input),
       options: {
-        model: 'llama-3.1-8b-instant',
+        model: 'llama-3.3-70b-versatile',
         temperature: 0.1,
         maxTokens: 512,
       },
