@@ -158,19 +158,22 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
         limit,
       });
 
-      // Fire-and-forget prescrape PER COMPANY (each needs own Search record)
-      for (const company of companiesToSearch) {
-        fetch('/api/prescrape', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            company,
-            role: filters.role,
-            university: filters.university,
-            location: filters.location,
-            ...(isMultiCompany ? { maxPages: 1 } : {}),
-          }),
-        }).catch(err => console.error('[Prescrape] Error:', err));
+      // Fire-and-forget prescrape PER COMPANY — only if we got results
+      // (if page 1 returned nothing, pages 2–5 won't be better)
+      if (result.results.length > 0) {
+        for (const company of companiesToSearch) {
+          fetch('/api/prescrape', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              company,
+              role: filters.role,
+              university: filters.university,
+              location: filters.location,
+              ...(isMultiCompany ? { maxPages: 1 } : {}),
+            }),
+          }).catch(err => console.error('[Prescrape] Error:', err));
+        }
       }
     }
 

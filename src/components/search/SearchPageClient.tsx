@@ -224,18 +224,20 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
         console.error('Error saving search params to sessionStorage:', e);
       }
 
-      // Fire-and-forget via API route (not server action) so it doesn't
-      // block subsequent server action calls like searchPeopleAction.
-      fetch('/api/prescrape', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          company: params.company!,
-          role: params.role,
-          university: params.university,
-          location: params.location,
-        }),
-      }).catch(err => console.error('[Prescrape] Error:', err));
+      // Fire-and-forget prescrape — only if we got results
+      // (if page 1 returned nothing, pages 2–5 won't be better)
+      if (result.results.length > 0) {
+        fetch('/api/prescrape', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            company: params.company!,
+            role: params.role,
+            university: params.university,
+            location: params.location,
+          }),
+        }).catch(err => console.error('[Prescrape] Error:', err));
+      }
     } else {
       setError(result.error);
       setIsSearching(false);
