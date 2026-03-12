@@ -344,34 +344,34 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
     .toUpperCase();
 
   return (
-    <div className="text-surface-900">
+    <div className="text-white min-h-screen bg-[#111111]">
       {/* Header */}
       <header className="mb-6">
         <h1 className="text-2xl font-bold tracking-tight">Profile</h1>
-        <p className="text-surface-500 text-sm">Manage your professional information and career assets.</p>
+        <p className="text-[#909090] text-sm">Manage your professional information and career assets.</p>
       </header>
 
       {/* Masonry Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4" style={{ alignItems: 'start' }}>
 
         {/* Profile Card */}
-        <section className="bg-surface-100 p-6 rounded-2xl border border-surface-200 card-shadow">
+        <section className="bg-[#1a1a1a] p-6 rounded-2xl border border-[#252525] card-shadow">
           <div className="flex items-center gap-4 mb-6">
             {userImage ? (
               <img
                 src={userImage}
                 alt={userName || 'Profile'}
-                className="w-16 h-16 rounded-full ring-2 ring-surface-500/20"
+                className="w-16 h-16 rounded-full ring-2 ring-[#909090]/20"
               />
             ) : (
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-surface-400 to-surface-600 flex items-center justify-center ring-2 ring-surface-500/20">
+              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#606060] to-[#909090] flex items-center justify-center ring-2 ring-[#909090]/20">
                 <span className="text-xl text-white font-semibold">{initials}</span>
               </div>
             )}
             <div>
-              <h2 className="text-xl font-bold text-surface-900">{profile.name || userName}</h2>
+              <h2 className="text-xl font-bold text-white">{profile.name || userName}</h2>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
-                <span className="text-sm text-surface-500">{userEmail}</span>
+                <span className="text-sm text-[#909090]">{userEmail}</span>
                 <span className="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 bg-green-900/30 text-green-400 rounded">
                   Google Connected
                 </span>
@@ -399,45 +399,45 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {[...Array(4)].map((_, i) => (
                   <div key={i} className="space-y-1.5">
-                    <div className="h-3 w-20 bg-surface-200 rounded" />
-                    <div className="h-11 bg-surface-100 rounded-lg" />
+                    <div className="h-3 w-20 bg-[#252525] rounded" />
+                    <div className="h-11 bg-[#1a1a1a] rounded-lg" />
                   </div>
                 ))}
                 <div className="md:col-span-2 space-y-1.5">
-                  <div className="h-3 w-28 bg-surface-200 rounded" />
-                  <div className="h-11 bg-surface-100 rounded-lg" />
+                  <div className="h-3 w-28 bg-[#252525] rounded" />
+                  <div className="h-11 bg-[#1a1a1a] rounded-lg" />
                 </div>
                 <div className="md:col-span-2 space-y-1.5">
-                  <div className="h-3 w-36 bg-surface-200 rounded" />
-                  <div className="h-[84px] bg-surface-100 rounded-lg" />
+                  <div className="h-3 w-36 bg-[#252525] rounded" />
+                  <div className="h-[84px] bg-[#1a1a1a] rounded-lg" />
                 </div>
               </div>
-              <div className="mt-6 h-11 w-32 bg-surface-200 rounded-xl" />
+              <div className="mt-6 h-11 w-32 bg-[#252525] rounded-xl" />
             </div>
           ) : (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-surface-500">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-[#909090]">
                     Full Name
                   </label>
                   <input
                     type="text"
                     value={profile.name || ''}
                     onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-                    className="w-full bg-surface-50 border-none rounded-lg focus:ring-2 focus:ring-surface-500 text-sm p-3"
+                    className="w-full bg-[#111111] border-none rounded-lg focus:ring-2 focus:ring-[#505050] text-sm p-3"
                     placeholder="Your full name"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-surface-500">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-[#909090]">
                     Classification
                   </label>
                   <select
                     value={profile.classification || ''}
                     onChange={(e) => setProfile({ ...profile, classification: e.target.value })}
-                    className="w-full bg-surface-50 border-none rounded-lg focus:ring-2 focus:ring-surface-500 text-sm p-3"
+                    className="w-full bg-[#111111] border-none rounded-lg focus:ring-2 focus:ring-[#505050] text-sm p-3"
                   >
                     <option value="">Select classification</option>
                     {CLASSIFICATIONS.map((c) => (
@@ -447,20 +447,20 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-surface-500">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-[#909090]">
                     Major
                   </label>
                   <input
                     type="text"
                     value={profile.major || ''}
                     onChange={(e) => setProfile({ ...profile, major: e.target.value })}
-                    className="w-full bg-surface-50 border-none rounded-lg focus:ring-2 focus:ring-surface-500 text-sm p-3"
+                    className="w-full bg-[#111111] border-none rounded-lg focus:ring-2 focus:ring-[#505050] text-sm p-3"
                     placeholder="e.g., Computer Science"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-surface-500">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-[#909090]">
                     University
                   </label>
                   <SearchableCombobox
@@ -474,39 +474,39 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                 </div>
 
                 <div className="md:col-span-2 space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-surface-500">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-[#909090]">
                     Career Interest
                   </label>
                   <input
                     type="text"
                     value={profile.career || ''}
                     onChange={(e) => setProfile({ ...profile, career: e.target.value })}
-                    className="w-full bg-surface-50 border-none rounded-lg focus:ring-2 focus:ring-surface-500 text-sm p-3"
+                    className="w-full bg-[#111111] border-none rounded-lg focus:ring-2 focus:ring-[#505050] text-sm p-3"
                     placeholder="e.g., Investment Banking, Consulting"
                   />
                 </div>
 
                 <div className="md:col-span-2 space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-surface-500">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-[#909090]">
                     Email Style Instructions
                   </label>
                   <textarea
                     value={profile.emailInstructions || ''}
                     onChange={(e) => setProfile({ ...profile, emailInstructions: e.target.value || null })}
                     rows={3}
-                    className="w-full bg-surface-50 border-none rounded-lg focus:ring-2 focus:ring-surface-500 text-sm p-3 resize-none"
+                    className="w-full bg-[#111111] border-none rounded-lg focus:ring-2 focus:ring-[#505050] text-sm p-3 resize-none"
                     placeholder="e.g. Keep emails under 3 sentences. Always mention I'm looking for a summer internship. Don't include my resume."
                   />
-                  <p className="text-xs text-surface-400">These instructions will be applied to every AI-generated email.</p>
+                  <p className="text-xs text-[#808080]">These instructions will be applied to every AI-generated email.</p>
                 </div>
 
                 {/* Auto-Personalize Toggle */}
-                <div className="md:col-span-2 flex items-center justify-between p-4 bg-surface-50 rounded-lg">
+                <div className="md:col-span-2 flex items-center justify-between p-4 bg-[#111111] rounded-lg">
                   <div className="space-y-0.5">
-                    <label className="text-sm font-semibold text-surface-900">
+                    <label className="text-sm font-semibold text-white">
                       Auto-Personalize Emails
                     </label>
-                    <p className="text-xs text-surface-500">
+                    <p className="text-xs text-[#909090]">
                       Automatically personalize emails with AI when opening the review modal
                     </p>
                   </div>
@@ -516,7 +516,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                     aria-checked={profile.autoPersonalize}
                     onClick={() => setProfile({ ...profile, autoPersonalize: !profile.autoPersonalize })}
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      profile.autoPersonalize ? 'bg-[#505050]' : 'bg-surface-300'
+                      profile.autoPersonalize ? 'bg-[#505050]' : 'bg-[#303030]'
                     }`}
                   >
                     <span
@@ -540,8 +540,8 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
         </section>
 
         {/* Resume Card */}
-        <section className="bg-surface-100 p-6 rounded-2xl border border-surface-200 card-shadow">
-          <h3 className="text-lg font-bold text-surface-900 mb-4">Resume</h3>
+        <section className="bg-[#1a1a1a] p-6 rounded-2xl border border-[#252525] card-shadow">
+          <h3 className="text-lg font-bold text-white mb-4">Resume</h3>
 
           {resumeSuccess && (
             <div className="mb-4 px-4 py-3 bg-green-900/30 text-green-400 rounded-lg text-sm">
@@ -556,17 +556,17 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
           )}
 
           {/* Upload Area */}
-          <label className="border-2 border-dashed border-surface-200 rounded-xl p-4 flex items-center gap-4 group hover:border-surface-400 transition-colors cursor-pointer mb-4 block">
-            <div className="bg-surface-500/10 p-3 rounded-full text-surface-400 group-hover:scale-110 transition-transform">
+          <label className="border-2 border-dashed border-[#252525] rounded-xl p-4 flex items-center gap-4 group hover:border-[#606060] transition-colors cursor-pointer mb-4 block">
+            <div className="bg-white/5 p-3 rounded-full text-[#808080] group-hover:scale-110 transition-transform">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
             </div>
             <div>
-              <p className="font-semibold text-surface-900 text-sm">
+              <p className="font-semibold text-white text-sm">
                 {isUploadingResume ? 'Uploading...' : 'Upload New Resume'}
               </p>
-              <p className="text-xs text-surface-500">PDF, DOCX (Max 10MB)</p>
+              <p className="text-xs text-[#909090]">PDF, DOCX (Max 10MB)</p>
             </div>
             <input
               type="file"
@@ -579,33 +579,33 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
 
           {/* Resumes List */}
           {isLoadingResumes ? (
-            <div className="text-center py-4 text-surface-500 text-sm">Loading resumes...</div>
+            <div className="text-center py-4 text-[#909090] text-sm">Loading resumes...</div>
           ) : resumes.length === 0 ? (
-            <div className="text-center py-4 text-surface-400 text-sm">No resumes uploaded yet</div>
+            <div className="text-center py-4 text-[#808080] text-sm">No resumes uploaded yet</div>
           ) : (
             <div className="space-y-2">
               {resumes.map((resume) => (
                 <div
                   key={resume.id}
                   className={`p-3 rounded-xl flex items-center gap-3 ${
-                    resume.isActive ? 'bg-surface-500/10' : 'bg-surface-50'
+                    resume.isActive ? 'bg-white/5' : 'bg-[#111111]'
                   }`}
                 >
-                  <div className="bg-surface-100 p-3 rounded-lg shadow-sm">
+                  <div className="bg-[#1a1a1a] p-3 rounded-lg shadow-sm">
                     <svg className="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm-1 2l5 5h-5V4zM6 20V4h6v6h6v10H6z"/>
                     </svg>
                   </div>
                   <div className="flex-grow min-w-0">
-                    <p className="font-semibold text-sm text-surface-900 truncate">
+                    <p className="font-semibold text-sm text-white truncate">
                       {resume.filename}
                       {resume.isActive && (
-                        <span className="ml-2 text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 bg-surface-500/20 text-surface-400 rounded">
+                        <span className="ml-2 text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 bg-white/10 text-[#808080] rounded">
                           Active
                         </span>
                       )}
                     </p>
-                    <p className="text-xs text-surface-400">
+                    <p className="text-xs text-[#808080]">
                       Uploaded {formatDate(resume.uploadedAt)} • {formatFileSize(resume.fileSize)}
                     </p>
                   </div>
@@ -613,7 +613,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                     {!resume.isActive && (
                       <button
                         onClick={() => handleSetActiveResume(resume.id)}
-                        className="p-2 hover:bg-surface-200 rounded-lg text-surface-500 transition-colors"
+                        className="p-2 hover:bg-[#252525] rounded-lg text-[#909090] transition-colors"
                         title="Set as active"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -625,7 +625,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                       href={`/api/resume/view?id=${resume.id}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="p-2 hover:bg-surface-200 rounded-lg text-surface-500 transition-colors"
+                      className="p-2 hover:bg-[#252525] rounded-lg text-[#909090] transition-colors"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -634,7 +634,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                     </a>
                     <button
                       onClick={() => handleDeleteResume(resume.id)}
-                      className="p-2 hover:bg-red-900/30 rounded-lg text-surface-400 hover:text-red-400 transition-colors"
+                      className="p-2 hover:bg-red-900/30 rounded-lg text-[#808080] hover:text-red-400 transition-colors"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -648,13 +648,13 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
         </section>
 
         {/* Email Templates Card */}
-        <section className="bg-surface-100 p-6 rounded-2xl border border-surface-200 card-shadow">
+        <section className="bg-[#1a1a1a] p-6 rounded-2xl border border-[#252525] card-shadow">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-bold text-surface-900">Email Templates</h3>
+            <h3 className="text-lg font-bold text-white">Email Templates</h3>
             {!isCreating && (
               <button
                 onClick={() => setIsCreating(true)}
-                className="text-surface-400 text-sm font-semibold flex items-center gap-1 hover:underline"
+                className="text-[#808080] text-sm font-semibold flex items-center gap-1 hover:underline"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -671,28 +671,28 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
           )}
 
           {isLoadingTemplates ? (
-            <div className="text-center py-4 text-surface-500 text-sm">Loading templates...</div>
+            <div className="text-center py-4 text-[#909090] text-sm">Loading templates...</div>
           ) : (
             <div className="space-y-3">
               {/* Built-in Default Template Template (always shown) */}
               <button
                 onClick={() => setShowDefaultTemplate(true)}
-                className="group w-full text-left bg-surface-100 border border-surface-200 p-4 rounded-xl hover:border-surface-400/50 transition-all"
+                className="group w-full text-left bg-[#1a1a1a] border border-[#252525] p-4 rounded-xl hover:border-[#606060]/50 transition-all"
               >
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <h4 className="font-semibold text-surface-900">Default Template</h4>
-                    <span className="bg-surface-500/10 text-surface-400 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">
+                    <h4 className="font-semibold text-white">Default Template</h4>
+                    <span className="bg-white/5 text-[#808080] text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">
                       Built-in
                     </span>
                     {!templates.some(t => t.isDefault) && (
-                      <span className="bg-surface-500/10 text-surface-400 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">
+                      <span className="bg-white/5 text-[#808080] text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">
                         Default
                       </span>
                     )}
                   </div>
                 </div>
-                <p className="text-sm text-surface-500 line-clamp-2">
+                <p className="text-sm text-[#909090] line-clamp-2">
                   AI generates a unique personalized email for each recipient based on their background and your profile.
                 </p>
               </button>
@@ -701,13 +701,13 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
               {templates.map((template) => (
                 <div
                   key={template.id}
-                  className="group relative bg-surface-100 border border-surface-200 p-4 rounded-xl hover:border-surface-400/50 transition-all"
+                  className="group relative bg-[#1a1a1a] border border-[#252525] p-4 rounded-xl hover:border-[#606060]/50 transition-all"
                 >
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <h4 className="font-semibold text-surface-900">{template.name}</h4>
+                      <h4 className="font-semibold text-white">{template.name}</h4>
                       {template.isDefault && (
-                        <span className="bg-surface-500/10 text-surface-400 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">
+                        <span className="bg-white/5 text-[#808080] text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">
                           Default
                         </span>
                       )}
@@ -720,7 +720,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
                         onClick={() => setSelectedTemplate(template)}
-                        className="p-1.5 hover:bg-surface-100 rounded-lg text-surface-500"
+                        className="p-1.5 hover:bg-[#1a1a1a] rounded-lg text-[#909090]"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -728,7 +728,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                       </button>
                       <button
                         onClick={() => handleDeleteTemplate(template.id)}
-                        className="p-1.5 hover:bg-red-900/30 rounded-lg text-surface-400 hover:text-red-400"
+                        className="p-1.5 hover:bg-red-900/30 rounded-lg text-[#808080] hover:text-red-400"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -736,7 +736,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                       </button>
                     </div>
                   </div>
-                  <p className="text-sm text-surface-500 line-clamp-2">{template.body}</p>
+                  <p className="text-sm text-[#909090] line-clamp-2">{template.body}</p>
                 </div>
               ))}
 
@@ -744,7 +744,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
               {!isCreating && (
                 <button
                   onClick={() => setIsCreating(true)}
-                  className="w-full py-3 border-2 border-dashed border-surface-200 rounded-xl text-surface-400 hover:text-surface-300 hover:border-surface-400 transition-all flex items-center justify-center gap-2 font-medium text-sm"
+                  className="w-full py-3 border-2 border-dashed border-[#252525] rounded-xl text-[#808080] hover:text-[#c0c0c0] hover:border-[#606060] transition-all flex items-center justify-center gap-2 font-medium text-sm"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -757,48 +757,48 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
 
           {/* Create Template Form */}
           {isCreating && (
-            <div className="mt-3 p-4 border border-surface-200 rounded-xl bg-surface-100">
-              <h4 className="font-semibold text-surface-900 mb-4">New Template</h4>
+            <div className="mt-3 p-4 border border-[#252525] rounded-xl bg-[#1a1a1a]">
+              <h4 className="font-semibold text-white mb-4">New Template</h4>
               <div className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-surface-500">Name</label>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-[#909090]">Name</label>
                   <input
                     type="text"
                     value={newTemplate.name}
                     onChange={(e) => setNewTemplate({ ...newTemplate, name: e.target.value })}
-                    className="w-full bg-surface-100 border-none rounded-lg focus:ring-2 focus:ring-surface-500 text-sm p-3"
+                    className="w-full bg-[#1a1a1a] border-none rounded-lg focus:ring-2 focus:ring-[#505050] text-sm p-3"
                     placeholder="Template name"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-surface-500">Subject</label>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-[#909090]">Subject</label>
                   <input
                     type="text"
                     value={newTemplate.subject}
                     onChange={(e) => setNewTemplate({ ...newTemplate, subject: e.target.value })}
-                    className="w-full bg-surface-100 border-none rounded-lg focus:ring-2 focus:ring-surface-500 text-sm p-3"
+                    className="w-full bg-[#1a1a1a] border-none rounded-lg focus:ring-2 focus:ring-[#505050] text-sm p-3"
                     placeholder="Email subject"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-surface-500">Body</label>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-[#909090]">Body</label>
                   <textarea
                     value={newTemplate.body}
                     onChange={(e) => setNewTemplate({ ...newTemplate, body: e.target.value })}
                     rows={4}
-                    className="w-full bg-surface-100 border-none rounded-lg focus:ring-2 focus:ring-surface-500 text-sm p-3 resize-none"
+                    className="w-full bg-[#1a1a1a] border-none rounded-lg focus:ring-2 focus:ring-[#505050] text-sm p-3 resize-none"
                     placeholder="Email body"
                   />
                 </div>
-                <div className="p-3 bg-surface-50 rounded-xl">
-                  <p className="text-xs font-semibold text-surface-700 mb-2">Available Placeholders:</p>
+                <div className="p-3 bg-[#111111] rounded-xl">
+                  <p className="text-xs font-semibold text-[#c0c0c0] mb-2">Available Placeholders:</p>
                   <div className="flex flex-wrap gap-1.5">
                     {DEFAULT_PLACEHOLDERS.map((p) => (
                       <button
                         key={p}
                         type="button"
                         onClick={() => setNewTemplate({ ...newTemplate, body: newTemplate.body + p })}
-                        className="text-xs px-2.5 py-1 bg-surface-500/20 text-surface-400 rounded-full font-medium hover:bg-surface-500/30 transition-colors cursor-pointer"
+                        className="text-xs px-2.5 py-1 bg-white/10 text-[#808080] rounded-full font-medium hover:bg-white/15 transition-colors cursor-pointer"
                       >
                         {p}
                       </button>
@@ -820,15 +820,15 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                             resumeId: checked ? (activeResume?.id || resumes[0]?.id || null) : null,
                           });
                         }}
-                        className="w-4 h-4 text-surface-400 border-surface-300 rounded focus:ring-surface-500"
+                        className="w-4 h-4 text-[#808080] border-[#303030] rounded focus:ring-[#505050]"
                       />
-                      <span className="text-sm text-surface-700">Attach resume</span>
+                      <span className="text-sm text-[#c0c0c0]">Attach resume</span>
                     </label>
                     {newTemplate.attachResume && (
                       <select
                         value={newTemplate.resumeId || ''}
                         onChange={(e) => setNewTemplate({ ...newTemplate, resumeId: e.target.value || null })}
-                        className="w-full bg-surface-100 border border-surface-200 rounded-lg text-sm p-2"
+                        className="w-full bg-[#1a1a1a] border border-[#252525] rounded-lg text-sm p-2"
                       >
                         {resumes.map((resume) => (
                           <option key={resume.id} value={resume.id}>
@@ -852,7 +852,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                       setIsCreating(false);
                       setNewTemplate({ name: '', subject: '', body: '', attachResume: false, resumeId: null });
                     }}
-                    className="px-6 py-2.5 rounded-xl font-semibold hover:bg-surface-100 transition-all text-sm text-surface-600"
+                    className="px-6 py-2.5 rounded-xl font-semibold hover:bg-[#1a1a1a] transition-all text-sm text-[#b0b0b0]"
                   >
                     Cancel
                   </button>
@@ -863,20 +863,20 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
         </section>
 
         {/* Plan & Billing Card */}
-        <section className="bg-surface-100 p-6 rounded-2xl border border-surface-200 card-shadow">
-          <h3 className="text-lg font-bold text-surface-900 mb-4">Plan & Billing</h3>
+        <section className="bg-[#1a1a1a] p-6 rounded-2xl border border-[#252525] card-shadow">
+          <h3 className="text-lg font-bold text-white mb-4">Plan & Billing</h3>
           {isLoadingSubscription ? (
-            <div className="text-center py-4 text-surface-500 text-sm">Loading plan details...</div>
+            <div className="text-center py-4 text-[#909090] text-sm">Loading plan details...</div>
           ) : subscription.isSubscribed ? (
             <div className="space-y-4">
               <div className="flex items-center gap-3">
                 <span className="inline-flex items-center px-2.5 py-1 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg text-white font-bold text-xs">
                   PRO
                 </span>
-                <span className="text-sm text-surface-700 font-medium">Unlimited emails</span>
+                <span className="text-sm text-[#c0c0c0] font-medium">Unlimited emails</span>
               </div>
               {subscription.currentPeriodEnd && (
-                <p className="text-sm text-surface-500">
+                <p className="text-sm text-[#909090]">
                   Next billing date: {new Date(subscription.currentPeriodEnd).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                 </p>
               )}
@@ -890,7 +890,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                   }
                 }}
                 disabled={isPortalLoading}
-                className="px-6 py-2.5 rounded-xl font-semibold border border-surface-200 hover:bg-surface-50 transition-all text-surface-700 text-sm disabled:opacity-50"
+                className="px-6 py-2.5 rounded-xl font-semibold border border-[#252525] hover:bg-[#111111] transition-all text-[#c0c0c0] text-sm disabled:opacity-50"
               >
                 {isPortalLoading ? 'Loading...' : 'Manage Billing'}
               </button>
@@ -898,12 +898,12 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
           ) : (
             <div className="space-y-4">
               <div className="flex items-center gap-3">
-                <span className="inline-flex items-center px-2.5 py-1 bg-surface-100 rounded-lg text-surface-600 font-bold text-xs">
+                <span className="inline-flex items-center px-2.5 py-1 bg-[#1a1a1a] rounded-lg text-[#b0b0b0] font-bold text-xs">
                   FREE
                 </span>
-                <span className="text-sm text-surface-700 font-medium">10 emails/day</span>
+                <span className="text-sm text-[#c0c0c0] font-medium">10 emails/day</span>
               </div>
-              <p className="text-sm text-surface-500">
+              <p className="text-sm text-[#909090]">
                 Upgrade to Pro for unlimited emails at $20/month.
               </p>
               <button
@@ -928,11 +928,11 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
         </section>
 
         {/* Account Settings Card */}
-        <section className="bg-surface-100 p-6 rounded-2xl border border-surface-200 card-shadow">
+        <section className="bg-[#1a1a1a] p-6 rounded-2xl border border-[#252525] card-shadow">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-bold text-surface-900">Account</h3>
-              <p className="text-sm text-surface-500">Manage your session</p>
+              <h3 className="text-lg font-bold text-white">Account</h3>
+              <p className="text-sm text-[#909090]">Manage your session</p>
             </div>
             <button
               onClick={handleSignOut}
@@ -949,11 +949,11 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
 
       {/* Template Modal */}
       {(selectedTemplate || showDefaultTemplate) && (
-        <div className="fixed inset-0 bg-surface-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-surface-100 rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-[#1a1a1a] rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
-              <div className="flex items-center justify-between mb-6 pb-4 border-b border-surface-200">
-                <h3 className="text-lg font-bold text-surface-900">
+              <div className="flex items-center justify-between mb-6 pb-4 border-b border-[#252525]">
+                <h3 className="text-lg font-bold text-white">
                   {showDefaultTemplate ? 'Default Template' : selectedTemplate?.name}
                 </h3>
                 <button
@@ -962,7 +962,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                     setShowDefaultTemplate(false);
                     setEditingTemplate(null);
                   }}
-                  className="p-2 text-surface-400 hover:text-surface-600 hover:bg-surface-100 rounded-lg transition-colors"
+                  className="p-2 text-[#808080] hover:text-[#b0b0b0] hover:bg-[#1a1a1a] rounded-lg transition-colors"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -973,22 +973,22 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
               {showDefaultTemplate ? (
                 <div className="space-y-5">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-surface-500">Subject</label>
-                    <div className="px-4 py-3 bg-surface-50 rounded-lg text-surface-700 text-sm">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-[#909090]">Subject</label>
+                    <div className="px-4 py-3 bg-[#111111] rounded-lg text-[#c0c0c0] text-sm">
                       {DEFAULT_TEMPLATE.subject}
                     </div>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-surface-500">Body</label>
-                    <div className="px-4 py-3 bg-surface-50 rounded-lg text-surface-700 text-sm whitespace-pre-wrap">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-[#909090]">Body</label>
+                    <div className="px-4 py-3 bg-[#111111] rounded-lg text-[#c0c0c0] text-sm whitespace-pre-wrap">
                       {DEFAULT_TEMPLATE.body}
                     </div>
                   </div>
-                  <div className="p-4 bg-surface-50 rounded-xl">
-                    <p className="text-xs font-semibold text-surface-700 mb-2">Available Placeholders:</p>
+                  <div className="p-4 bg-[#111111] rounded-xl">
+                    <p className="text-xs font-semibold text-[#c0c0c0] mb-2">Available Placeholders:</p>
                     <div className="flex flex-wrap gap-1.5">
                       {DEFAULT_PLACEHOLDERS.map((p) => (
-                        <span key={p} className="text-xs px-2.5 py-1 bg-surface-500/20 text-surface-400 rounded-full font-medium">
+                        <span key={p} className="text-xs px-2.5 py-1 bg-white/10 text-[#808080] rounded-full font-medium">
                           {p}
                         </span>
                       ))}
@@ -998,41 +998,41 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
               ) : selectedTemplate && editingTemplate?.id === selectedTemplate.id ? (
                 <div className="space-y-5">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-surface-500">Name</label>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-[#909090]">Name</label>
                     <input
                       type="text"
                       value={editingTemplate.name}
                       onChange={(e) => setEditingTemplate({ ...editingTemplate, name: e.target.value })}
-                      className="w-full bg-surface-50 border-none rounded-lg focus:ring-2 focus:ring-surface-500 text-sm p-3"
+                      className="w-full bg-[#111111] border-none rounded-lg focus:ring-2 focus:ring-[#505050] text-sm p-3"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-surface-500">Subject</label>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-[#909090]">Subject</label>
                     <input
                       type="text"
                       value={editingTemplate.subject}
                       onChange={(e) => setEditingTemplate({ ...editingTemplate, subject: e.target.value })}
-                      className="w-full bg-surface-50 border-none rounded-lg focus:ring-2 focus:ring-surface-500 text-sm p-3"
+                      className="w-full bg-[#111111] border-none rounded-lg focus:ring-2 focus:ring-[#505050] text-sm p-3"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-surface-500">Body</label>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-[#909090]">Body</label>
                     <textarea
                       value={editingTemplate.body}
                       onChange={(e) => setEditingTemplate({ ...editingTemplate, body: e.target.value })}
                       rows={8}
-                      className="w-full bg-surface-50 border-none rounded-lg focus:ring-2 focus:ring-surface-500 text-sm p-3 resize-none"
+                      className="w-full bg-[#111111] border-none rounded-lg focus:ring-2 focus:ring-[#505050] text-sm p-3 resize-none"
                     />
                   </div>
-                  <div className="p-3 bg-surface-50 rounded-xl">
-                    <p className="text-xs font-semibold text-surface-700 mb-2">Available Placeholders:</p>
+                  <div className="p-3 bg-[#111111] rounded-xl">
+                    <p className="text-xs font-semibold text-[#c0c0c0] mb-2">Available Placeholders:</p>
                     <div className="flex flex-wrap gap-1.5">
                       {DEFAULT_PLACEHOLDERS.map((p) => (
                         <button
                           key={p}
                           type="button"
                           onClick={() => setEditingTemplate({ ...editingTemplate, body: editingTemplate.body + p })}
-                          className="text-xs px-2.5 py-1 bg-surface-500/20 text-surface-400 rounded-full font-medium hover:bg-surface-500/30 transition-colors cursor-pointer"
+                          className="text-xs px-2.5 py-1 bg-white/10 text-[#808080] rounded-full font-medium hover:bg-white/15 transition-colors cursor-pointer"
                         >
                           {p}
                         </button>
@@ -1054,15 +1054,15 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                               resumeId: checked ? (editingTemplate.resumeId || activeResume?.id || resumes[0]?.id || null) : null,
                             });
                           }}
-                          className="w-4 h-4 text-surface-400 border-surface-300 rounded"
+                          className="w-4 h-4 text-[#808080] border-[#303030] rounded"
                         />
-                        <span className="text-sm text-surface-700">Attach resume</span>
+                        <span className="text-sm text-[#c0c0c0]">Attach resume</span>
                       </label>
                       {editingTemplate.attachResume && (
                         <select
                           value={editingTemplate.resumeId || ''}
                           onChange={(e) => setEditingTemplate({ ...editingTemplate, resumeId: e.target.value || null })}
-                          className="w-full bg-surface-100 border border-surface-200 rounded-lg text-sm p-2"
+                          className="w-full bg-[#1a1a1a] border border-[#252525] rounded-lg text-sm p-2"
                         >
                           {resumes.map((resume) => (
                             <option key={resume.id} value={resume.id}>
@@ -1073,7 +1073,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                       )}
                     </div>
                   )}
-                  <div className="flex gap-3 pt-5 border-t border-surface-200">
+                  <div className="flex gap-3 pt-5 border-t border-[#252525]">
                     <button
                       onClick={async () => {
                         await handleUpdateTemplate();
@@ -1086,7 +1086,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                     </button>
                     <button
                       onClick={() => setEditingTemplate(null)}
-                      className="px-6 py-2.5 rounded-xl font-semibold hover:bg-surface-100 transition-all text-surface-600"
+                      className="px-6 py-2.5 rounded-xl font-semibold hover:bg-[#1a1a1a] transition-all text-[#b0b0b0]"
                     >
                       Cancel
                     </button>
@@ -1096,25 +1096,25 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                 <div className="space-y-5">
                   <div className="flex items-center gap-2">
                     {selectedTemplate.isDefault && (
-                      <span className="bg-surface-500/20 text-surface-400 text-[10px] px-2.5 py-1 rounded-full font-bold uppercase">Default</span>
+                      <span className="bg-white/10 text-[#808080] text-[10px] px-2.5 py-1 rounded-full font-bold uppercase">Default</span>
                     )}
                     {selectedTemplate.attachResume && (
                       <span className="bg-green-900/30 text-green-400 text-[10px] px-2.5 py-1 rounded-full font-bold uppercase">Resume</span>
                     )}
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-surface-500">Subject</label>
-                    <div className="px-4 py-3 bg-surface-50 rounded-lg text-surface-700 text-sm">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-[#909090]">Subject</label>
+                    <div className="px-4 py-3 bg-[#111111] rounded-lg text-[#c0c0c0] text-sm">
                       {selectedTemplate.subject || '(No subject)'}
                     </div>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-surface-500">Body</label>
-                    <div className="px-4 py-3 bg-surface-50 rounded-lg text-surface-700 text-sm whitespace-pre-wrap max-h-64 overflow-y-auto">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-[#909090]">Body</label>
+                    <div className="px-4 py-3 bg-[#111111] rounded-lg text-[#c0c0c0] text-sm whitespace-pre-wrap max-h-64 overflow-y-auto">
                       {selectedTemplate.body}
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-3 pt-5 border-t border-surface-200">
+                  <div className="flex flex-wrap gap-3 pt-5 border-t border-[#252525]">
                     <button
                       onClick={() => setEditingTemplate(selectedTemplate)}
                       className="bg-[#505050] text-white px-6 py-2.5 rounded-xl font-semibold hover:bg-[#606060] transition-all"
@@ -1124,7 +1124,7 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                     {!selectedTemplate.isDefault && (
                       <button
                         onClick={() => handleSetDefault(selectedTemplate.id)}
-                        className="px-6 py-2.5 rounded-xl font-semibold border border-surface-200 hover:bg-surface-50 transition-all text-surface-700"
+                        className="px-6 py-2.5 rounded-xl font-semibold border border-[#252525] hover:bg-[#111111] transition-all text-[#c0c0c0]"
                       >
                         Set as Default
                       </button>

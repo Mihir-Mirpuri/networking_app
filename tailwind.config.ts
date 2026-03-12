@@ -36,17 +36,17 @@ const config: Config = {
           800: '#065f46',
           900: '#064e3b',
         },
-        // Dark theme surface palette - navy-tinted (inverted)
+        // Dark theme surface palette - neutral gray
         surface: {
-          50: '#06060f',   // Deep navy - main background
-          100: '#0c0c1a',  // Card backgrounds
-          200: '#151528',  // Borders
-          300: '#1e1e33',  // Elevated surfaces
-          400: '#7b82a0',  // Muted text
-          500: '#9299b2',  // Medium text
-          600: '#b0b6c9',  // Secondary text
-          700: '#cdd2de',  // Body text
-          800: '#e2e5ed',  // Strong text
+          50: '#111111',   // Main background
+          100: '#1a1a1a',  // Card backgrounds
+          200: '#252525',  // Borders
+          300: '#303030',  // Elevated surfaces
+          400: '#808080',  // Muted text
+          500: '#909090',  // Medium text
+          600: '#b0b0b0',  // Secondary text
+          700: '#c0c0c0',  // Body text
+          800: '#e0e0e0',  // Strong text
           900: '#ffffff',  // Headings
         },
       },

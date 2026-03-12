@@ -475,7 +475,7 @@ export function ComposeEmailModal({
     <div
       className={
         isEmbedded
-          ? 'bg-white rounded-lg shadow-lg max-w-3xl w-full overflow-hidden flex flex-col'
+          ? 'bg-[#1a1a1a] rounded-lg shadow-lg max-w-3xl w-full overflow-hidden flex flex-col'
           : 'fixed inset-0 lg:left-80 flex items-end justify-end z-50 p-4 sm:p-6 animate-fade-in'
       }
       onClick={!isEmbedded ? (e) => { if (e.target === e.currentTarget) handleClose(); } : undefined}
@@ -484,12 +484,12 @@ export function ComposeEmailModal({
         className={
           isEmbedded
             ? 'flex flex-col'
-            : 'bg-white rounded-t-lg shadow-2xl w-full max-w-[580px] max-h-[85vh] overflow-hidden flex flex-col animate-scale-in'
+            : 'bg-[#1a1a1a] rounded-t-lg shadow-2xl w-full max-w-[580px] max-h-[85vh] overflow-hidden flex flex-col animate-scale-in'
         }
         style={!isEmbedded ? { boxShadow: '0 8px 40px rgba(0,0,0,0.35)' } : undefined}
       >
         {/* Gmail-style header bar */}
-        <div className="flex items-center justify-between px-4 py-2 bg-[#404040] rounded-t-lg">
+        <div className="flex items-center justify-between px-4 py-2 bg-[#252525] rounded-t-lg">
           <h2 className="text-sm font-medium text-white">New Message</h2>
           <div className="flex items-center gap-1">
             {!isEmbedded && (
@@ -507,23 +507,23 @@ export function ComposeEmailModal({
         </div>
 
         {showSuccess ? (
-          <div className="flex flex-col items-center justify-center h-48 bg-white animate-fade-in">
+          <div className="flex flex-col items-center justify-center h-48 bg-[#1a1a1a] animate-fade-in">
             <svg className="w-12 h-12 text-green-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <p className="text-lg font-medium text-green-600">Email sent!</p>
           </div>
         ) : isLoadingData ? (
-          <div className="flex items-center justify-center h-48 bg-white">
+          <div className="flex items-center justify-center h-48 bg-[#1a1a1a]">
             <LoadingSpinner size="lg" />
           </div>
         ) : (
           <>
             {/* Gmail-style fields */}
-            <div className="flex-1 overflow-y-auto bg-white">
+            <div className="flex-1 overflow-y-auto bg-[#1a1a1a]">
               {/* To field */}
-              <div className="flex items-center border-b border-[#e0e0e0] px-4">
-                <span className="text-sm text-[#666] w-10 flex-shrink-0">To</span>
+              <div className="flex items-center border-b border-[#303030] px-4">
+                <span className="text-sm text-[#808080] w-10 flex-shrink-0">To</span>
                 <input
                   type="email"
                   value={recipientEmail}
@@ -533,33 +533,33 @@ export function ComposeEmailModal({
                   }}
                   onBlur={handleEmailBlur}
                   placeholder=""
-                  className={`flex-1 py-2.5 text-sm text-[#202124] bg-transparent outline-none ${emailError ? 'text-red-600' : ''}`}
+                  className={`flex-1 py-2.5 text-sm text-white bg-transparent outline-none ${emailError ? 'text-red-400' : ''}`}
                 />
               </div>
               {emailError && (
-                <div className="px-4 py-1 text-xs text-red-600 bg-red-50 border-b border-red-200">{emailError}</div>
+                <div className="px-4 py-1 text-xs text-red-400 bg-red-900/20 border-b border-red-800/30">{emailError}</div>
               )}
 
               {/* Recipient Name field */}
-              <div className="flex items-center border-b border-[#e0e0e0] px-4">
-                <span className="text-sm text-[#666] w-10 flex-shrink-0">Name</span>
+              <div className="flex items-center border-b border-[#303030] px-4">
+                <span className="text-sm text-[#808080] w-10 flex-shrink-0">Name</span>
                 <input
                   type="text"
                   value={recipientName}
                   onChange={(e) => setRecipientName(e.target.value)}
                   placeholder=""
-                  className="flex-1 py-2.5 text-sm text-[#202124] bg-transparent outline-none"
+                  className="flex-1 py-2.5 text-sm text-white bg-transparent outline-none"
                 />
               </div>
 
               {/* Subject field */}
-              <div className="flex items-center border-b border-[#e0e0e0] px-4">
+              <div className="flex items-center border-b border-[#303030] px-4">
                 <input
                   type="text"
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
                   placeholder="Subject"
-                  className="flex-1 py-2.5 text-sm text-[#202124] bg-transparent outline-none placeholder-[#666]"
+                  className="flex-1 py-2.5 text-sm text-white bg-transparent outline-none placeholder-[#606060]"
                 />
               </div>
 
@@ -570,24 +570,24 @@ export function ComposeEmailModal({
                   onChange={(e) => setBody(e.target.value)}
                   rows={14}
                   placeholder=""
-                  className="w-full text-sm text-[#202124] bg-transparent outline-none resize-none leading-relaxed"
+                  className="w-full text-sm text-white bg-transparent outline-none resize-none leading-relaxed"
                 />
               </div>
 
               {/* Video link input (toggle) */}
               {showVideoInput && (
-                <div className="flex items-center border-t border-[#e0e0e0] px-4 mx-4 mt-1">
-                  <IconVideo className="w-4 h-4 text-[#666] mr-2 flex-shrink-0" />
+                <div className="flex items-center border-t border-[#303030] px-4 mx-4 mt-1">
+                  <IconVideo className="w-4 h-4 text-[#808080] mr-2 flex-shrink-0" />
                   <input
                     type="url"
                     value={videoLink}
                     onChange={(e) => setVideoLink(e.target.value)}
                     placeholder="Paste Loom or video link..."
-                    className="flex-1 py-2 text-sm text-[#202124] bg-transparent outline-none placeholder-[#999]"
+                    className="flex-1 py-2 text-sm text-white bg-transparent outline-none placeholder-[#606060]"
                   />
                   <button
                     onClick={() => { setShowVideoInput(false); setVideoLink(''); }}
-                    className="p-1 text-[#999] hover:text-[#333] transition-colors"
+                    className="p-1 text-[#606060] hover:text-white transition-colors"
                   >
                     <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
@@ -600,16 +600,16 @@ export function ComposeEmailModal({
 
             {/* Persistent attachment banner - always visible above toolbar */}
             {(fileAttachments.length > 0 || (attachResume && selectedResumeId)) && (
-              <div className="px-3 py-2 bg-[#eaf1fb] border-t border-[#d3e3fd] flex flex-wrap items-center gap-2">
+              <div className="px-3 py-2 bg-[#252525] border-t border-[#303030] flex flex-wrap items-center gap-2">
                 {attachResume && selectedResumeId && (
-                  <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-[#c2d7f0] rounded-full">
-                    <IconResume className="w-3.5 h-3.5 text-[#1a73e8] flex-shrink-0" />
-                    <span className="text-xs font-medium text-[#1a73e8] truncate max-w-[180px]">
+                  <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[#303030] border border-[#404040] rounded-full">
+                    <IconResume className="w-3.5 h-3.5 text-[#6b9fff] flex-shrink-0" />
+                    <span className="text-xs font-medium text-[#6b9fff] truncate max-w-[180px]">
                       {resumes.find(r => r.id === selectedResumeId)?.filename || 'Resume'}
                     </span>
                     <button
                       onClick={() => setAttachResume(false)}
-                      className="p-0.5 text-[#7baaf7] hover:text-[#1a73e8] transition-colors"
+                      className="p-0.5 text-[#6b9fff] hover:text-white transition-colors"
                     >
                       <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
@@ -620,18 +620,18 @@ export function ComposeEmailModal({
                 {fileAttachments.map((attachment) => (
                   <div
                     key={attachment.id}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-[#dadce0] rounded-full"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[#303030] border border-[#404040] rounded-full"
                   >
-                    <IconAttach className="w-3.5 h-3.5 text-[#5f6368] flex-shrink-0" />
-                    <span className="text-xs text-[#202124] truncate max-w-[140px]">
+                    <IconAttach className="w-3.5 h-3.5 text-[#909090] flex-shrink-0" />
+                    <span className="text-xs text-white truncate max-w-[140px]">
                       {attachment.name}
                     </span>
-                    <span className="text-[10px] text-[#999] flex-shrink-0">
+                    <span className="text-[10px] text-[#606060] flex-shrink-0">
                       {formatFileSize(attachment.size)}
                     </span>
                     <button
                       onClick={() => handleRemoveFile(attachment.id)}
-                      className="p-0.5 text-[#999] hover:text-[#333] transition-colors"
+                      className="p-0.5 text-[#606060] hover:text-white transition-colors"
                     >
                       <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
@@ -644,13 +644,13 @@ export function ComposeEmailModal({
 
             {/* Error Display */}
             {error && (
-              <div className="px-4 py-2 bg-red-50 text-red-600 text-sm border-t border-red-200">
+              <div className="px-4 py-2 bg-red-900/20 text-red-400 text-sm border-t border-red-800/30">
                 {error}
               </div>
             )}
 
             {/* Gmail-style bottom toolbar */}
-            <div className="flex items-center gap-0.5 px-3 py-2 bg-[#f8f9fa] border-t border-[#e0e0e0]">
+            <div className="flex items-center gap-0.5 px-3 py-2 bg-[#252525] border-t border-[#303030]">
               {/* Send button with dropdown */}
               <button
                 onClick={limitReached ? () => setShowLimitModal(true) : handleSend}
@@ -680,7 +680,7 @@ export function ComposeEmailModal({
                 <IconDropdown className="w-4 h-4" />
               </button>
 
-              <div className="w-px h-5 bg-[#dadce0] mx-2" />
+              <div className="w-px h-5 bg-[#404040] mx-2" />
 
               {/* Toolbar icons */}
               <div className="flex items-center gap-0.5">
@@ -695,7 +695,7 @@ export function ComposeEmailModal({
                 />
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="p-2 rounded-full text-[#444746] hover:bg-[#e8eaed] transition-colors"
+                  className="p-2 rounded-full text-[#909090] hover:bg-[#303030] transition-colors"
                   title="Attach files"
                   disabled={fileAttachments.length >= MAX_ATTACHMENTS}
                 >
@@ -705,14 +705,14 @@ export function ComposeEmailModal({
                 {/* Link */}
                 <button
                   onClick={() => setShowVideoInput(!showVideoInput)}
-                  className={`p-2 rounded-full transition-colors ${showVideoInput ? 'bg-[#e8eaed] text-[#0b57d0]' : 'text-[#444746] hover:bg-[#e8eaed]'}`}
+                  className={`p-2 rounded-full transition-colors ${showVideoInput ? 'bg-[#303030] text-[#6b9fff]' : 'text-[#909090] hover:bg-[#303030]'}`}
                   title="Insert video link"
                 >
                   <IconLink className="w-5 h-5" />
                 </button>
 
                 {/* Emoji */}
-                <button className="p-2 rounded-full text-[#444746] hover:bg-[#e8eaed] transition-colors" title="Insert emoji">
+                <button className="p-2 rounded-full text-[#909090] hover:bg-[#303030] transition-colors" title="Insert emoji">
                   <IconEmoji className="w-5 h-5" />
                 </button>
 
@@ -731,7 +731,7 @@ export function ComposeEmailModal({
                         }
                       }
                     }}
-                    className={`p-2 rounded-full transition-colors ${attachResume ? 'bg-[#e8eaed] text-[#0b57d0]' : 'text-[#444746] hover:bg-[#e8eaed]'}`}
+                    className={`p-2 rounded-full transition-colors ${attachResume ? 'bg-[#303030] text-[#6b9fff]' : 'text-[#909090] hover:bg-[#303030]'}`}
                     title={attachResume ? 'Remove resume' : 'Attach resume'}
                   >
                     <IconResume className="w-5 h-5" />
@@ -742,13 +742,13 @@ export function ComposeEmailModal({
                 <div className="relative" ref={templateDropdownRef}>
                   <button
                     onClick={() => setShowTemplateDropdown(!showTemplateDropdown)}
-                    className={`p-2 rounded-full transition-colors ${showTemplateDropdown ? 'bg-[#e8eaed] text-[#0b57d0]' : 'text-[#444746] hover:bg-[#e8eaed]'}`}
+                    className={`p-2 rounded-full transition-colors ${showTemplateDropdown ? 'bg-[#303030] text-[#6b9fff]' : 'text-[#909090] hover:bg-[#303030]'}`}
                     title="Choose template"
                   >
                     <IconTemplate className="w-5 h-5" />
                   </button>
                   {showTemplateDropdown && (
-                    <div className="absolute bottom-full left-0 mb-2 w-56 bg-white rounded-lg shadow-lg border border-[#e0e0e0] py-1 z-10">
+                    <div className="absolute bottom-full left-0 mb-2 w-56 bg-[#252525] rounded-lg shadow-lg border border-[#404040] py-1 z-10">
                       {templates.map((template) => (
                         <button
                           key={template.id}
@@ -756,8 +756,8 @@ export function ComposeEmailModal({
                             handleTemplateChange(template.id);
                             setShowTemplateDropdown(false);
                           }}
-                          className={`w-full text-left px-4 py-2 text-sm hover:bg-[#f1f3f4] transition-colors ${
-                            selectedTemplateId === template.id ? 'text-[#0b57d0] font-medium bg-[#e8f0fe]' : 'text-[#202124]'
+                          className={`w-full text-left px-4 py-2 text-sm hover:bg-[#303030] transition-colors ${
+                            selectedTemplateId === template.id ? 'text-[#6b9fff] font-medium bg-[#303030]' : 'text-[#c0c0c0]'
                           }`}
                         >
                           {template.name} {template.isDefault ? '(Default)' : ''}
@@ -774,7 +774,7 @@ export function ComposeEmailModal({
               {/* Delete/discard */}
               <button
                 onClick={handleClose}
-                className="p-2 rounded-full text-[#444746] hover:bg-[#e8eaed] transition-colors"
+                className="p-2 rounded-full text-[#909090] hover:bg-[#303030] transition-colors"
                 title="Discard"
               >
                 <IconDelete className="w-5 h-5" />

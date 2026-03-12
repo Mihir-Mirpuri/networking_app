@@ -22,8 +22,8 @@ export function FeedbackButton() {
   // Pick a random prompt on mount
   const [prompt] = useState(() => PROMPTS[Math.floor(Math.random() * PROMPTS.length)]);
 
-  // Hide on landing page and history page
-  if (pathname === '/' || pathname === '/history') {
+  // Hide on landing page, history page, and profile page
+  if (pathname === '/' || pathname === '/history' || pathname === '/profile') {
     return null;
   }
 
