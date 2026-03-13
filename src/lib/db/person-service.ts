@@ -981,7 +981,7 @@ async function findPeopleByFiltersVector(
   // Vector similarity threshold: include null embeddings (penalty), exclude far embeddings
   conditions.push(Prisma.sql`(
     p.role_embedding IS NULL
-    OR (p.role_embedding <=> ${vectorString}::vector) <= 0.50
+    OR (p.role_embedding <=> ${vectorString}::vector) <= 0.75
   )`);
 
   const whereClause = Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}`;
