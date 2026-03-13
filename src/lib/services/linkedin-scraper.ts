@@ -227,10 +227,9 @@ interface ApifyProfileResponse {
     degree: string | null;
     fieldOfStudy: string | null;
     description: string | null;
-    activities: string | null;
+    insights: string | null; // "Activities and societies: ...\nGrade: ..."
     startDate: string | null;
     endDate: string | null;
-    grade: string | null;
   }>;
 
   // Error response
@@ -463,6 +462,25 @@ function parseProfile(raw: ApifyProfileResponse): ScrapedProfile {
     }
   }
 
+  /**
+   * Parse the insights string from Apify education entries.
+   * Format: "Activities and societies: X, Y, Z\nGrade: 3.8"
+   */
+  function parseInsights(insights: string | null): { activities: string | null; grade: string | null } {
+    if (!insights) return { activities: null, grade: null };
+    let activities: string | null = null;
+    let grade: string | null = null;
+    for (const line of insights.split('\n')) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('Activities and societies:')) {
+        activities = trimmed.replace('Activities and societies:', '').trim() || null;
+      } else if (trimmed.startsWith('Grade:')) {
+        grade = trimmed.replace('Grade:', '').trim() || null;
+      }
+    }
+    return { activities, grade };
+  }
+
   const fullName = `${firstName} ${lastName}`.trim();
 
   return {
@@ -486,16 +504,19 @@ function parseProfile(raw: ApifyProfileResponse): ScrapedProfile {
       startDate: e.startDate || null,
       endDate: e.endDate || null,
     })),
-    educationHistory: (raw.education || []).map(e => ({
-      schoolName: e.schoolName,
-      degree: e.degree || null,
-      fieldOfStudy: e.fieldOfStudy || null,
-      description: e.description || null,
-      activities: e.activities || null,
-      startDate: e.startDate || null,
-      endDate: e.endDate || null,
-      grade: e.grade || null,
-    })),
+    educationHistory: (raw.education || []).map(e => {
+      const { activities, grade } = parseInsights(e.insights);
+      return {
+        schoolName: e.schoolName,
+        degree: e.degree || null,
+        fieldOfStudy: e.fieldOfStudy || null,
+        description: e.description || null,
+        activities,
+        startDate: e.startDate || null,
+        endDate: e.endDate || null,
+        grade,
+      };
+    }),
   };
 }
 

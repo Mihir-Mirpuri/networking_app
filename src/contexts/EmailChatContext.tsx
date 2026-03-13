@@ -29,6 +29,7 @@ interface EmailChatContextValue {
   closeEmailChat: () => void;
   sendMessage: (message: string) => Promise<void>;
   updateEmail: (subject: string, body: string) => void;
+  clearMessages: () => void;
   fetchInsights: (personId: string) => Promise<void>;
   toggleInsight: (insightId: string) => void;
 }
@@ -122,6 +123,10 @@ export function EmailChatProvider({ children }: EmailChatProviderProps) {
 
   const updateEmail = useCallback((subject: string, body: string) => {
     setCurrentEmail({ subject, body });
+  }, []);
+
+  const clearMessages = useCallback(() => {
+    setMessages([]);
   }, []);
 
   const sendMessage = useCallback(async (content: string) => {
@@ -220,6 +225,7 @@ export function EmailChatProvider({ children }: EmailChatProviderProps) {
         closeEmailChat,
         sendMessage,
         updateEmail,
+        clearMessages,
         fetchInsights,
         toggleInsight,
       }}

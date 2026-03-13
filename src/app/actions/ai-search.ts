@@ -121,10 +121,14 @@ export async function extractSearchFiltersAction(
     const parsedFilters: ParsedFilters = {};
     if (filters.company) parsedFilters.company = filters.company;
     if (filters.companies && Array.isArray(filters.companies) && filters.companies.length > 0) {
-      // Enforce max 5 companies guardrail
-      parsedFilters.companies = filters.companies.slice(0, 5);
-      // When companies is set, company should be cleared
-      delete parsedFilters.company;
+      const trimmed = filters.companies.slice(0, 5);
+      if (trimmed.length === 1) {
+        // Single-item array → normalize to company (single)
+        parsedFilters.company = trimmed[0];
+      } else {
+        parsedFilters.companies = trimmed;
+        delete parsedFilters.company;
+      }
     }
     if (filters.role) parsedFilters.role = filters.role;
     if (filters.university) parsedFilters.university = filters.university;

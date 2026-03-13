@@ -375,7 +375,8 @@ export function MainSearchView({ initialRemainingDaily, pendingQuery, pendingFil
   }, [messages, currentFilters, hook.results, hook.expandedIndex, hook.sendStatuses, hook.showBulkReview, hook.generatingStatuses, hook.totalLoaded, hook.hasMore, hook.hiddenCount, hook.searchParams]);
 
   const runSearch = useCallback(async (filters: ParsedFilters) => {
-    if (!filters.company) return;
+    const companiesToSearch = filters.companies?.length ? filters.companies : filters.company ? [filters.company] : [];
+    if (companiesToSearch.length === 0) return;
 
     // Check guest query limit before searching
     if (checkGuestQueryLimit()) {
@@ -385,8 +386,10 @@ export function MainSearchView({ initialRemainingDaily, pendingQuery, pendingFil
     setIsSearching(true);
     hook.resetResults();
 
+    const isMultiCompany = companiesToSearch.length > 1;
     const params = {
-      company: filters.company,
+      company: isMultiCompany ? undefined : companiesToSearch[0],
+      companies: isMultiCompany ? companiesToSearch : undefined,
       role: filters.role,
       university: filters.university,
       location: filters.location,
@@ -399,18 +402,29 @@ export function MainSearchView({ initialRemainingDaily, pendingQuery, pendingFil
       // Increment guest query count after successful search
       incrementGuestQueryCount();
 
-      hook.applySearchResults(result.results, result.searchMeta, result.hiddenCount, params);
+      hook.applySearchResults(result.results, result.searchMeta, result.hiddenCount, {
+        company: companiesToSearch[0],
+        companies: isMultiCompany ? companiesToSearch : undefined,
+        role: filters.role,
+        university: filters.university,
+        location: filters.location,
+        limit: 6,
+      });
 
-      fetch('/api/prescrape', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          company: filters.company,
-          role: filters.role,
-          university: filters.university,
-          location: filters.location,
-        }),
-      }).catch(err => console.error('[Prescrape] Error:', err));
+      // Fire-and-forget prescrape per company
+      for (const company of companiesToSearch) {
+        fetch('/api/prescrape', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            company,
+            role: filters.role,
+            university: filters.university,
+            location: filters.location,
+            ...(isMultiCompany ? { maxPages: 1 } : {}),
+          }),
+        }).catch(err => console.error('[Prescrape] Error:', err));
+      }
     }
 
     setIsSearching(false);
@@ -454,7 +468,7 @@ export function MainSearchView({ initialRemainingDaily, pendingQuery, pendingFil
 
     const { filters, assistantMessage } = extractResult;
 
-    if (!filters.company) {
+    if (!filters.company && (!filters.companies || filters.companies.length === 0)) {
       setMessages(prev =>
         prev.map(m =>
           m.id === assistantMsgId
