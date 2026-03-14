@@ -33,6 +33,7 @@ interface LLMResponse {
     university: string | null;
     location: string | null;
   };
+  off_topic?: boolean;
   message: string;
 }
 
@@ -64,8 +65,9 @@ RULES:
 12. IMPORTANT: Your JSON filters must be consistent with your message. If your message mentions a location, the location filter must be set. If your message mentions a role, the role filter must be set. Never contradict your own message in the JSON output.
 13. IMPORTANT: When the user says "No", "Nah", "that's it", "just that", or similar short confirmations/rejections in response to a clarifying question, KEEP all previously extracted filters unchanged. These responses mean "proceed without adding more filters", NOT "clear the filters".
 14. IMPORTANT: Only ask a clarifying question if the user has NOT provided a company at all. If company/companies is set, always confirm and proceed — never ask for additional optional filters.
+15. IMPORTANT: If the user's message is off-topic or unrelated to finding professional contacts (e.g., "how is the weather", "tell me a joke", "what is 2+2"), set ALL filters to null and set "off_topic" to true. Your message should be a friendly redirect like: "I'm designed to help you find and reach out to professional contacts — that's my superpower! Try asking something like 'Find software engineers at Google' or 'PMs at top consulting firms'."
 
-Respond with JSON: { "filters": { "company": string|null, "companies": string[]|null, "role": string|null, "university": string|null, "location": string|null }, "message": string }`;
+Respond with JSON: { "filters": { "company": string|null, "companies": string[]|null, "role": string|null, "university": string|null, "location": string|null }, "off_topic": boolean, "message": string }`;
 
 function buildUserPrompt(input: ExtractFiltersInput): string {
   const parts: string[] = [];
@@ -115,7 +117,16 @@ export async function extractSearchFiltersAction(
       },
     });
 
-    const { filters, message } = response.content;
+    const { filters, off_topic, message } = response.content;
+
+    // If off-topic, return empty filters with the redirect message
+    if (off_topic) {
+      return {
+        success: true,
+        filters: {},
+        assistantMessage: message,
+      };
+    }
 
     // Convert nulls to undefined for clean filter objects
     const parsedFilters: ParsedFilters = {};
