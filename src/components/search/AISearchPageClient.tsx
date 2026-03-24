@@ -10,7 +10,13 @@ import { Toast } from '@/components/ui/Toast';
 import { LimitReachedModal, dispatchCreditsChanged } from '@/components/credits';
 import { HiddenPeopleBar } from './HiddenPeopleBar';
 import { searchPeopleAction, SearchResultWithDraft } from '@/app/actions/search';
-import { extractSearchFiltersAction, ParsedFilters, ChatMessage } from '@/app/actions/ai-search';
+import {
+  extractSearchFiltersAction,
+  ParsedFilters,
+  ChatMessage,
+  Selectable,
+  SuggestedSearch,
+} from '@/app/actions/ai-search';
 import { useSearchResults } from '@/hooks/useSearchResults';
 
 interface AISearchPageClientProps {
@@ -23,11 +29,14 @@ interface DisplayMessage {
   content: string;
   filters?: ParsedFilters;
   isLoading?: boolean;
+  selectables?: Selectable[];
+  allSelectables?: Selectable[];
+  selectablesPage?: number;
 }
 
 // Storage key for sessionStorage
 const AI_STORAGE_KEY = 'signl_aiSearchState';
-const AI_STORAGE_VERSION = 1;
+const AI_STORAGE_VERSION = 3; // Bumped: added allSelectables for Perplexity pagination
 
 interface AISearchPageState {
   version: number;
@@ -41,7 +50,8 @@ interface AISearchPageState {
   totalLoaded?: number;
   hasMore?: boolean;
   hiddenCount?: number;
-  searchParams?: { company?: string; companies?: string[]; role?: string; university?: string; location?: string; limit: number };
+  searchParams?: { company?: string; role?: string; university?: string; location?: string; limit: number };
+  suggestedSearches?: SuggestedSearch[];
   savedAt: number;
 }
 
@@ -49,7 +59,7 @@ const EXAMPLE_QUERIES = [
   'Product managers at Google in Austin',
   'Software engineers at Meta from Stanford',
   'Analysts at Goldman Sachs in New York',
-  'Consultants at top consulting firms from UT Austin',
+  'Consultants at McKinsey from UT Austin',
 ];
 
 export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClientProps) {
@@ -60,6 +70,7 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
   const [isExtracting, setIsExtracting] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [currentFilters, setCurrentFilters] = useState<ParsedFilters>({});
+  const [suggestedSearches, setSuggestedSearches] = useState<SuggestedSearch[]>([]);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -87,6 +98,7 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
           if (state.totalLoaded !== undefined) hook.setTotalLoaded(state.totalLoaded);
           if (state.hasMore !== undefined) hook.setHasMore(state.hasMore);
           if (state.hiddenCount !== undefined) hook.setHiddenCount(state.hiddenCount);
+          if (state.suggestedSearches) setSuggestedSearches(state.suggestedSearches);
         } else {
           sessionStorage.removeItem(AI_STORAGE_KEY);
         }
@@ -118,6 +130,7 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
             hasMore: hook.hasMore,
             hiddenCount: hook.hiddenCount,
             searchParams: hook.searchParams ?? undefined,
+            suggestedSearches,
             savedAt: Date.now(),
           };
           sessionStorage.setItem(AI_STORAGE_KEY, JSON.stringify(state));
@@ -125,23 +138,18 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
       }, 300);
     }
     return () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); };
-  }, [messages, currentFilters, hook.results, hook.expandedIndex, hook.sendStatuses, hook.showBulkReview, hook.generatingStatuses, hook.totalLoaded, hook.hasMore, hook.hiddenCount, hook.searchParams]);
+  }, [messages, currentFilters, hook.results, hook.expandedIndex, hook.sendStatuses, hook.showBulkReview, hook.generatingStatuses, hook.totalLoaded, hook.hasMore, hook.hiddenCount, hook.searchParams, suggestedSearches]);
 
   const runSearch = useCallback(async (filters: ParsedFilters) => {
-    // Need either a single company or multiple companies
-    if (!filters.company && (!filters.companies || filters.companies.length === 0)) return;
+    if (!filters.company) return;
 
     setIsSearching(true);
     hook.resetResults();
 
-    const companiesToSearch = filters.companies?.length ? filters.companies : [filters.company!];
-    const isMultiCompany = companiesToSearch.length > 1;
     const limit = 6;
 
-    // Single server action call — handles multi-company internally
     const result = await searchPeopleAction({
-      companies: isMultiCompany ? companiesToSearch : undefined,
-      company: isMultiCompany ? undefined : companiesToSearch[0],
+      company: filters.company,
       role: filters.role,
       university: filters.university,
       location: filters.location,
@@ -150,30 +158,25 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
 
     if (result.success) {
       hook.applySearchResults(result.results, result.searchMeta, result.hiddenCount, {
-        company: isMultiCompany ? undefined : companiesToSearch[0],
-        companies: isMultiCompany ? companiesToSearch : undefined,
+        company: filters.company,
         role: filters.role,
         university: filters.university,
         location: filters.location,
         limit,
       });
 
-      // Fire-and-forget prescrape PER COMPANY — only if we got results
-      // (if page 1 returned nothing, pages 2–5 won't be better)
+      // Fire-and-forget prescrape — only if we got results
       if (result.results.length > 0) {
-        for (const company of companiesToSearch) {
-          fetch('/api/prescrape', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              company,
-              role: filters.role,
-              university: filters.university,
-              location: filters.location,
-              ...(isMultiCompany ? { maxPages: 1 } : {}),
-            }),
-          }).catch(err => console.error('[Prescrape] Error:', err));
-        }
+        fetch('/api/prescrape', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            company: filters.company,
+            role: filters.role,
+            university: filters.university,
+            location: filters.location,
+          }),
+        }).catch(err => console.error('[Prescrape] Error:', err));
       }
     }
 
@@ -186,7 +189,7 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
 
     setInputValue('');
 
-    // Add user message
+    // Add user message + loading assistant message
     const userMsgId = `user-${Date.now()}`;
     const assistantMsgId = `assistant-${Date.now()}`;
     setMessages(prev => [
@@ -221,23 +224,44 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
     }
 
     const { filters, assistantMessage } = extractResult;
+    setCurrentFilters(filters);
 
-    // If no company or companies, ask the user to specify one
-    if (!filters.company && (!filters.companies || filters.companies.length === 0)) {
+    if (extractResult.status === 'off_topic') {
+      // Off-topic: show message, don't update filters
       setMessages(prev =>
         prev.map(m =>
           m.id === assistantMsgId
-            ? { ...m, content: assistantMessage, filters, isLoading: false }
+            ? { ...m, content: assistantMessage, isLoading: false }
             : m
         )
       );
-      setCurrentFilters(filters);
       setIsExtracting(false);
       return;
     }
 
-    // Update filters and run search
-    setCurrentFilters(filters);
+    if (extractResult.status === 'needs_selection') {
+      // Show message with selectable buttons
+      setMessages(prev =>
+        prev.map(m =>
+          m.id === assistantMsgId
+            ? {
+                ...m,
+                content: assistantMessage,
+                filters,
+                selectables: extractResult.selectables,
+                allSelectables: extractResult.allSelectables,
+                selectablesPage: 0,
+                isLoading: false,
+              }
+            : m
+        )
+      );
+      setIsExtracting(false);
+      return;
+    }
+
+    // status === 'ready' — run search
+    setSuggestedSearches(extractResult.suggestedSearches);
     setMessages(prev =>
       prev.map(m =>
         m.id === assistantMsgId
@@ -250,17 +274,69 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
     await runSearch(filters);
   };
 
+  const handleSelectableClick = async (selectable: Selectable) => {
+    // Add a user message showing what they picked
+    const userMsgId = `user-${Date.now()}`;
+    setMessages(prev => [
+      ...prev,
+      { id: userMsgId, role: 'user', content: selectable.label },
+    ]);
+
+    // Merge selection into current filters
+    const updated = { ...currentFilters, [selectable.filterKey]: selectable.filterValue };
+    setCurrentFilters(updated);
+
+    // If both company and role are now set, run search directly
+    if (updated.company && updated.role) {
+      // Add a confirmation message
+      const confirmMsgId = `assistant-${Date.now()}`;
+      setMessages(prev => [
+        ...prev,
+        { id: confirmMsgId, role: 'assistant', content: `Searching for ${updated.role}s at ${updated.company}${updated.location ? ` in ${updated.location}` : ''}${updated.university ? ` from ${updated.university}` : ''}!` },
+      ]);
+      await runSearch(updated);
+    } else {
+      // Still missing company or role — send back to LLM
+      await handleSendMessage(selectable.label);
+    }
+  };
+
+  const handleShowMoreSelectables = (messageId: string) => {
+    setMessages(prev => prev.map(m => {
+      if (m.id !== messageId || !m.allSelectables) return m;
+      const nextPage = (m.selectablesPage || 0) + 1;
+      const nextBatch = m.allSelectables.slice(nextPage * 5, nextPage * 5 + 5);
+      if (nextBatch.length === 0) return m;
+      return { ...m, selectables: nextBatch, selectablesPage: nextPage };
+    }));
+  };
+
+  const handleSuggestedSearchClick = async (suggestion: SuggestedSearch) => {
+    const { filters } = suggestion;
+    setCurrentFilters(filters);
+    setSuggestedSearches([]);
+
+    // Add messages to chat
+    const userMsgId = `user-${Date.now()}`;
+    const assistantMsgId = `assistant-${Date.now()}`;
+    setMessages(prev => [
+      ...prev,
+      { id: userMsgId, role: 'user', content: suggestion.label },
+      { id: assistantMsgId, role: 'assistant', content: `Searching for ${filters.role || 'people'} at ${filters.company}${filters.location ? ` in ${filters.location}` : ''}${filters.university ? ` from ${filters.university}` : ''}!` },
+    ]);
+
+    await runSearch(filters);
+  };
+
   const handleRemoveFilter = async (key: keyof ParsedFilters) => {
     const updated = { ...currentFilters };
     delete updated[key];
     setCurrentFilters(updated);
 
-    if (key === 'company' || key === 'companies') {
-      // Also clear the other company field
-      delete updated.company;
-      delete updated.companies;
+    if (key === 'company') {
       // Can't search without company — clear results
       hook.resetResults();
+      setSuggestedSearches([]);
       setMessages(prev => [
         ...prev,
         { id: `assistant-${Date.now()}`, role: 'assistant', content: 'Company filter removed. Please specify a company to search.' },
@@ -282,16 +358,11 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
     }
   };
 
-  // Build filter entries for display, showing companies array as a joined string
-  const activeFilterEntries: [string, string][] = [];
-  for (const [key, value] of Object.entries(currentFilters)) {
-    if (!value) continue;
-    if (key === 'companies' && Array.isArray(value) && value.length > 0) {
-      activeFilterEntries.push(['companies', value.join(', ')]);
-    } else if (key !== 'companies' && typeof value === 'string') {
-      activeFilterEntries.push([key, value]);
-    }
-  }
+  // Build filter entries for display
+  const activeFilterEntries: [string, string][] = Object.entries(currentFilters)
+    .filter(([, v]) => v && typeof v === 'string')
+    .map(([k, v]) => [k, v as string]);
+
   const hasResults = hook.results.length > 0;
   const showChat = hook.expandedIndex === null && !hook.showBulkReview;
 
@@ -332,6 +403,7 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
                   onClick={() => {
                     setMessages([]);
                     setCurrentFilters({});
+                    setSuggestedSearches([]);
                     hook.resetResults();
                     try { sessionStorage.removeItem(AI_STORAGE_KEY); } catch {}
                   }}
@@ -393,7 +465,33 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
                           <div className="w-1.5 h-1.5 rounded-full bg-surface-400 animate-bounce" style={{ animationDelay: '300ms' }} />
                         </div>
                       ) : (
-                        msg.content
+                        <>
+                          {msg.content}
+                          {/* Selectable buttons */}
+                          {msg.selectables && msg.selectables.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mt-3">
+                              {msg.selectables.map((s) => (
+                                <button
+                                  key={s.filterValue}
+                                  onClick={() => handleSelectableClick(s)}
+                                  disabled={isExtracting || isSearching}
+                                  className="px-3 py-1.5 text-xs font-medium text-primary-700 bg-primary-50 border border-primary-200 rounded-full hover:bg-primary-100 hover:border-primary-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  {s.label}
+                                </button>
+                              ))}
+                              {msg.allSelectables && msg.allSelectables.length > ((msg.selectablesPage || 0) + 1) * 5 && (
+                                <button
+                                  onClick={() => handleShowMoreSelectables(msg.id)}
+                                  disabled={isExtracting || isSearching}
+                                  className="px-3 py-1.5 text-xs font-medium text-surface-500 bg-surface-100 border border-surface-200 rounded-full hover:bg-surface-200 hover:text-surface-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  Show more...
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
@@ -451,6 +549,25 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
             limitReached={hook.limitReached}
             onLimitReached={() => hook.setShowLimitModal(true)}
           />
+
+          {/* Suggested Searches */}
+          {suggestedSearches.length > 0 && (
+            <div className="mt-6 mb-4">
+              <p className="text-sm text-surface-500 mb-2">Try searching for:</p>
+              <div className="flex flex-wrap gap-2">
+                {suggestedSearches.map((s) => (
+                  <button
+                    key={s.label}
+                    onClick={() => handleSuggestedSearchClick(s)}
+                    disabled={isSearching}
+                    className="px-3 py-1.5 text-xs font-medium text-surface-600 bg-white border border-surface-200 rounded-full hover:bg-primary-50 hover:text-primary-700 hover:border-primary-200 transition-colors disabled:opacity-50"
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Load More Button */}
           {hook.hasMore && !isSearching && (

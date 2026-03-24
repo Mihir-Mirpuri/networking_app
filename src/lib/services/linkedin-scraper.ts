@@ -545,12 +545,12 @@ export async function scrapeLinkedInProfiles(
   const { includeEmail = false, onBatchComplete } = options;
 
   if (!APIFY_API_KEY) {
-    console.error('[LinkedIn Scraper] No API key configured');
+    console.error('[Scraper] No API key configured');
     throw new Error('APIFY_API_KEY not configured');
   }
 
   if (linkedinUrls.length === 0) {
-    console.log('[LinkedIn Scraper] No URLs provided, returning empty array');
+    console.log('[Scraper] No URLs provided, returning empty array');
     return [];
   }
 
@@ -569,10 +569,10 @@ export async function scrapeLinkedInProfiles(
     : 'Profile details no email ($4 per 1k)';
 
   console.log(
-    `[LinkedIn Scraper] Scraping ${linkedinUrls.length} profiles in ${batches.length} batches (${MAX_CONCURRENT} concurrent)`
+    `[Scraper] Scraping ${linkedinUrls.length} profiles in ${batches.length} batches (mode: ${includeEmail ? 'email' : 'no-email'})`
   );
-  console.log(`[LinkedIn Scraper] Mode: ${mode}`);
 
+  const scrapeStart = Date.now();
   const allProfiles: ScrapedProfile[] = [];
   const failedUrls: string[] = [];
   const callbackPromises: Promise<void>[] = [];
@@ -584,7 +584,7 @@ export async function scrapeLinkedInProfiles(
       const batchStart = i + 1;
       const batchEnd = Math.min(i + MAX_CONCURRENT, batches.length);
 
-      console.log(`[LinkedIn Scraper] Running batches ${batchStart}-${batchEnd} of ${batches.length}...`);
+      console.log(`[Scraper] Running batches ${batchStart}-${batchEnd} of ${batches.length}...`);
 
       // Start all concurrent runs
       const runs = await Promise.all(
@@ -613,7 +613,7 @@ export async function scrapeLinkedInProfiles(
 
           // Skip error responses (e.g., "No person found")
           if (raw.error) {
-            console.warn(`[LinkedIn Scraper] Failed: ${raw.linkedinUrl} - ${raw.error}`);
+            console.warn(`[Scraper] Failed: ${raw.linkedinUrl} - ${raw.error}`);
             failedUrls.push(raw.linkedinUrl);
             continue;
           }
@@ -629,7 +629,7 @@ export async function scrapeLinkedInProfiles(
         const batchIndex = Math.floor(i / MAX_CONCURRENT);
         // Track promise but don't await - allows parallel processing
         const callbackPromise = onBatchComplete(batchProfiles, batchIndex, batches.length).catch((err) => {
-          console.error(`[LinkedIn Scraper] Batch callback error:`, err);
+          console.error(`[Scraper] Batch callback error:`, err);
         });
         callbackPromises.push(callbackPromise);
       }
@@ -641,12 +641,12 @@ export async function scrapeLinkedInProfiles(
     }
 
     console.log(
-      `[LinkedIn Scraper] Completed: ${allProfiles.length} succeeded, ${failedUrls.length} failed`
+      `[Scraper] Completed: ${allProfiles.length} succeeded, ${failedUrls.length} failed ${Date.now() - scrapeStart}ms`
     );
 
     return allProfiles;
   } catch (error) {
-    console.error('[LinkedIn Scraper] Scrape error:', error);
+    console.error('[Scraper] Scrape error:', error);
     throw error;
   }
 }

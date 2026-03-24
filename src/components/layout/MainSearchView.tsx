@@ -218,7 +218,7 @@ import { Toast } from '@/components/ui/Toast';
 import { LimitReachedModal, dispatchCreditsChanged } from '@/components/credits';
 import { HiddenPeopleBar } from '@/components/search/HiddenPeopleBar';
 import { searchPeopleAction, SearchResultWithDraft } from '@/app/actions/search';
-import { extractSearchFiltersAction, ParsedFilters, ChatMessage } from '@/app/actions/ai-search';
+import { extractSearchFiltersAction, ParsedFilters, ChatMessage, Selectable } from '@/app/actions/ai-search';
 import { useSearchResults } from '@/hooks/useSearchResults';
 import { LoginPromptModal } from '@/components/auth/LoginPromptModal';
 
@@ -240,10 +240,13 @@ interface DisplayMessage {
   content: string;
   filters?: ParsedFilters;
   isLoading?: boolean;
+  selectables?: Selectable[];
+  allSelectables?: Selectable[];
+  selectablesPage?: number;
 }
 
 const STORAGE_KEY = 'signl_mainSearchState';
-const STORAGE_VERSION = 1;
+const STORAGE_VERSION = 2; // Bumped: added allSelectables for Perplexity pagination
 
 interface MainSearchState {
   version: number;
@@ -375,8 +378,7 @@ export function MainSearchView({ initialRemainingDaily, pendingQuery, pendingFil
   }, [messages, currentFilters, hook.results, hook.expandedIndex, hook.sendStatuses, hook.showBulkReview, hook.generatingStatuses, hook.totalLoaded, hook.hasMore, hook.hiddenCount, hook.searchParams]);
 
   const runSearch = useCallback(async (filters: ParsedFilters) => {
-    const companiesToSearch = filters.companies?.length ? filters.companies : filters.company ? [filters.company] : [];
-    if (companiesToSearch.length === 0) return;
+    if (!filters.company) return;
 
     // Check guest query limit before searching
     if (checkGuestQueryLimit()) {
@@ -386,45 +388,37 @@ export function MainSearchView({ initialRemainingDaily, pendingQuery, pendingFil
     setIsSearching(true);
     hook.resetResults();
 
-    const isMultiCompany = companiesToSearch.length > 1;
-    const params = {
-      company: isMultiCompany ? undefined : companiesToSearch[0],
-      companies: isMultiCompany ? companiesToSearch : undefined,
+    const result = await searchPeopleAction({
+      company: filters.company,
       role: filters.role,
       university: filters.university,
       location: filters.location,
       limit: 6,
-    };
-
-    const result = await searchPeopleAction(params);
+    });
 
     if (result.success) {
       // Increment guest query count after successful search
       incrementGuestQueryCount();
 
       hook.applySearchResults(result.results, result.searchMeta, result.hiddenCount, {
-        company: companiesToSearch[0],
-        companies: isMultiCompany ? companiesToSearch : undefined,
+        company: filters.company,
         role: filters.role,
         university: filters.university,
         location: filters.location,
         limit: 6,
       });
 
-      // Fire-and-forget prescrape per company
-      for (const company of companiesToSearch) {
-        fetch('/api/prescrape', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            company,
-            role: filters.role,
-            university: filters.university,
-            location: filters.location,
-            ...(isMultiCompany ? { maxPages: 1 } : {}),
-          }),
-        }).catch(err => console.error('[Prescrape] Error:', err));
-      }
+      // Fire-and-forget prescrape
+      fetch('/api/prescrape', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          company: filters.company,
+          role: filters.role,
+          university: filters.university,
+          location: filters.location,
+        }),
+      }).catch(err => console.error('[Prescrape] Error:', err));
     }
 
     setIsSearching(false);
@@ -467,8 +461,9 @@ export function MainSearchView({ initialRemainingDaily, pendingQuery, pendingFil
     }
 
     const { filters, assistantMessage } = extractResult;
+    setCurrentFilters(filters);
 
-    if (!filters.company && (!filters.companies || filters.companies.length === 0)) {
+    if (extractResult.status === 'off_topic') {
       setMessages(prev =>
         prev.map(m =>
           m.id === assistantMsgId
@@ -476,12 +471,31 @@ export function MainSearchView({ initialRemainingDaily, pendingQuery, pendingFil
             : m
         )
       );
-      setCurrentFilters(filters);
       setIsExtracting(false);
       return;
     }
 
-    setCurrentFilters(filters);
+    if (extractResult.status === 'needs_selection') {
+      setMessages(prev =>
+        prev.map(m =>
+          m.id === assistantMsgId
+            ? {
+                ...m,
+                content: assistantMessage,
+                filters,
+                selectables: extractResult.selectables,
+                allSelectables: extractResult.allSelectables,
+                selectablesPage: 0,
+                isLoading: false,
+              }
+            : m
+        )
+      );
+      setIsExtracting(false);
+      return;
+    }
+
+    // status === 'ready'
     setMessages(prev =>
       prev.map(m =>
         m.id === assistantMsgId
@@ -493,6 +507,42 @@ export function MainSearchView({ initialRemainingDaily, pendingQuery, pendingFil
 
     await runSearch(filters);
   }, [isExtracting, isSearching, messages, currentFilters, runSearch]);
+
+  const handleSelectableClick = useCallback(async (selectable: Selectable) => {
+    // Add a user message showing what they picked
+    const userMsgId = `user-${Date.now()}`;
+    setMessages(prev => [
+      ...prev,
+      { id: userMsgId, role: 'user', content: selectable.label },
+    ]);
+
+    // Merge selection into current filters
+    const updated = { ...currentFilters, [selectable.filterKey]: selectable.filterValue };
+    setCurrentFilters(updated);
+
+    // If both company and role are now set, run search directly
+    if (updated.company && updated.role) {
+      const confirmMsgId = `assistant-${Date.now()}`;
+      setMessages(prev => [
+        ...prev,
+        { id: confirmMsgId, role: 'assistant', content: `Searching for ${updated.role}s at ${updated.company}${updated.location ? ` in ${updated.location}` : ''}${updated.university ? ` from ${updated.university}` : ''}!` },
+      ]);
+      await runSearch(updated);
+    } else {
+      // Still missing company or role — send back to LLM
+      await handleSendMessage(selectable.label);
+    }
+  }, [currentFilters, runSearch, handleSendMessage]);
+
+  const handleShowMoreSelectables = useCallback((messageId: string) => {
+    setMessages(prev => prev.map(m => {
+      if (m.id !== messageId || !m.allSelectables) return m;
+      const nextPage = (m.selectablesPage || 0) + 1;
+      const nextBatch = m.allSelectables.slice(nextPage * 5, nextPage * 5 + 5);
+      if (nextBatch.length === 0) return m;
+      return { ...m, selectables: nextBatch, selectablesPage: nextPage };
+    }));
+  }, []);
 
   // Process pending query from sidebar
   useEffect(() => {
@@ -596,7 +646,32 @@ export function MainSearchView({ initialRemainingDaily, pendingQuery, pendingFil
                         <div className="w-1.5 h-1.5 rounded-full bg-[#606080] animate-bounce" style={{ animationDelay: '300ms' }} />
                       </div>
                     ) : (
-                      msg.content
+                      <>
+                        {msg.content}
+                        {msg.selectables && msg.selectables.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-3">
+                            {msg.selectables.map((s) => (
+                              <button
+                                key={s.filterValue}
+                                onClick={() => handleSelectableClick(s)}
+                                disabled={isExtracting || isSearching}
+                                className="px-3 py-1.5 text-xs font-medium text-primary-300 bg-primary-900/30 border border-primary-700/50 rounded-full hover:bg-primary-800/40 hover:border-primary-600/60 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {s.label}
+                              </button>
+                            ))}
+                            {msg.allSelectables && msg.allSelectables.length > ((msg.selectablesPage || 0) + 1) * 5 && (
+                              <button
+                                onClick={() => handleShowMoreSelectables(msg.id)}
+                                disabled={isExtracting || isSearching}
+                                className="px-3 py-1.5 text-xs font-medium text-[#808090] bg-[#1a1a2e] border border-[#404060] rounded-full hover:bg-[#252540] hover:text-[#a0a0b0] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                Show more...
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>

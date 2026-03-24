@@ -11,7 +11,6 @@ import { useSession } from 'next-auth/react';
 
 export interface SearchParams {
   company?: string;
-  companies?: string[];
   role?: string;
   university?: string;
   location?: string;
@@ -291,14 +290,13 @@ export function useSearchResults({ initialRemainingDaily }: UseSearchResultsOpti
   };
 
   const handleLoadMore = useCallback(async () => {
-    if ((!searchParams?.company && !searchParams?.companies?.length) || isLoadingMore || !hasMore) return;
+    if (!searchParams?.company || isLoadingMore || !hasMore) return;
 
     setIsLoadingMore(true);
     setIsRetrying(false);
     try {
       const result = await loadMorePeopleAction({
         company: searchParams.company,
-        companies: searchParams.companies,
         role: searchParams.role,
         university: searchParams.university,
         location: searchParams.location,

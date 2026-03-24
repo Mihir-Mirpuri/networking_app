@@ -36,7 +36,7 @@ import {
   getCompanyPattern,
   generateEmailFromPattern,
 } from '@/lib/services/email-pattern';
-import { resolveCompanyAliases, resolveMultiCompanyAliases } from '@/lib/services/company-alias';
+import { resolveCompanyAliases } from '@/lib/services/company-alias';
 import { preFilterUrls } from '@/lib/services/snippet-filter';
 import { generateEmailWithLLM, getUserResumeSummary, getRecentSentEmails, refineEmailWithLLM } from '@/lib/services/personalization';
 
@@ -52,7 +52,6 @@ export interface RecentSearch {
 export interface SearchInput {
   name?: string;
   company?: string;
-  companies?: string[];       // Multiple companies for multi-company search
   role?: string;
   university?: string;
   location?: string;
@@ -149,37 +148,6 @@ interface PersonWithSource {
     snippet: string | null;
     domain: string | null;
   }>;
-}
-
-/**
- * Interleave ranked results by company for multi-company searches.
- * Round-robins through companies so results are mixed rather than clustered.
- * Preserves relative ranking within each company.
- */
-function interleaveByCompany<T extends { candidate: { company: string } }>(
-  ranked: T[]
-): T[] {
-  // Group by normalized company name, preserving order within each group
-  const buckets = new Map<string, T[]>();
-  for (const item of ranked) {
-    const key = item.candidate.company.toLowerCase().trim();
-    if (!buckets.has(key)) buckets.set(key, []);
-    buckets.get(key)!.push(item);
-  }
-
-  // Round-robin across buckets
-  const result: T[] = [];
-  const iterators = Array.from(buckets.values()).map(b => ({ items: b, idx: 0 }));
-  let remaining = ranked.length;
-  while (remaining > 0) {
-    for (const it of iterators) {
-      if (it.idx < it.items.length) {
-        result.push(it.items[it.idx++]);
-        remaining--;
-      }
-    }
-  }
-  return result;
 }
 
 /** Resolved template shape used by generateEmailDraft */
@@ -357,7 +325,6 @@ async function enrichPeopleWithPatterns(
         },
       });
       emailsGenerated++;
-      console.log(`[Enrich] Pattern → ${person.firstName} ${person.lastName} → ${generatedEmail}`);
     }
   }
 
@@ -483,16 +450,15 @@ async function buildResultsWithDrafts(
 export async function searchPeopleAction(
   input: SearchInput
 ): Promise<SearchActionResult> {
+  const searchStart = Date.now();
   const session = await getServerSession(authOptions);
   const userId = session?.user?.id || null;
   const isGuest = !userId;
 
-  const companyList = input.companies?.length ? input.companies : input.company ? [input.company] : [];
-  if (companyList.length === 0) {
+  if (!input.company) {
     return { success: false, error: 'Company is required' };
   }
-  const isMultiCompany = companyList.length > 1;
-  const primaryCompany = companyList[0];
+  const company = input.company;
 
   try {
     let user = null;
@@ -538,47 +504,37 @@ export async function searchPeopleAction(
       console.log(`[Search] Guest user search`);
     }
 
-    console.log(`[Search] Input: companies=${JSON.stringify(companyList)}, role=${input.role}, limit=${input.limit}, isMultiCompany=${isMultiCompany}`);
+    console.log(`[Search] Input: company=${company}, role=${input.role}, limit=${input.limit}`);
     // Merge sent/hidden IDs with already-displayed IDs for a single DB-level NOT IN
     const allExcludedIds = input.excludePersonIds
       ? [...excludedIds, ...input.excludePersonIds]
       : excludedIds;
 
-    // Resolve company aliases — multi or single
-    let allAliases: string[];
-    if (isMultiCompany) {
-      const resolved = await resolveMultiCompanyAliases(companyList);
-      allAliases = resolved.allAliases;
-      console.log(`[Search] Resolved ${companyList.length} companies → ${allAliases.length} aliases`);
-    } else {
-      const resolved = await resolveCompanyAliases(primaryCompany);
-      allAliases = resolved.aliases;
-      console.log(`[Search] Resolved company "${primaryCompany}" → ${allAliases.length} aliases`);
-    }
+    // Resolve company aliases
+    const resolved = await resolveCompanyAliases(company);
+    const allAliases = resolved.aliases;
+    console.log(`[Search] Resolved company "${company}" → ${allAliases.length} aliases`);
 
     // ===== STEP 1: Query DB, enrich only if needed =====
-    // Overfetch for multi-company so each company gets representation before interleaving
-    const dbLimit = isMultiCompany ? input.limit * companyList.length : input.limit;
     const filters: PersonFilters = {
-      company: primaryCompany,
-      companies: isMultiCompany ? companyList : undefined,
+      company,
       companyAliases: allAliases,
       location: input.location,
       role: input.role,
       university: input.university,
       requireEmail: false,
       excludePersonIds: allExcludedIds,
-      limit: dbLimit,
+      limit: input.limit,
     };
 
     // Query DB first — try free pattern enrichment if we don't have enough results
     let people = await findPeopleByFilters(filters);
-    console.log(`[Search] Found ${people.length} people in DB (need ${dbLimit} for interleave, showing ${input.limit})`);
+    console.log(`[Search] Found ${people.length} people in DB (need ${input.limit})`);
 
     if (people.length < input.limit) {
       // Not enough results — try free pattern enrichment, then re-query
       console.log(`[Search] Under limit, enriching with patterns`);
-      await enrichPeopleWithPatterns(filters, primaryCompany);
+      await enrichPeopleWithPatterns(filters, company);
       people = await findPeopleByFilters(filters);
       console.log(`[Search] After enrichment: ${people.length} people`);
     }
@@ -588,10 +544,9 @@ export async function searchPeopleAction(
     let cseHasMorePages = false;
 
     // ===== STEP 2: Check CSE state + sync scrape if 0 results =====
-    // For multi-company, check primary company for sync scrape; prescrape handles all per-company
     const normalizedParams = normalizeSearchParams({
       name: input.name,
-      company: primaryCompany,
+      company,
       role: input.role,
       university: input.university,
       location: input.location,
@@ -603,9 +558,9 @@ export async function searchPeopleAction(
       cseHasMorePages = true;
 
       if (people.length === 0) {
-        // 0 results → scrape synchronously for primary company (user expects to wait)
-        console.log(`[Search] 0 results, scraping CSE page ${nextPage} synchronously for "${primaryCompany}"`);
-        const syncInput = { ...input, company: primaryCompany };
+        // 0 results → scrape synchronously (user expects to wait)
+        console.log(`[Search] 0 results, scraping CSE page ${nextPage} synchronously for "${company}"`);
+        const syncInput = { ...input, company };
         const batch = await processRefreshBatch(syncInput, nextPage, 'SyncScrape');
         cseCallsMade = 1;
 
@@ -618,23 +573,13 @@ export async function searchPeopleAction(
         });
 
         // Enrich newly scraped people with patterns before re-querying
-        await enrichPeopleWithPatterns(filters, primaryCompany);
+        await enrichPeopleWithPatterns(filters, company);
 
         // Re-query DB after scraping + enrichment added new people
         people = await findPeopleByFilters(filters);
         console.log(`[Search] After scrape+enrich: ${people.length} results`);
       }
       // 1+ results: return as-is, prescrape will populate DB in background
-    }
-
-    // For multi-company, also check if ANY other company has more pages
-    if (isMultiCompany && !cseHasMorePages) {
-      for (const company of companyList.slice(1)) {
-        const params = normalizeSearchParams({ company, role: input.role, university: input.university, location: input.location });
-        const prog = await findOrCreateScrapeProgress(params);
-        const np = getNextCsePageStart(prog.lastCsePageScraped, prog.cseExhausted);
-        if (np !== null) { cseHasMorePages = true; break; }
-      }
     }
 
     // ===== STEP 3: Rank candidates =====
@@ -659,8 +604,7 @@ export async function searchPeopleAction(
     } else {
       // Fallback: keyword-based ranking
       const searchCriteria: SearchCriteria = {
-        company: primaryCompany,
-        companies: isMultiCompany ? companyList : undefined,
+        company,
         role: input.role,
         university: input.university,
         location: input.location,
@@ -684,11 +628,6 @@ export async function searchPeopleAction(
       console.log(`[Search] Fallback mode: ranked top ${rankedPeople.length} candidates`);
     }
 
-    // ===== STEP 3b: Interleave companies for multi-company searches =====
-    if (isMultiCompany && rankedPeople.length > 1) {
-      rankedPeople = interleaveByCompany(rankedPeople);
-    }
-    // Slice to actual limit after interleaving (we overfetched for company diversity)
     rankedPeople = rankedPeople.slice(0, input.limit);
 
     // ===== STEP 4: Build results with drafts =====
@@ -716,7 +655,7 @@ export async function searchPeopleAction(
     const hasMore = people.length >= input.limit || cseHasMorePages;
 
     console.log(
-      `[Search] Returning ${results.length} results (hasMore=${hasMore}, cseHasMore=${cseHasMorePages})`
+      `[Search] Returning ${results.length} results (hasMore=${hasMore}, cseHasMore=${cseHasMorePages}) ${Date.now() - searchStart}ms`
     );
 
     // Log the search for analytics (only for authenticated users)
@@ -724,7 +663,7 @@ export async function searchPeopleAction(
       await prisma.searchLog.create({
         data: {
           userId,
-          company: companyList.join(', '),
+          company,
           role: input.role || null,
           university: input.university || null,
           location: input.location || null,
@@ -747,7 +686,7 @@ export async function searchPeopleAction(
       hiddenCount,
     };
   } catch (error) {
-    console.error('Search error:', error);
+    console.error('[Search] Error:', error);
     return { success: false, error: 'Search failed. Please try again.' };
   }
 }
@@ -791,7 +730,7 @@ export async function getRecentSearchesAction(): Promise<RecentSearch[]> {
 
     return unique;
   } catch (error) {
-    console.error('Error fetching recent searches:', error);
+    console.error('[Search] Error fetching recent searches:', error);
     return [];
   }
 }
@@ -817,7 +756,7 @@ export async function hidePersonAction(
     console.log(`[Hide] User ${session.user.id} marked userCandidate ${userCandidateId} as doNotShow`);
     return { success: true };
   } catch (error) {
-    console.error('Error hiding person:', error);
+    console.error('[Hide] Error:', error);
     return { success: false, error: 'Failed to hide person' };
   }
 }
@@ -859,7 +798,7 @@ export async function getHiddenPeopleAction(): Promise<
       })),
     };
   } catch (error) {
-    console.error('Error fetching hidden people:', error);
+    console.error('[Hide] Error fetching hidden people:', error);
     return { success: false, error: 'Failed to fetch hidden people' };
   }
 }
@@ -970,7 +909,7 @@ export async function unhidePersonAction(
     console.log(`[Unhide] User ${userId} unmarked userCandidate ${userCandidateId}`);
     return { success: true, person };
   } catch (error) {
-    console.error('Error unhiding person:', error);
+    console.error('[Unhide] Error:', error);
     return { success: false, error: 'Failed to unhide person' };
   }
 }
@@ -979,7 +918,6 @@ export async function unhidePersonAction(
 
 export interface LoadMoreInput {
   company?: string;
-  companies?: string[];
   role?: string;
   university?: string;
   location?: string;
@@ -1016,12 +954,10 @@ export async function loadMorePeopleAction(
     return { success: false, error: 'Not authenticated' };
   }
 
-  const companyList = input.companies?.length ? input.companies : input.company ? [input.company] : [];
-  if (companyList.length === 0) {
+  if (!input.company) {
     return { success: false, error: 'Company is required' };
   }
-  const isMultiCompany = companyList.length > 1;
-  const primaryCompany = companyList[0];
+  const company = input.company;
 
   try {
     const userId = session.user.id;
@@ -1039,27 +975,19 @@ export async function loadMorePeopleAction(
     const excludedIds = await getExcludedPersonIds(userId);
     const allExcludedIds = [...excludedIds, ...input.excludePersonIds];
 
-    // Resolve company aliases — multi or single
-    let allAliases: string[];
-    if (isMultiCompany) {
-      const resolved = await resolveMultiCompanyAliases(companyList);
-      allAliases = resolved.allAliases;
-    } else {
-      const resolved = await resolveCompanyAliases(primaryCompany);
-      allAliases = resolved.aliases;
-    }
+    // Resolve company aliases
+    const resolved = await resolveCompanyAliases(company);
+    const allAliases = resolved.aliases;
 
-    const dbLimit = isMultiCompany ? input.limit * companyList.length : input.limit;
     const filters: PersonFilters = {
-      company: primaryCompany,
-      companies: isMultiCompany ? companyList : undefined,
+      company,
       companyAliases: allAliases,
       location: input.location,
       role: input.role,
       university: input.university,
       requireEmail: false,
       excludePersonIds: allExcludedIds,
-      limit: dbLimit,
+      limit: input.limit,
     };
 
     // Query DB first — try free pattern enrichment if not enough results
@@ -1069,7 +997,7 @@ export async function loadMorePeopleAction(
     if (people.length < input.limit) {
       // Not enough results — try free pattern enrichment, then re-query
       console.log(`[LoadMore] Under limit, enriching with patterns`);
-      await enrichPeopleWithPatterns(filters, primaryCompany);
+      await enrichPeopleWithPatterns(filters, company);
       people = await findPeopleByFilters(filters);
       console.log(`[LoadMore] After enrichment: ${people.length} people`);
     }
@@ -1090,8 +1018,7 @@ export async function loadMorePeopleAction(
     } else {
       // Fallback: keyword-based ranking
       const searchCriteria: SearchCriteria = {
-        company: primaryCompany,
-        companies: isMultiCompany ? companyList : undefined,
+        company,
         role: input.role,
         university: input.university,
         location: input.location,
@@ -1115,32 +1042,22 @@ export async function loadMorePeopleAction(
       console.log(`[LoadMore] Fallback mode: ranked top ${rankedPeople.length} candidates`);
     }
 
-    // Interleave companies for multi-company searches
-    if (isMultiCompany && rankedPeople.length > 1) {
-      rankedPeople = interleaveByCompany(rankedPeople);
-    }
     rankedPeople = rankedPeople.slice(0, input.limit);
 
     // Build results with drafts
     const template = await resolveTemplateForUser(userId, input.templateId);
     const results = await buildResultsWithDrafts(rankedPeople, userId, template, user);
 
-    // Check prescrape status across all companies
-    let prescrapeRunning = false;
-    for (const company of companyList) {
-      const normalizedParams = normalizeSearchParams({
-        name: input.name,
-        company,
-        role: input.role,
-        university: input.university,
-        location: input.location,
-      });
-      const progress = await findOrCreateScrapeProgress(normalizedParams);
-      if (progress.prescrapeStatus === 'RUNNING') {
-        prescrapeRunning = true;
-        break;
-      }
-    }
+    // Check prescrape status
+    const normalizedParams = normalizeSearchParams({
+      name: input.name,
+      company,
+      role: input.role,
+      university: input.university,
+      location: input.location,
+    });
+    const progress = await findOrCreateScrapeProgress(normalizedParams);
+    const prescrapeRunning = progress.prescrapeStatus === 'RUNNING';
 
     // hasMore = got a full page (probably more in DB) OR prescrape still running (more may appear)
     const hasMore = people.length >= input.limit || prescrapeRunning;
@@ -1155,7 +1072,7 @@ export async function loadMorePeopleAction(
       loadMoreMeta: { hasMore, prescrapeRunning },
     };
   } catch (error) {
-    console.error('LoadMore error:', error);
+    console.error('[LoadMore] Error:', error);
     return { success: false, error: 'Failed to load more profiles.' };
   }
 }
@@ -1287,7 +1204,7 @@ async function processRefreshBatch(
   return { newPeopleCount, matchedCount, emailsGenerated: 0, apolloCallsMade: 0, savedPersonIds, urlsScraped: urlsToScrape.length, urlsFromCse: cseResults.length, csePrefiltered };
 }
 
-const MAX_PRESCRAPE_PAGES = 5;
+const MAX_PRESCRAPE_PAGES = 3;
 const WEAK_PAGE_THRESHOLD = 3; // Pages with fewer than this many new valid profiles are "weak"
 const MAX_CONSECUTIVE_WEAK_PAGES = 2; // Stop after this many consecutive weak pages
 
@@ -1331,17 +1248,20 @@ export async function prescrapeAction(
 
     let pagesScraped = 0;
 
-    // Bail out if a prescrape is already running for these params
+    // Atomically claim the prescrape lock — prevents duplicate concurrent prescrapes
     const initialProgress = await findOrCreateScrapeProgressWithHash(normalizedParams, queryHash);
-    if (initialProgress.prescrapeStatus === 'RUNNING') {
+
+    const rowsUpdated = await prisma.$executeRaw`
+      UPDATE "Search"
+      SET "prescrapeStatus" = 'RUNNING', "updatedAt" = NOW()
+      WHERE id = ${initialProgress.id}
+        AND ("prescrapeStatus" IS NULL OR "prescrapeStatus" != 'RUNNING')
+    `;
+
+    if (rowsUpdated === 0) {
       console.log(`[Prescrape] Already running for "${input.company}", skipping`);
       return { success: true, pagesScraped: 0 };
     }
-
-    await prisma.search.update({
-      where: { id: initialProgress.id },
-      data: { prescrapeStatus: 'RUNNING' },
-    });
 
     let consecutiveWeakPages = 0;
     const pageLimit = input.maxPages ?? MAX_PRESCRAPE_PAGES;
@@ -1405,7 +1325,7 @@ export async function prescrapeAction(
     console.log(`[Prescrape] Done: scraped ${pagesScraped} pages for "${input.company}"`);
     return { success: true, pagesScraped };
   } catch (error) {
-    console.error('Prescrape error:', error);
+    console.error('[Prescrape] Error:', error);
     // Mark as DONE even on error to prevent permanently stuck RUNNING state
     try {
       const progress = await findOrCreateScrapeProgress(normalizeSearchParams({
@@ -1420,7 +1340,7 @@ export async function prescrapeAction(
         data: { prescrapeStatus: 'DONE' },
       });
     } catch (e) {
-      console.error('Failed to mark prescrape as DONE after error:', e);
+      console.error('[Prescrape] Failed to mark as DONE after error:', e);
     }
     return { success: false, error: 'Prescraping failed.' };
   }
@@ -1454,6 +1374,7 @@ export type LookupActionResult = {
 export async function lookupPersonAction(
   input: LookupInput
 ): Promise<LookupActionResult> {
+  const lookupStart = Date.now();
   const session = await getServerSession(authOptions);
 
   if (!session?.user?.id) {
@@ -1671,7 +1592,6 @@ export async function lookupPersonAction(
         person.email = generatedEmail;
         person.emailStatus = 'UNVERIFIED';
         person.emailConfidence = Math.round(pattern.confidence * 100);
-        console.log(`[Lookup] Pattern → ${person.fullName} → ${generatedEmail}`);
       }
     }
 
@@ -1686,10 +1606,10 @@ export async function lookupPersonAction(
     const template = await resolveTemplateForUser(userId, input.templateId);
     const results = await buildResultsWithDrafts(ranked, userId, template, user);
 
-    console.log(`[Lookup] Returning ${results.length} results for "${cleanName}"`);
+    console.log(`[Lookup] Returning ${results.length} results for "${cleanName}" ${Date.now() - lookupStart}ms`);
     return { success: true, results };
   } catch (error) {
-    console.error('Lookup error:', error);
+    console.error('[Lookup] Error:', error);
     return { success: false, error: 'Lookup failed. Please try again.' };
   }
 }
@@ -1796,7 +1716,7 @@ export async function regenerateDraftAction(input: {
 
     return { success: true, subject: draft.subject, body: draft.body, resumeId };
   } catch (error) {
-    console.error('RegenerateDraft error:', error);
+    console.error('[RegenerateDraft] Error:', error);
     return { success: false, error: 'Failed to regenerate draft' };
   }
 }
@@ -1872,7 +1792,7 @@ export async function generateLLMDraftAction(input: {
 
     return { success: true, subject: draft.subject, body: draft.body };
   } catch (error) {
-    console.error('GenerateLLMDraft error:', error);
+    console.error('[GenerateLLMDraft] Error:', error);
     return { success: false, error: 'Failed to generate draft' };
   }
 }
@@ -1922,7 +1842,7 @@ export async function refineDraftAction(input: {
 
     return { success: true, subject: result.subject, body: result.body };
   } catch (error) {
-    console.error('RefineDraft error:', error);
+    console.error('[RefineDraft] Error:', error);
     return { success: false, error: 'Failed to refine email' };
   }
 }

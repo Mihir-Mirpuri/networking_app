@@ -134,7 +134,7 @@ export async function findEmail(params: FindEmailParams): Promise<EmailResult> {
   const { firstName, lastName, company, linkedinUrl } = params;
 
   if (!APOLLO_API_KEY) {
-    console.log('No Apollo API key - skipping email lookup');
+    console.log('[Apollo] No API key - skipping email lookup');
     return {
       email: null,
       status: 'MISSING',
@@ -149,7 +149,7 @@ export async function findEmail(params: FindEmailParams): Promise<EmailResult> {
     };
   }
 
-  console.log(`Looking up email for: ${firstName} ${lastName} at ${company}${linkedinUrl ? ` (LinkedIn: ${linkedinUrl})` : ''}`);
+  console.log(`[Apollo] Looking up: ${firstName} ${lastName} at ${company}${linkedinUrl ? ` (LinkedIn: ${linkedinUrl})` : ''}`);
 
   try {
     // Build request body with optional LinkedIn URL
@@ -176,7 +176,7 @@ export async function findEmail(params: FindEmailParams): Promise<EmailResult> {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Apollo API error:', response.status, errorText);
+      console.error('[Apollo] API error:', response.status, errorText);
       return {
         email: null,
         status: 'MISSING',
@@ -203,10 +203,7 @@ export async function findEmail(params: FindEmailParams): Promise<EmailResult> {
       const locationParts = [person.city, person.state, person.country].filter(Boolean);
       const locationStr = locationParts.length > 0 ? locationParts.join(', ') : 'unknown';
 
-      // Log raw Apollo education data for debugging
-      console.log(`[Apollo] Raw education data: ${JSON.stringify(person.education || 'none')}`);
-      console.log(`[Apollo] Parsed education: ${JSON.stringify(education)}`);
-      console.log(`Found: ${person.email || 'no email'} (${isVerified ? 'verified' : 'unverified'}), location: ${locationStr}, education: ${education?.schoolName || 'unknown'}, employment: ${employment?.company || 'unknown'} - ${employment?.title || 'unknown'}`);
+      console.log(`[Apollo] Found: ${person.email || 'no email'} (${isVerified ? 'verified' : 'unverified'}), location: ${locationStr}, education: ${education?.schoolName || 'unknown'}, employment: ${employment?.company || 'unknown'} - ${employment?.title || 'unknown'}`);
 
       return {
         email: person.email || null,
@@ -224,7 +221,7 @@ export async function findEmail(params: FindEmailParams): Promise<EmailResult> {
       };
     }
 
-    console.log(`No person found for ${firstName} ${lastName}`);
+    console.log(`[Apollo] No person found for ${firstName} ${lastName}`);
     return {
       email: null,
       status: 'MISSING',
@@ -238,7 +235,7 @@ export async function findEmail(params: FindEmailParams): Promise<EmailResult> {
       apolloStatus: 'NOT_FOUND',
     };
   } catch (error) {
-    console.error('Apollo enrichment error:', error);
+    console.error('[Apollo] Enrichment error:', error);
     return {
       email: null,
       status: 'MISSING',

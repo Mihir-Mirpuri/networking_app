@@ -987,7 +987,7 @@ async function findPeopleByFiltersVector(
   const whereClause = Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}`;
   const fetchLimit = limit * 2; // Overfetch for post-query company filtering
 
-  console.log(`[VectorQuery] Filters: company=${company}, aliases=${filters.companyAliases?.length ?? 0}, location=${location}, university=${university}, requireEmail=${requireEmail}, excludeIds=${excludePersonIds?.length ?? 0}, threshold=0.50, fetchLimit=${fetchLimit}`);
+  console.log(`[VectorQuery] Filters: company=${company}, aliases=${filters.companyAliases?.length ?? 0}, location=${location}, university=${university}, requireEmail=${requireEmail}, excludeIds=${excludePersonIds?.length ?? 0}, threshold=0.75, fetchLimit=${fetchLimit}`);
 
   const rows = await prisma.$queryRaw<Array<{
     id: string;
@@ -1053,9 +1053,7 @@ async function findPeopleByFiltersVector(
   `);
 
   console.log(`[VectorQuery] Raw rows returned: ${rows.length}${rows.length > 0 ? ` | distance range: ${Number(rows[0].role_distance).toFixed(4)} → ${Number(rows[rows.length - 1].role_distance).toFixed(4)}` : ''}`);
-  if (rows.length > 0 && rows.length <= 5) {
-    console.log(`[VectorQuery] All results: ${rows.map(r => `${r.role}@${r.company}(d=${Number(r.role_distance).toFixed(3)})`).join(', ')}`);
-  } else if (rows.length > 5) {
+  if (rows.length > 0) {
     console.log(`[VectorQuery] Top 3: ${rows.slice(0, 3).map(r => `${r.role}@${r.company}(d=${Number(r.role_distance).toFixed(3)})`).join(', ')}`);
   }
 
@@ -1284,7 +1282,7 @@ export async function saveDiscoveredPerson(
     // Fire-and-forget: generate role embedding
     if (apolloData.role) {
       updatePersonRoleEmbedding(existing.id, apolloData.role)
-        .catch(err => console.error('[Embedding] Error:', err));
+        .catch(err => console.error('[Embedding] Error (saveProfile update):', err));
     }
 
     return { personId: existing.id, isNew: false };
@@ -1335,7 +1333,7 @@ export async function saveDiscoveredPerson(
   // Fire-and-forget: generate role embedding
   if (apolloData.role) {
     updatePersonRoleEmbedding(person.id, apolloData.role)
-      .catch(err => console.error('[Embedding] Error:', err));
+      .catch(err => console.error('[Embedding] Error (saveProfile create):', err));
   }
 
   return { personId: person.id, isNew: true };
@@ -1496,7 +1494,7 @@ export async function saveScrapedProfile(
     // Fire-and-forget: generate role embedding
     if (profile.role) {
       updatePersonRoleEmbedding(existingByUrl.id, profile.role)
-        .catch(err => console.error('[Embedding] Error:', err));
+        .catch(err => console.error('[Embedding] Error (saveScrapedProfile urlMatch):', err));
     }
 
     return { personId: existingByUrl.id, isNew: false };
@@ -1537,52 +1535,86 @@ export async function saveScrapedProfile(
     // Fire-and-forget: generate role embedding
     if (profile.role) {
       updatePersonRoleEmbedding(existingByName.id, profile.role)
-        .catch(err => console.error('[Embedding] Error:', err));
+        .catch(err => console.error('[Embedding] Error (saveScrapedProfile nameMatch):', err));
     }
 
     return { personId: existingByName.id, isNew: false };
   }
 
-  // Create new person
-  const person = await prisma.person.create({
-    data: {
-      fullName: profile.fullName,
-      firstName: profile.firstName,
-      lastName: profile.lastName,
-      company,
-      role: profile.role,
-      linkedinUrl: profile.linkedinUrl,
-      email: profile.email,
-      emailStatus: getEmailStatus(profile.email),
-      emailConfidence: profile.email ? 50 : 0,
-      city: profile.city,
-      state: profile.state,
-      country: profile.country,
-      schools: schools.length > 0 ? schools : undefined,
-      educationSchool,
-      experienceHistory: profile.experienceHistory?.length ? profile.experienceHistory : undefined,
-      educationHistory: profile.educationHistory?.length ? profile.educationHistory : undefined,
-      scrapedAt: new Date(),
-    },
-  });
+  // Create new person — wrapped in try/catch to handle race condition where
+  // a concurrent scrape creates the same person between our check and create
+  try {
+    const person = await prisma.person.create({
+      data: {
+        fullName: profile.fullName,
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        company,
+        role: profile.role,
+        linkedinUrl: profile.linkedinUrl,
+        email: profile.email,
+        emailStatus: getEmailStatus(profile.email),
+        emailConfidence: profile.email ? 50 : 0,
+        city: profile.city,
+        state: profile.state,
+        country: profile.country,
+        schools: schools.length > 0 ? schools : undefined,
+        educationSchool,
+        experienceHistory: profile.experienceHistory?.length ? profile.experienceHistory : undefined,
+        educationHistory: profile.educationHistory?.length ? profile.educationHistory : undefined,
+        scrapedAt: new Date(),
+      },
+    });
 
-  // Create source link
-  await prisma.sourceLink.create({
-    data: {
-      personId: person.id,
-      kind: 'DISCOVERY',
-      url: sourceUrl,
-      title: sourceTitle,
-      snippet: sourceSnippet,
-      domain: sourceDomain,
-    },
-  });
+    // Create source link
+    await prisma.sourceLink.create({
+      data: {
+        personId: person.id,
+        kind: 'DISCOVERY',
+        url: sourceUrl,
+        title: sourceTitle,
+        snippet: sourceSnippet,
+        domain: sourceDomain,
+      },
+    });
 
-  // Fire-and-forget: generate role embedding
-  if (profile.role) {
-    updatePersonRoleEmbedding(person.id, profile.role)
-      .catch(err => console.error('[Embedding] Error:', err));
+    // Fire-and-forget: generate role embedding
+    if (profile.role) {
+      updatePersonRoleEmbedding(person.id, profile.role)
+        .catch(err => console.error('[Embedding] Error (saveScrapedProfile create):', err));
+    }
+
+    return { personId: person.id, isNew: true };
+  } catch (error: any) {
+    // P2002 = Prisma unique constraint violation (concurrent scrape created this person)
+    if (error.code === 'P2002') {
+      console.log(`[saveScrapedProfile] Duplicate detected for "${profile.fullName}" at "${company}", falling back to update`);
+      const existing = await prisma.person.findUnique({
+        where: { fullName_company: { fullName: profile.fullName, company } },
+        select: { id: true },
+      });
+      if (existing) {
+        await prisma.person.update({
+          where: { id: existing.id },
+          data: {
+            linkedinUrl: profile.linkedinUrl,
+            role: profile.role,
+            email: profile.email || undefined,
+            emailStatus: profile.email ? getEmailStatus(profile.email) : undefined,
+            emailConfidence: profile.email ? 50 : undefined,
+            city: profile.city,
+            state: profile.state,
+            country: profile.country,
+            schools: schools.length > 0 ? schools : undefined,
+            educationSchool: educationSchool || undefined,
+            experienceHistory: profile.experienceHistory?.length ? profile.experienceHistory : undefined,
+            educationHistory: profile.educationHistory?.length ? profile.educationHistory : undefined,
+            scrapedAt: new Date(),
+          },
+        });
+        return { personId: existing.id, isNew: false };
+      }
+    }
+    throw error;
   }
-
-  return { personId: person.id, isNew: true };
 }

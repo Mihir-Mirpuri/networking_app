@@ -1,0 +1,258 @@
+
+================================================================================
+Query: site:linkedin.com/in "BCG" consultant
+================================================================================
+
+#1 | Title role+co: Boston Consulting Group (BCG) - LinkedIn
+     | Snippet company: Boston Consulting Group (BCG) | Snippet school: The Wharton School
+     | URL: https://www.linkedin.com/in/melissalevy711
+
+#2 | Title role+co: Boston Consulting Group (BCG) - LinkedIn
+     | Snippet company: Boston Consulting Group (BCG) | Snippet school: Duke University
+     | URL: https://www.linkedin.com/in/sunnyczhang
+
+#3 | Title role+co: Consultant @ BCG - LinkedIn
+     | Snippet company: (none) | Snippet school: (none)
+     | URL: https://www.linkedin.com/in/sarah-bland
+
+#4 | Title role+co: Consultant at BCG
+     | Snippet company: Boston Consulting Group (BCG) | Snippet school: Yale School of Management
+     | URL: https://www.linkedin.com/in/joshua-king-0879a323b
+
+#5 | Title role+co: Boston Consulting Group (BCG) - LinkedIn
+     | Snippet company: Boston Consulting Group (BCG) | Snippet school: The ...
+     | URL: https://www.linkedin.com/in/matthew-j-rosenberg
+
+#6 | Title role+co: BCG
+     | Snippet company: (none) | Snippet school: (none)
+     | URL: https://www.linkedin.com/in/michael-o-regan
+
+#7 | Title role+co: Boston Consulting Group (BCG) - LinkedIn
+     | Snippet company: Boston Consulting Group (BCG) | Snippet school: Indian Institute of Management, ...
+     | URL: https://www.linkedin.com/in/anshul-gupta-1633ba17
+
+#8 | Title role+co: Boston Consulting Group (BCG) - LinkedIn
+     | Snippet company: Boston Consulting Group (BCG) | Snippet school: Harvard Business School
+     | URL: https://www.linkedin.com/in/raaminmostaghimi
+
+#9 | Title role+co: Boston Consulting Group (BCG) - LinkedIn
+     | Snippet company: Boston Consulting Group (BCG) | Snippet school: University of Virginia Darden School of Business
+     | URL: https://www.linkedin.com/in/timgao
+
+#10 | Title role+co: Boston Consulting Group (BCG) - LinkedIn
+     | Snippet company: Boston Consulting Group (BCG) | Snippet school: London Business School
+     | URL: https://www.linkedin.com/in/konstantin-burlaev
+
+#11 | Title role+co: Consultant at BCG
+     | Snippet company: Boston Consulting Group (BCG) | Snippet school: Yale School of Management
+     | URL: https://www.linkedin.com/in/joshua-king-0879a323b
+
+#12 | Title role+co: Boston Consulting Group (BCG) - LinkedIn
+     | Snippet company: Boston Consulting Group (BCG) | Snippet school: University of Virginia Darden School of Business
+     | URL: https://www.linkedin.com/in/timgao
+
+#13 | Title role+co: Boston Consulting Group (BCG) - LinkedIn
+     | Snippet company: Boston Consulting Group (BCG) | Snippet school: London Business School
+     | URL: https://www.linkedin.com/in/konstantin-burlaev
+
+#14 | Title role+co: Boston Consulting Group (BCG) - LinkedIn
+     | Snippet company: (none) | Snippet school: (none)
+     | URL: https://www.linkedin.com/in/taylortcr
+
+#15 | Title role+co: Associate Consultant at BCG
+     | Snippet company: (none) | Snippet school: (none)
+     | URL: https://www.linkedin.com/in/cole-hume-a737041b6
+
+#16 | Title role+co: Boston Consulting Group (BCG)
+     | Snippet company: Boston Consulting Group (BCG) | Snippet school: Baylor ...
+     | URL: https://www.linkedin.com/in/ruth-ebeling-439b3b8
+
+#17 | Title role+co: Boston Consulting Group (BCG)
+     | Snippet company: Boston Consulting Group (BCG) | Snippet school: Washington University in St. Louis
+     | URL: https://www.linkedin.com/in/eric-levey
+
+#18 | Title role+co: Managing Director & Senior Partner at Boston ...
+     | Snippet company: (none) | Snippet school: (none)
+     | URL: https://www.linkedin.com/in/benjamin-rehberg
+
+#19 | Title role+co: Boston Consulting Group (BCG) - LinkedIn
+     | Snippet company: Boston Consulting Group (BCG) | Snippet school: United States Naval Academy
+     | URL: https://www.linkedin.com/in/matsonml
+
+#20 | Title role+co: Boston Consulting Group (BCG) - LinkedIn
+     | Snippet company: Boston Consulting Group (BCG) | Snippet school: Duke University - The Fuqua School of Business
+     | URL: https://www.linkedin.com/in/gursimran-kaur-1810
+
+Total: 20 profiles
+
+================================================================================
+Query: site:linkedin.com/in "Bain" associate
+================================================================================
+
+#1 | Title role+co: Associate Consultant at Bain & Company
+     | Snippet company: Bain & Company | Snippet school: Babson College
+     | URL: https://www.linkedin.com/in/seanfranciskelley
+
+#2 | Title role+co: Associate Consultant @ Bain
+     | Snippet company: Bain & Company | Snippet school: UNC Kenan-Flagler Business School
+     | URL: https://www.linkedin.com/in/andy-jin-yaoyu
+
+#3 | Title role+co: Associate Consultant at Bain & Company
+     | Snippet company: Bain & Company | Snippet school: University of Pennsylvania
+     | URL: https://www.linkedin.com/in/daniel-t-tan
+
+#4 | Title role+co: Associate Consultant at Bain & Company
+     | Snippet company: (none) | Snippet school: (none)
+     | URL: https://www.linkedin.com/in/keller-olivia
+
+#5 | Title role+co: Associate Consultant @ Bain - LinkedIn
+     | Snippet company: Bain & Company | Snippet school: Vanderbilt University
+     | URL: https://www.linkedin.com/in/sarahwnorwood
+
+#6 | Title role+co: Associate Consultant at Bain & Company
+     | Snippet company: Bain & Company | Snippet school: University of California, Los Angeles
+     | URL: https://www.linkedin.com/in/rileynoon
+
+#7 | Title role+co: Associate Consultant @ Bain
+     | Snippet company: Bain & Company | Snippet school: The Wharton School
+     | URL: https://www.linkedin.com/in/mattf45
+
+#8 | Title role+co: Associate Consultant at Bain & Company
+     | Snippet company: Bain & Company | Snippet school: University of Wisconsin-Madison
+     | URL: https://www.linkedin.com/in/elizabethmander
+
+#9 | Title role+co: Incoming Associate Consultant @ Bain & Company
+     | Snippet company: (none) | Snippet school: (none)
+     | URL: https://www.linkedin.com/in/jalenewilliams
+
+#10 | Title role+co: Associate Consultant at Bain & Company - LinkedIn
+     | Snippet company: Bain & Company | Snippet school: UCLA
+     | URL: https://www.linkedin.com/in/samantha-kao
+
+#11 | Title role+co: Associate Consultant at Bain - LinkedIn
+     | Snippet company: Bain & Company | Snippet school: University of Michigan - Stephen M. Ross School of Business
+     | URL: https://www.linkedin.com/in/kasanjeev
+
+#12 | Title role+co: Associate Consultant @ Bain
+     | Snippet company: (none) | Snippet school: (none)
+     | URL: https://www.linkedin.com/in/nps1
+
+#13 | Title role+co: Associate Consultant at Bain & Company
+     | Snippet company: Bain & Company | Snippet school: University of Virginia
+     | URL: https://www.linkedin.com/in/grey-atkinson-494b341a2
+
+#14 | Title role+co: Associate Consultant at Bain & Company - LinkedIn
+     | Snippet company: Bain & Company | Snippet school: Indiana University - Kelley School of Business
+     | URL: https://www.linkedin.com/in/nikkihite
+
+#15 | Title role+co: Associate Consultant @ Bain & Company
+     | Snippet company: (none) | Snippet school: (none)
+     | URL: https://www.linkedin.com/in/dgrayy
+
+#16 | Title role+co: Senior Associate Consultant at Bain & Company
+     | Snippet company: Bain & Company | Snippet school: Davidson College
+     | URL: https://www.linkedin.com/in/katherinepsmith23
+
+#17 | Title role+co: Senior Associate Consultant at Bain & Company
+     | Snippet company: Bain & Company | Snippet school: Harvard University
+     | URL: https://www.linkedin.com/in/katie-player-9975781a8
+
+#18 | Title role+co: Associate Consultant at Bain & Company
+     | Snippet company: (none) | Snippet school: (none)
+     | URL: https://www.linkedin.com/in/chloe-h-estrada
+
+#19 | Title role+co: Associate Consultant @ Bain & Co.
+     | Snippet company: Bain & Company | Snippet school: University of Notre Dame
+     | URL: https://www.linkedin.com/in/jack-lewis-225a18176
+
+#20 | Title role+co: Associate Consultant @ Bain & Co.
+     | Snippet company: Bain & Company | Snippet school: Princeton University
+     | URL: https://www.linkedin.com/in/auslinmills
+
+Total: 20 profiles
+
+================================================================================
+Query: site:linkedin.com/in "Meta" engineer
+================================================================================
+
+#1 | Title role+co: Software Engineer @ Meta
+     | Snippet company: (none) | Snippet school: (none)
+     | URL: https://www.linkedin.com/in/chrisgmoffitt
+
+#2 | Title role+co: Engineer @ Meta - LinkedIn
+     | Snippet company: Meta | Snippet school: University of Michigan College of Engineering ...
+     | URL: https://www.linkedin.com/in/adam-keefer-bb6932149
+
+#3 | Title role+co: Production Engineer @ Meta
+     | Snippet company: Meta | Snippet school: Rochester Institute of Technology ...
+     | URL: https://www.linkedin.com/in/nathan-wren
+
+#4 | Title role+co: Software Engineer at Meta
+     | Snippet company: (none) | Snippet school: (none)
+     | URL: https://www.linkedin.com/in/james-peralta
+
+#5 | Title role+co: Software Engineer at Meta
+     | Snippet company: (none) | Snippet school: (none)
+     | URL: https://www.linkedin.com/in/peihsun-ben-yeh
+
+#6 | Title role+co: Engineering Manager @ Meta - Reality Labs - LinkedIn
+     | Snippet company: (none) | Snippet school: (none)
+     | URL: https://www.linkedin.com/in/jake-posner
+
+#7 | Title role+co: Senior ML Engineer @ Meta ...
+     | Snippet company: Meta | Snippet school: Columbia University in the City of New York
+     | URL: https://www.linkedin.com/in/bensenberner
+
+#8 | Title role+co: Distinguished Software Engineer at Meta
+     | Snippet company: (none) | Snippet school: (none)
+     | URL: https://www.linkedin.com/in/stephen-chen-74a29723a
+
+#9 | Title role+co: Software Engineer
+     | Snippet company: Meta | Snippet school: (none)
+     | URL: https://www.linkedin.com/in/jitendrabhamare
+
+#10 | Title role+co: Engineering Leader @ Meta
+     | Snippet company: (none) | Snippet school: (none)
+     | URL: https://www.linkedin.com/in/zhiachong
+
+#11 | Title role+co: Staff Software Engineer, Meta
+     | Snippet company: Meta | Snippet school: Carnegie Mellon University
+     | URL: https://www.linkedin.com/in/akshita-jain-01195626
+
+#12 | Title role+co: Senior Software Engineer at Meta
+     | Snippet company: (none) | Snippet school: (none)
+     | URL: https://www.linkedin.com/in/jeremysbernier
+
+#13 | Title role+co: iOS Engineer at Meta
+     | Snippet company: Meta | Snippet school: App Academy
+     | URL: https://www.linkedin.com/in/gabriellewis0
+
+#14 | Title role+co: Engineering leader at Meta
+     | Snippet company: (none) | Snippet school: (none)
+     | URL: https://www.linkedin.com/in/rhljain08
+
+#15 | Title role+co: Ex. Meta Engineering Manager, semi-retired
+     | Snippet company: (none) | Snippet school: (none)
+     | URL: https://www.linkedin.com/in/dannymiller2
+
+#16 | Title role+co: Director of Engineering at Meta
+     | Snippet company: (none) | Snippet school: (none)
+     | URL: https://www.linkedin.com/in/rajeevnagar
+
+#17 | Title role+co: Software Engineer at Meta
+     | Snippet company: Meta | Snippet school: Carnegie Mellon University
+     | URL: https://www.linkedin.com/in/zhenbiaoyan
+
+#18 | Title role+co: Senior Software Engineer @ Meta
+     | Snippet company: (none) | Snippet school: (none)
+     | URL: https://www.linkedin.com/in/jim-shepherd
+
+#19 | Title role+co: Senior Software Engineer @ Meta - LinkedIn
+     | Snippet company: Meta | Snippet school: Carnegie Mellon University ...
+     | URL: https://www.linkedin.com/in/justinstarks97
+
+#20 | Title role+co: Meta
+     | Snippet company: Meta | Snippet school: Georgia Institute of Technology ...
+     | URL: https://www.linkedin.com/in/zrehmani
+
+Total: 20 profiles

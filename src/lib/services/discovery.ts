@@ -147,7 +147,6 @@ function processSerperResults(
     if (fullName && company) {
       const personKey = `${fullName}_${company}`.toLowerCase();
       if (excludePersonKeys.has(personKey)) {
-        console.log(`[Discovery] Skipping excluded person: ${fullName}`);
         continue;
       }
     }
@@ -235,23 +234,23 @@ export async function lookupByName(params: {
   if (company && company.trim()) {
     const companyPart = await buildCompanyQueryPart(company);
     const query = `site:linkedin.com/in "${cleanName}" ${companyPart}`;
-    console.log(`[Lookup] Pass 1 query: ${query}`);
+    console.log(`[Discovery:Lookup] Pass 1 query: ${query}`);
     const results = await searchSerper(query);
     const candidates = processSerperResults(results, LIMIT, seenUrls, new Set(), company);
 
     if (candidates.length > 0) {
-      console.log(`[Lookup] Pass 1 found ${candidates.length} results`);
+      console.log(`[Discovery:Lookup] Pass 1 found ${candidates.length} results`);
       return candidates;
     }
-    console.log('[Lookup] Pass 1 returned 0 results, falling back to name-only');
+    console.log('[Discovery:Lookup] Pass 1 returned 0 results, falling back to name-only');
   }
 
   // Pass 2: name only (fallback or no company provided)
   const query = `site:linkedin.com/in "${cleanName}"`;
-  console.log(`[Lookup] Pass 2 query: ${query}`);
+  console.log(`[Discovery:Lookup] Pass 2 query: ${query}`);
   const results = await searchSerper(query);
   const candidates = processSerperResults(results, LIMIT, seenUrls, new Set());
-  console.log(`[Lookup] Pass 2 found ${candidates.length} results`);
+  console.log(`[Discovery:Lookup] Pass 2 found ${candidates.length} results`);
   return candidates;
 }
 
