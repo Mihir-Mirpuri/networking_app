@@ -88,7 +88,7 @@ export function ResultsList({
               person={person}
               onExpand={() => {
                 if (!isAuthenticated) {
-                  signIn('google', { callbackUrl: '/' });
+                  signIn('google', { callbackUrl: '/app' });
                   return;
                 }
                 onExpand(index);

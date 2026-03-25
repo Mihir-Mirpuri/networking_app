@@ -87,7 +87,7 @@ export function WelcomeModal({ onClose }: WelcomeModalProps) {
   };
 
   const handleSignIn = () => {
-    signIn('google', { callbackUrl: '/' });
+    signIn('google', { callbackUrl: '/app' });
   };
 
   return (

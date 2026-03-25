@@ -1,8 +1,15 @@
 import type { Metadata } from 'next';
 import { GeistSans } from 'geist/font/sans';
+import { Outfit } from 'next/font/google';
 import './globals.css';
 import { Providers } from '@/components/Providers';
 import { FeedbackButton } from '@/components/feedback/FeedbackButton';
+
+const outfit = Outfit({
+  subsets: ['latin'],
+  variable: '--font-outfit',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://signl.to'),
@@ -20,7 +27,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={GeistSans.className}>
+      <body className={`${GeistSans.className} ${outfit.variable}`}>
         <Providers>
           {children}
           <FeedbackButton />

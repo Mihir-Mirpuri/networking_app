@@ -1,105 +1,82 @@
 'use client';
 
-import { useState } from 'react';
-import { OutreachStatus, InteractionType } from '@prisma/client';
+import { useState, useRef, useEffect } from 'react';
 import { OutreachTrackerEntry, updateOutreachTracker } from '@/app/actions/outreach';
-import { StatusDropdown } from './StatusDropdown';
 import { NotesModal } from './NotesModal';
-import { InteractionModal, getInteractionLabel } from './InteractionModal';
+import { InteractionModal } from './InteractionModal';
+import { ColumnKey } from './OutreachFilters';
+import { InteractionType } from '@prisma/client';
 
 interface OutreachRowProps {
   tracker: OutreachTrackerEntry;
   onUpdate: (tracker: OutreachTrackerEntry) => void;
   onDelete: (id: string) => void;
+  onToggleStar: (id: string) => void;
   onRowClick: (tracker: OutreachTrackerEntry) => void;
-  isEven?: boolean;
+  visibleColumns: ColumnKey[];
 }
 
-export function OutreachRow({ tracker, onUpdate, onDelete, onRowClick, isEven = false }: OutreachRowProps) {
-  const [isEditing, setIsEditing] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
+// Deterministic avatar color from name
+const AVATAR_COLORS = ['#6364FF', '#22c55e', '#a855f7', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899', '#f97316'];
+function getAvatarColor(name: string | null, email: string): string {
+  const str = name || email;
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+function getInitials(name: string | null, email: string): string {
+  if (name) {
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+    return name.slice(0, 2).toUpperCase();
+  }
+  return email.slice(0, 2).toUpperCase();
+}
+
+const COLUMN_WIDTHS: Record<ColumnKey, string> = {
+  name: 'w-[200px] min-w-[200px]',
+  company: 'w-[100px] min-w-[100px]',
+  role: 'w-[120px] min-w-[120px]',
+  location: 'w-[120px] min-w-[120px]',
+  subject: 'flex-1 min-w-[120px]',
+  date: 'w-[120px] min-w-[120px]',
+};
+
+export function OutreachRow({ tracker, onUpdate, onDelete, onToggleStar, onRowClick, visibleColumns }: OutreachRowProps) {
+  const [showMenu, setShowMenu] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [showInteractionModal, setShowInteractionModal] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
-  const formatRelativeDate = (date: Date | null) => {
+  // Close menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowMenu(false);
+      }
+    };
+    if (showMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showMenu]);
+
+  const formatDate = (date: Date | null) => {
     if (!date) return '-';
     const d = new Date(date);
-    const now = new Date();
-    const diffMs = now.getTime() - d.getTime();
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-    if (diffDays === 0) return 'Today';
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return `${diffDays}d ago`;
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
-    if (diffDays < 365) return `${Math.floor(diffDays / 30)}mo ago`;
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
-  };
-
-  const formatFullDate = (date: Date | null) => {
-    if (!date) return '';
-    return new Date(date).toLocaleDateString('en-US', {
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
-
-  const handleStartEdit = (field: string, value: string | null) => {
-    setIsEditing(field);
-    setEditValue(value || '');
-  };
-
-  const handleSaveEdit = async (field: string) => {
-    if (isSaving) return;
-    setIsSaving(true);
-
-    try {
-      const result = await updateOutreachTracker({
-        id: tracker.id,
-        [field]: editValue.trim() || null,
-      });
-
-      if (result.success) {
-        onUpdate(result.tracker);
-      }
-    } catch (error) {
-      console.error('Error updating tracker:', error);
-    } finally {
-      setIsSaving(false);
-      setIsEditing(null);
-    }
-  };
-
-  const handleStatusChange = async (status: OutreachStatus) => {
-    setIsSaving(true);
-    try {
-      const result = await updateOutreachTracker({
-        id: tracker.id,
-        status,
-      });
-      if (result.success) {
-        onUpdate(result.tracker);
-      }
-    } catch (error) {
-      console.error('Error updating status:', error);
-    } finally {
-      setIsSaving(false);
-    }
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
   };
 
   const handleNotesSave = async (notes: string | null) => {
-    const result = await updateOutreachTracker({
-      id: tracker.id,
-      notes,
-    });
-    if (result.success) {
-      onUpdate(result.tracker);
-    } else {
-      throw new Error(result.error);
-    }
+    const result = await updateOutreachTracker({ id: tracker.id, notes });
+    if (result.success) onUpdate(result.tracker);
+    else throw new Error(result.error);
   };
 
   const handleInteractionSave = async (
@@ -107,208 +84,146 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onRowClick, isEven = 
     interactionType: InteractionType,
     interactionDate: Date | null
   ) => {
-    const result = await updateOutreachTracker({
-      id: tracker.id,
-      spokeToThem,
-      interactionType,
-      interactionDate,
-    });
-    if (result.success) {
-      onUpdate(result.tracker);
-    } else {
-      throw new Error(result.error);
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent, field: string) => {
-    if (e.key === 'Enter') {
-      handleSaveEdit(field);
-    } else if (e.key === 'Escape') {
-      setIsEditing(null);
-    }
-  };
-
-  const renderEditableCell = (field: string, value: string | null) => {
-    if (isEditing === field) {
-      return (
-        <input
-          type="text"
-          value={editValue}
-          onChange={(e) => setEditValue(e.target.value)}
-          onBlur={() => handleSaveEdit(field)}
-          onKeyDown={(e) => handleKeyDown(e, field)}
-          autoFocus
-          className="w-full px-2 py-1 text-sm border border-[#505050] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#606060]/30 bg-[#2a2a2a] text-[#E0E0E0]"
-        />
-      );
-    }
-
-    return (
-      <button
-        onClick={() => handleStartEdit(field, value)}
-        className="w-full text-left truncate hover:text-[#c0c0c0] cursor-pointer transition-colors flex items-center gap-1 group/edit"
-        title={value || 'Click to edit'}
-      >
-        <span className="truncate">{value || <span className="text-[#505050]">--</span>}</span>
-        <svg className="w-3 h-3 text-[#505050] opacity-0 group-hover/edit:opacity-100 shrink-0 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-        </svg>
-      </button>
-    );
-  };
-
-  const cellClass = "px-5 py-4 text-sm";
-  const rowBg = isEven ? 'bg-[#242424]' : 'bg-[#1e1e1e]';
-
-  const renderNameCell = () => {
-    const nameContent = (
-      <div className="flex items-center gap-1">
-        <span className="truncate">{tracker.contactName || tracker.contactEmail}</span>
-        {tracker.messageCount >= 2 && (
-          <span className="text-xs text-gray-500">({tracker.messageCount})</span>
-        )}
-      </div>
-    );
-
-    if (tracker.linkedinUrl) {
-      return (
-        <a
-          href={tracker.linkedinUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-white hover:text-[#6b9fff] transition-colors"
-          title="View LinkedIn"
-        >
-          {nameContent}
-        </a>
-      );
-    }
-
-    return (
-      <button
-        onClick={() => handleStartEdit('contactName', tracker.contactName)}
-        className="text-left text-white hover:text-[#c0c0c0] transition-colors"
-      >
-        {nameContent}
-      </button>
-    );
+    const result = await updateOutreachTracker({ id: tracker.id, spokeToThem, interactionType, interactionDate });
+    if (result.success) onUpdate(result.tracker);
+    else throw new Error(result.error);
   };
 
   const handleRowClick = (e: React.MouseEvent) => {
-    // Don't trigger row click if clicking on interactive elements
     const target = e.target as HTMLElement;
-    if (target.closest('button') || target.closest('a') || target.closest('input') || target.closest('select')) {
-      return;
-    }
+    if (target.closest('button') || target.closest('a') || target.closest('input') || target.closest('select')) return;
     onRowClick(tracker);
+  };
+
+  const avatarColor = getAvatarColor(tracker.contactName, tracker.contactEmail);
+  const initials = getInitials(tracker.contactName, tracker.contactEmail);
+
+  const renderCell = (col: ColumnKey) => {
+    switch (col) {
+      case 'name':
+        return (
+          <div className={`${COLUMN_WIDTHS.name} px-2 flex items-center gap-2.5`}>
+            {/* Avatar */}
+            <div
+              className="w-[30px] h-[30px] rounded-full flex items-center justify-center shrink-0"
+              style={{ backgroundColor: avatarColor }}
+            >
+              <span className="text-[11px] font-semibold text-white font-['Inter']">{initials}</span>
+            </div>
+            {/* Name + Email */}
+            <div className="flex flex-col gap-0.5 min-w-0">
+              <span className="text-[13px] font-medium text-[#E0E0E0] font-['Inter'] truncate">
+                {tracker.contactName || tracker.contactEmail}
+              </span>
+              <span className="text-[11px] text-[#707070] font-['Inter'] truncate">
+                {tracker.contactEmail}
+              </span>
+            </div>
+          </div>
+        );
+      case 'company':
+        return (
+          <div className={`${COLUMN_WIDTHS.company} px-2`}>
+            <span className="text-[13px] text-[#909090] font-['Inter'] truncate block">
+              {tracker.company || <span className="text-[#505050]">--</span>}
+            </span>
+          </div>
+        );
+      case 'role':
+        return (
+          <div className={`${COLUMN_WIDTHS.role} px-2`}>
+            <span className="text-[13px] text-[#909090] font-['Inter'] truncate block">
+              {tracker.role || <span className="text-[#505050]">--</span>}
+            </span>
+          </div>
+        );
+      case 'location':
+        return (
+          <div className={`${COLUMN_WIDTHS.location} px-2`}>
+            <span className="text-[13px] text-[#909090] font-['Inter'] truncate block">
+              {tracker.location || <span className="text-[#505050]">--</span>}
+            </span>
+          </div>
+        );
+      case 'subject':
+        return (
+          <div className={`${COLUMN_WIDTHS.subject} px-2`}>
+            <span className="text-[13px] text-[#707070] font-['Inter'] truncate block">
+              {tracker.emailSubject || <span className="text-[#505050]">--</span>}
+            </span>
+          </div>
+        );
+      case 'date':
+        return (
+          <div className={`${COLUMN_WIDTHS.date} px-2`}>
+            <span className="text-[13px] text-[#707070] font-['Inter'] truncate block whitespace-nowrap">
+              {formatDate(tracker.dateEmailed)}
+            </span>
+          </div>
+        );
+    }
   };
 
   return (
     <>
-      <tr
-        className={`group ${rowBg} hover:bg-[#2f2f2f] cursor-pointer transition-all duration-150 border-b border-[#2a2a2a] last:border-b-0`}
+      <div
+        className="flex items-center px-4 py-2.5 bg-[#1a1a1a] border-b border-[#2a2a2a] hover:bg-[#252525] cursor-pointer transition-colors group"
         onClick={handleRowClick}
       >
-        {/* Name */}
-        <td className={cellClass}>
-          <div className="truncate font-semibold text-white">
-            {renderNameCell()}
+        {visibleColumns.map((col) => (
+          <div key={col} className="contents">
+            {renderCell(col)}
           </div>
-          <div className="text-xs text-[#707070] truncate mt-1">{tracker.contactEmail}</div>
-        </td>
+        ))}
 
-        {/* Company */}
-        <td className={cellClass}>
-          <div className="truncate text-[#b0b0b0]">
-            {renderEditableCell('company', tracker.company)}
-          </div>
-        </td>
-
-        {/* Role */}
-        <td className={cellClass}>
-          <div className="truncate text-[#909090]">
-            {renderEditableCell('role', tracker.role)}
-          </div>
-        </td>
-
-        {/* Location */}
-        <td className={cellClass}>
-          <div className="truncate text-[#909090]">
-            {renderEditableCell('location', tracker.location)}
-          </div>
-        </td>
-
-        {/* Date Emailed */}
-        <td
-          className={`${cellClass} text-[#707070] whitespace-nowrap`}
-          title={formatFullDate(tracker.dateEmailed)}
-        >
-          {formatRelativeDate(tracker.dateEmailed)}
-        </td>
-
-        {/* Spoke To */}
-        <td className={cellClass} onClick={(e) => e.stopPropagation()}>
+        {/* Three-dots menu */}
+        <div className="w-10 min-w-[40px] flex justify-center relative" ref={menuRef}>
           <button
-            onClick={() => setShowInteractionModal(true)}
-            className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-              tracker.spokeToThem
-                ? 'bg-[#404040] text-[#c0c0c0]'
-                : 'text-[#505050] hover:text-[#707070] hover:bg-[#333333]'
-            }`}
-            title={tracker.spokeToThem ? getInteractionLabel(tracker.interactionType) : 'Log interaction'}
+            onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
+            className="p-1 text-[#707070] hover:text-[#E0E0E0] opacity-0 group-hover:opacity-100 transition-all rounded"
           >
-            {tracker.spokeToThem ? getInteractionLabel(tracker.interactionType) : (
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
-              </svg>
-            )}
-          </button>
-        </td>
-
-        {/* Notes */}
-        <td className={cellClass} onClick={(e) => e.stopPropagation()}>
-          <button
-            onClick={() => setShowNotesModal(true)}
-            className="w-full text-left text-[#A0A0A0] hover:text-[#c0c0c0] truncate transition-colors flex items-center gap-1 group/notes"
-            title={tracker.notes || 'Add notes'}
-          >
-            {tracker.notes ? (
-              <span className="truncate">{tracker.notes}</span>
-            ) : (
-              <svg className="w-4 h-4 text-[#505050] group-hover/notes:text-[#808080] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
-              </svg>
-            )}
-          </button>
-        </td>
-
-        {/* Status */}
-        <td className={cellClass} onClick={(e) => e.stopPropagation()}>
-          <StatusDropdown
-            value={tracker.status}
-            onChange={handleStatusChange}
-            disabled={isSaving}
-          />
-        </td>
-
-        {/* Actions */}
-        <td className={cellClass} onClick={(e) => e.stopPropagation()}>
-          <button
-            onClick={() => setShowDeleteConfirm(true)}
-            className="p-1.5 text-[#505050] hover:text-red-400 hover:bg-red-900/20 rounded-lg transition-colors"
-            title="Delete"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-              />
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+              <circle cx="12" cy="5" r="1.5" />
+              <circle cx="12" cy="12" r="1.5" />
+              <circle cx="12" cy="19" r="1.5" />
             </svg>
           </button>
-        </td>
-      </tr>
+
+          {/* Dropdown */}
+          {showMenu && (
+            <div className="absolute right-0 top-full mt-1 w-40 bg-[#2a2a2a] border border-[#3a3a3a] rounded-lg shadow-lg shadow-black/40 z-50 py-1">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleStar(tracker.id);
+                  setShowMenu(false);
+                }}
+                className="flex items-center gap-2.5 w-full px-3.5 py-2.5 hover:bg-[#353535] transition-colors"
+              >
+                <svg className={`w-3.5 h-3.5 ${tracker.starred ? 'text-[#f59e0b]' : 'text-[#E0E0E0]'}`} fill={tracker.starred ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                </svg>
+                <span className="text-[13px] text-[#E0E0E0] font-['Inter']">
+                  {tracker.starred ? 'Unstar' : 'Star'}
+                </span>
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowMenu(false);
+                  setShowDeleteConfirm(true);
+                }}
+                className="flex items-center gap-2.5 w-full px-3.5 py-2.5 hover:bg-[#353535] transition-colors"
+              >
+                <svg className="w-3.5 h-3.5 text-[#ef4444]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                <span className="text-[13px] text-[#ef4444] font-['Inter']">Delete</span>
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Modals */}
       <NotesModal
@@ -332,7 +247,7 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onRowClick, isEven = 
       {/* Delete Confirmation */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
-          <div className="bg-[#2a2a2a] rounded-2xl shadow-soft-xl max-w-sm w-full p-6 animate-scale-in">
+          <div className="bg-[#2a2a2a] rounded-2xl shadow-lg shadow-black/40 max-w-sm w-full p-6 animate-scale-in">
             <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-red-900/30 flex items-center justify-center">
               <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -347,7 +262,7 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onRowClick, isEven = 
             <div className="flex gap-3 justify-center">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
-                className="btn-secondary"
+                className="px-4 py-2.5 text-sm font-medium bg-[#333333] text-[#c0c0c0] rounded-lg hover:bg-[#3a3a3a] transition-all"
               >
                 Cancel
               </button>

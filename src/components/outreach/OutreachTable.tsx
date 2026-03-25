@@ -2,6 +2,9 @@
 
 import { OutreachTrackerEntry, SortField, SortDirection } from '@/app/actions/outreach';
 import { OutreachRow } from './OutreachRow';
+import { ColumnKey } from './OutreachFilters';
+import { LoadingSpinner } from '@/components/search/LoadingSpinner';
+import Link from 'next/link';
 
 interface OutreachTableProps {
   trackers: OutreachTrackerEntry[];
@@ -10,27 +13,49 @@ interface OutreachTableProps {
   onSort: (field: SortField) => void;
   onUpdate: (tracker: OutreachTrackerEntry) => void;
   onDelete: (id: string) => void;
+  onToggleStar: (id: string) => void;
   onRowClick: (tracker: OutreachTrackerEntry) => void;
+  visibleColumns: ColumnKey[];
+  hasMore: boolean;
+  isLoadingMore: boolean;
+  onLoadMore: () => void;
 }
 
 interface ColumnConfig {
-  key: SortField | null;
+  key: ColumnKey;
+  sortKey: SortField | null;
   label: string;
-  sortable: boolean;
-  className?: string;
+  width: string; // Tailwind class
 }
 
 const COLUMNS: ColumnConfig[] = [
-  { key: 'contactName', label: 'Name', sortable: true, className: 'w-[18%]' },
-  { key: 'company', label: 'Company', sortable: true, className: 'w-[14%]' },
-  { key: 'role', label: 'Role', sortable: true, className: 'w-[14%]' },
-  { key: 'location', label: 'Location', sortable: true, className: 'w-[12%]' },
-  { key: 'dateEmailed', label: 'Emailed', sortable: true, className: 'w-[9%]' },
-  { key: null, label: 'Spoke To', sortable: false, className: 'w-[8%]' },
-  { key: null, label: 'Notes', sortable: false, className: 'w-[11%]' },
-  { key: 'status', label: 'Status', sortable: true, className: 'w-[10%]' },
-  { key: null, label: '', sortable: false, className: 'w-[4%]' },
+  { key: 'name', sortKey: 'contactName', label: 'Name', width: 'w-[200px] min-w-[200px]' },
+  { key: 'company', sortKey: 'company', label: 'Company', width: 'w-[100px] min-w-[100px]' },
+  { key: 'role', sortKey: 'role', label: 'Role', width: 'w-[120px] min-w-[120px]' },
+  { key: 'location', sortKey: 'location', label: 'Location', width: 'w-[120px] min-w-[120px]' },
+  { key: 'subject', sortKey: null, label: 'Subject', width: 'flex-1 min-w-[120px]' },
+  { key: 'date', sortKey: 'dateEmailed', label: 'Date', width: 'w-[120px] min-w-[120px]' },
 ];
+
+const SortIcon = ({ field, sortField, sortDirection }: { field: SortField | null; sortField: SortField; sortDirection: SortDirection }) => {
+  if (!field) return null;
+  if (sortField !== field) {
+    return (
+      <svg className="w-3 h-3 text-[#606060]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+      </svg>
+    );
+  }
+  return sortDirection === 'asc' ? (
+    <svg className="w-3 h-3 text-[#909090]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+    </svg>
+  ) : (
+    <svg className="w-3 h-3 text-[#909090]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+    </svg>
+  );
+};
 
 export function OutreachTable({
   trackers,
@@ -39,87 +64,108 @@ export function OutreachTable({
   onSort,
   onUpdate,
   onDelete,
+  onToggleStar,
   onRowClick,
+  visibleColumns,
+  hasMore,
+  isLoadingMore,
+  onLoadMore,
 }: OutreachTableProps) {
-  const renderSortIcon = (field: SortField | null) => {
-    if (!field) return null;
-    if (sortField !== field) {
-      return (
-        <svg className="w-4 h-4 text-[#606060]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-        </svg>
-      );
-    }
-    return sortDirection === 'asc' ? (
-      <svg className="w-4 h-4 text-[#808080]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-      </svg>
-    ) : (
-      <svg className="w-4 h-4 text-[#808080]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-      </svg>
-    );
-  };
+  const activeColumns = COLUMNS.filter((col) => visibleColumns.includes(col.key));
 
   if (trackers.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-[#707070]">
-        <div className="w-20 h-20 mb-5 rounded-2xl bg-[#2a2a2a] flex items-center justify-center border border-[#353535]">
-          <svg className="w-10 h-10 text-[#505050]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-            />
+      <div className="flex-1 bg-[#1a1a1a] border border-[#3a3a3a] rounded-lg flex flex-col items-center justify-center py-20 gap-5">
+        {/* Icon circle */}
+        <div className="w-20 h-20 rounded-full bg-[#6364FF]/10 flex items-center justify-center">
+          <svg className="w-9 h-9 text-[#6364FF]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
           </svg>
         </div>
-        <p className="text-xl font-semibold text-[#c0c0c0]">No outreach contacts yet</p>
-        <p className="text-sm mt-2 text-[#606060]">
-          Send an email through the app to automatically track your outreach
-        </p>
+
+        {/* Text block */}
+        <div className="flex flex-col items-center gap-2 max-w-[400px]">
+          <h3 className="text-xl font-semibold text-[#E0E0E0] font-['Inter'] text-center">
+            No emails sent yet
+          </h3>
+          <p className="text-sm text-[#707070] font-['Inter'] text-center max-w-[380px]">
+            Once you send your first outreach email, it will appear here. Start by searching for people to connect with.
+          </p>
+        </div>
+
+        {/* CTA button */}
+        <Link
+          href="/"
+          className="flex items-center gap-2 bg-[#6364FF] rounded-lg px-6 py-3 hover:bg-[#5354EE] transition-colors"
+        >
+          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <span className="text-sm font-medium text-white font-['Inter']">Find People</span>
+        </Link>
       </div>
     );
   }
 
   return (
-    <div className="border border-[#353535] rounded-2xl overflow-hidden shadow-lg shadow-black/20 overflow-x-auto bg-[#1e1e1e]">
-      <table className="w-full border-collapse md:table-fixed">
-        <thead className="sticky top-0 z-10">
-          <tr className="bg-[#282828] border-b border-[#3a3a3a]">
-            {COLUMNS.map((column, index) => (
-              <th
-                key={index}
-                className={`px-5 py-4 text-left text-[11px] font-semibold text-[#888888] uppercase tracking-wider ${column.className || ''}`}
+    <div className="flex-1 flex flex-col min-h-0 bg-[#1a1a1a] border border-[#3a3a3a] rounded-lg overflow-hidden">
+      {/* Header Row - Fixed */}
+      <div className="flex-shrink-0 flex items-center px-4 py-2.5 bg-[#2a2a2a] border-b border-[#3a3a3a]">
+        {activeColumns.map((col) => (
+          <div key={col.key} className={`${col.width} px-2`}>
+            {col.sortKey ? (
+              <button
+                onClick={() => onSort(col.sortKey!)}
+                className="flex items-center gap-1 hover:text-[#c0c0c0] transition-colors"
               >
-                {column.sortable && column.key ? (
-                  <button
-                    onClick={() => onSort(column.key!)}
-                    className="flex items-center gap-1.5 hover:text-[#c0c0c0] transition-colors"
-                  >
-                    {column.label}
-                    {renderSortIcon(column.key)}
-                  </button>
-                ) : (
-                  column.label
-                )}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {trackers.map((tracker, index) => (
-            <OutreachRow
-              key={tracker.id}
-              tracker={tracker}
-              onUpdate={onUpdate}
-              onDelete={onDelete}
-              onRowClick={onRowClick}
-              isEven={index % 2 === 0}
-            />
-          ))}
-        </tbody>
-      </table>
+                <span className="text-[13px] font-semibold text-[#909090] font-['Inter']">{col.label}</span>
+                <SortIcon field={col.sortKey} sortField={sortField} sortDirection={sortDirection} />
+              </button>
+            ) : (
+              <div className="flex items-center gap-1">
+                <span className="text-[13px] font-semibold text-[#909090] font-['Inter']">{col.label}</span>
+              </div>
+            )}
+          </div>
+        ))}
+        {/* Actions column header (empty) */}
+        <div className="w-10 min-w-[40px]" />
+      </div>
+
+      {/* Data Rows - Scrollable */}
+      <div className="flex-1 overflow-y-auto">
+        {trackers.map((tracker) => (
+          <OutreachRow
+            key={tracker.id}
+            tracker={tracker}
+            onUpdate={onUpdate}
+            onDelete={onDelete}
+            onToggleStar={onToggleStar}
+            onRowClick={onRowClick}
+            visibleColumns={visibleColumns}
+          />
+        ))}
+
+        {/* Load More Button */}
+        {hasMore && (
+          <div className="flex justify-center py-4">
+            <button
+              onClick={onLoadMore}
+              disabled={isLoadingMore}
+              className="px-5 py-2.5 text-sm font-medium bg-[#252525] border border-[#3a3a3a] text-[#E0E0E0] rounded-lg hover:bg-[#303030] transition-all disabled:opacity-50"
+            >
+              {isLoadingMore ? (
+                <span className="flex items-center gap-2">
+                  <LoadingSpinner size="sm" />
+                  Loading...
+                </span>
+              ) : (
+                'Load More'
+              )}
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

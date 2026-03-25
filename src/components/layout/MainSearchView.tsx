@@ -225,16 +225,7 @@ import { LoginPromptModal } from '@/components/auth/LoginPromptModal';
 const GUEST_QUERY_LIMIT = 5;
 const GUEST_QUERY_KEY = 'signl_guest_queries';
 
-interface MainSearchViewProps {
-  initialRemainingDaily: number;
-  pendingQuery: string | null;
-  pendingFilters: ParsedFilters | null;
-  onQueryProcessed: () => void;
-  aiMode?: boolean;
-  isAuthenticated?: boolean;
-}
-
-interface DisplayMessage {
+export interface DisplayMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
@@ -243,6 +234,24 @@ interface DisplayMessage {
   selectables?: Selectable[];
   allSelectables?: Selectable[];
   selectablesPage?: number;
+}
+
+interface MainSearchViewProps {
+  initialRemainingDaily: number;
+  pendingQuery: string | null;
+  pendingFilters: ParsedFilters | null;
+  onQueryProcessed: () => void;
+  aiMode?: boolean;
+  isAuthenticated?: boolean;
+  // Lifted state from AppShell
+  messages: DisplayMessage[];
+  setMessages: React.Dispatch<React.SetStateAction<DisplayMessage[]>>;
+  currentFilters: ParsedFilters;
+  setCurrentFilters: React.Dispatch<React.SetStateAction<ParsedFilters>>;
+  isExtracting: boolean;
+  setIsExtracting: React.Dispatch<React.SetStateAction<boolean>>;
+  isSearching: boolean;
+  setIsSearching: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 const STORAGE_KEY = 'signl_mainSearchState';
@@ -264,17 +273,27 @@ interface MainSearchState {
   savedAt: number;
 }
 
-export function MainSearchView({ initialRemainingDaily, pendingQuery, pendingFilters, onQueryProcessed, aiMode, isAuthenticated = true }: MainSearchViewProps) {
+export function MainSearchView({
+  initialRemainingDaily,
+  pendingQuery,
+  pendingFilters,
+  onQueryProcessed,
+  aiMode,
+  isAuthenticated = true,
+  messages,
+  setMessages,
+  currentFilters,
+  setCurrentFilters,
+  isExtracting,
+  setIsExtracting,
+  isSearching,
+  setIsSearching,
+}: MainSearchViewProps) {
   const hook = useSearchResults({ initialRemainingDaily });
 
-  const [messages, setMessages] = useState<DisplayMessage[]>([]);
-  const [isExtracting, setIsExtracting] = useState(false);
-  const [isSearching, setIsSearching] = useState(false);
-  const [currentFilters, setCurrentFilters] = useState<ParsedFilters>({});
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const [loginPromptReason, setLoginPromptReason] = useState<'query_limit' | 'send_email'>('query_limit');
 
-  const chatEndRef = useRef<HTMLDivElement>(null);
   const lastProcessedQueryRef = useRef<string | null>(null);
   const lastProcessedFiltersRef = useRef<string | null>(null);
 
@@ -310,11 +329,6 @@ export function MainSearchView({ initialRemainingDaily, pendingQuery, pendingFil
     }
     return false;
   }, [isAuthenticated, getGuestQueryCount]);
-
-  // Auto-scroll to bottom on new messages
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
 
   // Restore state from sessionStorage on mount
   useEffect(() => {
@@ -508,41 +522,6 @@ export function MainSearchView({ initialRemainingDaily, pendingQuery, pendingFil
     await runSearch(filters);
   }, [isExtracting, isSearching, messages, currentFilters, runSearch]);
 
-  const handleSelectableClick = useCallback(async (selectable: Selectable) => {
-    // Add a user message showing what they picked
-    const userMsgId = `user-${Date.now()}`;
-    setMessages(prev => [
-      ...prev,
-      { id: userMsgId, role: 'user', content: selectable.label },
-    ]);
-
-    // Merge selection into current filters
-    const updated = { ...currentFilters, [selectable.filterKey]: selectable.filterValue };
-    setCurrentFilters(updated);
-
-    // If company is set, run search directly
-    if (updated.company) {
-      const confirmMsgId = `assistant-${Date.now()}`;
-      setMessages(prev => [
-        ...prev,
-        { id: confirmMsgId, role: 'assistant', content: `Searching for ${updated.role ? `${updated.role}s` : 'people'} at ${updated.company}${updated.location ? ` in ${updated.location}` : ''}${updated.university ? ` from ${updated.university}` : ''}!` },
-      ]);
-      await runSearch(updated);
-    } else {
-      // Still missing company — send back to LLM
-      await handleSendMessage(selectable.label);
-    }
-  }, [currentFilters, runSearch, handleSendMessage]);
-
-  const handleShowMoreSelectables = useCallback((messageId: string) => {
-    setMessages(prev => prev.map(m => {
-      if (m.id !== messageId || !m.allSelectables) return m;
-      const nextPage = (m.selectablesPage || 0) + 1;
-      const nextBatch = m.allSelectables.slice(nextPage * 5, nextPage * 5 + 5);
-      if (nextBatch.length === 0) return m;
-      return { ...m, selectables: nextBatch, selectablesPage: nextPage };
-    }));
-  }, []);
 
   // Process pending query from sidebar
   useEffect(() => {
@@ -623,63 +602,7 @@ export function MainSearchView({ initialRemainingDaily, pendingQuery, pendingFil
           <IdleAnimation />
         )}
 
-        {/* Chat messages — AI mode only */}
-        {aiMode && showChat && messages.length > 0 && (
-          <div className="mb-4 max-h-48 overflow-y-auto rounded-xl bg-[#141425] p-4">
-            <div className="space-y-3">
-              {messages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div
-                    className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm ${
-                      msg.role === 'user'
-                        ? 'bg-primary-600 text-white rounded-br-md'
-                        : 'bg-[#252540] text-[#a0a0b0] rounded-bl-md'
-                    }`}
-                  >
-                    {msg.isLoading ? (
-                      <div className="flex items-center gap-1.5 py-1">
-                        <div className="w-1.5 h-1.5 rounded-full bg-[#606080] animate-bounce" style={{ animationDelay: '0ms' }} />
-                        <div className="w-1.5 h-1.5 rounded-full bg-[#606080] animate-bounce" style={{ animationDelay: '150ms' }} />
-                        <div className="w-1.5 h-1.5 rounded-full bg-[#606080] animate-bounce" style={{ animationDelay: '300ms' }} />
-                      </div>
-                    ) : (
-                      <>
-                        {msg.content}
-                        {msg.selectables && msg.selectables.length > 0 && (
-                          <div className="flex flex-wrap gap-2 mt-3">
-                            {msg.selectables.map((s) => (
-                              <button
-                                key={s.filterValue}
-                                onClick={() => handleSelectableClick(s)}
-                                disabled={isExtracting || isSearching}
-                                className="px-3 py-1.5 text-xs font-medium text-primary-300 bg-primary-900/30 border border-primary-700/50 rounded-full hover:bg-primary-800/40 hover:border-primary-600/60 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                {s.label}
-                              </button>
-                            ))}
-                            {msg.allSelectables && msg.allSelectables.length > ((msg.selectablesPage || 0) + 1) * 5 && (
-                              <button
-                                onClick={() => handleShowMoreSelectables(msg.id)}
-                                disabled={isExtracting || isSearching}
-                                className="px-3 py-1.5 text-xs font-medium text-[#808090] bg-[#1a1a2e] border border-[#404060] rounded-full hover:bg-[#252540] hover:text-[#a0a0b0] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                Show more...
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
-              ))}
-              <div ref={chatEndRef} />
-            </div>
-          </div>
-        )}
+        {/* Chat messages moved to SearchSidebar */}
 
         {/* Loading state for search */}
         {isSearching && <SearchLoadingState />}

@@ -15,12 +15,12 @@ export function NewHeader({ onToggleSidebar, showSidebarToggle, isAuthenticated 
   const pathname = usePathname();
 
   const tabs = [
-    { name: 'Outreach', href: '/' },
+    { name: 'Outreach', href: '/app' },
     { name: 'History', href: '/history' },
   ];
 
   const handleSignIn = () => {
-    signIn('google', { callbackUrl: '/' });
+    signIn('google', { callbackUrl: '/app' });
   };
 
   return (

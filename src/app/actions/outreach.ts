@@ -21,6 +21,8 @@ export interface OutreachTrackerEntry {
   interactionDate: Date | null;
   status: OutreachStatus;
   notes: string | null;
+  starred: boolean;
+  emailSubject: string | null;
   reminderDate: Date | null;
   reminderNote: string | null;
   reminderSent: boolean;
@@ -52,6 +54,7 @@ export type SortDirection = 'asc' | 'desc';
 export interface GetOutreachTrackersParams {
   search?: string;
   status?: OutreachStatus[];
+  starred?: boolean;
   sortField?: SortField;
   sortDirection?: SortDirection;
   cursor?: string;
@@ -74,6 +77,7 @@ export async function getOutreachTrackers(
   const {
     search,
     status,
+    starred,
     sortField = 'createdAt',
     sortDirection = 'desc',
     cursor,
@@ -93,6 +97,7 @@ export async function getOutreachTrackers(
         { company: { contains: search, mode: 'insensitive' } },
         { role: { contains: search, mode: 'insensitive' } },
         { location: { contains: search, mode: 'insensitive' } },
+        { emailSubject: { contains: search, mode: 'insensitive' } },
         { notes: { contains: search, mode: 'insensitive' } },
       ];
     }
@@ -100,6 +105,11 @@ export async function getOutreachTrackers(
     // Add status filter
     if (status && status.length > 0) {
       where.status = { in: status };
+    }
+
+    // Add starred filter
+    if (starred !== undefined) {
+      where.starred = starred;
     }
 
     // Build orderBy
@@ -162,6 +172,8 @@ export async function getOutreachTrackers(
         interactionDate: t.interactionDate,
         status: t.status,
         notes: t.notes,
+        starred: t.starred,
+        emailSubject: t.emailSubject,
         reminderDate: t.reminderDate,
         reminderNote: t.reminderNote,
         reminderSent: t.reminderSent,
@@ -240,6 +252,8 @@ export async function getInitialOutreachTrackers(userId: string): Promise<{
         interactionDate: t.interactionDate,
         status: t.status,
         notes: t.notes,
+        starred: t.starred,
+        emailSubject: t.emailSubject,
         reminderDate: t.reminderDate,
         reminderNote: t.reminderNote,
         reminderSent: t.reminderSent,
@@ -273,6 +287,7 @@ export interface UpdateOutreachTrackerInput {
   interactionDate?: Date | null;
   status?: OutreachStatus;
   notes?: string | null;
+  starred?: boolean;
   reminderDate?: Date | null;
   reminderNote?: string | null;
 }
@@ -337,6 +352,8 @@ export async function updateOutreachTracker(
         interactionDate: updated.interactionDate,
         status: updated.status,
         notes: updated.notes,
+        starred: updated.starred,
+        emailSubject: updated.emailSubject,
         reminderDate: updated.reminderDate,
         reminderNote: updated.reminderNote,
         reminderSent: updated.reminderSent,
@@ -384,6 +401,38 @@ export async function deleteOutreachTracker(
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to delete outreach tracker',
+    };
+  }
+}
+
+export async function toggleStarOutreachTracker(
+  id: string
+): Promise<{ success: true; starred: boolean } | { success: false; error: string }> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return { success: false, error: 'Not authenticated' };
+  }
+
+  try {
+    const existing = await prisma.outreachTracker.findFirst({
+      where: { id, userId: session.user.id },
+    });
+
+    if (!existing) {
+      return { success: false, error: 'Outreach tracker not found' };
+    }
+
+    const updated = await prisma.outreachTracker.update({
+      where: { id },
+      data: { starred: !existing.starred },
+    });
+
+    return { success: true, starred: updated.starred };
+  } catch (error) {
+    console.error('[Outreach] Error toggling star:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to toggle star',
     };
   }
 }
@@ -481,6 +530,7 @@ export async function upsertOutreachTrackerOnSend(params: {
   userCandidateId?: string | null;
   gmailThreadId?: string | null;
   sendLogId: string;
+  emailSubject?: string | null;
 }): Promise<{ success: true; trackerId: string } | { success: false; error: string }> {
   const {
     userId,
@@ -493,6 +543,7 @@ export async function upsertOutreachTrackerOnSend(params: {
     userCandidateId,
     gmailThreadId,
     sendLogId,
+    emailSubject,
   } = params;
 
   try {
@@ -519,6 +570,8 @@ export async function upsertOutreachTrackerOnSend(params: {
           gmailThreadId: gmailThreadId || existing.gmailThreadId,
           // Update status if it was NOT_STARTED
           status: existing.status === 'NOT_STARTED' ? 'SENT' : existing.status,
+          // Set emailSubject if not already set (use first email's subject)
+          emailSubject: existing.emailSubject || emailSubject,
         },
       });
 
@@ -542,6 +595,7 @@ export async function upsertOutreachTrackerOnSend(params: {
           gmailThreadId,
           dateEmailed: new Date(),
           status: 'SENT',
+          emailSubject,
         },
       });
 
@@ -675,6 +729,8 @@ export async function createOutreachTracker(params: {
         interactionDate: tracker.interactionDate,
         status: tracker.status,
         notes: tracker.notes,
+        starred: tracker.starred,
+        emailSubject: tracker.emailSubject,
         reminderDate: tracker.reminderDate,
         reminderNote: tracker.reminderNote,
         reminderSent: tracker.reminderSent,

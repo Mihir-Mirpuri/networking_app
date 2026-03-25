@@ -1,11 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { COMPANIES, ROLES, ROLES_BY_COMPANY, LOCATIONS } from '@/lib/constants';
 import { SearchableCombobox } from '@/components/search/SearchableCombobox';
 import { useEmailChat } from '@/contexts/EmailChatContext';
 import { EmailChatPanel } from '@/components/sidebar/EmailChatPanel';
+import { DisplayMessage } from './MainSearchView';
+import { Selectable } from '@/app/actions/ai-search';
 
 // Mascot SVG component
 function MascotSVG({ className }: { className?: string }) {
@@ -53,11 +55,37 @@ interface SearchSidebarProps {
   isSearching?: boolean;
   aiMode: boolean;
   onAiModeChange: (aiMode: boolean) => void;
+  // Chat props
+  messages: DisplayMessage[];
+  isExtracting: boolean;
+  onSelectableClick: (selectable: Selectable) => void;
+  onShowMoreSelectables: (messageId: string) => void;
+  onClearChat: () => void;
 }
 
-export function SearchSidebar({ onSearchSubmit, onFilterSubmit, isOpen, onClose, onToggleSidebar, isSearching, aiMode, onAiModeChange }: SearchSidebarProps) {
+export function SearchSidebar({
+  onSearchSubmit,
+  onFilterSubmit,
+  isOpen,
+  onClose,
+  onToggleSidebar,
+  isSearching,
+  aiMode,
+  onAiModeChange,
+  messages,
+  isExtracting,
+  onSelectableClick,
+  onShowMoreSelectables,
+  onClearChat,
+}: SearchSidebarProps) {
   const [inputValue, setInputValue] = useState('');
   const { isEmailReviewOpen } = useEmailChat();
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom on new messages
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   // Filter state
   const [company, setCompany] = useState('');
@@ -165,10 +193,81 @@ export function SearchSidebar({ onSearchSubmit, onFilterSubmit, isOpen, onClose,
           </div>
         ) : (
           <>
-            <div className="flex-1 overflow-y-auto flex flex-col justify-center">
+            <div className={`flex-1 overflow-y-auto flex flex-col ${aiMode ? '' : 'justify-center'}`}>
               {aiMode ? (
-                /* AI mode: empty area for now */
-                <div className="p-3" />
+                /* AI mode: chat messages */
+                <div className="flex-1 flex flex-col p-3">
+                  {messages.length > 0 ? (
+                    <div className="flex-1 overflow-y-auto">
+                      <div className="space-y-3">
+                        {messages.map((msg) => (
+                          <div
+                            key={msg.id}
+                            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                          >
+                            <div
+                              className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${
+                                msg.role === 'user'
+                                  ? 'bg-[#2a2a2a] text-[#c0c0c0] rounded-br-md'
+                                  : 'bg-[#1a1a1a] text-[#909090] rounded-bl-md'
+                              }`}
+                            >
+                              {msg.isLoading ? (
+                                <div className="flex items-center gap-1.5 py-1">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-[#505050] animate-bounce" style={{ animationDelay: '0ms' }} />
+                                  <div className="w-1.5 h-1.5 rounded-full bg-[#505050] animate-bounce" style={{ animationDelay: '150ms' }} />
+                                  <div className="w-1.5 h-1.5 rounded-full bg-[#505050] animate-bounce" style={{ animationDelay: '300ms' }} />
+                                </div>
+                              ) : (
+                                <>
+                                  {msg.content}
+                                  {msg.selectables && msg.selectables.length > 0 && (
+                                    <div className="flex flex-wrap gap-1.5 mt-2">
+                                      {msg.selectables.map((s) => (
+                                        <button
+                                          key={s.filterValue}
+                                          onClick={() => onSelectableClick(s)}
+                                          disabled={isExtracting || isSearching}
+                                          className="px-2.5 py-1 text-xs font-medium text-[#a0a0a0] bg-[#252525] border border-[#383838] rounded-full hover:bg-[#333333] hover:border-[#484848] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                          {s.label}
+                                        </button>
+                                      ))}
+                                      {msg.allSelectables && msg.allSelectables.length > ((msg.selectablesPage || 0) + 1) * 5 && (
+                                        <button
+                                          onClick={() => onShowMoreSelectables(msg.id)}
+                                          disabled={isExtracting || isSearching}
+                                          className="px-2.5 py-1 text-xs font-medium text-[#707070] bg-[#1a1a1a] border border-[#333333] rounded-full hover:bg-[#252525] hover:text-[#909090] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                          Show more...
+                                        </button>
+                                      )}
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                        <div ref={chatEndRef} />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      <p className="text-sm text-[#505050] text-center px-4">
+                        Ask me who you want to find...
+                      </p>
+                    </div>
+                  )}
+                  {messages.length > 0 && (
+                    <button
+                      onClick={onClearChat}
+                      className="mt-2 self-center px-3 py-1 text-xs text-[#606060] hover:text-[#909090] transition-colors"
+                    >
+                      Clear chat
+                    </button>
+                  )}
+                </div>
               ) : (
                 /* Filter mode: dropdowns with sentence context */
                 <div className="px-4 py-6 space-y-3">

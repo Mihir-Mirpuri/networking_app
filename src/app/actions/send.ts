@@ -305,6 +305,7 @@ export async function sendEmailsAction(
         userCandidateId: person.userCandidateId,
         gmailThreadId: sendResult.threadId,
         sendLogId: sendLog.id,
+        emailSubject: person.subject,
       });
       if (!trackerResult.success) {
         console.error('[Send] Failed to upsert outreach tracker:', trackerResult.error);
@@ -670,6 +671,7 @@ export async function sendFollowUpAction(
       toEmail: input.toEmail,
       gmailThreadId: sendResult.threadId,
       sendLogId: sendLog.id,
+      emailSubject: input.subject,
     });
   }
 

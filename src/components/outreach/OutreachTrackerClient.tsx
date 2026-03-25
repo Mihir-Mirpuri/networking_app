@@ -8,10 +8,11 @@ import {
   SortDirection,
   getOutreachTrackers,
   deleteOutreachTracker,
+  toggleStarOutreachTracker,
   clearAllOutreachTrackers,
 } from '@/app/actions/outreach';
 import { OutreachTable } from './OutreachTable';
-import { OutreachFilters } from './OutreachFilters';
+import { OutreachFilters, ColumnKey } from './OutreachFilters';
 import { ThreadPanel } from './ThreadPanel';
 import { LoadingSpinner } from '@/components/search/LoadingSpinner';
 
@@ -21,6 +22,8 @@ interface OutreachTrackerClientProps {
   initialHasMore: boolean;
   initialStats: OutreachStats;
 }
+
+const DEFAULT_COLUMNS: ColumnKey[] = ['name', 'company', 'role', 'location', 'subject', 'date'];
 
 export function OutreachTrackerClient({
   initialTrackers,
@@ -36,12 +39,15 @@ export function OutreachTrackerClient({
   const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState<SortField>('createdAt');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [starredFilter, setStarredFilter] = useState<boolean | undefined>(undefined);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [selectedTracker, setSelectedTracker] = useState<OutreachTrackerEntry | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
+
+  const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(DEFAULT_COLUMNS);
 
   const fetchTrackers = useCallback(
     async (resetCursor = true) => {
@@ -51,6 +57,7 @@ export function OutreachTrackerClient({
           search: searchQuery || undefined,
           sortField,
           sortDirection,
+          starred: starredFilter,
           cursor: resetCursor ? undefined : cursor || undefined,
         });
 
@@ -69,7 +76,7 @@ export function OutreachTrackerClient({
         setIsLoading(false);
       }
     },
-    [searchQuery, sortField, sortDirection, cursor]
+    [searchQuery, sortField, sortDirection, starredFilter, cursor]
   );
 
   const handleSearch = () => {
@@ -84,6 +91,7 @@ export function OutreachTrackerClient({
         search: searchQuery || undefined,
         sortField,
         sortDirection,
+        starred: starredFilter,
         cursor,
       });
 
@@ -106,8 +114,26 @@ export function OutreachTrackerClient({
       setSortField(field);
       setSortDirection('desc');
     }
-    // Trigger search with new sort
     setTimeout(() => fetchTrackers(true), 0);
+  };
+
+  const handleStarredFilterChange = (starred: boolean | undefined) => {
+    setStarredFilter(starred);
+    // Trigger refetch
+    setTimeout(() => fetchTrackers(true), 0);
+  };
+
+  const handleToggleColumn = (column: ColumnKey) => {
+    setVisibleColumns((prev) => {
+      if (prev.includes(column)) {
+        // Don't allow removing all columns
+        if (prev.length <= 1) return prev;
+        return prev.filter((c) => c !== column);
+      }
+      // Add in default order
+      const ordered = DEFAULT_COLUMNS.filter((c) => prev.includes(c) || c === column);
+      return ordered;
+    });
   };
 
   const recomputeStats = (trackerList: OutreachTrackerEntry[]) => {
@@ -141,6 +167,15 @@ export function OutreachTrackerClient({
     }
   };
 
+  const handleToggleStar = async (id: string) => {
+    const result = await toggleStarOutreachTracker(id);
+    if (result.success) {
+      setTrackers((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, starred: result.starred } : t))
+      );
+    }
+  };
+
   const handleClearAll = async () => {
     setIsClearing(true);
     try {
@@ -160,43 +195,24 @@ export function OutreachTrackerClient({
   };
 
   return (
-    <div>
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-bold text-[#E0E0E0]">History</h1>
-          {trackers.length > 0 && (
-            <button
-              onClick={() => setShowClearConfirm(true)}
-              className="flex items-center gap-2 px-3 py-2 text-sm text-[#909090] hover:text-red-400 hover:bg-red-900/20 rounded-lg transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-              Clear All
-            </button>
-          )}
-        </div>
-
-        {/* Filters */}
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Filters - Fixed at top */}
+      <div className="flex-shrink-0 pb-4">
         <OutreachFilters
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           onSearch={handleSearch}
           isLoading={isLoading}
+          starredFilter={starredFilter}
+          onStarredFilterChange={handleStarredFilterChange}
+          visibleColumns={visibleColumns}
+          onToggleColumn={handleToggleColumn}
+          showClearAll={trackers.length > 0}
+          onClearAll={() => setShowClearConfirm(true)}
         />
       </div>
 
-      {/* Result count */}
-      {trackers.length > 0 && (
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-xs text-[#606060]">
-            Showing {trackers.length}{stats.total ? ` of ${stats.total}` : ''} contacts
-          </p>
-        </div>
-      )}
-
-      {/* Table */}
+      {/* Table - Scrollable */}
       {isLoading && trackers.length === 0 ? (
         <div className="flex items-center justify-center h-64">
           <div className="flex items-center gap-3 text-[#707070]">
@@ -205,37 +221,20 @@ export function OutreachTrackerClient({
           </div>
         </div>
       ) : (
-        <>
-          <OutreachTable
-            trackers={trackers}
-            sortField={sortField}
-            sortDirection={sortDirection}
-            onSort={handleSort}
-            onUpdate={handleUpdate}
-            onDelete={handleDelete}
-            onRowClick={setSelectedTracker}
-          />
-
-          {/* Load More Button */}
-          {hasMore && (
-            <div className="mt-6 flex justify-center">
-              <button
-                onClick={handleLoadMore}
-                disabled={isLoadingMore}
-                className="btn-secondary"
-              >
-                {isLoadingMore ? (
-                  <span className="flex items-center gap-2">
-                    <LoadingSpinner size="sm" />
-                    Loading...
-                  </span>
-                ) : (
-                  'Load More'
-                )}
-              </button>
-            </div>
-          )}
-        </>
+        <OutreachTable
+          trackers={trackers}
+          sortField={sortField}
+          sortDirection={sortDirection}
+          onSort={handleSort}
+          onUpdate={handleUpdate}
+          onDelete={handleDelete}
+          onToggleStar={handleToggleStar}
+          onRowClick={setSelectedTracker}
+          visibleColumns={visibleColumns}
+          hasMore={hasMore}
+          isLoadingMore={isLoadingMore}
+          onLoadMore={handleLoadMore}
+        />
       )}
 
       {/* Thread Panel */}
@@ -250,15 +249,15 @@ export function OutreachTrackerClient({
       {/* Clear All Confirmation Modal */}
       {showClearConfirm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
-          <div className="bg-[#252525] rounded-2xl shadow-xl shadow-black/40 max-w-md w-full p-6 animate-scale-in border border-[#353535]">
+          <div className="bg-[#2a2a2a] rounded-2xl shadow-lg shadow-black/40 max-w-md w-full p-6 animate-scale-in border border-[#3a3a3a]">
             <div className="w-14 h-14 mx-auto mb-5 rounded-full bg-red-900/30 flex items-center justify-center">
               <svg className="w-7 h-7 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
             </div>
-            <h3 className="text-xl font-semibold text-center text-white mb-2">Clear All History</h3>
-            <p className="text-[#909090] text-center mb-6">
-              Are you sure you want to delete all <span className="font-medium text-white">{trackers.length}</span> contacts from your history? This action cannot be undone.
+            <h3 className="text-xl font-semibold text-center text-[#E0E0E0] mb-2">Clear All History</h3>
+            <p className="text-[#808080] text-center mb-6">
+              Are you sure you want to delete all <span className="font-medium text-[#E0E0E0]">{trackers.length}</span> contacts from your history? This action cannot be undone.
             </p>
             <div className="flex gap-3 justify-center">
               <button

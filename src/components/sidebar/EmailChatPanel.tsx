@@ -54,12 +54,6 @@ export function InsightsSection() {
   const [collapsed, setCollapsed] = useState(false);
 
   const selectedCount = selectedInsightIds.size;
-
-  // Don't render if no insights and not loading
-  if (!insightsLoading && insights.length === 0 && !insightsError) {
-    return null;
-  }
-
   const firstName = currentPersonName?.split(' ')[0] || 'them';
 
   const handleApply = () => {
@@ -115,6 +109,10 @@ export function InsightsSection() {
                   Retry
                 </button>
               )}
+            </div>
+          ) : insights.length === 0 ? (
+            <div className="px-3 py-2">
+              <span className="text-xs text-[#505050]">No additional info found</span>
             </div>
           ) : (
             <>

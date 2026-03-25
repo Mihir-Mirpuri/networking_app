@@ -191,6 +191,7 @@ model UserCandidate {
   emailConfidence      Float?
   manualEmailConfirmed Boolean          @default(false)
   doNotShow            Boolean          @default(false)
+  savedForLater        Boolean          @default(false)
   university           String?
   createdAt            DateTime         @default(now())
   updatedAt            DateTime         @updatedAt
@@ -587,8 +588,10 @@ model OutreachTracker {
   interactionDate DateTime?
 
   // Status & Notes
-  status OutreachStatus @default(NOT_STARTED)
-  notes  String?        @db.Text
+  status       OutreachStatus @default(NOT_STARTED)
+  notes        String?        @db.Text
+  starred      Boolean        @default(false)
+  emailSubject String?
 
   // Reminder
   reminderDate DateTime?

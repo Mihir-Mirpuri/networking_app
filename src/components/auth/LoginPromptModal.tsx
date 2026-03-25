@@ -13,7 +13,7 @@ export function LoginPromptModal({ isOpen, onClose, title, message }: LoginPromp
   if (!isOpen) return null;
 
   const handleSignIn = () => {
-    signIn('google', { callbackUrl: '/' });
+    signIn('google', { callbackUrl: '/app' });
   };
 
   return (

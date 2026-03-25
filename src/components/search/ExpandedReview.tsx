@@ -297,7 +297,7 @@ export function ExpandedReview({
 
     // Redirect to sign in if not authenticated
     if (!isAuthenticated) {
-      signIn('google', { callbackUrl: '/' });
+      signIn('google', { callbackUrl: '/app' });
       return;
     }
 

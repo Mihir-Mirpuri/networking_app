@@ -156,7 +156,7 @@ export function ProfileDropdown({ isSubscribed }: ProfileDropdownProps) {
                 Plans
               </button>
                 <button
-                  onClick={() => signOut({ callbackUrl: '/' })}
+                  onClick={() => signOut({ callbackUrl: '/app' })}
                   className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-red-400 hover:bg-[#1a1a1a] transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
