@@ -8,6 +8,7 @@ import {
   SortDirection,
   getOutreachTrackers,
   deleteOutreachTracker,
+  clearAllOutreachTrackers,
 } from '@/app/actions/outreach';
 import { OutreachTable } from './OutreachTable';
 import { OutreachFilters } from './OutreachFilters';
@@ -39,6 +40,8 @@ export function OutreachTrackerClient({
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [selectedTracker, setSelectedTracker] = useState<OutreachTrackerEntry | null>(null);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
 
   const fetchTrackers = useCallback(
     async (resetCursor = true) => {
@@ -138,11 +141,42 @@ export function OutreachTrackerClient({
     }
   };
 
+  const handleClearAll = async () => {
+    setIsClearing(true);
+    try {
+      const result = await clearAllOutreachTrackers();
+      if (result.success) {
+        setTrackers([]);
+        setStats({ total: 0, sent: 0, waiting: 0, ongoingConversations: 0 });
+        setCursor(null);
+        setHasMore(false);
+        setShowClearConfirm(false);
+      }
+    } catch (error) {
+      console.error('Error clearing history:', error);
+    } finally {
+      setIsClearing(false);
+    }
+  };
+
   return (
     <div>
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[#E0E0E0] mb-4">History</h1>
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-2xl font-bold text-[#E0E0E0]">History</h1>
+          {trackers.length > 0 && (
+            <button
+              onClick={() => setShowClearConfirm(true)}
+              className="flex items-center gap-2 px-3 py-2 text-sm text-[#909090] hover:text-red-400 hover:bg-red-900/20 rounded-lg transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Clear All
+            </button>
+          )}
+        </div>
 
         {/* Filters */}
         <OutreachFilters
@@ -211,6 +245,46 @@ export function OutreachTrackerClient({
           isOpen={!!selectedTracker}
           onClose={() => setSelectedTracker(null)}
         />
+      )}
+
+      {/* Clear All Confirmation Modal */}
+      {showClearConfirm && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-[#252525] rounded-2xl shadow-xl shadow-black/40 max-w-md w-full p-6 animate-scale-in border border-[#353535]">
+            <div className="w-14 h-14 mx-auto mb-5 rounded-full bg-red-900/30 flex items-center justify-center">
+              <svg className="w-7 h-7 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <h3 className="text-xl font-semibold text-center text-white mb-2">Clear All History</h3>
+            <p className="text-[#909090] text-center mb-6">
+              Are you sure you want to delete all <span className="font-medium text-white">{trackers.length}</span> contacts from your history? This action cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={() => setShowClearConfirm(false)}
+                disabled={isClearing}
+                className="px-5 py-2.5 text-sm font-medium bg-[#333333] text-[#c0c0c0] rounded-lg hover:bg-[#3a3a3a] transition-all disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleClearAll}
+                disabled={isClearing}
+                className="px-5 py-2.5 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all shadow-sm disabled:opacity-50 flex items-center gap-2"
+              >
+                {isClearing ? (
+                  <>
+                    <LoadingSpinner size="sm" />
+                    Clearing...
+                  </>
+                ) : (
+                  'Clear All'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

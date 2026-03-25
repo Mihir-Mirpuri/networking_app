@@ -113,6 +113,66 @@ export interface GenerateFollowUpResult {
   error?: string;
 }
 
+export async function generateFollowUpFromThreadAction(
+  gmailThreadId: string
+): Promise<GenerateFollowUpResult> {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return { success: false, error: 'Not authenticated' };
+    }
+
+    // Find the most recent sendLog for this thread
+    const sendLog = await prisma.sendLog.findFirst({
+      where: {
+        gmailThreadId,
+        userId: session.user.id,
+        status: 'SUCCESS',
+      },
+      orderBy: { sentAt: 'desc' },
+      include: {
+        outreachTracker: true,
+      },
+    });
+
+    if (!sendLog) {
+      return { success: false, error: 'No emails found in this thread' };
+    }
+
+    const tracker = sendLog.outreachTracker;
+    const senderName = session.user.name || 'there';
+
+    // Generate follow-up email
+    const result = await generateFollowUpEmail({
+      originalSubject: sendLog.subject,
+      originalBody: sendLog.body,
+      personName: tracker?.contactName || sendLog.directRecipientName || 'there',
+      personCompany: tracker?.company || '',
+      personRole: tracker?.role || undefined,
+      senderName,
+      userId: session.user.id,
+    });
+
+    return {
+      success: true,
+      subject: result.subject,
+      body: result.body,
+      toEmail: sendLog.toEmail,
+      toName: tracker?.contactName || sendLog.directRecipientName || undefined,
+      company: tracker?.company || undefined,
+      gmailThreadId: sendLog.gmailThreadId || undefined,
+      gmailMessageId: sendLog.gmailMessageId || undefined,
+      userCandidateId: sendLog.userCandidateId || undefined,
+    };
+  } catch (error) {
+    console.error('GenerateFollowUpFromThread error:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to generate follow-up',
+    };
+  }
+}
+
 export async function generateFollowUpAction(
   sendLogId: string
 ): Promise<GenerateFollowUpResult> {

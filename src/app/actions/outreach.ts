@@ -388,6 +388,30 @@ export async function deleteOutreachTracker(
   }
 }
 
+export async function clearAllOutreachTrackers(): Promise<{
+  success: true;
+  deletedCount: number;
+} | { success: false; error: string }> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return { success: false, error: 'Not authenticated' };
+  }
+
+  try {
+    const result = await prisma.outreachTracker.deleteMany({
+      where: { userId: session.user.id },
+    });
+
+    return { success: true, deletedCount: result.count };
+  } catch (error) {
+    console.error('[Outreach] Error clearing all trackers:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to clear outreach history',
+    };
+  }
+}
+
 export async function getOutreachStats(): Promise<{
   success: true;
   stats: OutreachStats;

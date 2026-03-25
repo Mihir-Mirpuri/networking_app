@@ -157,8 +157,8 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onRowClick, isEven = 
     );
   };
 
-  const cellClass = "px-4 py-3 text-sm border-r border-[#333333] last:border-r-0";
-  const rowBg = isEven ? 'bg-[#2a2a2a]' : 'bg-[#252525]/30';
+  const cellClass = "px-5 py-4 text-sm";
+  const rowBg = isEven ? 'bg-[#242424]' : 'bg-[#1e1e1e]';
 
   const renderNameCell = () => {
     const nameContent = (
@@ -176,7 +176,7 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onRowClick, isEven = 
           href={tracker.linkedinUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-[#E0E0E0] hover:text-white hover:underline"
+          className="text-white hover:text-[#6b9fff] transition-colors"
           title="View LinkedIn"
         >
           {nameContent}
@@ -187,7 +187,7 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onRowClick, isEven = 
     return (
       <button
         onClick={() => handleStartEdit('contactName', tracker.contactName)}
-        className="text-left hover:text-[#c0c0c0]"
+        className="text-left text-white hover:text-[#c0c0c0] transition-colors"
       >
         {nameContent}
       </button>
@@ -206,50 +206,41 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onRowClick, isEven = 
   return (
     <>
       <tr
-        className={`group ${rowBg} hover:bg-[#333333] cursor-pointer transition-colors`}
+        className={`group ${rowBg} hover:bg-[#2f2f2f] cursor-pointer transition-all duration-150 border-b border-[#2a2a2a] last:border-b-0`}
         onClick={handleRowClick}
       >
         {/* Name */}
         <td className={cellClass}>
-          <div className="truncate font-semibold text-[#E0E0E0]">
+          <div className="truncate font-semibold text-white">
             {renderNameCell()}
           </div>
-          <div className="text-xs text-[#606060] truncate mt-0.5">{tracker.contactEmail}</div>
-        </td>
-
-        {/* Status */}
-        <td className={cellClass} onClick={(e) => e.stopPropagation()}>
-          <StatusDropdown
-            value={tracker.status}
-            onChange={handleStatusChange}
-            disabled={isSaving}
-          />
+          <div className="text-xs text-[#707070] truncate mt-1">{tracker.contactEmail}</div>
         </td>
 
         {/* Company */}
         <td className={cellClass}>
-          <div className="truncate text-[#A0A0A0]">
+          <div className="truncate text-[#b0b0b0]">
             {renderEditableCell('company', tracker.company)}
           </div>
         </td>
 
         {/* Role */}
         <td className={cellClass}>
-          <div className="truncate text-[#A0A0A0]">
+          <div className="truncate text-[#909090]">
             {renderEditableCell('role', tracker.role)}
           </div>
         </td>
 
         {/* Location */}
         <td className={cellClass}>
-          <div className="truncate text-[#A0A0A0]">
+          <div className="truncate text-[#909090]">
             {renderEditableCell('location', tracker.location)}
           </div>
         </td>
 
         {/* Date Emailed */}
         <td
-          className={`${cellClass} text-[#808080] whitespace-nowrap`}
+          className={`${cellClass} text-[#707070] whitespace-nowrap`}
           title={formatFullDate(tracker.dateEmailed)}
         >
           {formatRelativeDate(tracker.dateEmailed)}
@@ -289,6 +280,15 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onRowClick, isEven = 
               </svg>
             )}
           </button>
+        </td>
+
+        {/* Status */}
+        <td className={cellClass} onClick={(e) => e.stopPropagation()}>
+          <StatusDropdown
+            value={tracker.status}
+            onChange={handleStatusChange}
+            disabled={isSaving}
+          />
         </td>
 
         {/* Actions */}
