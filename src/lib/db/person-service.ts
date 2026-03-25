@@ -6,6 +6,84 @@ import { ScrapedProfile } from '@/lib/services/linkedin-scraper';
 import { updatePersonRoleEmbedding, getSearchRoleEmbedding } from '@/lib/services/embeddings';
 import { Prisma } from '@prisma/client';
 
+/**
+ * Common university abbreviation → keyword expansions.
+ * Each entry maps a recognized abbreviation to the keywords that should ALL appear
+ * in the DB value for a match. Order doesn't matter — they're ANDed via ILIKE.
+ */
+const UNIVERSITY_ALIASES: Record<string, string[]> = {
+  'ut austin':    ['texas', 'austin'],
+  'ut':           ['texas', 'austin'],
+  'ut dallas':    ['texas', 'dallas'],
+  'utd':          ['texas', 'dallas'],
+  'ut arlington': ['texas', 'arlington'],
+  'uta':          ['texas', 'arlington'],
+  'tamu':         ['texas', 'a&m'],
+  'texas a&m':    ['texas', 'a&m'],
+  'nyu':          ['nyu'],
+  'new york university': ['nyu'],
+  'mit':          ['mit'],
+  'massachusetts institute of technology': ['mit'],
+  'usc':          ['usc'],
+  'university of southern california': ['usc'],
+  'ucla':         ['ucla'],
+  'university of california los angeles': ['ucla'],
+  'ucb':          ['uc', 'berkeley'],
+  'uc berkeley':  ['uc', 'berkeley'],
+  'cal':          ['uc', 'berkeley'],
+  'berkeley':     ['berkeley'],
+  'smu':          ['smu'],
+  'southern methodist university': ['smu'],
+  'southern methodist': ['smu'],
+  'gatech':       ['georgia', 'tech'],
+  'georgia tech': ['georgia', 'tech'],
+  'gt':           ['georgia', 'tech'],
+  'uiuc':         ['illinois', 'urbana'],
+  'upenn':        ['pennsylvania'],
+  'penn':         ['pennsylvania'],
+  'penn state':   ['penn', 'state'],
+  'umich':        ['michigan'],
+  'cmu':          ['carnegie', 'mellon'],
+  'carnegie mellon': ['carnegie', 'mellon'],
+  'cal poly':     ['california', 'polytechnic'],
+  'caltech':      ['california', 'technology'],
+  'osu':          ['ohio', 'state'],
+  'unc':          ['north', 'carolina', 'chapel'],
+  'uva':          ['virginia'],
+  'bu':           ['boston', 'university'],
+  'bc':           ['boston', 'college'],
+  'neu':          ['northeastern'],
+  'wustl':        ['washington', 'louis'],
+  'wash u':       ['washington', 'louis'],
+};
+
+/**
+ * Split a university search term into keywords for AND-matching.
+ * First checks the alias map, then falls back to splitting on whitespace.
+ * Filters out very short noise words (<=2 chars) unless the whole input is short.
+ */
+function getUniversityKeywords(university: string): string[] {
+  const trimmed = university.trim();
+  const lower = trimmed.toLowerCase();
+
+  // Check alias map first
+  if (UNIVERSITY_ALIASES[lower]) {
+    return UNIVERSITY_ALIASES[lower];
+  }
+
+  // Fall back to splitting on spaces — each word becomes a keyword
+  const words = trimmed.split(/\s+/).filter(Boolean);
+
+  // If only one word, use it as-is
+  if (words.length <= 1) return [trimmed];
+
+  // Filter out noise words (of, at, the, and) but keep everything else
+  const noise = new Set(['of', 'at', 'the', 'and', 'in', 'for']);
+  const meaningful = words.filter(w => !noise.has(w.toLowerCase()));
+
+  return meaningful.length > 0 ? meaningful : [trimmed];
+}
+
 // Personal email domains - emails from these are UNVERIFIED
 const PERSONAL_DOMAINS = new Set([
   'gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'aol.com',
@@ -717,12 +795,17 @@ export function buildPersonWhereClause(filters: Omit<PersonFilters, 'limit'>, sc
     }
   }
 
-  // University filter — check all schools, not just the primary one.
-  // educationSchool uses Prisma ILIKE (case-insensitive). For the schools JSON
-  // array, callers pre-query matching IDs via raw SQL and pass them in.
+  // University filter — keyword-split matching to handle abbreviations
+  // e.g., "UT Austin" → keywords ["texas", "austin"] → matches "University of Texas at Austin"
   if (university && university.trim()) {
+    const keywords = getUniversityKeywords(university);
+    // Each keyword must appear in educationSchool OR the person's ID is in schoolMatchIds
+    const educationSchoolConditions = keywords.map(kw => ({
+      educationSchool: { contains: kw, mode: 'insensitive' as const }
+    }));
     const uniConditions: Record<string, unknown>[] = [
-      { educationSchool: { contains: university.trim(), mode: 'insensitive' as const } },
+      // All keywords must match educationSchool
+      { AND: educationSchoolConditions },
     ];
     if (schoolMatchIds && schoolMatchIds.length > 0) {
       uniConditions.push({ id: { in: schoolMatchIds } });
@@ -767,13 +850,16 @@ export function buildPersonWhereClause(filters: Omit<PersonFilters, 'limit'>, sc
 }
 
 /**
- * Pre-query person IDs whose `schools` JSON array matches a university term
+ * Pre-query person IDs whose `schools` JSON array matches university keywords
  * (case-insensitive). Used to supplement the Prisma path which can't do ILIKE on JSON.
  */
 async function getSchoolMatchIds(university: string): Promise<string[]> {
-  const uniTerm = '%' + university.trim() + '%';
+  const keywords = getUniversityKeywords(university);
+  // Build AND chain: schools::text must ILIKE each keyword
+  const conditions = keywords.map(kw => Prisma.sql`schools::text ILIKE ${'%' + kw + '%'}`);
+  const whereClause = Prisma.join(conditions, ' AND ');
   const matches = await prisma.$queryRaw<{ id: string }[]>(
-    Prisma.sql`SELECT id FROM "Person" WHERE schools::text ILIKE ${uniTerm}`
+    Prisma.sql`SELECT id FROM "Person" WHERE ${whereClause}`
   );
   return matches.map(r => r.id);
 }
@@ -950,10 +1036,14 @@ async function findPeopleByFiltersVector(
     conditions.push(Prisma.sql`p.city ILIKE ${'%' + location.trim() + '%'}`);
   }
 
-  // University filter — check all schools, not just the primary one
+  // University filter — keyword-split matching to handle abbreviations
   if (university && university.trim()) {
-    const uniTerm = '%' + university.trim() + '%';
-    conditions.push(Prisma.sql`(p."educationSchool" ILIKE ${uniTerm} OR p.schools::text ILIKE ${uniTerm})`);
+    const keywords = getUniversityKeywords(university);
+    const kwConditions = keywords.map(kw => {
+      const term = '%' + kw + '%';
+      return Prisma.sql`(p."educationSchool" ILIKE ${term} OR p.schools::text ILIKE ${term})`;
+    });
+    conditions.push(Prisma.sql`(${Prisma.join(kwConditions, ' AND ')})`);
   }
 
   // Email filter
