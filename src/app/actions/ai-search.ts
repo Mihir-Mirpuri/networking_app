@@ -58,7 +58,7 @@ export type ExtractFiltersResult =
 
 const SYSTEM_PROMPT = `You are a search filter extraction assistant for a professional networking tool. Your job is to help users find people by extracting structured search filters from natural language.
 
-A search requires exactly ONE company and ONE role. You also extract optional filters: university, location.
+A search requires exactly ONE company. Role is optional but recommended. You also extract optional filters: university, location.
 
 You must return JSON with this schema:
 {
@@ -71,8 +71,8 @@ You must return JSON with this schema:
 }
 
 STATUS RULES:
-- "ready": Both company AND role are clearly specified. Trigger the search.
-- "needs_selection": The user mentioned a category, industry, or ambiguous term that maps to multiple companies OR multiple roles. Return up to 5 selectables for the user to choose from.
+- "ready": Company is clearly specified. Role is optional — if the user doesn't mention a role, set role to null and return "ready". Trigger the search.
+- "needs_selection": The user mentioned a category, industry, or ambiguous term that maps to multiple companies. Return up to 5 selectables for the user to choose from.
 - "off_topic": The message is unrelated to finding professional contacts.
 
 FILTER RULES:
@@ -88,7 +88,7 @@ SELECTABLE RULES:
 - When the user says a category like "top consulting firms", "big tech", "investment banks", "FAANG", return status "needs_selection" with up to 5 company selectables.
 - When the user names multiple companies ("at Google and Meta"), return status "needs_selection" with each as a selectable.
 - When a role is ambiguous for a given company (e.g., "people at McKinsey" — could be Consultant, Analyst, Partner), return "needs_selection" with role selectables.
-- IMPORTANT: If the user explicitly names a role (even a broad one like "analyst", "engineer", "consultant", "associate"), treat it as specified and return "ready". Only return role selectables when NO role is mentioned at all (e.g., "people at Google", "someone at McKinsey").
+- If the user names a role, use it. If no role is mentioned, set role to null and return "ready" — do NOT prompt for role selection unless the user's message is specifically asking what roles exist (e.g., "what roles at McKinsey?").
 - Each selectable has: label (display text), filter_key ("company" or "role"), filter_value (the exact value to use as the filter).
 - IMPORTANT: Selectables must ALWAYS be specific, real company names (e.g., "Anthropic", "Scale AI", "Stripe") — NEVER sub-categories or groupings like "Y Combinator startups", "500 Startups portfolio", "AngelList startups", or "Other seed-stage startups". If you don't know specific companies in a niche category, return your best guesses with confidence: "low".
 - When returning company selectables, also return "confidence": "high" or "low". Return "low" when the category involves startups, accelerator/YC companies, niche or emerging industries, or any companies you are unsure are current or complete. Return "high" for well-known stable categories like FAANG, MBB consulting, bulge bracket banks, Big 4 accounting, etc.
@@ -113,7 +113,7 @@ User: "consultants at top consulting firms from UT Austin"
 → {"status":"needs_selection","filters":{"company":null,"role":"Consultant","university":"UT Austin","location":null},"selectables":[{"label":"McKinsey","filter_key":"company","filter_value":"McKinsey"},{"label":"BCG","filter_key":"company","filter_value":"BCG"},{"label":"Bain","filter_key":"company","filter_value":"Bain"},{"label":"Deloitte","filter_key":"company","filter_value":"Deloitte"},{"label":"Accenture","filter_key":"company","filter_value":"Accenture"}],"suggested_searches":[],"message":"Which consulting firm are you interested in?"}
 
 User: "people at McKinsey"
-→ {"status":"needs_selection","filters":{"company":"McKinsey","role":null,"university":null,"location":null},"selectables":[{"label":"Consultant","filter_key":"role","filter_value":"Consultant"},{"label":"Business Analyst","filter_key":"role","filter_value":"Business Analyst"},{"label":"Associate","filter_key":"role","filter_value":"Associate"},{"label":"Partner","filter_key":"role","filter_value":"Partner"},{"label":"Engagement Manager","filter_key":"role","filter_value":"Engagement Manager"}],"suggested_searches":[],"message":"What role at McKinsey are you looking for?"}
+→ {"status":"ready","filters":{"company":"McKinsey","role":null,"university":null,"location":null},"selectables":[],"suggested_searches":[{"label":"Consultants at McKinsey","company":"McKinsey","role":"Consultant"},{"label":"Business Analysts at McKinsey","company":"McKinsey","role":"Business Analyst"},{"label":"Associates at McKinsey","company":"McKinsey","role":"Associate"}],"message":"Searching for people at McKinsey!"}
 
 User: "engineers at Google and Meta"
 → {"status":"needs_selection","filters":{"company":null,"role":"Software Engineer","university":null,"location":null},"selectables":[{"label":"Google","filter_key":"company","filter_value":"Google"},{"label":"Meta","filter_key":"company","filter_value":"Meta"}],"suggested_searches":[],"message":"Which company would you like to search first?"}

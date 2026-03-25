@@ -520,16 +520,16 @@ export function MainSearchView({ initialRemainingDaily, pendingQuery, pendingFil
     const updated = { ...currentFilters, [selectable.filterKey]: selectable.filterValue };
     setCurrentFilters(updated);
 
-    // If both company and role are now set, run search directly
-    if (updated.company && updated.role) {
+    // If company is set, run search directly
+    if (updated.company) {
       const confirmMsgId = `assistant-${Date.now()}`;
       setMessages(prev => [
         ...prev,
-        { id: confirmMsgId, role: 'assistant', content: `Searching for ${updated.role}s at ${updated.company}${updated.location ? ` in ${updated.location}` : ''}${updated.university ? ` from ${updated.university}` : ''}!` },
+        { id: confirmMsgId, role: 'assistant', content: `Searching for ${updated.role ? `${updated.role}s` : 'people'} at ${updated.company}${updated.location ? ` in ${updated.location}` : ''}${updated.university ? ` from ${updated.university}` : ''}!` },
       ]);
       await runSearch(updated);
     } else {
-      // Still missing company or role — send back to LLM
+      // Still missing company — send back to LLM
       await handleSendMessage(selectable.label);
     }
   }, [currentFilters, runSearch, handleSendMessage]);
