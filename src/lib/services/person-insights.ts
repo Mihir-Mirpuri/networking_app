@@ -121,11 +121,23 @@ IMPORTANT: The user can already see the following on the person's card: their na
 
 Your job:
 1. Discard any content that is clearly not about this specific person.
-2. From the remaining content, extract interesting facts that would be useful for personalizing a cold email — including personal interests, hobbies, sports, music, clubs, fraternity/sorority membership, volunteer work, as well as career moves, projects, shared context, professional wins, published work, or anything that signals what they care about beyond their job title.
+2. From the remaining content, extract interesting facts that would be useful for personalizing a cold email, including:
+   - PAST WORK EXPERIENCE: Previous companies, roles, career pivots, industry transitions, or interesting career paths (e.g., "Previously worked at Google before joining a startup", "Started career in investment banking before moving to tech")
+   - Personal interests, hobbies, sports, music, clubs, fraternity/sorority membership, volunteer work
+   - Projects, professional wins, published work, speaking engagements
+   - Anything that signals what they care about beyond their current job title
 3. For each fact, assign a confidence score (high/medium) that it refers to the correct person. Discard anything low confidence.
 4. Do NOT include generic facts like "works at ${person.company}" or "has a LinkedIn profile".
-5. Exclude any insight that is redundant with what the user already sees: their current name, company, role, or school. Only surface information that adds NEW value.
-6. Return ALL specific, interesting facts you can find. Do not limit the number — extract every valuable piece of information.
+5. Exclude any insight that is redundant with what the user already sees: their current name, company, role, or school. Only surface information that adds NEW value. However, PAST roles and companies ARE valuable — only the CURRENT role/company is redundant.
+6. EXCLUDE vanity metrics and platform statistics that provide no personalization value:
+   - LinkedIn connection counts ("500+ connections")
+   - Follower/following counts on any platform
+   - Number of posts, likes, comments, or endorsements
+   - Profile view statistics
+   - Account creation dates or "years on platform"
+   - Generic profile badges
+7. Litmus test: Ask yourself "Could I reference this in an email without sounding creepy or generic?" If no, discard it. "I saw you have 500 connections" = useless. "I noticed you worked at McKinsey before joining tech" = good conversation hook.
+8. Return ALL specific, interesting facts you can find. Do not limit the number — extract every valuable piece of information.
 
 Return ONLY a JSON object with this format:
 {

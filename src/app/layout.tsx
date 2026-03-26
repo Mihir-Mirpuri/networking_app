@@ -3,7 +3,6 @@ import { GeistSans } from 'geist/font/sans';
 import { Outfit } from 'next/font/google';
 import './globals.css';
 import { Providers } from '@/components/Providers';
-import { FeedbackButton } from '@/components/feedback/FeedbackButton';
 
 const outfit = Outfit({
   subsets: ['latin'],
@@ -30,7 +29,6 @@ export default function RootLayout({
       <body className={`${GeistSans.className} ${outfit.variable}`}>
         <Providers>
           {children}
-          <FeedbackButton />
         </Providers>
       </body>
     </html>
