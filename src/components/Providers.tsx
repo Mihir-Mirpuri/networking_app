@@ -5,6 +5,7 @@ import { ReactNode } from 'react';
 import { useTimezone } from '@/hooks/useTimezone';
 import { DrafterProvider } from '@/contexts/DrafterContext';
 import { DrafterPanel } from '@/components/drafter/DrafterPanel';
+import { ReferralCapture } from '@/components/ReferralCapture';
 
 /**
  * Component that runs silent background tasks (like timezone sync)
@@ -20,6 +21,7 @@ export function Providers({ children }: { children: ReactNode }) {
     <SessionProvider>
       <DrafterProvider>
         <BackgroundTasks />
+        <ReferralCapture />
         {children}
         <DrafterPanel />
       </DrafterProvider>
