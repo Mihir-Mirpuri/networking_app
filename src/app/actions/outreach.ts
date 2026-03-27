@@ -457,6 +457,105 @@ export async function toggleStarOutreachTracker(
   }
 }
 
+export interface ScheduledEmailEntry {
+  id: string;
+  toEmail: string;
+  contactName: string | null;
+  company: string | null;
+  role: string | null;
+  subject: string;
+  body: string;
+  scheduledFor: Date;
+  createdAt: Date;
+}
+
+export async function getScheduledEmails(): Promise<{
+  success: true;
+  emails: ScheduledEmailEntry[];
+} | { success: false; error: string }> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return { success: false, error: 'Not authenticated' };
+  }
+
+  try {
+    const emails = await prisma.scheduledEmail.findMany({
+      where: {
+        userId: session.user.id,
+        status: 'PENDING',
+      },
+      include: {
+        userCandidate: {
+          include: { person: true },
+        },
+      },
+      orderBy: { scheduledFor: 'asc' },
+    });
+
+    return {
+      success: true,
+      emails: emails.map((e) => ({
+        id: e.id,
+        toEmail: e.toEmail,
+        contactName: e.userCandidate.person.fullName,
+        company: e.userCandidate.person.company,
+        role: e.userCandidate.person.role,
+        subject: e.subject,
+        body: e.body,
+        scheduledFor: e.scheduledFor,
+        createdAt: e.createdAt,
+      })),
+    };
+  } catch (error) {
+    console.error('[Outreach] Error fetching scheduled emails:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch scheduled emails',
+    };
+  }
+}
+
+export async function getInitialScheduledEmails(userId: string): Promise<{
+  success: true;
+  emails: ScheduledEmailEntry[];
+} | { success: false; error: string }> {
+  try {
+    const emails = await prisma.scheduledEmail.findMany({
+      where: {
+        userId,
+        status: 'PENDING',
+      },
+      include: {
+        userCandidate: {
+          include: { person: true },
+        },
+      },
+      orderBy: { scheduledFor: 'asc' },
+    });
+
+    return {
+      success: true,
+      emails: emails.map((e) => ({
+        id: e.id,
+        toEmail: e.toEmail,
+        contactName: e.userCandidate.person.fullName,
+        company: e.userCandidate.person.company,
+        role: e.userCandidate.person.role,
+        subject: e.subject,
+        body: e.body,
+        scheduledFor: e.scheduledFor,
+        createdAt: e.createdAt,
+      })),
+    };
+  } catch (error) {
+    console.error('[Outreach] Error fetching initial scheduled emails:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch scheduled emails',
+    };
+  }
+}
+
 export async function clearAllOutreachTrackers(): Promise<{
   success: true;
   deletedCount: number;
