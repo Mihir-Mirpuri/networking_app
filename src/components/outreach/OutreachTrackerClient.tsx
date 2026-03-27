@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react';
 import {
   OutreachTrackerEntry,
   OutreachStats,
+  ScheduledEmailEntry,
   SortField,
   SortDirection,
   getOutreachTrackers,
@@ -13,6 +14,7 @@ import {
 } from '@/app/actions/outreach';
 import { OutreachTable } from './OutreachTable';
 import { OutreachFilters, ColumnKey } from './OutreachFilters';
+import { ScheduledEmailsSection } from './ScheduledEmailsSection';
 import { ThreadPanel } from './ThreadPanel';
 import { LoadingSpinner } from '@/components/search/LoadingSpinner';
 
@@ -21,6 +23,7 @@ interface OutreachTrackerClientProps {
   initialCursor: string | null;
   initialHasMore: boolean;
   initialStats: OutreachStats;
+  initialScheduledEmails: ScheduledEmailEntry[];
 }
 
 const DEFAULT_COLUMNS: ColumnKey[] = ['name', 'firm', 'role', 'group', 'connection', 'firstEmailDate', 'lastEmailDate', 'followUps', 'notes'];
@@ -30,8 +33,10 @@ export function OutreachTrackerClient({
   initialCursor,
   initialHasMore,
   initialStats,
+  initialScheduledEmails,
 }: OutreachTrackerClientProps) {
   const [trackers, setTrackers] = useState<OutreachTrackerEntry[]>(initialTrackers);
+  const [scheduledEmails, setScheduledEmails] = useState<ScheduledEmailEntry[]>(initialScheduledEmails);
   const [stats, setStats] = useState<OutreachStats>(initialStats);
   const [cursor, setCursor] = useState<string | null>(initialCursor);
   const [hasMore, setHasMore] = useState(initialHasMore);
@@ -40,6 +45,7 @@ export function OutreachTrackerClient({
   const [sortField, setSortField] = useState<SortField>('createdAt');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [starredFilter, setStarredFilter] = useState<boolean | undefined>(undefined);
+  const [scheduledFilter, setScheduledFilter] = useState<boolean | undefined>(undefined);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -119,8 +125,14 @@ export function OutreachTrackerClient({
 
   const handleStarredFilterChange = (starred: boolean | undefined) => {
     setStarredFilter(starred);
+    if (starred === true) setScheduledFilter(undefined);
     // Trigger refetch
     setTimeout(() => fetchTrackers(true), 0);
+  };
+
+  const handleScheduledFilterChange = (scheduled: boolean | undefined) => {
+    setScheduledFilter(scheduled);
+    if (scheduled === true) setStarredFilter(undefined);
   };
 
   const handleToggleColumn = (column: ColumnKey) => {
@@ -205,6 +217,8 @@ export function OutreachTrackerClient({
           isLoading={isLoading}
           starredFilter={starredFilter}
           onStarredFilterChange={handleStarredFilterChange}
+          scheduledFilter={scheduledFilter}
+          onScheduledFilterChange={handleScheduledFilterChange}
           visibleColumns={visibleColumns}
           onToggleColumn={handleToggleColumn}
           showClearAll={trackers.length > 0}
@@ -212,8 +226,32 @@ export function OutreachTrackerClient({
         />
       </div>
 
-      {/* Table - Scrollable */}
-      {isLoading && trackers.length === 0 ? (
+      {/* Content area - Scheduled emails or Outreach table */}
+      {scheduledFilter === true ? (
+        <ScheduledEmailsSection
+          scheduledEmails={searchQuery
+            ? scheduledEmails.filter((e) => {
+                const q = searchQuery.toLowerCase();
+                return (
+                  (e.contactName && e.contactName.toLowerCase().includes(q)) ||
+                  e.toEmail.toLowerCase().includes(q) ||
+                  (e.company && e.company.toLowerCase().includes(q)) ||
+                  e.subject.toLowerCase().includes(q)
+                );
+              })
+            : scheduledEmails}
+          onEmailCancelled={(id) => {
+            setScheduledEmails((prev) => prev.filter((e) => e.id !== id));
+          }}
+          onEmailUpdated={(id, newScheduledFor) => {
+            setScheduledEmails((prev) =>
+              prev
+                .map((e) => (e.id === id ? { ...e, scheduledFor: newScheduledFor } : e))
+                .sort((a, b) => new Date(a.scheduledFor).getTime() - new Date(b.scheduledFor).getTime())
+            );
+          }}
+        />
+      ) : isLoading && trackers.length === 0 ? (
         <div className="flex items-center justify-center h-64">
           <div className="flex items-center gap-3 text-[#707070]">
             <LoadingSpinner size="md" />
