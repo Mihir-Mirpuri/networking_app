@@ -107,16 +107,16 @@ function InsightRow({ insight, isSelected, isExpanded, onToggleSelect, onToggleE
               className="flex items-center gap-1 text-left"
             >
               <span className={`text-xs leading-relaxed transition-all ${
-                isSelected ? 'text-[#c0c0c0]' : 'text-[#808080]'
-              } ${isTitleHovered ? 'underline text-[#a0a0a0]' : ''}`}>
+                isSelected ? 'text-white' : 'text-[#e0e0e0]'
+              } ${isTitleHovered ? 'underline text-white' : ''}`}>
                 {insight.label}
               </span>
-              <svg className={`w-3 h-3 flex-shrink-0 transition-colors ${isTitleHovered ? 'text-[#707070]' : 'text-[#404040]'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg className={`w-3 h-3 flex-shrink-0 transition-colors ${isTitleHovered ? 'text-white' : 'text-[#606060]'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
               </svg>
             </button>
           ) : (
-            <span className={`text-xs leading-relaxed ${isSelected ? 'text-[#c0c0c0]' : 'text-[#808080]'}`}>
+            <span className={`text-xs leading-relaxed ${isSelected ? 'text-white' : 'text-[#e0e0e0]'}`}>
               {insight.label}
             </span>
           )}
@@ -124,7 +124,7 @@ function InsightRow({ insight, isSelected, isExpanded, onToggleSelect, onToggleE
 
         {/* Detail - shown on hover of the row */}
         {showDetail && (
-          <p className="text-[11px] text-[#505050] leading-relaxed mt-0.5">{insight.detail}</p>
+          <p className="text-[11px] text-[#a0a0a0] leading-relaxed mt-0.5">{insight.detail}</p>
         )}
       </div>
     </div>
@@ -166,10 +166,10 @@ function InsightSectionGroup({
         className="w-full flex items-center gap-2 px-3 py-2 hover:bg-[#1a1a1a]/30 transition-colors"
       >
         {icon}
-        <span className="text-xs font-medium text-[#707070]">{title}</span>
-        <span className="text-[10px] text-[#505050]">({insights.length})</span>
+        <span className="text-xs font-medium text-white">{title}</span>
+        <span className="text-[10px] text-[#a0a0a0]">({insights.length})</span>
         <svg
-          className={`w-3 h-3 text-[#505050] ml-auto transition-transform ${isOpen ? 'rotate-180' : ''}`}
+          className={`w-3 h-3 text-[#a0a0a0] ml-auto transition-transform ${isOpen ? 'rotate-180' : ''}`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"

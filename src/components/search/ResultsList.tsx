@@ -10,6 +10,7 @@ interface ResultsListProps {
   onReviewAndSend: () => void;
   onExpand: (index: number) => void;
   onHide?: (userCandidateId: string) => void;
+  onToggleSaveForLater?: (userCandidateId: string) => void;
   isSending: boolean;
   sendingIndex?: number;
   sendStatuses: Map<string, 'success' | 'failed' | 'pending'>;
@@ -23,6 +24,7 @@ export function ResultsList({
   onReviewAndSend,
   onExpand,
   onHide,
+  onToggleSaveForLater,
   isSending,
   sendingIndex,
   sendStatuses,
@@ -94,6 +96,7 @@ export function ResultsList({
                 onExpand(index);
               }}
               onHide={person.userCandidateId && onHide ? () => onHide(person.userCandidateId!) : undefined}
+              onToggleSaveForLater={person.userCandidateId && onToggleSaveForLater ? () => onToggleSaveForLater(person.userCandidateId!) : undefined}
               isSending={isSending && sendingIndex === index}
               sendStatus={sendStatuses.get(person.id)}
               limitReached={limitReached}

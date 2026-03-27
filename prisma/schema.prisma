@@ -566,21 +566,25 @@ model OutreachTracker {
   userId String
 
   // Contact info
-  contactEmail String
-  contactName  String?
-  company      String?
-  role         String?
-  location     String?
-  linkedinUrl  String?
+  contactEmail   String
+  contactName    String?
+  company        String?
+  role           String?
+  location       String?
+  linkedinUrl    String?
+  group          String? // Division within firm (e.g., TMT, Healthcare)
+  connectionType String? // Relationship type (e.g., Alumni, Referral, Cold)
 
   // Links
   userCandidateId String? @unique
   gmailThreadId   String?
 
   // Dates
-  dateEmailed        DateTime?
+  dateEmailed        DateTime? // First email date
+  lastEmailDate      DateTime? // Most recent email date
   responseReceivedAt DateTime?
   followedUpAt       DateTime?
+  followUpCount      Int       @default(0) // Number of follow-up emails sent
 
   // Interaction
   spokeToThem     Boolean         @default(false)

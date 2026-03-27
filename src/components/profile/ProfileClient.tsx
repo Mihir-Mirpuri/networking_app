@@ -27,10 +27,13 @@ import {
 import { SearchableCombobox } from '@/components/search/SearchableCombobox';
 import { UNIVERSITIES, CLASSIFICATIONS } from '@/lib/constants';
 
+type ProfileTab = 'profile' | 'resumes' | 'templates' | 'billing' | 'settings';
+
 interface ProfileClientProps {
   userEmail: string;
   userName: string;
   userImage: string;
+  activeTab?: ProfileTab;
 }
 
 const DEFAULT_TEMPLATE = {
@@ -58,7 +61,7 @@ const DEFAULT_PLACEHOLDERS = [
   '{industry}',
 ];
 
-export function ProfileClient({ userEmail, userName, userImage }: ProfileClientProps) {
+export function ProfileClient({ userEmail, userName, userImage, activeTab }: ProfileClientProps) {
   const { status } = useSession();
 
   // Profile state
@@ -343,126 +346,100 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
     .join('')
     .toUpperCase();
 
+  const TAB_TITLES: Record<string, { title: string; subtitle: string }> = {
+    profile: { title: 'Profile', subtitle: 'Manage your personal information and preferences' },
+    resumes: { title: 'Resumes', subtitle: 'Upload and manage your resumes' },
+    templates: { title: 'Templates', subtitle: 'Create and manage email templates' },
+    billing: { title: 'Plan & Billing', subtitle: 'Manage your subscription and billing' },
+    settings: { title: 'Settings', subtitle: 'Account preferences and settings' },
+  };
+
+  const currentTab = activeTab || 'profile';
+  const tabInfo = TAB_TITLES[currentTab] || TAB_TITLES.profile;
+
   return (
-    <div className="text-white min-h-screen bg-[#111111]">
+    <div className="text-white p-8 sm:p-10 max-w-4xl">
       {/* Header */}
-      <header className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">Profile</h1>
-        <p className="text-[#909090] text-sm">Manage your professional information and career assets.</p>
+      <header className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-[22px] font-bold tracking-tight">{tabInfo.title}</h1>
+          <p className="text-[#606060] text-[13px] mt-1">{tabInfo.subtitle}</p>
+        </div>
+        {currentTab === 'profile' && (
+          <button
+            onClick={handleSaveProfile}
+            disabled={isSavingProfile}
+            className="bg-[#6364FF] text-white text-[13px] font-semibold px-6 py-2.5 rounded-lg hover:bg-[#5354EE] transition-colors disabled:opacity-50"
+          >
+            {isSavingProfile ? 'Saving...' : 'Save Changes'}
+          </button>
+        )}
       </header>
 
-      {/* Masonry Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4" style={{ alignItems: 'start' }}>
+      {profileSaved && (
+        <div className="mb-6 px-4 py-3 bg-green-900/30 text-green-400 rounded-lg text-sm flex items-center gap-2">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+          Profile saved successfully!
+        </div>
+      )}
 
-        {/* Profile Card */}
-        <section className="bg-[#1a1a1a] p-6 rounded-2xl border border-[#252525] card-shadow">
-          <div className="flex items-center gap-4 mb-6">
-            {userImage ? (
-              <img
-                src={userImage}
-                alt={userName || 'Profile'}
-                className="w-16 h-16 rounded-full ring-2 ring-[#909090]/20"
-              />
-            ) : (
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#606060] to-[#909090] flex items-center justify-center ring-2 ring-[#909090]/20">
-                <span className="text-xl text-white font-semibold">{initials}</span>
-              </div>
-            )}
-            <div>
-              <h2 className="text-xl font-bold text-white">{profile.name || userName}</h2>
-              <div className="flex items-center gap-2 mt-1 flex-wrap">
-                <span className="text-sm text-[#909090]">{userEmail}</span>
-                <span className="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 bg-green-900/30 text-green-400 rounded">
-                  Google Connected
-                </span>
-              </div>
-            </div>
-          </div>
+      {profileError && (
+        <div className="mb-6 px-4 py-3 bg-red-900/30 text-red-400 rounded-lg text-sm">
+          {profileError}
+        </div>
+      )}
 
-          {profileSaved && (
-            <div className="mb-6 px-4 py-3 bg-green-900/30 text-green-400 rounded-lg text-sm flex items-center gap-2">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              Profile saved successfully!
-            </div>
-          )}
+      <div className="space-y-6">
 
-          {profileError && (
-            <div className="mb-6 px-4 py-3 bg-red-900/30 text-red-400 rounded-lg text-sm">
-              {profileError}
-            </div>
-          )}
-
+        {/* Profile Section */}
+        {currentTab === 'profile' && (
+        <div>
           {isLoadingProfile ? (
-            <div className="animate-pulse">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {[...Array(4)].map((_, i) => (
-                  <div key={i} className="space-y-1.5">
-                    <div className="h-3 w-20 bg-[#252525] rounded" />
-                    <div className="h-11 bg-[#1a1a1a] rounded-lg" />
+            <div className="animate-pulse space-y-3">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="flex gap-3">
+                  <div className="flex-1 space-y-1">
+                    <div className="h-3 w-20 bg-[#2a2a2a] rounded" />
+                    <div className="h-11 bg-[#111111] rounded-lg" />
                   </div>
-                ))}
-                <div className="md:col-span-2 space-y-1.5">
-                  <div className="h-3 w-28 bg-[#252525] rounded" />
-                  <div className="h-11 bg-[#1a1a1a] rounded-lg" />
+                  <div className="flex-1 space-y-1">
+                    <div className="h-3 w-20 bg-[#2a2a2a] rounded" />
+                    <div className="h-11 bg-[#111111] rounded-lg" />
+                  </div>
                 </div>
-                <div className="md:col-span-2 space-y-1.5">
-                  <div className="h-3 w-36 bg-[#252525] rounded" />
-                  <div className="h-[84px] bg-[#1a1a1a] rounded-lg" />
-                </div>
-              </div>
-              <div className="mt-6 h-11 w-32 bg-[#252525] rounded-xl" />
+              ))}
             </div>
           ) : (
-            <>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-[#909090]">
-                    Full Name
-                  </label>
+            <div className="space-y-3">
+              {/* Row 1: Name + Email */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-medium text-[#707070]">Full Name</label>
                   <input
                     type="text"
                     value={profile.name || ''}
                     onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-                    className="w-full bg-[#111111] border-none rounded-lg focus:ring-2 focus:ring-[#505050] text-sm p-3"
+                    className="w-full h-11 bg-[#111111] border-none rounded-lg text-[13px] text-[#E0E0E0] px-4 focus:outline-none focus:ring-1 focus:ring-[#404040] transition-colors"
                     placeholder="Your full name"
                   />
                 </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-[#909090]">
-                    Classification
-                  </label>
-                  <select
-                    value={profile.classification || ''}
-                    onChange={(e) => setProfile({ ...profile, classification: e.target.value })}
-                    className="w-full bg-[#111111] border-none rounded-lg focus:ring-2 focus:ring-[#505050] text-sm p-3"
-                  >
-                    <option value="">Select classification</option>
-                    {CLASSIFICATIONS.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-medium text-[#707070]">Email</label>
+                  <div className="flex items-center gap-2 h-11 bg-[#111111] rounded-lg px-4">
+                    <svg className="w-3 h-3 text-[#404040] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+                    </svg>
+                    <span className="text-[13px] text-[#505050]">{userEmail}</span>
+                  </div>
                 </div>
+              </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-[#909090]">
-                    Major
-                  </label>
-                  <input
-                    type="text"
-                    value={profile.major || ''}
-                    onChange={(e) => setProfile({ ...profile, major: e.target.value })}
-                    className="w-full bg-[#111111] border-none rounded-lg focus:ring-2 focus:ring-[#505050] text-sm p-3"
-                    placeholder="e.g., Computer Science"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-[#909090]">
-                    University
-                  </label>
+              {/* Row 2: University + Classification */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-medium text-[#707070]">University</label>
                   <SearchableCombobox
                     options={UNIVERSITIES}
                     value={profile.university || ''}
@@ -472,74 +449,103 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
                     id="university"
                   />
                 </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-medium text-[#707070]">Classification</label>
+                  <select
+                    value={profile.classification || ''}
+                    onChange={(e) => setProfile({ ...profile, classification: e.target.value })}
+                    className="w-full h-11 bg-[#111111] border-none rounded-lg text-[13px] text-[#E0E0E0] px-4 focus:outline-none focus:ring-1 focus:ring-[#404040] transition-colors appearance-none"
+                  >
+                    <option value="">Select classification</option>
+                    {CLASSIFICATIONS.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
 
-                <div className="md:col-span-2 space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-[#909090]">
-                    Career Interest
-                  </label>
+              {/* Row 3: Major + Career */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-medium text-[#707070]">Major</label>
+                  <input
+                    type="text"
+                    value={profile.major || ''}
+                    onChange={(e) => setProfile({ ...profile, major: e.target.value })}
+                    className="w-full h-11 bg-[#111111] border-none rounded-lg text-[13px] text-[#E0E0E0] px-4 focus:outline-none focus:ring-1 focus:ring-[#404040] transition-colors"
+                    placeholder="e.g., Computer Science"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-medium text-[#707070]">Career Interest</label>
                   <input
                     type="text"
                     value={profile.career || ''}
                     onChange={(e) => setProfile({ ...profile, career: e.target.value })}
-                    className="w-full bg-[#111111] border-none rounded-lg focus:ring-2 focus:ring-[#505050] text-sm p-3"
+                    className="w-full h-11 bg-[#111111] border-none rounded-lg text-[13px] text-[#E0E0E0] px-4 focus:outline-none focus:ring-1 focus:ring-[#404040] transition-colors"
                     placeholder="e.g., Investment Banking, Consulting"
                   />
                 </div>
-
-                <div className="md:col-span-2 space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-[#909090]">
-                    Email Style Instructions
-                  </label>
-                  <textarea
-                    value={profile.emailInstructions || ''}
-                    onChange={(e) => setProfile({ ...profile, emailInstructions: e.target.value || null })}
-                    rows={3}
-                    className="w-full bg-[#111111] border-none rounded-lg focus:ring-2 focus:ring-[#505050] text-sm p-3 resize-none"
-                    placeholder="e.g. Keep emails under 3 sentences. Always mention I'm looking for a summer internship. Don't include my resume."
-                  />
-                  <p className="text-xs text-[#808080]">These instructions will be applied to every AI-generated email.</p>
-                </div>
-
-                {/* Auto-Personalize Toggle */}
-                <div className="md:col-span-2 flex items-center justify-between p-4 bg-[#111111] rounded-lg">
-                  <div className="space-y-0.5">
-                    <label className="text-sm font-semibold text-white">
-                      Auto-Personalize Emails
-                    </label>
-                    <p className="text-xs text-[#909090]">
-                      Automatically personalize emails with AI when opening the review modal
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={profile.autoPersonalize}
-                    onClick={() => setProfile({ ...profile, autoPersonalize: !profile.autoPersonalize })}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      profile.autoPersonalize ? 'bg-[#505050]' : 'bg-[#303030]'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        profile.autoPersonalize ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                </div>
               </div>
-
-              <button
-                onClick={handleSaveProfile}
-                disabled={isSavingProfile}
-                className="mt-6 w-full md:w-auto bg-[#505050] text-white px-6 py-2.5 rounded-xl font-semibold hover:bg-[#606060] transition-all disabled:opacity-50"
-              >
-                {isSavingProfile ? 'Saving...' : 'Save Profile'}
-              </button>
-            </>
+            </div>
           )}
-        </section>
+        </div>
+        )}
+
+        {/* Settings Section */}
+        {currentTab === 'settings' && (
+        <div className="space-y-5">
+          {/* Email Style Instructions */}
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-medium text-[#707070]">Email Style Instructions</label>
+            <textarea
+              value={profile.emailInstructions || ''}
+              onChange={(e) => setProfile({ ...profile, emailInstructions: e.target.value || null })}
+              rows={3}
+              className="w-full bg-[#111111] border-none rounded-lg text-[13px] text-[#909090] p-4 focus:outline-none focus:ring-1 focus:ring-[#404040] transition-colors resize-none leading-relaxed"
+              placeholder="e.g. Keep emails under 3 sentences. Always mention I'm looking for a summer internship."
+            />
+            <p className="text-[10px] text-[#505050]">These instructions will be applied to every AI-generated email.</p>
+          </div>
+
+          {/* Auto-Personalize Toggle */}
+          <div className="flex items-center justify-between p-4 bg-[#111111] rounded-lg">
+            <div className="space-y-0.5">
+              <span className="text-[13px] font-medium text-[#E0E0E0]">Auto-Personalize Emails</span>
+              <p className="text-[11px] text-[#505050]">
+                Automatically personalize emails with AI when opening review
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={profile.autoPersonalize}
+              onClick={() => setProfile({ ...profile, autoPersonalize: !profile.autoPersonalize })}
+              className={`relative inline-flex h-[22px] w-10 items-center rounded-full transition-colors shrink-0 ${
+                profile.autoPersonalize ? 'bg-[#6364FF]' : 'bg-[#303030]'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  profile.autoPersonalize ? 'translate-x-[22px]' : 'translate-x-[3px]'
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* Save */}
+          <button
+            onClick={handleSaveProfile}
+            disabled={isSavingProfile}
+            className="bg-[#6364FF] text-white text-[13px] font-semibold px-6 py-2.5 rounded-lg hover:bg-[#5354EE] transition-colors disabled:opacity-50"
+          >
+            {isSavingProfile ? 'Saving...' : 'Save Settings'}
+          </button>
+        </div>
+        )}
 
         {/* Resume Card */}
+        {currentTab === 'resumes' && (
         <section className="bg-[#1a1a1a] p-6 rounded-2xl border border-[#252525] card-shadow">
           <h3 className="text-lg font-bold text-white mb-4">Resume</h3>
 
@@ -646,8 +652,10 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
             </div>
           )}
         </section>
+        )}
 
         {/* Email Templates Card */}
+        {currentTab === 'templates' && (
         <section className="bg-[#1a1a1a] p-6 rounded-2xl border border-[#252525] card-shadow">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-bold text-white">Email Templates</h3>
@@ -861,8 +869,10 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
             </div>
           )}
         </section>
+        )}
 
         {/* Plan & Billing Card */}
+        {currentTab === 'billing' && (
         <section className="bg-[#1a1a1a] p-6 rounded-2xl border border-[#252525] card-shadow">
           <h3 className="text-lg font-bold text-white mb-4">Plan & Billing</h3>
           {isLoadingSubscription ? (
@@ -926,25 +936,8 @@ export function ProfileClient({ userEmail, userName, userImage }: ProfileClientP
             </div>
           )}
         </section>
+        )}
 
-        {/* Account Settings Card */}
-        <section className="bg-[#1a1a1a] p-6 rounded-2xl border border-[#252525] card-shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-bold text-white">Account</h3>
-              <p className="text-sm text-[#909090]">Manage your session</p>
-            </div>
-            <button
-              onClick={handleSignOut}
-              className="bg-red-500 text-white px-6 py-2.5 rounded-xl font-semibold hover:bg-red-600 transition-all flex items-center gap-2"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
-              Sign Out
-            </button>
-          </div>
-        </section>
       </div>
 
       {/* Template Modal */}

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-export type ColumnKey = 'name' | 'company' | 'role' | 'location' | 'subject' | 'date';
+export type ColumnKey = 'name' | 'firm' | 'role' | 'location' | 'group' | 'connection' | 'firstEmailDate' | 'lastEmailDate' | 'followUps' | 'subject' | 'notes';
 
 interface OutreachFiltersProps {
   searchQuery: string;
@@ -19,17 +19,18 @@ interface OutreachFiltersProps {
 
 const ALL_COLUMNS: { key: ColumnKey; label: string }[] = [
   { key: 'name', label: 'Name' },
-  { key: 'company', label: 'Company' },
+  { key: 'firm', label: 'Firm' },
   { key: 'role', label: 'Role' },
   { key: 'location', label: 'Location' },
+  { key: 'group', label: 'Group' },
+  { key: 'connection', label: 'Connection' },
+  { key: 'firstEmailDate', label: 'First Email' },
+  { key: 'lastEmailDate', label: 'Last Email' },
+  { key: 'followUps', label: 'Follow-ups' },
   { key: 'subject', label: 'Subject' },
-  { key: 'date', label: 'Date' },
+  { key: 'notes', label: 'Notes' },
 ];
 
-const EXTRA_COLUMNS: { key: string; label: string }[] = [
-  { key: 'phone', label: 'Phone' },
-  { key: 'linkedin', label: 'LinkedIn' },
-];
 
 export function OutreachFilters({
   searchQuery,
@@ -131,7 +132,7 @@ export function OutreachFilters({
         </button>
 
         {/* Column filter pills */}
-        {['Name', 'Company', 'Role', 'Location', 'Date'].map((label) => (
+        {['Name', 'Firm', 'Role', 'Group', 'Connection'].map((label) => (
           <button
             key={label}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#1a1a1a] border border-[#3a3a3a] text-xs text-[#E0E0E0] font-['Inter'] hover:border-[#505050] transition-colors"
@@ -195,18 +196,6 @@ export function OutreachFilters({
                 );
               })}
 
-              <div className="h-px bg-[#3a3a3a] my-1" />
-
-              {EXTRA_COLUMNS.map((col) => (
-                <button
-                  key={col.key}
-                  className="flex items-center gap-2.5 w-full px-3.5 py-2 hover:bg-[#353535] transition-colors cursor-not-allowed opacity-60"
-                  disabled
-                >
-                  <div className="w-4 h-4 rounded border border-[#505050] shrink-0" />
-                  <span className="text-[13px] text-[#707070] font-['Inter']">{col.label}</span>
-                </button>
-              ))}
             </div>
           )}
         </div>

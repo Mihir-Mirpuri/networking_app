@@ -16,7 +16,7 @@ export function AppShell({ initialRemainingDaily, isAuthenticated = true }: AppS
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pendingQuery, setPendingQuery] = useState<string | null>(null);
   const [pendingFilters, setPendingFilters] = useState<ParsedFilters | null>(null);
-  const [aiMode, setAiMode] = useState(false);
+  const [aiMode, setAiMode] = useState(true);
 
   // Chat state lifted from MainSearchView
   const [messages, setMessages] = useState<DisplayMessage[]>([]);

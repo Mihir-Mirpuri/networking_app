@@ -5,13 +5,51 @@ import { usePathname } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import { ProfileDropdown } from './ProfileDropdown';
 
+// Mascot SVG component
+function MascotSVG({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="60" cy="60" r="54" fill="url(#mascotBgHeader)"/>
+      <path
+        d="M18 60 Q25 42 32 60 Q39 78 46 60 Q53 42 60 60 Q67 78 74 60 Q81 42 88 60 Q95 78 102 60"
+        stroke="url(#waveGradHeader)"
+        strokeWidth="4.5"
+        strokeLinecap="round"
+        fill="none"
+      />
+      <circle cx="52" cy="52" r="5" fill="#e0e0e0"/>
+      <circle cx="68" cy="52" r="5" fill="#e0e0e0"/>
+      <circle cx="53.5" cy="53.5" r="2.5" fill="#1a1a1a"/>
+      <circle cx="69.5" cy="53.5" r="2.5" fill="#1a1a1a"/>
+      <circle cx="54.5" cy="52.5" r="1" fill="white" opacity="0.8"/>
+      <circle cx="70.5" cy="52.5" r="1" fill="white" opacity="0.8"/>
+      <path d="M52 70 Q60 77 68 70" stroke="#e0e0e0" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
+      <line x1="60" y1="6" x2="60" y2="22" stroke="#808080" strokeWidth="2.5" strokeLinecap="round"/>
+      <circle cx="60" cy="5" r="3.5" fill="#a0a0a0"/>
+      <circle cx="60" cy="5" r="6" fill="rgba(160,160,160,0.3)"/>
+      <defs>
+        <linearGradient id="waveGradHeader" x1="18" y1="60" x2="102" y2="60" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#505050"/>
+          <stop offset="50%" stopColor="#808080"/>
+          <stop offset="100%" stopColor="#505050"/>
+        </linearGradient>
+        <radialGradient id="mascotBgHeader" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#3a3a3a"/>
+          <stop offset="100%" stopColor="#252525"/>
+        </radialGradient>
+      </defs>
+    </svg>
+  );
+}
+
 interface NewHeaderProps {
   onToggleSidebar?: () => void;
   showSidebarToggle?: boolean;
   isAuthenticated?: boolean;
+  showLogo?: boolean;
 }
 
-export function NewHeader({ onToggleSidebar, showSidebarToggle, isAuthenticated = true }: NewHeaderProps) {
+export function NewHeader({ onToggleSidebar, showSidebarToggle, isAuthenticated = true, showLogo = false }: NewHeaderProps) {
   const pathname = usePathname();
 
   const tabs = [
@@ -26,19 +64,29 @@ export function NewHeader({ onToggleSidebar, showSidebarToggle, isAuthenticated 
   return (
     <header className="sticky top-0 z-40 bg-[#212121]">
       <div className="px-4 sm:px-6">
-        <div className="flex justify-end items-center h-14">
-          {/* Mobile sidebar toggle */}
-          {showSidebarToggle && (
-            <button
-              onClick={onToggleSidebar}
-              className="lg:hidden absolute left-4 flex items-center justify-center w-8 h-8 rounded-lg text-[#808080] hover:text-white transition-colors"
-              aria-label="Toggle sidebar"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-              </svg>
-            </button>
-          )}
+        <div className="flex justify-between items-center h-14">
+          {/* LEFT: Logo or Mobile sidebar toggle */}
+          <div className="flex items-center">
+            {showSidebarToggle && (
+              <button
+                onClick={onToggleSidebar}
+                className="lg:hidden flex items-center justify-center w-8 h-8 rounded-lg text-[#808080] hover:text-white transition-colors"
+                aria-label="Toggle sidebar"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+                </svg>
+              </button>
+            )}
+            {showLogo && (
+              <Link href="/" className="flex items-center gap-2 group">
+                <MascotSVG className="w-7 h-7" />
+                <span className="text-xl font-bold text-white group-hover:text-[#a0a0a0] transition-colors">
+                  Signl
+                </span>
+              </Link>
+            )}
+          </div>
 
           {/* RIGHT: Nav tabs + Profile/Sign In */}
           <div className="flex items-center gap-6">

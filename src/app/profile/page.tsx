@@ -1,8 +1,7 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { NewHeader } from '@/components/layout/NewHeader';
-import { ProfileClient } from '@/components/profile/ProfileClient';
+import { ProfileLayout } from '@/components/profile/ProfileLayout';
 
 export default async function ProfilePage() {
   const session = await getServerSession(authOptions);
@@ -12,15 +11,10 @@ export default async function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#111111]">
-      <NewHeader />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <ProfileClient
-          userEmail={session.user.email || ''}
-          userName={session.user.name || ''}
-          userImage={session.user.image || ''}
-        />
-      </main>
-    </div>
+    <ProfileLayout
+      userEmail={session.user.email || ''}
+      userName={session.user.name || ''}
+      userImage={session.user.image || ''}
+    />
   );
 }

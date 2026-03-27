@@ -1,7 +1,8 @@
 'use client';
 
 import { SearchResultWithDraft } from '@/app/actions/search';
-import { EnvelopeIcon, AcademicCapIcon, MapPinIcon, BuildingOfficeIcon, CheckIcon } from '@heroicons/react/24/outline';
+import { EnvelopeIcon, AcademicCapIcon, MapPinIcon, BuildingOfficeIcon, CheckIcon, BookmarkIcon } from '@heroicons/react/24/outline';
+import { BookmarkIcon as BookmarkIconSolid } from '@heroicons/react/24/solid';
 
 const AVATAR_GRADIENTS = [
   'from-primary-400 to-primary-600',
@@ -24,6 +25,7 @@ interface PersonCardProps {
   person: SearchResultWithDraft;
   onExpand: () => void;
   onHide?: () => void;
+  onToggleSaveForLater?: () => void;
   isSending: boolean;
   sendStatus?: 'success' | 'failed' | 'pending';
   scheduledFor?: Date | null;
@@ -35,6 +37,7 @@ export function PersonCard({
   person,
   onExpand,
   onHide,
+  onToggleSaveForLater,
   isSending,
   sendStatus,
   scheduledFor,
@@ -91,28 +94,49 @@ export function PersonCard({
     <div className={`group relative card-hover p-5 flex flex-col items-center text-center hover:-translate-y-0.5 ${
       (isSent || isFailed) ? 'opacity-60 saturate-50' : ''
     }`}>
-      {/* Hide button */}
-      {onHide && person.userCandidateId && (
-        <button
-          onClick={onHide}
-          className="absolute top-3 right-3 p-1.5 text-[#707070] hover:text-[#A0A0A0] hover:bg-[#404040] rounded-lg opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all"
-          title="Don't show again"
-        >
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+      {/* Top right buttons */}
+      <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all">
+        {/* Save for later button */}
+        {onToggleSaveForLater && person.userCandidateId && (
+          <button
+            onClick={onToggleSaveForLater}
+            className={`p-1.5 rounded-lg transition-all ${
+              person.savedForLater
+                ? 'text-[#6364FF] hover:text-[#5354EE] hover:bg-[#6364FF]/10'
+                : 'text-[#707070] hover:text-[#A0A0A0] hover:bg-[#404040]'
+            }`}
+            title={person.savedForLater ? 'Remove from saved' : 'Save for later'}
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
-        </button>
-      )}
+            {person.savedForLater ? (
+              <BookmarkIconSolid className="w-4 h-4" />
+            ) : (
+              <BookmarkIcon className="w-4 h-4" />
+            )}
+          </button>
+        )}
+        {/* Hide button */}
+        {onHide && person.userCandidateId && (
+          <button
+            onClick={onHide}
+            className="p-1.5 text-[#707070] hover:text-[#A0A0A0] hover:bg-[#404040] rounded-lg transition-all"
+            title="Don't show again"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        )}
+      </div>
 
       {/* Avatar */}
       <div className="mb-4">

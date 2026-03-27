@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { SearchResultWithDraft, loadMorePeopleAction, regenerateDraftAction } from '@/app/actions/search';
 import { sendSingleEmailAction, sendEmailsAction, PersonToSend } from '@/app/actions/send';
 import { getTemplatesAction, getAutoPersonalizeAction, TemplateData } from '@/app/actions/profile';
-import { hidePersonAction } from '@/app/actions/search';
+import { hidePersonAction, toggleSavedForLaterAction } from '@/app/actions/search';
 import { EMAIL_TEMPLATES } from '@/lib/constants';
 import { LimitReachedModal, dispatchCreditsChanged } from '@/components/credits';
 import { useSession } from 'next-auth/react';
@@ -240,6 +240,24 @@ export function useSearchResults({ initialRemainingDaily }: UseSearchResultsOpti
     }
   };
 
+  const handleToggleSaveForLater = async (userCandidateId: string) => {
+    const result = await toggleSavedForLaterAction(userCandidateId);
+
+    if (result.success) {
+      setResults((prev) =>
+        prev.map((r) =>
+          r.userCandidateId === userCandidateId ? { ...r, savedForLater: result.savedForLater } : r
+        )
+      );
+      setToast({
+        message: result.savedForLater ? 'Saved for later' : 'Removed from saved',
+        type: 'success',
+      });
+    } else if (result.error !== 'Not authenticated') {
+      setToast({ message: result.error || 'Failed to update', type: 'error' });
+    }
+  };
+
   const handleTemplateChange = async (templateId: string, personIndex: number) => {
     const person = results[personIndex];
     if (!person?.userCandidateId) return;
@@ -378,6 +396,7 @@ export function useSearchResults({ initialRemainingDaily }: UseSearchResultsOpti
     handleSendFromReview,
     handleBulkSend,
     handleHidePerson,
+    handleToggleSaveForLater,
     handleTemplateChange,
     handleApplyTemplateToAll,
     handleLoadMore,

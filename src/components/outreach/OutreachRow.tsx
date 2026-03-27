@@ -40,11 +40,16 @@ function getInitials(name: string | null, email: string): string {
 
 const COLUMN_WIDTHS: Record<ColumnKey, string> = {
   name: 'w-[200px] min-w-[200px]',
-  company: 'w-[100px] min-w-[100px]',
+  firm: 'w-[100px] min-w-[100px]',
   role: 'w-[120px] min-w-[120px]',
-  location: 'w-[120px] min-w-[120px]',
-  subject: 'flex-1 min-w-[120px]',
-  date: 'w-[120px] min-w-[120px]',
+  location: 'w-[100px] min-w-[100px]',
+  group: 'w-[80px] min-w-[80px]',
+  connection: 'w-[100px] min-w-[100px]',
+  firstEmailDate: 'w-[100px] min-w-[100px]',
+  lastEmailDate: 'w-[100px] min-w-[100px]',
+  followUps: 'w-[80px] min-w-[80px]',
+  subject: 'flex-1 min-w-[100px]',
+  notes: 'w-[60px] min-w-[60px]',
 };
 
 export function OutreachRow({ tracker, onUpdate, onDelete, onToggleStar, onRowClick, visibleColumns }: OutreachRowProps) {
@@ -121,9 +126,9 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onToggleStar, onRowCl
             </div>
           </div>
         );
-      case 'company':
+      case 'firm':
         return (
-          <div className={`${COLUMN_WIDTHS.company} px-2`}>
+          <div className={`${COLUMN_WIDTHS.firm} px-2`}>
             <span className="text-[13px] text-[#909090] font-['Inter'] truncate block">
               {tracker.company || <span className="text-[#505050]">--</span>}
             </span>
@@ -145,6 +150,46 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onToggleStar, onRowCl
             </span>
           </div>
         );
+      case 'group':
+        return (
+          <div className={`${COLUMN_WIDTHS.group} px-2`}>
+            <span className="text-[13px] text-[#909090] font-['Inter'] truncate block">
+              {tracker.group || <span className="text-[#505050]">--</span>}
+            </span>
+          </div>
+        );
+      case 'connection':
+        return (
+          <div className={`${COLUMN_WIDTHS.connection} px-2`}>
+            <span className="text-[13px] text-[#909090] font-['Inter'] truncate block">
+              {tracker.connectionType || <span className="text-[#505050]">--</span>}
+            </span>
+          </div>
+        );
+      case 'firstEmailDate':
+        return (
+          <div className={`${COLUMN_WIDTHS.firstEmailDate} px-2`}>
+            <span className="text-[13px] text-[#707070] font-['Inter'] truncate block whitespace-nowrap">
+              {formatDate(tracker.dateEmailed)}
+            </span>
+          </div>
+        );
+      case 'lastEmailDate':
+        return (
+          <div className={`${COLUMN_WIDTHS.lastEmailDate} px-2`}>
+            <span className="text-[13px] text-[#707070] font-['Inter'] truncate block whitespace-nowrap">
+              {formatDate(tracker.lastEmailDate)}
+            </span>
+          </div>
+        );
+      case 'followUps':
+        return (
+          <div className={`${COLUMN_WIDTHS.followUps} px-2`}>
+            <span className="text-[13px] text-[#707070] font-['Inter'] truncate block text-center">
+              {tracker.followUpCount > 0 ? tracker.followUpCount : <span className="text-[#505050]">0</span>}
+            </span>
+          </div>
+        );
       case 'subject':
         return (
           <div className={`${COLUMN_WIDTHS.subject} px-2`}>
@@ -153,12 +198,17 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onToggleStar, onRowCl
             </span>
           </div>
         );
-      case 'date':
+      case 'notes':
         return (
-          <div className={`${COLUMN_WIDTHS.date} px-2`}>
-            <span className="text-[13px] text-[#707070] font-['Inter'] truncate block whitespace-nowrap">
-              {formatDate(tracker.dateEmailed)}
-            </span>
+          <div className={`${COLUMN_WIDTHS.notes} px-2 flex justify-center`}>
+            {tracker.notes ? (
+              <svg className="w-4 h-4 text-[#6364FF]" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm-1 2l5 5h-5V4zM6 20V4h6v6h6v10H6z"/>
+                <path d="M8 12h8v2H8zm0 4h8v2H8z"/>
+              </svg>
+            ) : (
+              <span className="text-[#505050]">--</span>
+            )}
           </div>
         );
     }

@@ -89,6 +89,7 @@ export interface SearchResultWithDraft {
   draftBody: string;
   userCandidateId: string | null;
   resumeId: string | null;
+  savedForLater: boolean;
   score?: number;
   scoreBreakdown?: ScoreBreakdown;
   llmDraftGenerated?: boolean;
@@ -348,6 +349,7 @@ async function buildResultsWithDrafts(
       let draftSubject = '';
       let draftBody = '';
 
+      let savedForLater = false;
       if (userId) {
         // Authenticated user: create UserCandidate and EmailDraft records
         const userCandidate = await prisma.userCandidate.upsert({
@@ -362,8 +364,10 @@ async function buildResultsWithDrafts(
             emailConfidence: person.emailConfidence,
           },
           update: {},
-          select: { id: true },
+          select: { id: true, savedForLater: true },
         });
+
+        savedForLater = userCandidate.savedForLater;
 
         userCandidateId = userCandidate.id;
 
@@ -431,6 +435,7 @@ async function buildResultsWithDrafts(
         draftBody,
         userCandidateId,
         resumeId: template.attachResume ? template.resumeId : null,
+        savedForLater,
         score,
         scoreBreakdown: breakdown,
       };
@@ -762,6 +767,42 @@ export async function hidePersonAction(
 }
 
 /**
+ * Toggle saved for later status for a person
+ */
+export async function toggleSavedForLaterAction(
+  userCandidateId: string
+): Promise<{ success: true; savedForLater: boolean } | { success: false; error: string }> {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.id) {
+    return { success: false, error: 'Not authenticated' };
+  }
+
+  try {
+    const current = await prisma.userCandidate.findUnique({
+      where: { id: userCandidateId, userId: session.user.id },
+      select: { savedForLater: true },
+    });
+
+    if (!current) {
+      return { success: false, error: 'Person not found' };
+    }
+
+    const newValue = !current.savedForLater;
+    await prisma.userCandidate.update({
+      where: { id: userCandidateId, userId: session.user.id },
+      data: { savedForLater: newValue },
+    });
+
+    console.log(`[SaveForLater] User ${session.user.id} set savedForLater=${newValue} for userCandidate ${userCandidateId}`);
+    return { success: true, savedForLater: newValue };
+  } catch (error) {
+    console.error('[SaveForLater] Error:', error);
+    return { success: false, error: 'Failed to update saved status' };
+  }
+}
+
+/**
  * Fetch hidden people for the current user (for the "N people hidden" bar)
  */
 export async function getHiddenPeopleAction(): Promise<
@@ -831,6 +872,7 @@ export async function unhidePersonAction(
       select: {
         id: true,
         personId: true,
+        savedForLater: true,
         person: {
           select: {
             id: true,
@@ -904,6 +946,7 @@ export async function unhidePersonAction(
       draftBody: draft?.body || '',
       userCandidateId: uc.id,
       resumeId: draft?.template?.attachResume ? draft.template.resumeId : null,
+      savedForLater: uc.savedForLater,
     };
 
     console.log(`[Unhide] User ${userId} unmarked userCandidate ${userCandidateId}`);

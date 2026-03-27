@@ -30,11 +30,16 @@ interface ColumnConfig {
 
 const COLUMNS: ColumnConfig[] = [
   { key: 'name', sortKey: 'contactName', label: 'Name', width: 'w-[200px] min-w-[200px]' },
-  { key: 'company', sortKey: 'company', label: 'Company', width: 'w-[100px] min-w-[100px]' },
+  { key: 'firm', sortKey: 'company', label: 'Firm', width: 'w-[100px] min-w-[100px]' },
   { key: 'role', sortKey: 'role', label: 'Role', width: 'w-[120px] min-w-[120px]' },
-  { key: 'location', sortKey: 'location', label: 'Location', width: 'w-[120px] min-w-[120px]' },
-  { key: 'subject', sortKey: null, label: 'Subject', width: 'flex-1 min-w-[120px]' },
-  { key: 'date', sortKey: 'dateEmailed', label: 'Date', width: 'w-[120px] min-w-[120px]' },
+  { key: 'location', sortKey: 'location', label: 'Location', width: 'w-[100px] min-w-[100px]' },
+  { key: 'group', sortKey: 'group', label: 'Group', width: 'w-[80px] min-w-[80px]' },
+  { key: 'connection', sortKey: 'connectionType', label: 'Connection', width: 'w-[100px] min-w-[100px]' },
+  { key: 'firstEmailDate', sortKey: 'dateEmailed', label: 'First Email', width: 'w-[100px] min-w-[100px]' },
+  { key: 'lastEmailDate', sortKey: 'lastEmailDate', label: 'Last Email', width: 'w-[100px] min-w-[100px]' },
+  { key: 'followUps', sortKey: 'followUpCount', label: 'Follow-ups', width: 'w-[80px] min-w-[80px]' },
+  { key: 'subject', sortKey: null, label: 'Subject', width: 'flex-1 min-w-[100px]' },
+  { key: 'notes', sortKey: null, label: 'Notes', width: 'w-[60px] min-w-[60px]' },
 ];
 
 const SortIcon = ({ field, sortField, sortDirection }: { field: SortField | null; sortField: SortField; sortDirection: SortDirection }) => {

@@ -373,6 +373,7 @@ export function SearchPageClient({ initialRemainingDaily }: SearchPageClientProp
             onReviewAndSend={() => hook.setShowBulkReview(true)}
             onExpand={hook.setExpandedIndex}
             onHide={hook.handleHidePerson}
+            onToggleSaveForLater={hook.handleToggleSaveForLater}
             isSending={hook.isSending}
             sendingIndex={undefined}
             sendStatuses={hook.sendStatuses}

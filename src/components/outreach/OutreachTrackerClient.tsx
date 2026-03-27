@@ -23,7 +23,7 @@ interface OutreachTrackerClientProps {
   initialStats: OutreachStats;
 }
 
-const DEFAULT_COLUMNS: ColumnKey[] = ['name', 'company', 'role', 'location', 'subject', 'date'];
+const DEFAULT_COLUMNS: ColumnKey[] = ['name', 'firm', 'role', 'group', 'connection', 'firstEmailDate', 'lastEmailDate', 'followUps', 'notes'];
 
 export function OutreachTrackerClient({
   initialTrackers,

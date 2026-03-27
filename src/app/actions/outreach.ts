@@ -13,9 +13,13 @@ export interface OutreachTrackerEntry {
   role: string | null;
   location: string | null;
   linkedinUrl: string | null;
+  group: string | null;
+  connectionType: string | null;
   dateEmailed: Date | null;
+  lastEmailDate: Date | null;
   responseReceivedAt: Date | null;
   followedUpAt: Date | null;
+  followUpCount: number;
   spokeToThem: boolean;
   interactionType: InteractionType;
   interactionDate: Date | null;
@@ -45,7 +49,11 @@ export type SortField =
   | 'company'
   | 'role'
   | 'location'
+  | 'group'
+  | 'connectionType'
   | 'dateEmailed'
+  | 'lastEmailDate'
+  | 'followUpCount'
   | 'status'
   | 'createdAt';
 
@@ -164,9 +172,13 @@ export async function getOutreachTrackers(
         role: t.role,
         location: t.location,
         linkedinUrl: t.linkedinUrl,
+        group: t.group,
+        connectionType: t.connectionType,
         dateEmailed: t.dateEmailed,
+        lastEmailDate: t.lastEmailDate,
         responseReceivedAt: t.responseReceivedAt,
         followedUpAt: t.followedUpAt,
+        followUpCount: t.followUpCount,
         spokeToThem: t.spokeToThem,
         interactionType: t.interactionType,
         interactionDate: t.interactionDate,
@@ -244,9 +256,13 @@ export async function getInitialOutreachTrackers(userId: string): Promise<{
         role: t.role,
         location: t.location,
         linkedinUrl: t.linkedinUrl,
+        group: t.group,
+        connectionType: t.connectionType,
         dateEmailed: t.dateEmailed,
+        lastEmailDate: t.lastEmailDate,
         responseReceivedAt: t.responseReceivedAt,
         followedUpAt: t.followedUpAt,
+        followUpCount: t.followUpCount,
         spokeToThem: t.spokeToThem,
         interactionType: t.interactionType,
         interactionDate: t.interactionDate,
@@ -344,9 +360,13 @@ export async function updateOutreachTracker(
         role: updated.role,
         location: updated.location,
         linkedinUrl: updated.linkedinUrl,
+        group: updated.group,
+        connectionType: updated.connectionType,
         dateEmailed: updated.dateEmailed,
+        lastEmailDate: updated.lastEmailDate,
         responseReceivedAt: updated.responseReceivedAt,
         followedUpAt: updated.followedUpAt,
+        followUpCount: updated.followUpCount,
         spokeToThem: updated.spokeToThem,
         interactionType: updated.interactionType,
         interactionDate: updated.interactionDate,
@@ -721,9 +741,13 @@ export async function createOutreachTracker(params: {
         role: tracker.role,
         location: tracker.location,
         linkedinUrl: tracker.linkedinUrl,
+        group: tracker.group,
+        connectionType: tracker.connectionType,
         dateEmailed: tracker.dateEmailed,
+        lastEmailDate: tracker.lastEmailDate,
         responseReceivedAt: tracker.responseReceivedAt,
         followedUpAt: tracker.followedUpAt,
+        followUpCount: tracker.followUpCount,
         spokeToThem: tracker.spokeToThem,
         interactionType: tracker.interactionType,
         interactionDate: tracker.interactionDate,
