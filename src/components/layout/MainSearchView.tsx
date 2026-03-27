@@ -217,7 +217,7 @@ import { SearchLoadingState } from '@/components/search/SearchLoadingState';
 import { Toast } from '@/components/ui/Toast';
 import { LimitReachedModal, dispatchCreditsChanged } from '@/components/credits';
 import { HiddenPeopleBar } from '@/components/search/HiddenPeopleBar';
-import { searchPeopleAction, SearchResultWithDraft } from '@/app/actions/search';
+import { searchPeopleAction, lookupPersonAction, SearchResultWithDraft } from '@/app/actions/search';
 import { extractSearchFiltersAction, ParsedFilters, ChatMessage, Selectable } from '@/app/actions/ai-search';
 import { useSearchResults } from '@/hooks/useSearchResults';
 import { LoginPromptModal } from '@/components/auth/LoginPromptModal';
@@ -518,6 +518,41 @@ export function MainSearchView({
         )
       );
       setIsExtracting(false);
+      return;
+    }
+
+    // Handle person lookup before accessing filters (person_lookup doesn't have filters)
+    if (extractResult.status === 'person_lookup') {
+      const { assistantMessage } = extractResult;
+      setMessages(prev =>
+        prev.map(m =>
+          m.id === assistantMsgId
+            ? { ...m, content: assistantMessage, isLoading: false }
+            : m
+        )
+      );
+      setIsExtracting(false);
+      setIsSearching(true);
+      hook.resetResults();
+
+      const lookupResult = await lookupPersonAction({
+        name: extractResult.personName,
+        company: extractResult.personCompany,
+      });
+
+      if (searchIdRef.current !== thisSearchId) return;
+
+      if (lookupResult.success) {
+        hook.setResults(lookupResult.results);
+        hook.setHasMore(false);
+        hook.setTotalLoaded(lookupResult.results.length);
+      } else {
+        setMessages(prev => [
+          ...prev,
+          { id: `assistant-${Date.now()}`, role: 'assistant', content: lookupResult.error || 'Could not find that person.' },
+        ]);
+      }
+      setIsSearching(false);
       return;
     }
 

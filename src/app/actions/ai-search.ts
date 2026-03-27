@@ -38,7 +38,7 @@ export interface ExtractFiltersInput {
 }
 
 interface LLMResponse {
-  status: 'ready' | 'needs_selection' | 'off_topic';
+  status: 'ready' | 'needs_selection' | 'off_topic' | 'person_lookup';
   confidence?: 'high' | 'low';
   filters: {
     company: string | null;
@@ -46,6 +46,8 @@ interface LLMResponse {
     university: string | null;
     location: string | null;
   };
+  person_name?: string;
+  person_company?: string;
   selectables?: Array<{ label: string; filter_key: 'company' | 'role'; filter_value: string }>;
   suggested_searches?: Array<{ label: string; company: string; role: string | null }>;
   message: string;
@@ -54,6 +56,7 @@ interface LLMResponse {
 export type ExtractFiltersResult =
   | { success: true; status: 'ready'; filters: ParsedFilters; assistantMessage: string; suggestedSearches: SuggestedSearch[] }
   | { success: true; status: 'needs_selection'; filters: ParsedFilters; assistantMessage: string; selectables: Selectable[]; allSelectables?: Selectable[] }
+  | { success: true; status: 'person_lookup'; assistantMessage: string; personName: string; personCompany?: string }
   | { success: true; status: 'off_topic'; filters: ParsedFilters; assistantMessage: string }
   | { success: false; error: string };
 
@@ -63,18 +66,27 @@ A search requires exactly ONE company. Role is optional but recommended. You als
 
 You must return JSON with this schema:
 {
-  "status": "ready" | "needs_selection" | "off_topic",
+  "status": "ready" | "needs_selection" | "off_topic" | "person_lookup",
   "confidence": "high" | "low",
   "filters": { "company": string|null, "role": string|null, "university": string|null, "location": string|null },
+  "person_name": string|null,
+  "person_company": string|null,
   "selectables": [{ "label": string, "filter_key": "company"|"role", "filter_value": string }],
   "suggested_searches": [{ "label": string, "company": string, "role": string|null }],
   "message": string
 }
 
 STATUS RULES:
-- "ready": Company is clearly specified. Role is optional — if the user doesn't mention a role, set role to null and return "ready". Trigger the search.
+- "person_lookup": The user is searching for a SPECIFIC PERSON by name (e.g., "Find John Smith", "Look up Jane Doe at Google", "Do you have Sarah Connor's info?"). Return the person's name in "person_name" and optional company in "person_company". This takes priority over "ready" when a person's full name (first + last) is clearly provided.
+- "ready": Company is clearly specified but NO specific person name. Role is optional — if the user doesn't mention a role, set role to null and return "ready". Trigger the search.
 - "needs_selection": The user mentioned a category, industry, or ambiguous term that maps to multiple companies. Return up to 5 selectables for the user to choose from.
 - "off_topic": The message is unrelated to finding professional contacts.
+
+PERSON LOOKUP RULES:
+- A person lookup requires at minimum a first AND last name (e.g., "John Smith"). A single name like "John" is NOT enough — ask for a last name.
+- If the user also mentions a company (e.g., "John Smith at Google"), include it in "person_company" to narrow results.
+- Do NOT use "person_lookup" for generic role-based searches like "engineers at Google" — those are "ready" searches.
+- Examples of person lookups: "Find John Smith", "Look up Sarah at Meta" (ask for last name), "John Smith Goldman Sachs", "Do you know Jane Doe?"
 
 FILTER RULES:
 1. If a filter was previously set and the user doesn't mention it, KEEP the previous value.
@@ -123,6 +135,12 @@ User: "people at McKinsey"
 
 User: "engineers at Google and Meta"
 → {"status":"needs_selection","filters":{"company":null,"role":"Software Engineer","university":null,"location":null},"selectables":[{"label":"Google","filter_key":"company","filter_value":"Google"},{"label":"Meta","filter_key":"company","filter_value":"Meta"}],"suggested_searches":[],"message":"Which company would you like to search first?"}
+
+User: "Find John Smith at Google"
+→ {"status":"person_lookup","filters":{"company":null,"role":null,"university":null,"location":null},"person_name":"John Smith","person_company":"Google","selectables":[],"suggested_searches":[],"message":"Looking up John Smith at Google!"}
+
+User: "Do you have Jane Doe's info?"
+→ {"status":"person_lookup","filters":{"company":null,"role":null,"university":null,"location":null},"person_name":"Jane Doe","person_company":null,"selectables":[],"suggested_searches":[],"message":"Looking up Jane Doe!"}
 
 User: "how is the weather?"
 → {"status":"off_topic","filters":{"company":null,"role":null,"university":null,"location":null},"selectables":[],"suggested_searches":[],"message":"I'm designed to help you find and reach out to professional contacts! Try something like 'Find software engineers at Google' or 'PMs at McKinsey'."}`;
@@ -259,6 +277,26 @@ export async function extractSearchFiltersAction(
         status: 'off_topic',
         filters: parsedFilters,
         assistantMessage: message,
+      };
+    }
+
+    if (status === 'person_lookup') {
+      const personName = response.content.person_name?.trim();
+      if (!personName) {
+        return {
+          success: true,
+          status: 'off_topic',
+          filters: parsedFilters,
+          assistantMessage: message || "I need a first and last name to look someone up. Could you provide their full name?",
+        };
+      }
+      console.log(`[AI Search] Person lookup: name="${personName}", company="${response.content.person_company || '(none)'}"`);
+      return {
+        success: true,
+        status: 'person_lookup',
+        assistantMessage: message,
+        personName,
+        personCompany: response.content.person_company?.trim() || undefined,
       };
     }
 
