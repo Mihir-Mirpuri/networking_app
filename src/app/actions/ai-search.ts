@@ -17,6 +17,7 @@ export interface Selectable {
   label: string;
   filterKey: 'company' | 'role';
   filterValue: string;
+  skipLocationInSearch?: boolean;
 }
 
 export interface SuggestedSearch {
@@ -79,10 +80,15 @@ FILTER RULES:
 1. If a filter was previously set and the user doesn't mention it, KEEP the previous value.
 2. "try X instead" or "change to X" → replace the relevant filter.
 3. "remove the role filter" or "any role" → set that filter to null.
-4. Be smart about abbreviations: "PMs" = "Product Manager", "SWEs" = "Software Engineer", "bankers" could mean role in banking.
+4. ROLE NORMALIZATION: Always normalize informal, slang, or abbreviated role terms to the most common LinkedIn job title(s). The role you return must be a real title that people actually use on LinkedIn profiles.
+   - Abbreviations: "PMs" → "Product Manager", "SWEs" → "Software Engineer", "BAs" → "Business Analyst", "IB" → "Investment Banking"
+   - Slang/informal: "Banker" → "Investment Banking Analyst", "Consultant" → "Consultant" (already standard), "Trader" → "Trader" (already standard), "Coder" → "Software Engineer", "Dev" → "Software Engineer", "Designer" → "Product Designer", "Data guy" → "Data Scientist"
+   - Finance titles: "Banker" → "Investment Banking Analyst", "Quant" → "Quantitative Researcher", "PE" → "Private Equity"
+   - If the term is already a standard LinkedIn title (e.g., "Software Engineer", "Product Manager", "Consultant"), keep it as-is.
 5. "at [X]" = company. "from [X]" = university. University abbreviations: "UT" = "UT Austin", "MIT" = "MIT", "Stanford" = "Stanford University".
 6. When the user says "No", "Nah", "that's it" in response to a question, KEEP all previous filters unchanged.
 7. Always extract a company when one is clearly stated. "at Meta" = company: "Meta". Never drop it.
+8. For US locations, ALWAYS normalize to "City, State" format (e.g., "Austin" → "Austin, Texas", "SF" → "San Francisco, California", "NYC" → "New York, New York", "LA" → "Los Angeles, California", "Chi" → "Chicago, Illinois"). For international locations, use "City, Country" (e.g., "London" → "London, United Kingdom"). This prevents city names from matching people's names in search results.
 
 SELECTABLE RULES:
 - When the user says a category like "top consulting firms", "big tech", "investment banks", "FAANG", return status "needs_selection" with up to 5 company selectables.
@@ -107,7 +113,7 @@ MESSAGE RULES:
 EXAMPLES:
 
 User: "PMs at Google in Austin"
-→ {"status":"ready","filters":{"company":"Google","role":"Product Manager","university":null,"location":"Austin"},"selectables":[],"suggested_searches":[{"label":"PMs at Meta","company":"Meta","role":"Product Manager"},{"label":"PMs at Apple","company":"Apple","role":"Product Manager"},{"label":"Software Engineers at Google","company":"Google","role":"Software Engineer"}],"message":"Searching for Product Managers at Google in Austin!"}
+→ {"status":"ready","filters":{"company":"Google","role":"Product Manager","university":null,"location":"Austin, Texas"},"selectables":[],"suggested_searches":[{"label":"PMs at Meta","company":"Meta","role":"Product Manager"},{"label":"PMs at Apple","company":"Apple","role":"Product Manager"},{"label":"Software Engineers at Google","company":"Google","role":"Software Engineer"}],"message":"Searching for Product Managers at Google in Austin!"}
 
 User: "consultants at top consulting firms from UT Austin"
 → {"status":"needs_selection","filters":{"company":null,"role":"Consultant","university":"UT Austin","location":null},"selectables":[{"label":"McKinsey","filter_key":"company","filter_value":"McKinsey"},{"label":"BCG","filter_key":"company","filter_value":"BCG"},{"label":"Bain","filter_key":"company","filter_value":"Bain"},{"label":"Deloitte","filter_key":"company","filter_value":"Deloitte"},{"label":"Accenture","filter_key":"company","filter_value":"Accenture"}],"suggested_searches":[],"message":"Which consulting firm are you interested in?"}
@@ -284,6 +290,7 @@ export async function extractSearchFiltersAction(
               label: c.name,
               filterKey: 'company' as const,
               filterValue: c.name,
+              skipLocationInSearch: true,
             }));
 
             // Deduplicate: remove Groq suggestions that Perplexity also returned
@@ -333,6 +340,7 @@ export async function extractSearchFiltersAction(
             label: c.name,
             filterKey: 'company' as const,
             filterValue: c.name,
+            skipLocationInSearch: true,
           }));
 
           return {

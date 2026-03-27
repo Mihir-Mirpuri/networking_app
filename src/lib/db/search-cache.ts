@@ -365,6 +365,7 @@ export interface ScrapeProgress {
   lastCsePageScraped: number;
   cseExhausted: boolean;
   prescrapeStatus: string | null;
+  lastPrescrapeNewCount: number;
 }
 
 // Hard cap: 10 total Serper pages. Serper uses 1-based page numbers (1, 2, 3, ...).
@@ -412,10 +413,11 @@ export async function findOrCreateScrapeProgress(
       lastCsePageScraped: number;
       cseExhausted: boolean;
       prescrapeStatus: string | null;
+      lastPrescrapeNewCount: number;
       updatedAt: Date;
     }>
   >`
-    SELECT "id", "lastCsePageScraped", "cseExhausted", "prescrapeStatus", "updatedAt"
+    SELECT "id", "lastCsePageScraped", "cseExhausted", "prescrapeStatus", "lastPrescrapeNewCount", "updatedAt"
     FROM "Search"
     WHERE COALESCE("name", '') = COALESCE(${params.name}, '')
       AND COALESCE("company", '') = COALESCE(${params.company}, '')
@@ -438,7 +440,7 @@ export async function findOrCreateScrapeProgress(
         where: { id: record.id },
         data: { lastCsePageScraped: 0, cseExhausted: false },
       });
-      return { id: record.id, lastCsePageScraped: 0, cseExhausted: false, prescrapeStatus: null };
+      return { id: record.id, lastCsePageScraped: 0, cseExhausted: false, prescrapeStatus: null, lastPrescrapeNewCount: 0 };
     }
 
     return {
@@ -446,6 +448,7 @@ export async function findOrCreateScrapeProgress(
       lastCsePageScraped: record.lastCsePageScraped,
       cseExhausted: record.cseExhausted,
       prescrapeStatus: record.prescrapeStatus,
+      lastPrescrapeNewCount: record.lastPrescrapeNewCount,
     };
   }
 
@@ -467,6 +470,7 @@ export async function findOrCreateScrapeProgress(
     lastCsePageScraped: 0,
     cseExhausted: false,
     prescrapeStatus: null,
+    lastPrescrapeNewCount: 0,
   };
 }
 
@@ -484,6 +488,7 @@ export async function updateScrapeProgress(
     data: {
       lastCsePageScraped: pageScraped,
       cseExhausted: isCsePageExhausted(cseReturnedCount),
+      lastPrescrapeNewCount: apiStats?.profilesAdded ?? 0,
       completedAt: new Date(),
       ...(apiStats?.cseCallsMade !== undefined && {
         cseCallsMade: { increment: apiStats.cseCallsMade },
@@ -528,7 +533,7 @@ export function buildSerperQuery(params: {
     queryParts.push(`"${params.university.trim()}"`);
   }
   if (params.role && params.role.trim()) queryParts.push(params.role.trim());
-  if (params.location && params.location.trim()) queryParts.push(params.location.trim());
+  if (params.location && params.location.trim()) queryParts.push(`"${params.location.trim()}"`);
   if (params.name && params.name.trim()) queryParts.push(params.name.trim());
 
   return `site:linkedin.com/in ${queryParts.join(' ')}`;
@@ -554,10 +559,11 @@ export async function findScrapeProgressByQueryHash(
       lastCsePageScraped: number;
       cseExhausted: boolean;
       prescrapeStatus: string | null;
+      lastPrescrapeNewCount: number;
       updatedAt: Date;
     }>
   >`
-    SELECT "id", "lastCsePageScraped", "cseExhausted", "prescrapeStatus", "updatedAt"
+    SELECT "id", "lastCsePageScraped", "cseExhausted", "prescrapeStatus", "lastPrescrapeNewCount", "updatedAt"
     FROM "Search"
     WHERE "queryHash" = ${queryHash}
     ORDER BY "updatedAt" DESC
@@ -578,6 +584,7 @@ export async function findScrapeProgressByQueryHash(
     lastCsePageScraped: record.lastCsePageScraped,
     cseExhausted: record.cseExhausted,
     prescrapeStatus: record.prescrapeStatus,
+    lastPrescrapeNewCount: record.lastPrescrapeNewCount,
   };
 }
 

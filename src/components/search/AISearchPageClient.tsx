@@ -74,6 +74,7 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const searchIdRef = useRef(0);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -140,8 +141,30 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
     return () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); };
   }, [messages, currentFilters, hook.results, hook.expandedIndex, hook.sendStatuses, hook.showBulkReview, hook.generatingStatuses, hook.totalLoaded, hook.hasMore, hook.hiddenCount, hook.searchParams, suggestedSearches]);
 
-  const runSearch = useCallback(async (filters: ParsedFilters) => {
+  const cancelSearch = useCallback(() => {
+    const cancelledId = searchIdRef.current;
+    console.log(`[CancelSearch] Cancelling search #${cancelledId}`);
+
+    searchIdRef.current += 1;
+    console.log(`[CancelSearch] Search generation bumped to #${searchIdRef.current}`);
+
+    setIsExtracting(false);
+    setIsSearching(false);
+
+    // Remove any loading assistant bubbles
+    setMessages(prev => prev.filter(m => !m.isLoading));
+
+    // Clear Load More retry timers
+    hook.cancelRetries();
+
+    console.log(`[CancelSearch] Cleanup complete for search #${cancelledId}. Ready for new search.`);
+  }, [hook]);
+
+  const runSearch = useCallback(async (filters: ParsedFilters, skipLocationInSearch?: boolean) => {
     if (!filters.company) return;
+
+    const thisSearchId = searchIdRef.current;
+    console.log(`[Search] Starting search #${thisSearchId} for company="${filters.company}" role="${filters.role || '(any)'}"`);
 
     setIsSearching(true);
     hook.resetResults();
@@ -154,9 +177,17 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
       university: filters.university,
       location: filters.location,
       limit,
+      skipLocationInSearch,
     });
 
+    // Stale check: discard if search was cancelled or a new search started
+    if (searchIdRef.current !== thisSearchId) {
+      console.log(`[Search] Discarding stale result from search #${thisSearchId} (current is #${searchIdRef.current})`);
+      return;
+    }
+
     if (result.success) {
+      console.log(`[Search] Search #${thisSearchId} returned ${result.results.length} results`);
       hook.applySearchResults(result.results, result.searchMeta, result.hiddenCount, {
         company: filters.company,
         role: filters.role,
@@ -167,6 +198,7 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
 
       // Fire-and-forget prescrape — only if we got results
       if (result.results.length > 0) {
+        console.log(`[Search] Firing prescrape for search #${thisSearchId}`);
         fetch('/api/prescrape', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -175,9 +207,12 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
             role: filters.role,
             university: filters.university,
             location: filters.location,
+            skipLocationInSearch,
           }),
         }).catch(err => console.error('[Prescrape] Error:', err));
       }
+    } else {
+      console.log(`[Search] Search #${thisSearchId} failed:`, result.error);
     }
 
     setIsSearching(false);
@@ -186,6 +221,11 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
   const handleSendMessage = async (text?: string) => {
     const message = text || inputValue.trim();
     if (!message || isExtracting || isSearching) return;
+
+    // Start a new search generation
+    searchIdRef.current += 1;
+    const thisSearchId = searchIdRef.current;
+    console.log(`[SendMessage] Starting search #${thisSearchId} with message: "${message}"`);
 
     setInputValue('');
 
@@ -210,6 +250,12 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
       conversationHistory,
       currentFilters,
     });
+
+    // Stale check after LLM extraction
+    if (searchIdRef.current !== thisSearchId) {
+      console.log(`[SendMessage] Discarding stale extraction result from search #${thisSearchId} (current is #${searchIdRef.current})`);
+      return;
+    }
 
     if (!extractResult.success) {
       setMessages(prev =>
@@ -275,6 +321,11 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
   };
 
   const handleSelectableClick = async (selectable: Selectable) => {
+    // Start a new search generation
+    searchIdRef.current += 1;
+    const thisSearchId = searchIdRef.current;
+    console.log(`[SelectableClick] Starting search #${thisSearchId} with selection: "${selectable.label}"`);
+
     // Add a user message showing what they picked
     const userMsgId = `user-${Date.now()}`;
     setMessages(prev => [
@@ -294,7 +345,7 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
         ...prev,
         { id: confirmMsgId, role: 'assistant', content: `Searching for ${updated.role ? `${updated.role}s` : 'people'} at ${updated.company}${updated.location ? ` in ${updated.location}` : ''}${updated.university ? ` from ${updated.university}` : ''}!` },
       ]);
-      await runSearch(updated);
+      await runSearch(updated, selectable.skipLocationInSearch);
     } else {
       // Still missing company — send back to LLM
       await handleSendMessage(selectable.label);
@@ -312,6 +363,11 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
   };
 
   const handleSuggestedSearchClick = async (suggestion: SuggestedSearch) => {
+    // Start a new search generation
+    searchIdRef.current += 1;
+    const thisSearchId = searchIdRef.current;
+    console.log(`[SuggestedSearch] Starting search #${thisSearchId} with suggestion: "${suggestion.label}"`);
+
     const { filters } = suggestion;
     setCurrentFilters(filters);
     setSuggestedSearches([]);
@@ -342,7 +398,10 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
         { id: `assistant-${Date.now()}`, role: 'assistant', content: 'Company filter removed. Please specify a company to search.' },
       ]);
     } else {
-      // Re-run search with updated filters
+      // Start a new search generation for re-search
+      searchIdRef.current += 1;
+      console.log(`[RemoveFilter] Starting search #${searchIdRef.current} after removing "${key}" filter`);
+
       setMessages(prev => [
         ...prev,
         { id: `assistant-${Date.now()}`, role: 'assistant', content: `Removed ${key} filter. Updating results...` },
@@ -513,22 +572,37 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
               disabled={isExtracting || isSearching}
               className="w-full pl-4 pr-12 py-3 text-sm border border-surface-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:opacity-60 disabled:cursor-not-allowed"
             />
-            <button
-              onClick={() => handleSendMessage()}
-              disabled={!inputValue.trim() || isExtracting || isSearching}
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg text-primary-600 hover:bg-primary-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              aria-label="Send message"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />
-              </svg>
-            </button>
+            {isExtracting ? (
+              <button
+                onClick={() => {
+                  console.log('[UI] Cancel extraction clicked');
+                  cancelSearch();
+                }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg text-red-400 hover:bg-red-50 transition-colors"
+                aria-label="Cancel search"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            ) : (
+              <button
+                onClick={() => handleSendMessage()}
+                disabled={!inputValue.trim() || isSearching}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg text-primary-600 hover:bg-primary-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                aria-label="Send message"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />
+                </svg>
+              </button>
+            )}
           </div>
         </>
       )}
 
       {/* Loading state for search */}
-      {isSearching && <SearchLoadingState />}
+      {isSearching && <SearchLoadingState onCancel={cancelSearch} />}
 
       {/* Results */}
       {hasResults && hook.expandedIndex === null && !hook.showBulkReview && (

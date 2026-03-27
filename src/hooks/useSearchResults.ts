@@ -67,6 +67,18 @@ export function useSearchResults({ initialRemainingDaily }: UseSearchResultsOpti
     };
   }, []);
 
+  // Cancel all retry timers and reset retry state
+  const cancelRetries = useCallback(() => {
+    if (retryTimerRef.current) {
+      console.log('[CancelSearch] Clearing Load More retry timer');
+      clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+    retryCountRef.current = 0;
+    setIsRetrying(false);
+    setIsLoadingMore(false);
+  }, []);
+
   // Load templates and user preferences when session is ready
   useEffect(() => {
     if (sessionStatus !== 'authenticated') return;
@@ -391,6 +403,7 @@ export function useSearchResults({ initialRemainingDaily }: UseSearchResultsOpti
     setHiddenCount,
 
     // Actions
+    cancelRetries,
     resetResults,
     applySearchResults,
     handleSendFromReview,

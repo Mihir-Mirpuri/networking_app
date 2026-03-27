@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
       university: input.university,
       location: input.location,
       name: input.name,
-      maxPages: input.maxPages,
+      skipLocationInSearch: input.skipLocationInSearch,
     });
 
     return NextResponse.json(result);

@@ -104,6 +104,40 @@ export async function getSearchRoleEmbedding(role: string): Promise<number[] | n
 }
 
 /**
+ * Batch-generate and store role embeddings for multiple Person records.
+ * Takes a Map of personId -> role, calls generateRoleEmbeddings once (single OpenAI call),
+ * then bulk-updates all Person records. Returns the number of records updated.
+ */
+export async function bulkUpdatePersonRoleEmbeddings(
+  personRoles: Map<string, string>
+): Promise<number> {
+  if (personRoles.size === 0) return 0;
+
+  const allRoles = Array.from(personRoles.values());
+  const roles = Array.from(new Set(allRoles)).filter(r => r.trim().length > 0);
+  if (roles.length === 0) return 0;
+
+  const start = Date.now();
+  const embeddings = await generateRoleEmbeddings(roles);
+  if (embeddings.size === 0) return 0;
+
+  let updated = 0;
+  const entries = Array.from(personRoles.entries());
+  for (const [personId, role] of entries) {
+    const embedding = embeddings.get(role.trim());
+    if (!embedding) continue;
+    const vectorString = `[${embedding.join(',')}]`;
+    await prisma.$executeRaw`
+      UPDATE "Person" SET role_embedding = ${vectorString}::vector WHERE id = ${personId}
+    `;
+    updated++;
+  }
+
+  console.log(`[Embeddings] Batch embedded ${updated}/${personRoles.size} roles (${roles.length} unique) in ${Date.now() - start}ms`);
+  return updated;
+}
+
+/**
  * Generate and store role embedding for a Person record.
  * Uses $executeRaw since Prisma doesn't natively support pgvector types.
  * Returns true if embedding was stored, false if skipped/failed.

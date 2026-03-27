@@ -127,7 +127,11 @@ function BouncingMascot() {
   );
 }
 
-export function SearchLoadingState() {
+interface SearchLoadingStateProps {
+  onCancel?: () => void;
+}
+
+export function SearchLoadingState({ onCancel }: SearchLoadingStateProps) {
   return (
     <div className="relative min-h-[60vh]">
       {/* Bouncing mascot */}
@@ -145,6 +149,17 @@ export function SearchLoadingState() {
             <span className="w-2 h-2 rounded-full bg-[#505050] animate-bounce" style={{ animationDelay: '300ms' }} />
           </span>
         </p>
+        {onCancel && (
+          <button
+            onClick={() => {
+              console.log('[UI] Cancel button clicked');
+              onCancel();
+            }}
+            className="pointer-events-auto mt-6 px-5 py-2 text-sm font-medium text-surface-500 bg-surface-100 border border-surface-300 rounded-lg hover:bg-surface-200 hover:text-surface-700 transition-colors"
+          >
+            Cancel Search
+          </button>
+        )}
       </div>
     </div>
   );

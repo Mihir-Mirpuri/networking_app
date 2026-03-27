@@ -3,7 +3,7 @@ import { SearchResult } from '@/lib/services/discovery';
 import { EmailResult, EducationInfo, EmploymentInfo } from '@/lib/services/enrichment';
 import { EmailStatus } from '@prisma/client';
 import { ScrapedProfile } from '@/lib/services/linkedin-scraper';
-import { updatePersonRoleEmbedding, getSearchRoleEmbedding } from '@/lib/services/embeddings';
+import { getSearchRoleEmbedding } from '@/lib/services/embeddings';
 import { Prisma } from '@prisma/client';
 
 /**
@@ -759,11 +759,14 @@ export function buildPersonWhereClause(filters: Omit<PersonFilters, 'limit'>, sc
     where.id = { notIn: excludePersonIds };
   }
 
-  // Company filter — use pre-resolved aliases (exact match) or fall back to alias mapping
+  // Company filter — use pre-resolved aliases or fall back to alias mapping
   if (filters.companyAliases && filters.companyAliases.length > 0) {
-    // Exact-match OR query for each resolved alias — zero false positives
+    // Short aliases (<=3 chars like "gs") use exact match to avoid false positives.
+    // Longer aliases use substring match so "anara" matches "Anara Health".
     const aliasFilters = filters.companyAliases.map(alias => ({
-      company: { equals: alias, mode: 'insensitive' as const }
+      company: alias.length <= 3
+        ? { equals: alias, mode: 'insensitive' as const }
+        : { contains: alias, mode: 'insensitive' as const }
     }));
     if (aliasFilters.length === 1) {
       where.company = aliasFilters[0].company;
@@ -775,9 +778,15 @@ export function buildPersonWhereClause(filters: Omit<PersonFilters, 'limit'>, sc
     where.company = { contains: company.trim(), mode: 'insensitive' as const };
   }
 
-  // Location filter
+  // Location filter — split "City, State" and match city OR state
   if (location && location.trim()) {
-    where.city = { contains: location.trim(), mode: 'insensitive' };
+    const parts = location.split(',').map(p => p.trim()).filter(Boolean);
+    const locConditions = parts.flatMap(part => [
+      { city: { contains: part, mode: 'insensitive' as const } },
+      { state: { contains: part, mode: 'insensitive' as const } },
+    ]);
+    if (!where.AND) where.AND = [];
+    (where.AND as unknown[]).push({ OR: locConditions });
   }
 
   // Role filter — expand with aliases (e.g., "Vice President" also matches "VP")
@@ -1020,10 +1029,14 @@ async function findPeopleByFiltersVector(
   // Build WHERE conditions as Prisma.sql fragments
   const conditions: Prisma.Sql[] = [Prisma.sql`1=1`];
 
-  // Company filter — use pre-resolved aliases (exact match) or fall back to alias mapping
+  // Company filter — use pre-resolved aliases or fall back to alias mapping
   if (filters.companyAliases && filters.companyAliases.length > 0) {
+    // Short aliases (<=3 chars like "gs") use exact match to avoid false positives.
+    // Longer aliases use substring match so "anara" matches "Anara Health".
     const companyConditions = filters.companyAliases.map(alias =>
-      Prisma.sql`p.company ILIKE ${alias}`
+      alias.length <= 3
+        ? Prisma.sql`p.company ILIKE ${alias}`
+        : Prisma.sql`p.company ILIKE ${'%' + alias + '%'}`
     );
     conditions.push(Prisma.sql`(${Prisma.join(companyConditions, ' OR ')})`);
   } else if (company && company.trim()) {
@@ -1031,9 +1044,15 @@ async function findPeopleByFiltersVector(
     conditions.push(Prisma.sql`p.company ILIKE ${'%' + company.trim() + '%'}`);
   }
 
-  // Location filter
+  // Location filter — split "City, State" and check city OR state for each part
   if (location && location.trim()) {
-    conditions.push(Prisma.sql`p.city ILIKE ${'%' + location.trim() + '%'}`);
+    const locationParts = location.split(',').map(p => p.trim()).filter(Boolean);
+    const locConditions = locationParts.map(part => {
+      const term = '%' + part + '%';
+      return Prisma.sql`(p.city ILIKE ${term} OR p.state ILIKE ${term})`;
+    });
+    // ANY part matching is sufficient (e.g., "New York" OR "New York" from "New York, New York")
+    conditions.push(Prisma.sql`(${Prisma.join(locConditions, ' OR ')})`);
   }
 
   // University filter — keyword-split matching to handle abbreviations
@@ -1068,16 +1087,17 @@ async function findPeopleByFiltersVector(
   // Exclude people whose role indicates they haven't started yet (e.g., "Incoming Analyst")
   conditions.push(Prisma.sql`p.role !~* '^(incoming|future)\s+'`);
 
-  // Vector similarity threshold: include null embeddings (penalty), exclude far embeddings
-  conditions.push(Prisma.sql`(
-    p.role_embedding IS NULL
-    OR (p.role_embedding <=> ${vectorString}::vector) <= 0.75
-  )`);
+  // Vector similarity threshold: only include people with embeddings that are close enough.
+  // Null embeddings are excluded — they'll get backfilled by the next prescrape/scrape cycle.
+  conditions.push(Prisma.sql`
+    p.role_embedding IS NOT NULL
+    AND (p.role_embedding <=> ${vectorString}::vector) <= 0.55
+  `);
 
   const whereClause = Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}`;
   const fetchLimit = limit * 2; // Overfetch for post-query company filtering
 
-  console.log(`[VectorQuery] Filters: company=${company}, aliases=${filters.companyAliases?.length ?? 0}, location=${location}, university=${university}, requireEmail=${requireEmail}, excludeIds=${excludePersonIds?.length ?? 0}, threshold=0.75, fetchLimit=${fetchLimit}`);
+  console.log(`[VectorQuery] Filters: company=${company}, aliases=${filters.companyAliases?.length ?? 0}, location=${location}, university=${university}, requireEmail=${requireEmail}, excludeIds=${excludePersonIds?.length ?? 0}, threshold=0.55, fetchLimit=${fetchLimit}`);
 
   const rows = await prisma.$queryRaw<Array<{
     id: string;
@@ -1123,11 +1143,7 @@ async function findPeopleByFiltersVector(
       p."educationDegree",
       p."educationField",
       p."educationYear",
-      CASE
-        WHEN p.role_embedding IS NOT NULL
-        THEN (p.role_embedding <=> ${vectorString}::vector)
-        ELSE 1.0
-      END as role_distance
+      (p.role_embedding <=> ${vectorString}::vector) as role_distance
     FROM "Person" p
     ${whereClause}
     ORDER BY
@@ -1309,7 +1325,7 @@ export async function saveDiscoveredPerson(
     apolloStatus?: 'SUCCESS' | 'NOT_FOUND' | 'API_ERROR' | 'SKIPPED';
   },
   searchUniversity?: string | null // Fallback university from search params
-): Promise<{ personId: string; isNew: boolean }> {
+): Promise<{ personId: string; isNew: boolean; role: string | null }> {
   // Use Apollo's company if available, otherwise fall back to search company, then normalize
   const rawCompany = apolloData.apolloCompany || apolloData.company;
   const resolvedCompany = normalizeCompanyForStorage(rawCompany);
@@ -1369,13 +1385,7 @@ export async function saveDiscoveredPerson(
       },
     });
 
-    // Fire-and-forget: generate role embedding
-    if (apolloData.role) {
-      updatePersonRoleEmbedding(existing.id, apolloData.role)
-        .catch(err => console.error('[Embedding] Error (saveProfile update):', err));
-    }
-
-    return { personId: existing.id, isNew: false };
+    return { personId: existing.id, isNew: false, role: apolloData.role };
   }
 
   // Create new person
@@ -1420,13 +1430,7 @@ export async function saveDiscoveredPerson(
     },
   });
 
-  // Fire-and-forget: generate role embedding
-  if (apolloData.role) {
-    updatePersonRoleEmbedding(person.id, apolloData.role)
-      .catch(err => console.error('[Embedding] Error (saveProfile create):', err));
-  }
-
-  return { personId: person.id, isNew: true };
+  return { personId: person.id, isNew: true, role: apolloData.role };
 }
 
 /**
@@ -1538,7 +1542,7 @@ export async function saveScrapedProfile(
   sourceDomain: string | null,
   searchCompany: string, // Fallback if scraper didn't find company
   searchUniversity?: string | null // Fallback if scraper didn't find school
-): Promise<{ personId: string; isNew: boolean }> {
+): Promise<{ personId: string; isNew: boolean; role: string | null }> {
   // Use scraped company or fall back to search company, then normalize
   const rawCompany = profile.company || searchCompany;
   const company = normalizeCompanyForStorage(rawCompany);
@@ -1581,13 +1585,7 @@ export async function saveScrapedProfile(
       },
     });
 
-    // Fire-and-forget: generate role embedding
-    if (profile.role) {
-      updatePersonRoleEmbedding(existingByUrl.id, profile.role)
-        .catch(err => console.error('[Embedding] Error (saveScrapedProfile urlMatch):', err));
-    }
-
-    return { personId: existingByUrl.id, isNew: false };
+    return { personId: existingByUrl.id, isNew: false, role: profile.role };
   }
 
   // Check if person exists by fullName + company (legacy records without LinkedIn URL)
@@ -1622,13 +1620,7 @@ export async function saveScrapedProfile(
       },
     });
 
-    // Fire-and-forget: generate role embedding
-    if (profile.role) {
-      updatePersonRoleEmbedding(existingByName.id, profile.role)
-        .catch(err => console.error('[Embedding] Error (saveScrapedProfile nameMatch):', err));
-    }
-
-    return { personId: existingByName.id, isNew: false };
+    return { personId: existingByName.id, isNew: false, role: profile.role };
   }
 
   // Create new person — wrapped in try/catch to handle race condition where
@@ -1668,13 +1660,7 @@ export async function saveScrapedProfile(
       },
     });
 
-    // Fire-and-forget: generate role embedding
-    if (profile.role) {
-      updatePersonRoleEmbedding(person.id, profile.role)
-        .catch(err => console.error('[Embedding] Error (saveScrapedProfile create):', err));
-    }
-
-    return { personId: person.id, isNew: true };
+    return { personId: person.id, isNew: true, role: profile.role };
   } catch (error: any) {
     // P2002 = Prisma unique constraint violation (concurrent scrape created this person)
     if (error.code === 'P2002') {
@@ -1702,7 +1688,7 @@ export async function saveScrapedProfile(
             scrapedAt: new Date(),
           },
         });
-        return { personId: existing.id, isNew: false };
+        return { personId: existing.id, isNew: false, role: profile.role };
       }
     }
     throw error;

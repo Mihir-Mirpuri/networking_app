@@ -20,6 +20,7 @@ export interface SearchParams {
   limit: number;
   excludePersonKeys?: Set<string>; // Set of "fullName_company" keys (lowercase) to exclude
   pageStart?: number; // Serper page number (1-based: 1, 2, 3, ...)
+  skipLocation?: boolean; // Niche companies: skip location in CSE query (DB filtering still applies)
 }
 
 /**
@@ -108,7 +109,7 @@ export async function buildCompanyQueryPart(company: string): Promise<string> {
   const trimmed = company.trim();
   if (!trimmed) return '';
 
-  return `"${trimmed}"`;
+  return `"at ${trimmed}"`;
 }
 
 /**
@@ -187,7 +188,7 @@ export async function discoverLinkedInProfiles(params: SearchParams): Promise<CS
     queryParts.push(`"${university.trim()}"`);
   }
   if (role && role.trim()) queryParts.push(role.trim()); // Unquoted for flexibility
-  if (location && location.trim()) queryParts.push(location.trim()); // Unquoted for flexibility
+  if (location && location.trim() && !params.skipLocation) queryParts.push(`"${location.trim()}"`); // Quoted to prevent name collisions
   if (name && name.trim()) queryParts.push(name.trim());
 
   const query = `site:linkedin.com/in ${queryParts.join(' ')}`;

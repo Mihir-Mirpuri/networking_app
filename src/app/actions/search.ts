@@ -36,6 +36,7 @@ import {
   getCompanyPattern,
   generateEmailFromPattern,
 } from '@/lib/services/email-pattern';
+import { bulkUpdatePersonRoleEmbeddings } from '@/lib/services/embeddings';
 import { resolveCompanyAliases } from '@/lib/services/company-alias';
 import { preFilterUrls } from '@/lib/services/snippet-filter';
 import { generateEmailWithLLM, getUserResumeSummary, getRecentSentEmails, refineEmailWithLLM } from '@/lib/services/personalization';
@@ -58,6 +59,7 @@ export interface SearchInput {
   limit: number;
   templateId?: string;
   excludePersonIds?: string[]; // IDs of people already displayed (prevents duplicates on Load More)
+  skipLocationInSearch?: boolean; // Niche companies: skip location in CSE query
 }
 
 export interface SearchResultWithDraft {
@@ -562,9 +564,9 @@ export async function searchPeopleAction(
     if (nextPage !== null) {
       cseHasMorePages = true;
 
-      if (people.length === 0) {
-        // 0 results → scrape synchronously (user expects to wait)
-        console.log(`[Search] 0 results, scraping CSE page ${nextPage} synchronously for "${company}"`);
+      if (people.length < 3) {
+        // 0-2 results → scrape synchronously to fill out the page
+        console.log(`[Search] ${people.length} results (<3), scraping CSE page ${nextPage} synchronously for "${company}"`);
         const syncInput = { ...input, company };
         const batch = await processRefreshBatch(syncInput, nextPage, 'SyncScrape');
         cseCallsMade = 1;
@@ -1109,6 +1111,18 @@ export async function loadMorePeopleAction(
       `[LoadMore] Returning ${results.length} results (hasMore=${hasMore}, prescrapeRunning=${prescrapeRunning})`
     );
 
+    // Trigger prescrape for the next page ahead (fire-and-forget)
+    // Skip if: exhausted, or last prescrape added 0 new profiles (diminishing returns)
+    if (hasMore && !progress.cseExhausted && progress.lastPrescrapeNewCount !== 0) {
+      prescrapeAction({
+        company,
+        role: input.role,
+        university: input.university,
+        location: input.location,
+        name: input.name,
+      }).catch(err => console.error('[LoadMore] Prescrape trigger error:', err));
+    }
+
     return {
       success: true,
       results,
@@ -1135,7 +1149,7 @@ async function processRefreshBatch(
   apolloCallsMade: number;
   savedPersonIds: string[];
   urlsScraped: number;
-  urlsFromCse: number;  // How many URLs CSE returned (10 = likely more pages)
+  urlsFromCse: number;  // Valid URLs from CSE after prefiltering (used for exhaustion check)
   csePrefiltered: number; // How many profiles skipped by CSE company pre-filter
 }> {
   let newPeopleCount = 0;
@@ -1153,6 +1167,7 @@ async function processRefreshBatch(
     name: input.name,
     limit: 10,
     pageStart,
+    skipLocation: input.skipLocationInSearch,
   });
   console.log(`[Refresh ${batchLabel}] CSE found ${cseResults.length} LinkedIn profiles`);
 
@@ -1198,6 +1213,8 @@ async function processRefreshBatch(
   console.log(`[Refresh ${batchLabel}] Need to scrape ${urlsToScrape.length} new profiles`);
 
   // ===== STEP 3: SCRAPE NEW LINKEDIN PROFILES =====
+  const personRolesMap = new Map<string, string>();
+
   if (urlsToScrape.length > 0) {
     const processBatch = async (profiles: ScrapedProfile[], batchIndex: number, totalBatches: number) => {
       console.log(`[Refresh ${batchLabel}] Processing scrape batch ${batchIndex + 1}/${totalBatches} (${profiles.length} profiles)`);
@@ -1206,7 +1223,7 @@ async function processRefreshBatch(
         const cseResult = cseResultMap.get(profile.linkedinUrl);
         if (!cseResult) continue;
 
-        const { personId, isNew } = await saveScrapedProfile(
+        const { personId, isNew, role } = await saveScrapedProfile(
           profile,
           cseResult.linkedinUrl,
           cseResult.sourceTitle,
@@ -1217,6 +1234,8 @@ async function processRefreshBatch(
         );
 
         savedPersonIds.push(personId);
+        if (role) personRolesMap.set(personId, role);
+
         if (isNew) {
           newPeopleCount++;
           // Check if this profile matches the user's full search criteria
@@ -1228,8 +1247,9 @@ async function processRefreshBatch(
           const uniMatch = !input.university || (profile.schools || []).some(
             (s) => s.toLowerCase().includes(input.university!.toLowerCase())
           );
-          const locMatch = !input.location || [profile.city, profile.state, profile.country]
-            .filter(Boolean).some((v) => v!.toLowerCase().includes(input.location!.toLowerCase()));
+          const locCity = input.location?.includes(',') ? input.location.split(',')[0].trim() : input.location;
+          const locMatch = !locCity || [profile.city, profile.state, profile.country]
+            .filter(Boolean).some((v) => v!.toLowerCase().includes(locCity!.toLowerCase()));
           if (companyMatch && roleMatch && uniMatch && locMatch) matchedCount++;
         }
       }
@@ -1243,18 +1263,23 @@ async function processRefreshBatch(
     });
   }
 
+  // ===== STEP 3.5: BATCH EMBED ROLE VECTORS =====
+  if (personRolesMap.size > 0) {
+    const embeddedCount = await bulkUpdatePersonRoleEmbeddings(personRolesMap);
+    console.log(`[Refresh ${batchLabel}] Batch embedded ${embeddedCount}/${personRolesMap.size} roles`);
+  }
+
   // Email enrichment is now handled on-demand in searchPeopleAction via enrichPeopleOnDemand()
-  return { newPeopleCount, matchedCount, emailsGenerated: 0, apolloCallsMade: 0, savedPersonIds, urlsScraped: urlsToScrape.length, urlsFromCse: cseResults.length, csePrefiltered };
+  // urlsFromCse = valid URLs after prefiltering (existing dupes + new valid). Used for Serper exhaustion check.
+  // Existing dupes already passed validation when first scraped, so they count as valid.
+  const validUrlsFromCse = existingPeopleMap.size + urlsToScrape.length;
+  return { newPeopleCount, matchedCount, emailsGenerated: 0, apolloCallsMade: 0, savedPersonIds, urlsScraped: urlsToScrape.length, urlsFromCse: validUrlsFromCse, csePrefiltered };
 }
 
-const MAX_PRESCRAPE_PAGES = 3;
-const WEAK_PAGE_THRESHOLD = 3; // Pages with fewer than this many new valid profiles are "weak"
-const MAX_CONSECUTIVE_WEAK_PAGES = 2; // Stop after this many consecutive weak pages
-
 /**
- * Background prescrape: scrape all remaining CSE pages (up to 4 total) for a search.
- * Fire-and-forget from the frontend — populates the Person table so future
- * Load More clicks are instant DB reads.
+ * Background prescrape: scrape the single next CSE page for a search.
+ * One-page-ahead model: each call scrapes exactly one page, then marks DONE.
+ * Triggered after initial search and after each Load More.
  */
 export async function prescrapeAction(
   input: {
@@ -1263,7 +1288,7 @@ export async function prescrapeAction(
     university?: string;
     location?: string;
     name?: string;
-    maxPages?: number;
+    skipLocationInSearch?: boolean;
   }
 ): Promise<{ success: true; pagesScraped: number } | { success: false; error: string }> {
   const session = await getServerSession(authOptions);
@@ -1289,8 +1314,6 @@ export async function prescrapeAction(
     const serperQuery = buildSerperQuery(normalizedParams);
     const queryHash = computeQueryHash(serperQuery);
 
-    let pagesScraped = 0;
-
     // Atomically claim the prescrape lock — prevents duplicate concurrent prescrapes
     const initialProgress = await findOrCreateScrapeProgressWithHash(normalizedParams, queryHash);
 
@@ -1306,58 +1329,29 @@ export async function prescrapeAction(
       return { success: true, pagesScraped: 0 };
     }
 
-    let consecutiveWeakPages = 0;
-    const pageLimit = input.maxPages ?? MAX_PRESCRAPE_PAGES;
+    // Single-pass: get the next page, scrape it, done
+    const progress = await findOrCreateScrapeProgress(normalizedParams);
+    const nextPage = getNextCsePageStart(progress.lastCsePageScraped, progress.cseExhausted);
 
-    while (pagesScraped < pageLimit) {
-      // Re-fetch progress each iteration (updated by previous iteration)
-      const progress = await findOrCreateScrapeProgress(normalizedParams);
-      const nextPage = getNextCsePageStart(progress.lastCsePageScraped, progress.cseExhausted);
-
-      if (nextPage === null) {
-        console.log(`[Prescrape] Exhausted after ${pagesScraped} pages for "${input.company}"`);
-        break;
-      }
-
-      console.log(`[Prescrape] Scraping page ${nextPage} for "${input.company}" (${pagesScraped + 1}/${pageLimit})`);
-      const batch = await processRefreshBatch(input, nextPage, `Prescrape-${pagesScraped + 1}`);
-
-      // New valid profiles = scraped + matched (excludes deduped and prefiltered)
-      const newValidCount = batch.newPeopleCount;
-
-      await updateScrapeProgress(progress.id, nextPage, batch.urlsFromCse, {
-        cseCallsMade: 1,
-        linkedinScraperCalls: batch.urlsScraped,
-        apolloCallsMade: batch.apolloCallsMade,
-        profilesAdded: batch.newPeopleCount,
-        profilesMatchedSearch: batch.matchedCount,
+    if (nextPage === null) {
+      console.log(`[Prescrape] Exhausted for "${input.company}", nothing to scrape`);
+      await prisma.search.update({
+        where: { id: initialProgress.id },
+        data: { prescrapeStatus: 'DONE' },
       });
-
-      pagesScraped++;
-
-      // Adaptive exhaustion: track consecutive weak pages
-      if (newValidCount < WEAK_PAGE_THRESHOLD) {
-        consecutiveWeakPages++;
-        console.log(`[Prescrape] Weak page (${newValidCount} new valid profiles), consecutive: ${consecutiveWeakPages}/${MAX_CONSECUTIVE_WEAK_PAGES}`);
-        if (consecutiveWeakPages >= MAX_CONSECUTIVE_WEAK_PAGES) {
-          console.log(`[Prescrape] Exhausted (${MAX_CONSECUTIVE_WEAK_PAGES} consecutive weak pages) after ${pagesScraped} pages`);
-          // Mark as exhausted in DB
-          await prisma.search.update({
-            where: { id: progress.id },
-            data: { cseExhausted: true },
-          });
-          break;
-        }
-      } else {
-        consecutiveWeakPages = 0;
-      }
-
-      // Also stop if Serper returned very few results (no more pages available)
-      if (batch.urlsFromCse < 5) {
-        console.log(`[Prescrape] Serper exhausted (${batch.urlsFromCse} URLs) after ${pagesScraped} pages`);
-        break;
-      }
+      return { success: true, pagesScraped: 0 };
     }
+
+    console.log(`[Prescrape] Scraping page ${nextPage} for "${input.company}"`);
+    const batch = await processRefreshBatch(input, nextPage, 'Prescrape');
+
+    await updateScrapeProgress(progress.id, nextPage, batch.urlsFromCse, {
+      cseCallsMade: 1,
+      linkedinScraperCalls: batch.urlsScraped,
+      apolloCallsMade: batch.apolloCallsMade,
+      profilesAdded: batch.newPeopleCount,
+      profilesMatchedSearch: batch.matchedCount,
+    });
 
     // Mark prescrape as done
     await prisma.search.update({
@@ -1365,8 +1359,8 @@ export async function prescrapeAction(
       data: { prescrapeStatus: 'DONE' },
     });
 
-    console.log(`[Prescrape] Done: scraped ${pagesScraped} pages for "${input.company}"`);
-    return { success: true, pagesScraped };
+    console.log(`[Prescrape] Done: scraped 1 page (page ${nextPage}) for "${input.company}", ${batch.newPeopleCount} new profiles`);
+    return { success: true, pagesScraped: 1 };
   } catch (error) {
     console.error('[Prescrape] Error:', error);
     // Mark as DONE even on error to prevent permanently stuck RUNNING state
