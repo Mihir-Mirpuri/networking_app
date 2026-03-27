@@ -155,7 +155,7 @@ export function SearchLoadingState({ onCancel }: SearchLoadingStateProps) {
               console.log('[UI] Cancel button clicked');
               onCancel();
             }}
-            className="pointer-events-auto mt-6 px-5 py-2 text-sm font-medium text-surface-500 bg-surface-100 border border-surface-300 rounded-lg hover:bg-surface-200 hover:text-surface-700 transition-colors"
+            className="pointer-events-auto mt-6 px-5 py-2.5 text-sm font-medium text-[#999] bg-[#2a2a2a] border border-[#555] rounded-lg hover:bg-[#333] hover:text-white transition-colors"
           >
             Cancel Search
           </button>

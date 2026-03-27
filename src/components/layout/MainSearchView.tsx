@@ -296,6 +296,7 @@ export function MainSearchView({
 
   const lastProcessedQueryRef = useRef<string | null>(null);
   const lastProcessedFiltersRef = useRef<string | null>(null);
+  const searchIdRef = useRef(0);
 
   // Guest query counter
   const getGuestQueryCount = useCallback(() => {
@@ -391,6 +392,26 @@ export function MainSearchView({
     return () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); };
   }, [messages, currentFilters, hook.results, hook.expandedIndex, hook.sendStatuses, hook.showBulkReview, hook.generatingStatuses, hook.totalLoaded, hook.hasMore, hook.hiddenCount, hook.searchParams]);
 
+  const cancelSearch = useCallback(() => {
+    const cancelledId = searchIdRef.current;
+    console.log(`[CancelSearch] Cancelling search #${cancelledId}`);
+
+    searchIdRef.current += 1;
+    console.log(`[CancelSearch] Search generation bumped to #${searchIdRef.current}`);
+
+    setIsExtracting(false);
+    setIsSearching(false);
+
+    // Remove any loading assistant bubbles
+    setMessages(prev => prev.filter(m => !m.isLoading));
+
+    // Clear Load More retry timers
+    hook.cancelRetries();
+
+    console.log(`[CancelSearch] Cleanup complete for search #${cancelledId}. Ready for new search.`);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hook]);
+
   const runSearch = useCallback(async (filters: ParsedFilters) => {
     if (!filters.company) return;
 
@@ -398,6 +419,9 @@ export function MainSearchView({
     if (checkGuestQueryLimit()) {
       return;
     }
+
+    const thisSearchId = searchIdRef.current;
+    console.log(`[Search] Starting search #${thisSearchId} for company="${filters.company}" role="${filters.role || '(any)'}"`);
 
     setIsSearching(true);
     hook.resetResults();
@@ -410,7 +434,14 @@ export function MainSearchView({
       limit: 6,
     });
 
+    // Stale check: discard if search was cancelled or a new search started
+    if (searchIdRef.current !== thisSearchId) {
+      console.log(`[Search] Discarding stale result from search #${thisSearchId} (current is #${searchIdRef.current})`);
+      return;
+    }
+
     if (result.success) {
+      console.log(`[Search] Search #${thisSearchId} returned ${result.results.length} results`);
       // Increment guest query count after successful search
       incrementGuestQueryCount();
 
@@ -423,16 +454,21 @@ export function MainSearchView({
       });
 
       // Fire-and-forget prescrape
-      fetch('/api/prescrape', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          company: filters.company,
-          role: filters.role,
-          university: filters.university,
-          location: filters.location,
-        }),
-      }).catch(err => console.error('[Prescrape] Error:', err));
+      if (result.results.length > 0) {
+        console.log(`[Search] Firing prescrape for search #${thisSearchId}`);
+        fetch('/api/prescrape', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            company: filters.company,
+            role: filters.role,
+            university: filters.university,
+            location: filters.location,
+          }),
+        }).catch(err => console.error('[Prescrape] Error:', err));
+      }
+    } else {
+      console.log(`[Search] Search #${thisSearchId} failed:`, result.error);
     }
 
     setIsSearching(false);
@@ -441,6 +477,11 @@ export function MainSearchView({
 
   const handleSendMessage = useCallback(async (text: string) => {
     if (!text || isExtracting || isSearching) return;
+
+    // Start a new search generation
+    searchIdRef.current += 1;
+    const thisSearchId = searchIdRef.current;
+    console.log(`[SendMessage] Starting search #${thisSearchId} with message: "${text}"`);
 
     const userMsgId = `user-${Date.now()}`;
     const assistantMsgId = `assistant-${Date.now()}`;
@@ -461,6 +502,12 @@ export function MainSearchView({
       conversationHistory,
       currentFilters,
     });
+
+    // Stale check after LLM extraction
+    if (searchIdRef.current !== thisSearchId) {
+      console.log(`[SendMessage] Discarding stale extraction result from search #${thisSearchId} (current is #${searchIdRef.current})`);
+      return;
+    }
 
     if (!extractResult.success) {
       setMessages(prev =>
@@ -605,7 +652,7 @@ export function MainSearchView({
         {/* Chat messages moved to SearchSidebar */}
 
         {/* Loading state for search */}
-        {isSearching && <SearchLoadingState />}
+        {isSearching && <SearchLoadingState onCancel={cancelSearch} />}
 
         {/* Results */}
         {hasResults && hook.expandedIndex === null && !hook.showBulkReview && (

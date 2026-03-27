@@ -572,13 +572,13 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
               disabled={isExtracting || isSearching}
               className="w-full pl-4 pr-12 py-3 text-sm border border-surface-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:opacity-60 disabled:cursor-not-allowed"
             />
-            {isExtracting ? (
+            {(isExtracting || isSearching) ? (
               <button
                 onClick={() => {
-                  console.log('[UI] Cancel extraction clicked');
+                  console.log(`[UI] Cancel clicked (extracting=${isExtracting}, searching=${isSearching})`);
                   cancelSearch();
                 }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg text-red-400 hover:bg-red-50 transition-colors"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg text-red-400 hover:bg-red-50/10 transition-colors"
                 aria-label="Cancel search"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -588,7 +588,7 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
             ) : (
               <button
                 onClick={() => handleSendMessage()}
-                disabled={!inputValue.trim() || isSearching}
+                disabled={!inputValue.trim()}
                 className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg text-primary-600 hover:bg-primary-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 aria-label="Send message"
               >
