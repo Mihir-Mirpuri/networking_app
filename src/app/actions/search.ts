@@ -970,6 +970,7 @@ export interface LoadMoreInput {
   limit: number;
   templateId?: string;
   excludePersonIds: string[];
+  skipLocationInSearch?: boolean;
 }
 
 export interface LoadMoreMeta {
@@ -1120,6 +1121,7 @@ export async function loadMorePeopleAction(
         university: input.university,
         location: input.location,
         name: input.name,
+        skipLocationInSearch: input.skipLocationInSearch,
       }).catch(err => console.error('[LoadMore] Prescrape trigger error:', err));
     }
 

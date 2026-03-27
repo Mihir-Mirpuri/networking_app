@@ -9,7 +9,7 @@ import { SearchLoadingState } from './SearchLoadingState';
 import { Toast } from '@/components/ui/Toast';
 import { LimitReachedModal, dispatchCreditsChanged } from '@/components/credits';
 import { HiddenPeopleBar } from './HiddenPeopleBar';
-import { searchPeopleAction, SearchResultWithDraft } from '@/app/actions/search';
+import { searchPeopleAction, lookupPersonAction, SearchResultWithDraft } from '@/app/actions/search';
 import {
   extractSearchFiltersAction,
   ParsedFilters,
@@ -59,7 +59,7 @@ const EXAMPLE_QUERIES = [
   'Product managers at Google in Austin',
   'Software engineers at Meta from Stanford',
   'Analysts at Goldman Sachs in New York',
-  'Consultants at McKinsey from UT Austin',
+  'Find John Smith at Google',
 ];
 
 export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClientProps) {
@@ -194,6 +194,7 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
         university: filters.university,
         location: filters.location,
         limit,
+        skipLocationInSearch,
       });
 
       // Fire-and-forget prescrape — only if we got results
@@ -266,6 +267,45 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
         )
       );
       setIsExtracting(false);
+      return;
+    }
+
+    // Handle person lookup before accessing filters (person_lookup doesn't have filters)
+    if (extractResult.status === 'person_lookup') {
+      const { assistantMessage } = extractResult;
+      setMessages(prev =>
+        prev.map(m =>
+          m.id === assistantMsgId
+            ? { ...m, content: assistantMessage, isLoading: false }
+            : m
+        )
+      );
+      setIsExtracting(false);
+      setIsSearching(true);
+      hook.resetResults();
+
+      const lookupResult = await lookupPersonAction({
+        name: extractResult.personName,
+        company: extractResult.personCompany,
+      });
+
+      // Stale check
+      if (searchIdRef.current !== thisSearchId) {
+        console.log(`[PersonLookup] Discarding stale result from search #${thisSearchId}`);
+        return;
+      }
+
+      if (lookupResult.success) {
+        hook.setResults(lookupResult.results);
+        hook.setHasMore(false);
+        hook.setTotalLoaded(lookupResult.results.length);
+      } else {
+        setMessages(prev => [
+          ...prev,
+          { id: `assistant-${Date.now()}`, role: 'assistant', content: lookupResult.error || 'Could not find that person.' },
+        ]);
+      }
+      setIsSearching(false);
       return;
     }
 

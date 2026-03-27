@@ -15,6 +15,7 @@ export interface SearchParams {
   university?: string;
   location?: string;
   limit: number;
+  skipLocationInSearch?: boolean;
 }
 
 export interface SearchResultsMeta {
@@ -332,6 +333,7 @@ export function useSearchResults({ initialRemainingDaily }: UseSearchResultsOpti
         location: searchParams.location,
         limit: searchParams.limit,
         excludePersonIds: results.map(r => r.id),
+        skipLocationInSearch: searchParams.skipLocationInSearch,
       });
 
       if (result.success) {
