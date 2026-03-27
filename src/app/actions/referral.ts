@@ -17,7 +17,7 @@ export async function processReferralAction(code: string) {
   if (user?.referralLinkId) return;
 
   // Only attribute users created within the last hour
-  if (!user || Date.now() - user.createdAt.getTime() > 10 * 60 * 1000) return;
+  if (!user || Date.now() - user.createdAt.getTime() > 60 * 60 * 1000) return;
 
   const link = await prisma.referralLink.findUnique({
     where: { code },
