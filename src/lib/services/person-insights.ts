@@ -89,13 +89,27 @@ export async function getOrExtractInsights(
     return { insights: [], fromCache: false };
   }
 
-  // 3. Google search via Serper — search just the name to get broad results
-  //    (searching "name" "company" misses personal/extracurricular pages)
+  // 3. Google search via Serper — two parallel queries for better coverage:
+  //    - Name only: catches personal pages for unique names
+  //    - Name + company: disambiguates common names
   let serperSnippets = '';
   let serperResults: Array<{ title: string; link: string; snippet: string }> = [];
   try {
-    const results = await searchSerper(`"${person.fullName}"`);
-    serperResults = results.slice(0, 10);
+    const [nameResults, nameCompanyResults] = await Promise.all([
+      searchSerper(`"${person.fullName}"`),
+      searchSerper(`"${person.fullName}" "${person.company}"`),
+    ]);
+
+    // Merge and dedupe by URL
+    const seen = new Set<string>();
+    const merged: typeof serperResults = [];
+    for (const r of [...nameResults, ...nameCompanyResults]) {
+      if (!seen.has(r.link)) {
+        seen.add(r.link);
+        merged.push({ title: r.title, link: r.link, snippet: r.snippet });
+      }
+    }
+    serperResults = merged.slice(0, 15);
     serperSnippets = serperResults
       .map((r) => `- [${r.link}] ${r.title}: ${r.snippet}`)
       .join('\n');
