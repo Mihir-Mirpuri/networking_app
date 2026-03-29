@@ -60,6 +60,7 @@ export interface SearchInput {
   templateId?: string;
   excludePersonIds?: string[]; // IDs of people already displayed (prevents duplicates on Load More)
   skipLocationInSearch?: boolean; // Niche companies: skip location in CSE query
+  companyNameAmbiguous?: boolean; // When false, use "Company" instead of "at Company" in Serper query
 }
 
 export interface SearchResultWithDraft {
@@ -971,6 +972,7 @@ export interface LoadMoreInput {
   templateId?: string;
   excludePersonIds: string[];
   skipLocationInSearch?: boolean;
+  companyNameAmbiguous?: boolean;
 }
 
 export interface LoadMoreMeta {
@@ -1122,6 +1124,7 @@ export async function loadMorePeopleAction(
         location: input.location,
         name: input.name,
         skipLocationInSearch: input.skipLocationInSearch,
+        companyNameAmbiguous: input.companyNameAmbiguous,
       }).catch(err => console.error('[LoadMore] Prescrape trigger error:', err));
     }
 
@@ -1170,6 +1173,7 @@ async function processRefreshBatch(
     limit: 10,
     pageStart,
     skipLocation: input.skipLocationInSearch,
+    companyNameAmbiguous: input.companyNameAmbiguous,
   });
   console.log(`[Refresh ${batchLabel}] CSE found ${cseResults.length} LinkedIn profiles`);
 
@@ -1291,6 +1295,7 @@ export async function prescrapeAction(
     location?: string;
     name?: string;
     skipLocationInSearch?: boolean;
+    companyNameAmbiguous?: boolean;
   }
 ): Promise<{ success: true; pagesScraped: number } | { success: false; error: string }> {
   const session = await getServerSession(authOptions);
@@ -1313,7 +1318,7 @@ export async function prescrapeAction(
     });
 
     // Compute query hash for dedup
-    const serperQuery = buildSerperQuery(normalizedParams);
+    const serperQuery = buildSerperQuery({ ...normalizedParams, companyNameAmbiguous: input.companyNameAmbiguous });
     const queryHash = computeQueryHash(serperQuery);
 
     // Atomically claim the prescrape lock — prevents duplicate concurrent prescrapes

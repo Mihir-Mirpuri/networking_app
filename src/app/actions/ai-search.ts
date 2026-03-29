@@ -18,6 +18,7 @@ export interface Selectable {
   filterKey: 'company' | 'role';
   filterValue: string;
   skipLocationInSearch?: boolean;
+  companyNameAmbiguous?: boolean;
 }
 
 export interface SuggestedSearch {
@@ -46,6 +47,7 @@ interface LLMResponse {
     university: string | null;
     location: string | null;
   };
+  company_name_ambiguous?: boolean;
   person_name?: string;
   person_company?: string;
   selectables?: Array<{ label: string; filter_key: 'company' | 'role'; filter_value: string }>;
@@ -54,7 +56,7 @@ interface LLMResponse {
 }
 
 export type ExtractFiltersResult =
-  | { success: true; status: 'ready'; filters: ParsedFilters; assistantMessage: string; suggestedSearches: SuggestedSearch[] }
+  | { success: true; status: 'ready'; filters: ParsedFilters; assistantMessage: string; suggestedSearches: SuggestedSearch[]; companyNameAmbiguous?: boolean }
   | { success: true; status: 'needs_selection'; filters: ParsedFilters; assistantMessage: string; selectables: Selectable[]; allSelectables?: Selectable[] }
   | { success: true; status: 'person_lookup'; assistantMessage: string; personName: string; personCompany?: string }
   | { success: true; status: 'off_topic'; filters: ParsedFilters; assistantMessage: string }
@@ -69,6 +71,7 @@ You must return JSON with this schema:
   "status": "ready" | "needs_selection" | "off_topic" | "person_lookup",
   "confidence": "high" | "low",
   "filters": { "company": string|null, "role": string|null, "university": string|null, "location": string|null },
+  "company_name_ambiguous": boolean,
   "person_name": string|null,
   "person_company": string|null,
   "selectables": [{ "label": string, "filter_key": "company"|"role", "filter_value": string }],
@@ -101,6 +104,11 @@ FILTER RULES:
 6. When the user says "No", "Nah", "that's it" in response to a question, KEEP all previous filters unchanged.
 7. Always extract a company when one is clearly stated. "at Meta" = company: "Meta". Never drop it.
 8. For US locations, ALWAYS normalize to "City, State" format (e.g., "Austin" → "Austin, Texas", "SF" → "San Francisco, California", "NYC" → "New York, New York", "LA" → "Los Angeles, California", "Chi" → "Chicago, Illinois"). For international locations, use "City, Country" (e.g., "London" → "London, United Kingdom"). This prevents city names from matching people's names in search results.
+
+COMPANY NAME AMBIGUITY:
+- Set "company_name_ambiguous" to true when the company name could easily be confused with a person's name or a common English word (e.g., Chase, Block, Bolt, Squire, Square, Plaid, Hinge, Gusto, Toast, Brex, Ramp).
+- Set to false for distinctive, well-known company names that are unlikely to be confused (e.g., McKinsey, Google, Goldman Sachs, Stripe, Anthropic, JPMorgan, Deloitte, Microsoft, Meta, Apple, Figma, Notion).
+- Default to true when unsure.
 
 SELECTABLE RULES:
 - When the user says a category like "top consulting firms", "big tech", "investment banks", "FAANG", return status "needs_selection" with up to 5 company selectables.
@@ -260,7 +268,7 @@ export async function extractSearchFiltersAction(
       },
     });
 
-    const { status, confidence, filters, selectables, suggested_searches, message } = response.content;
+    const { status, confidence, filters, company_name_ambiguous, selectables, suggested_searches, message } = response.content;
 
     // Build parsed filters (convert nulls to undefined)
     const parsedFilters: ParsedFilters = {};
@@ -305,6 +313,7 @@ export async function extractSearchFiltersAction(
         label: s.label,
         filterKey: s.filter_key,
         filterValue: s.filter_value,
+        companyNameAmbiguous: company_name_ambiguous,
       }));
 
       let allSelectables: Selectable[] | undefined;
@@ -415,6 +424,7 @@ export async function extractSearchFiltersAction(
       filters: parsedFilters,
       assistantMessage: message,
       suggestedSearches: parsedSuggestions,
+      companyNameAmbiguous: company_name_ambiguous,
     };
   } catch (error) {
     if (error instanceof GroqJsonParseError) {

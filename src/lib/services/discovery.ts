@@ -21,6 +21,7 @@ export interface SearchParams {
   excludePersonKeys?: Set<string>; // Set of "fullName_company" keys (lowercase) to exclude
   pageStart?: number; // Serper page number (1-based: 1, 2, 3, ...)
   skipLocation?: boolean; // Niche companies: skip location in CSE query (DB filtering still applies)
+  companyNameAmbiguous?: boolean; // When false, use "Company" instead of "at Company" in query
 }
 
 /**
@@ -103,12 +104,14 @@ export async function expandCompanyName(company: string): Promise<string[]> {
 
 /**
  * Build the company portion of a search query.
- * Currently just quotes the company name.
+ * When ambiguous is false (distinctive company name), uses plain "Company".
+ * Otherwise defaults to "at Company" for better precision.
  */
-export async function buildCompanyQueryPart(company: string): Promise<string> {
+export async function buildCompanyQueryPart(company: string, ambiguous?: boolean): Promise<string> {
   const trimmed = company.trim();
   if (!trimmed) return '';
 
+  if (ambiguous === false) return `"${trimmed}"`;
   return `"at ${trimmed}"`;
 }
 
@@ -182,7 +185,7 @@ export async function discoverLinkedInProfiles(params: SearchParams): Promise<CS
 
   // Build query for LinkedIn profile search
   const queryParts: string[] = [];
-  if (company && company.trim()) queryParts.push(await buildCompanyQueryPart(company));
+  if (company && company.trim()) queryParts.push(await buildCompanyQueryPart(company, params.companyNameAmbiguous));
   // Omit university if "any" is selected (case-insensitive)
   if (university && university.trim() && university.trim().toLowerCase() !== 'any') {
     queryParts.push(`"${university.trim()}"`);

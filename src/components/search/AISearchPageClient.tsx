@@ -160,7 +160,7 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
     console.log(`[CancelSearch] Cleanup complete for search #${cancelledId}. Ready for new search.`);
   }, [hook]);
 
-  const runSearch = useCallback(async (filters: ParsedFilters, skipLocationInSearch?: boolean) => {
+  const runSearch = useCallback(async (filters: ParsedFilters, skipLocationInSearch?: boolean, companyNameAmbiguous?: boolean) => {
     if (!filters.company) return;
 
     const thisSearchId = searchIdRef.current;
@@ -178,6 +178,7 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
       location: filters.location,
       limit,
       skipLocationInSearch,
+      companyNameAmbiguous,
     });
 
     // Stale check: discard if search was cancelled or a new search started
@@ -195,6 +196,7 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
         location: filters.location,
         limit,
         skipLocationInSearch,
+        companyNameAmbiguous,
       });
 
       // Fire-and-forget prescrape — only if we got results
@@ -209,6 +211,7 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
             university: filters.university,
             location: filters.location,
             skipLocationInSearch,
+            companyNameAmbiguous,
           }),
         }).catch(err => console.error('[Prescrape] Error:', err));
       }
@@ -357,7 +360,7 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
     );
     setIsExtracting(false);
 
-    await runSearch(filters);
+    await runSearch(filters, undefined, extractResult.companyNameAmbiguous);
   };
 
   const handleSelectableClick = async (selectable: Selectable) => {
@@ -385,7 +388,7 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
         ...prev,
         { id: confirmMsgId, role: 'assistant', content: `Searching for ${updated.role ? `${updated.role}s` : 'people'} at ${updated.company}${updated.location ? ` in ${updated.location}` : ''}${updated.university ? ` from ${updated.university}` : ''}!` },
       ]);
-      await runSearch(updated, selectable.skipLocationInSearch);
+      await runSearch(updated, selectable.skipLocationInSearch, selectable.companyNameAmbiguous);
     } else {
       // Still missing company — send back to LLM
       await handleSendMessage(selectable.label);

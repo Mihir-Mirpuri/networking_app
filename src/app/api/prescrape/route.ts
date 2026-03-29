@@ -16,6 +16,7 @@ export async function POST(request: NextRequest) {
       location: input.location,
       name: input.name,
       skipLocationInSearch: input.skipLocationInSearch,
+      companyNameAmbiguous: input.companyNameAmbiguous,
     });
 
     return NextResponse.json(result);

@@ -16,6 +16,7 @@ export interface SearchParams {
   location?: string;
   limit: number;
   skipLocationInSearch?: boolean;
+  companyNameAmbiguous?: boolean;
 }
 
 export interface SearchResultsMeta {
@@ -334,6 +335,7 @@ export function useSearchResults({ initialRemainingDaily }: UseSearchResultsOpti
         limit: searchParams.limit,
         excludePersonIds: results.map(r => r.id),
         skipLocationInSearch: searchParams.skipLocationInSearch,
+        companyNameAmbiguous: searchParams.companyNameAmbiguous,
       });
 
       if (result.success) {

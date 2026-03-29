@@ -526,9 +526,13 @@ export function buildSerperQuery(params: {
   role?: string | null;
   location?: string | null;
   name?: string | null;
+  companyNameAmbiguous?: boolean;
 }): string {
   const queryParts: string[] = [];
-  if (params.company && params.company.trim()) queryParts.push(`"${params.company.trim()}"`);
+  if (params.company && params.company.trim()) {
+    const co = params.company.trim();
+    queryParts.push(params.companyNameAmbiguous === false ? `"${co}"` : `"at ${co}"`);
+  }
   if (params.university && params.university.trim() && params.university.trim().toLowerCase() !== 'any') {
     queryParts.push(`"${params.university.trim()}"`);
   }
