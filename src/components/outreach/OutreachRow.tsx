@@ -14,6 +14,7 @@ interface OutreachRowProps {
   onToggleStar: (id: string) => void;
   onRowClick: (tracker: OutreachTrackerEntry) => void;
   visibleColumns: ColumnKey[];
+  columnWidths: Record<ColumnKey, number>;
 }
 
 // Deterministic avatar color from name
@@ -38,21 +39,7 @@ function getInitials(name: string | null, email: string): string {
   return email.slice(0, 2).toUpperCase();
 }
 
-const COLUMN_WIDTHS: Record<ColumnKey, string> = {
-  name: 'w-[200px] min-w-[200px]',
-  firm: 'w-[100px] min-w-[100px]',
-  role: 'w-[120px] min-w-[120px]',
-  location: 'w-[100px] min-w-[100px]',
-  group: 'w-[80px] min-w-[80px]',
-  connection: 'w-[100px] min-w-[100px]',
-  firstEmailDate: 'w-[100px] min-w-[100px]',
-  lastEmailDate: 'w-[100px] min-w-[100px]',
-  followUps: 'w-[80px] min-w-[80px]',
-  subject: 'flex-1 min-w-[100px]',
-  notes: 'w-[60px] min-w-[60px]',
-};
-
-export function OutreachRow({ tracker, onUpdate, onDelete, onToggleStar, onRowClick, visibleColumns }: OutreachRowProps) {
+export function OutreachRow({ tracker, onUpdate, onDelete, onToggleStar, onRowClick, visibleColumns, columnWidths }: OutreachRowProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showNotesModal, setShowNotesModal] = useState(false);
@@ -104,10 +91,16 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onToggleStar, onRowCl
   const initials = getInitials(tracker.contactName, tracker.contactEmail);
 
   const renderCell = (col: ColumnKey) => {
+    const width = columnWidths[col];
+
     switch (col) {
       case 'name':
         return (
-          <div className={`${COLUMN_WIDTHS.name} px-2 flex items-center gap-2.5`}>
+          <div
+            className="px-2 flex items-center gap-2.5 shrink-0"
+            style={{ width }}
+            data-column={col}
+          >
             {/* Avatar */}
             <div
               className="w-[30px] h-[30px] rounded-full flex items-center justify-center shrink-0"
@@ -116,7 +109,7 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onToggleStar, onRowCl
               <span className="text-[11px] font-semibold text-white font-['Inter']">{initials}</span>
             </div>
             {/* Name + Email */}
-            <div className="flex flex-col gap-0.5 min-w-0">
+            <div className="flex flex-col gap-0.5 min-w-0 flex-1">
               <span className="text-[13px] font-medium text-[#E0E0E0] font-['Inter'] truncate">
                 {tracker.contactName || tracker.contactEmail}
               </span>
@@ -128,7 +121,7 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onToggleStar, onRowCl
         );
       case 'firm':
         return (
-          <div className={`${COLUMN_WIDTHS.firm} px-2`}>
+          <div className="px-2 shrink-0" style={{ width }} data-column={col}>
             <span className="text-[13px] text-[#909090] font-['Inter'] truncate block">
               {tracker.company || <span className="text-[#505050]">--</span>}
             </span>
@@ -136,7 +129,7 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onToggleStar, onRowCl
         );
       case 'role':
         return (
-          <div className={`${COLUMN_WIDTHS.role} px-2`}>
+          <div className="px-2 shrink-0" style={{ width }} data-column={col}>
             <span className="text-[13px] text-[#909090] font-['Inter'] truncate block">
               {tracker.role || <span className="text-[#505050]">--</span>}
             </span>
@@ -144,7 +137,7 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onToggleStar, onRowCl
         );
       case 'location':
         return (
-          <div className={`${COLUMN_WIDTHS.location} px-2`}>
+          <div className="px-2 shrink-0" style={{ width }} data-column={col}>
             <span className="text-[13px] text-[#909090] font-['Inter'] truncate block">
               {tracker.location || <span className="text-[#505050]">--</span>}
             </span>
@@ -152,7 +145,7 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onToggleStar, onRowCl
         );
       case 'group':
         return (
-          <div className={`${COLUMN_WIDTHS.group} px-2`}>
+          <div className="px-2 shrink-0" style={{ width }} data-column={col}>
             <span className="text-[13px] text-[#909090] font-['Inter'] truncate block">
               {tracker.group || <span className="text-[#505050]">--</span>}
             </span>
@@ -160,7 +153,7 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onToggleStar, onRowCl
         );
       case 'connection':
         return (
-          <div className={`${COLUMN_WIDTHS.connection} px-2`}>
+          <div className="px-2 shrink-0" style={{ width }} data-column={col}>
             <span className="text-[13px] text-[#909090] font-['Inter'] truncate block">
               {tracker.connectionType || <span className="text-[#505050]">--</span>}
             </span>
@@ -168,7 +161,7 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onToggleStar, onRowCl
         );
       case 'firstEmailDate':
         return (
-          <div className={`${COLUMN_WIDTHS.firstEmailDate} px-2`}>
+          <div className="px-2 shrink-0" style={{ width }} data-column={col}>
             <span className="text-[13px] text-[#707070] font-['Inter'] truncate block whitespace-nowrap">
               {formatDate(tracker.dateEmailed)}
             </span>
@@ -176,7 +169,7 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onToggleStar, onRowCl
         );
       case 'lastEmailDate':
         return (
-          <div className={`${COLUMN_WIDTHS.lastEmailDate} px-2`}>
+          <div className="px-2 shrink-0" style={{ width }} data-column={col}>
             <span className="text-[13px] text-[#707070] font-['Inter'] truncate block whitespace-nowrap">
               {formatDate(tracker.lastEmailDate)}
             </span>
@@ -184,7 +177,7 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onToggleStar, onRowCl
         );
       case 'followUps':
         return (
-          <div className={`${COLUMN_WIDTHS.followUps} px-2`}>
+          <div className="px-2 shrink-0" style={{ width }} data-column={col}>
             <span className="text-[13px] text-[#707070] font-['Inter'] truncate block text-center">
               {tracker.followUpCount > 0 ? tracker.followUpCount : <span className="text-[#505050]">0</span>}
             </span>
@@ -192,7 +185,7 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onToggleStar, onRowCl
         );
       case 'subject':
         return (
-          <div className={`${COLUMN_WIDTHS.subject} px-2`}>
+          <div className="px-2 shrink-0" style={{ width }} data-column={col}>
             <span className="text-[13px] text-[#707070] font-['Inter'] truncate block">
               {tracker.emailSubject || <span className="text-[#505050]">--</span>}
             </span>
@@ -200,7 +193,7 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onToggleStar, onRowCl
         );
       case 'notes':
         return (
-          <div className={`${COLUMN_WIDTHS.notes} px-2 flex justify-center`}>
+          <div className="px-2 flex justify-center shrink-0" style={{ width }} data-column={col}>
             {tracker.notes ? (
               <svg className="w-4 h-4 text-[#6364FF]" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm-1 2l5 5h-5V4zM6 20V4h6v6h6v10H6z"/>
@@ -227,7 +220,7 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onToggleStar, onRowCl
         ))}
 
         {/* Three-dots menu */}
-        <div className="w-10 min-w-[40px] flex justify-center relative" ref={menuRef}>
+        <div className="w-10 min-w-[40px] flex justify-center relative shrink-0" ref={menuRef}>
           <button
             onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
             className="p-1 text-[#707070] hover:text-[#E0E0E0] opacity-0 group-hover:opacity-100 transition-all rounded"

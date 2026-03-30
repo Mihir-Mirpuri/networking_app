@@ -204,7 +204,7 @@ function IdleAnimation() {
           </p>
         </div>
         <p className="text-sm text-[#505050] mt-6">
-          Select filters in the sidebar to get started
+          Type a search in the sidebar to get started
         </p>
       </div>
     </div>

@@ -1,13 +1,15 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   OutreachTrackerEntry,
   OutreachStats,
   ScheduledEmailEntry,
   SortField,
   SortDirection,
+  OutreachFilterOptions,
   getOutreachTrackers,
+  getOutreachFilterOptions,
   deleteOutreachTracker,
   toggleStarOutreachTracker,
   clearAllOutreachTrackers,
@@ -17,6 +19,7 @@ import { OutreachFilters, ColumnKey } from './OutreachFilters';
 import { ScheduledEmailsSection } from './ScheduledEmailsSection';
 import { ThreadPanel } from './ThreadPanel';
 import { LoadingSpinner } from '@/components/search/LoadingSpinner';
+import { useColumnSettings, COLUMN_LABELS } from './useColumnSettings';
 
 interface OutreachTrackerClientProps {
   initialTrackers: OutreachTrackerEntry[];
@@ -25,8 +28,6 @@ interface OutreachTrackerClientProps {
   initialStats: OutreachStats;
   initialScheduledEmails: ScheduledEmailEntry[];
 }
-
-const DEFAULT_COLUMNS: ColumnKey[] = ['name', 'firm', 'role', 'group', 'connection', 'firstEmailDate', 'lastEmailDate', 'followUps', 'notes'];
 
 export function OutreachTrackerClient({
   initialTrackers,
@@ -53,7 +54,34 @@ export function OutreachTrackerClient({
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
 
-  const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(DEFAULT_COLUMNS);
+  // Multi-select filter state
+  const [filterOptions, setFilterOptions] = useState<OutreachFilterOptions | null>(null);
+  const [filterOptionsLoading, setFilterOptionsLoading] = useState(true);
+  const [selectedFirms, setSelectedFirms] = useState<string[]>([]);
+  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+  const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
+  const [selectedConnections, setSelectedConnections] = useState<string[]>([]);
+
+  // Column settings hook
+  const columnSettings = useColumnSettings();
+
+  // Fetch filter options on mount
+  useEffect(() => {
+    const loadFilterOptions = async () => {
+      setFilterOptionsLoading(true);
+      try {
+        const result = await getOutreachFilterOptions();
+        if (result.success) {
+          setFilterOptions(result.options);
+        }
+      } catch (error) {
+        console.error('Error fetching filter options:', error);
+      } finally {
+        setFilterOptionsLoading(false);
+      }
+    };
+    loadFilterOptions();
+  }, []);
 
   const fetchTrackers = useCallback(
     async (resetCursor = true) => {
@@ -65,6 +93,10 @@ export function OutreachTrackerClient({
           sortDirection,
           starred: starredFilter,
           cursor: resetCursor ? undefined : cursor || undefined,
+          firms: selectedFirms.length > 0 ? selectedFirms : undefined,
+          roles: selectedRoles.length > 0 ? selectedRoles : undefined,
+          groups: selectedGroups.length > 0 ? selectedGroups : undefined,
+          connections: selectedConnections.length > 0 ? selectedConnections : undefined,
         });
 
         if (result.success) {
@@ -82,7 +114,7 @@ export function OutreachTrackerClient({
         setIsLoading(false);
       }
     },
-    [searchQuery, sortField, sortDirection, starredFilter, cursor]
+    [searchQuery, sortField, sortDirection, starredFilter, cursor, selectedFirms, selectedRoles, selectedGroups, selectedConnections]
   );
 
   const handleSearch = () => {
@@ -99,6 +131,10 @@ export function OutreachTrackerClient({
         sortDirection,
         starred: starredFilter,
         cursor,
+        firms: selectedFirms.length > 0 ? selectedFirms : undefined,
+        roles: selectedRoles.length > 0 ? selectedRoles : undefined,
+        groups: selectedGroups.length > 0 ? selectedGroups : undefined,
+        connections: selectedConnections.length > 0 ? selectedConnections : undefined,
       });
 
       if (result.success) {
@@ -126,7 +162,6 @@ export function OutreachTrackerClient({
   const handleStarredFilterChange = (starred: boolean | undefined) => {
     setStarredFilter(starred);
     if (starred === true) setScheduledFilter(undefined);
-    // Trigger refetch
     setTimeout(() => fetchTrackers(true), 0);
   };
 
@@ -135,17 +170,24 @@ export function OutreachTrackerClient({
     if (scheduled === true) setStarredFilter(undefined);
   };
 
-  const handleToggleColumn = (column: ColumnKey) => {
-    setVisibleColumns((prev) => {
-      if (prev.includes(column)) {
-        // Don't allow removing all columns
-        if (prev.length <= 1) return prev;
-        return prev.filter((c) => c !== column);
-      }
-      // Add in default order
-      const ordered = DEFAULT_COLUMNS.filter((c) => prev.includes(c) || c === column);
-      return ordered;
-    });
+  const handleFirmsChange = (firms: string[]) => {
+    setSelectedFirms(firms);
+    setTimeout(() => fetchTrackers(true), 0);
+  };
+
+  const handleRolesChange = (roles: string[]) => {
+    setSelectedRoles(roles);
+    setTimeout(() => fetchTrackers(true), 0);
+  };
+
+  const handleGroupsChange = (groups: string[]) => {
+    setSelectedGroups(groups);
+    setTimeout(() => fetchTrackers(true), 0);
+  };
+
+  const handleConnectionsChange = (connections: string[]) => {
+    setSelectedConnections(connections);
+    setTimeout(() => fetchTrackers(true), 0);
   };
 
   const recomputeStats = (trackerList: OutreachTrackerEntry[]) => {
@@ -219,10 +261,23 @@ export function OutreachTrackerClient({
           onStarredFilterChange={handleStarredFilterChange}
           scheduledFilter={scheduledFilter}
           onScheduledFilterChange={handleScheduledFilterChange}
-          visibleColumns={visibleColumns}
-          onToggleColumn={handleToggleColumn}
+          columnOrder={columnSettings.columnOrder}
+          isColumnVisible={columnSettings.isVisible}
+          onToggleColumn={columnSettings.toggleColumn}
+          onReorderColumns={columnSettings.reorderColumns}
+          columnLabels={COLUMN_LABELS}
           showClearAll={trackers.length > 0}
           onClearAll={() => setShowClearConfirm(true)}
+          filterOptions={filterOptions}
+          filterOptionsLoading={filterOptionsLoading}
+          selectedFirms={selectedFirms}
+          selectedRoles={selectedRoles}
+          selectedGroups={selectedGroups}
+          selectedConnections={selectedConnections}
+          onFirmsChange={handleFirmsChange}
+          onRolesChange={handleRolesChange}
+          onGroupsChange={handleGroupsChange}
+          onConnectionsChange={handleConnectionsChange}
         />
       </div>
 
@@ -268,7 +323,10 @@ export function OutreachTrackerClient({
           onDelete={handleDelete}
           onToggleStar={handleToggleStar}
           onRowClick={setSelectedTracker}
-          visibleColumns={visibleColumns}
+          visibleColumns={columnSettings.visibleColumns}
+          columnWidths={columnSettings.widths}
+          onStartResize={columnSettings.startResize}
+          onAutoFitColumn={columnSettings.autoFitColumn}
           hasMore={hasMore}
           isLoadingMore={isLoadingMore}
           onLoadMore={handleLoadMore}

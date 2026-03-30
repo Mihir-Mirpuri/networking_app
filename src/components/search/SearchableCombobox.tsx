@@ -64,7 +64,7 @@ export function SearchableCombobox({
         <div className="relative">
           <Combobox.Input
             id={id}
-            className="input pr-10 text-center"
+            className="input pr-10 text-left"
             displayValue={() => displayValue}
             onChange={(event) => {
               const nextValue = event.target.value;

@@ -67,6 +67,89 @@ export interface GetOutreachTrackersParams {
   sortDirection?: SortDirection;
   cursor?: string;
   limit?: number;
+  // Multi-select filters
+  firms?: string[];
+  roles?: string[];
+  groups?: string[];
+  connections?: string[];
+}
+
+export interface FilterOption {
+  value: string;
+  count: number;
+}
+
+export interface OutreachFilterOptions {
+  firms: FilterOption[];
+  roles: FilterOption[];
+  groups: FilterOption[];
+  connections: FilterOption[];
+}
+
+export async function getOutreachFilterOptions(): Promise<{
+  success: true;
+  options: OutreachFilterOptions;
+} | { success: false; error: string }> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return { success: false, error: 'Not authenticated' };
+  }
+
+  try {
+    const userId = session.user.id;
+
+    // Fetch all distinct values in parallel using groupBy
+    const [firmsResult, rolesResult, groupsResult, connectionsResult] = await Promise.all([
+      prisma.outreachTracker.groupBy({
+        by: ['company'],
+        where: { userId, company: { not: null } },
+        _count: { company: true },
+        orderBy: { _count: { company: 'desc' } },
+      }),
+      prisma.outreachTracker.groupBy({
+        by: ['role'],
+        where: { userId, role: { not: null } },
+        _count: { role: true },
+        orderBy: { _count: { role: 'desc' } },
+      }),
+      prisma.outreachTracker.groupBy({
+        by: ['group'],
+        where: { userId, group: { not: null } },
+        _count: { group: true },
+        orderBy: { _count: { group: 'desc' } },
+      }),
+      prisma.outreachTracker.groupBy({
+        by: ['connectionType'],
+        where: { userId, connectionType: { not: null } },
+        _count: { connectionType: true },
+        orderBy: { _count: { connectionType: 'desc' } },
+      }),
+    ]);
+
+    return {
+      success: true,
+      options: {
+        firms: firmsResult
+          .filter((r) => r.company)
+          .map((r) => ({ value: r.company!, count: r._count.company })),
+        roles: rolesResult
+          .filter((r) => r.role)
+          .map((r) => ({ value: r.role!, count: r._count.role })),
+        groups: groupsResult
+          .filter((r) => r.group)
+          .map((r) => ({ value: r.group!, count: r._count.group })),
+        connections: connectionsResult
+          .filter((r) => r.connectionType)
+          .map((r) => ({ value: r.connectionType!, count: r._count.connectionType })),
+      },
+    };
+  } catch (error) {
+    console.error('[Outreach] Error fetching filter options:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch filter options',
+    };
+  }
 }
 
 export async function getOutreachTrackers(
@@ -90,6 +173,10 @@ export async function getOutreachTrackers(
     sortDirection = 'desc',
     cursor,
     limit = 50,
+    firms,
+    roles,
+    groups,
+    connections,
   } = params;
 
   try {
@@ -118,6 +205,20 @@ export async function getOutreachTrackers(
     // Add starred filter
     if (starred !== undefined) {
       where.starred = starred;
+    }
+
+    // Add multi-select filters
+    if (firms && firms.length > 0) {
+      where.company = { in: firms };
+    }
+    if (roles && roles.length > 0) {
+      where.role = { in: roles };
+    }
+    if (groups && groups.length > 0) {
+      where.group = { in: groups };
+    }
+    if (connections && connections.length > 0) {
+      where.connectionType = { in: connections };
     }
 
     // Build orderBy

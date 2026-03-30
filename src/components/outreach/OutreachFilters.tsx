@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { OutreachFilterOptions } from '@/app/actions/outreach';
+import { MultiSelectFilter } from './MultiSelectFilter';
 
 export type ColumnKey = 'name' | 'firm' | 'role' | 'location' | 'group' | 'connection' | 'firstEmailDate' | 'lastEmailDate' | 'followUps' | 'subject' | 'notes';
 
@@ -13,26 +15,26 @@ interface OutreachFiltersProps {
   onStarredFilterChange: (starred: boolean | undefined) => void;
   scheduledFilter: boolean | undefined;
   onScheduledFilterChange: (scheduled: boolean | undefined) => void;
-  visibleColumns: ColumnKey[];
+  // Column settings
+  columnOrder: ColumnKey[];
+  isColumnVisible: (column: ColumnKey) => boolean;
   onToggleColumn: (column: ColumnKey) => void;
+  onReorderColumns: (fromIndex: number, toIndex: number) => void;
+  columnLabels: Record<ColumnKey, string>;
   showClearAll: boolean;
   onClearAll: () => void;
+  // Multi-select filter options
+  filterOptions: OutreachFilterOptions | null;
+  filterOptionsLoading: boolean;
+  selectedFirms: string[];
+  selectedRoles: string[];
+  selectedGroups: string[];
+  selectedConnections: string[];
+  onFirmsChange: (firms: string[]) => void;
+  onRolesChange: (roles: string[]) => void;
+  onGroupsChange: (groups: string[]) => void;
+  onConnectionsChange: (connections: string[]) => void;
 }
-
-const ALL_COLUMNS: { key: ColumnKey; label: string }[] = [
-  { key: 'name', label: 'Name' },
-  { key: 'firm', label: 'Firm' },
-  { key: 'role', label: 'Role' },
-  { key: 'location', label: 'Location' },
-  { key: 'group', label: 'Group' },
-  { key: 'connection', label: 'Connection' },
-  { key: 'firstEmailDate', label: 'First Email' },
-  { key: 'lastEmailDate', label: 'Last Email' },
-  { key: 'followUps', label: 'Follow-ups' },
-  { key: 'subject', label: 'Subject' },
-  { key: 'notes', label: 'Notes' },
-];
-
 
 export function OutreachFilters({
   searchQuery,
@@ -43,15 +45,32 @@ export function OutreachFilters({
   onStarredFilterChange,
   scheduledFilter,
   onScheduledFilterChange,
-  visibleColumns,
+  columnOrder,
+  isColumnVisible,
   onToggleColumn,
+  onReorderColumns,
+  columnLabels,
   showClearAll,
   onClearAll,
+  filterOptions,
+  filterOptionsLoading,
+  selectedFirms,
+  selectedRoles,
+  selectedGroups,
+  selectedConnections,
+  onFirmsChange,
+  onRolesChange,
+  onGroupsChange,
+  onConnectionsChange,
 }: OutreachFiltersProps) {
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const isFirstRender = useRef(true);
   const [showColumnsDropdown, setShowColumnsDropdown] = useState(false);
   const columnsRef = useRef<HTMLDivElement>(null);
+
+  // Drag state
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   // Debounced search on query change
   useEffect(() => {
@@ -81,6 +100,44 @@ export function OutreachFilters({
 
   const starredActive = starredFilter === true;
   const scheduledActive = scheduledFilter === true;
+
+  // Count visible columns for numbering
+  const getVisibleIndex = (column: ColumnKey): number | null => {
+    const visibleColumns = columnOrder.filter(isColumnVisible);
+    const idx = visibleColumns.indexOf(column);
+    return idx >= 0 ? idx + 1 : null;
+  };
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', index.toString());
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverIndex(index);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverIndex(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, toIndex: number) => {
+    e.preventDefault();
+    const fromIndex = draggedIndex;
+    if (fromIndex !== null && fromIndex !== toIndex) {
+      onReorderColumns(fromIndex, toIndex);
+    }
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
 
   return (
     <div className="flex flex-col gap-4">
@@ -151,18 +208,35 @@ export function OutreachFilters({
           <span>Scheduled</span>
         </button>
 
-        {/* Column filter pills */}
-        {['Name', 'Firm', 'Role', 'Group', 'Connection'].map((label) => (
-          <button
-            key={label}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#1a1a1a] border border-[#3a3a3a] text-xs text-[#E0E0E0] font-['Inter'] hover:border-[#505050] transition-colors"
-          >
-            <span>{label}</span>
-            <svg className="w-3 h-3 text-[#707070]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-        ))}
+        {/* Multi-select filter dropdowns */}
+        <MultiSelectFilter
+          label="Firm"
+          options={filterOptions?.firms ?? []}
+          selected={selectedFirms}
+          onChange={onFirmsChange}
+          isLoading={filterOptionsLoading}
+        />
+        <MultiSelectFilter
+          label="Role"
+          options={filterOptions?.roles ?? []}
+          selected={selectedRoles}
+          onChange={onRolesChange}
+          isLoading={filterOptionsLoading}
+        />
+        <MultiSelectFilter
+          label="Group"
+          options={filterOptions?.groups ?? []}
+          selected={selectedGroups}
+          onChange={onGroupsChange}
+          isLoading={filterOptionsLoading}
+        />
+        <MultiSelectFilter
+          label="Connection"
+          options={filterOptions?.connections ?? []}
+          selected={selectedConnections}
+          onChange={onConnectionsChange}
+          isLoading={filterOptionsLoading}
+        />
 
         {/* Spacer */}
         <div className="flex-1" />
@@ -184,38 +258,77 @@ export function OutreachFilters({
 
           {/* Columns Dropdown */}
           {showColumnsDropdown && (
-            <div className="absolute right-0 top-full mt-2 w-[220px] bg-[#2a2a2a] border border-[#3a3a3a] rounded-lg shadow-lg shadow-black/40 z-50 py-2">
-              <div className="px-3.5 py-2">
+            <div className="absolute right-0 top-full mt-2 w-[260px] bg-[#2a2a2a] border border-[#3a3a3a] rounded-lg shadow-lg shadow-black/40 z-50 py-2">
+              <div className="px-3.5 py-2 flex items-center justify-between">
                 <span className="text-[13px] font-semibold text-[#E0E0E0] font-['Inter']">Manage Columns</span>
+                <span className="text-[11px] text-[#606060] font-['Inter']">Drag to reorder</span>
               </div>
               <div className="h-px bg-[#3a3a3a]" />
 
-              {ALL_COLUMNS.map((col) => {
-                const isActive = visibleColumns.includes(col.key);
-                return (
-                  <button
-                    key={col.key}
-                    onClick={() => onToggleColumn(col.key)}
-                    className="flex items-center gap-2.5 w-full px-3.5 py-2 hover:bg-[#353535] transition-colors"
-                  >
+              <div className="py-1">
+                {columnOrder.map((col, index) => {
+                  const isActive = isColumnVisible(col);
+                  const visibleNum = getVisibleIndex(col);
+                  const isDragging = draggedIndex === index;
+                  const isDragOver = dragOverIndex === index;
+
+                  return (
                     <div
-                      className={`w-4 h-4 rounded flex items-center justify-center shrink-0 ${
-                        isActive ? 'bg-[#6364FF]' : 'border border-[#505050]'
-                      }`}
+                      key={col}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, index)}
+                      onDragOver={(e) => handleDragOver(e, index)}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, index)}
+                      onDragEnd={handleDragEnd}
+                      className={`flex items-center gap-2 w-full px-3.5 py-2 hover:bg-[#353535] transition-colors cursor-grab active:cursor-grabbing ${
+                        isDragging ? 'opacity-50' : ''
+                      } ${isDragOver ? 'bg-[#3a3a3a]' : ''}`}
                     >
-                      {isActive && (
-                        <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                        </svg>
+                      {/* Drag handle */}
+                      <div className="flex flex-col gap-0.5 text-[#505050] shrink-0">
+                        <div className="flex gap-0.5">
+                          <div className="w-1 h-1 bg-current rounded-full" />
+                          <div className="w-1 h-1 bg-current rounded-full" />
+                        </div>
+                        <div className="flex gap-0.5">
+                          <div className="w-1 h-1 bg-current rounded-full" />
+                          <div className="w-1 h-1 bg-current rounded-full" />
+                        </div>
+                      </div>
+
+                      {/* Checkbox */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onToggleColumn(col);
+                        }}
+                        className={`w-4 h-4 rounded flex items-center justify-center shrink-0 ${
+                          isActive ? 'bg-[#6364FF]' : 'border border-[#505050]'
+                        }`}
+                      >
+                        {isActive && (
+                          <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </button>
+
+                      {/* Column name */}
+                      <span className={`text-[13px] font-['Inter'] flex-1 ${isActive ? 'text-[#E0E0E0]' : 'text-[#707070]'}`}>
+                        {columnLabels[col]}
+                      </span>
+
+                      {/* Position number */}
+                      {visibleNum && (
+                        <span className="w-5 h-5 rounded bg-[#3a3a3a] text-[11px] text-[#909090] font-medium font-['Inter'] flex items-center justify-center">
+                          {visibleNum}
+                        </span>
                       )}
                     </div>
-                    <span className={`text-[13px] font-['Inter'] ${isActive ? 'text-[#E0E0E0]' : 'text-[#707070]'}`}>
-                      {col.label}
-                    </span>
-                  </button>
-                );
-              })}
-
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
