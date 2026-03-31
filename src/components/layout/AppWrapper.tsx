@@ -8,9 +8,9 @@ interface AppWrapperProps {
 }
 
 export function AppWrapper({ initialRemainingDaily }: AppWrapperProps) {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
 
-  const isAuthenticated = !!session?.user;
+  const isAuthenticated = status === 'loading' ? true : !!session?.user;
 
   return (
     <AppShell
