@@ -55,7 +55,7 @@ export function PlansModal({ isOpen, onClose, isSubscribed }: PlansModalProps) {
         {/* Header */}
         <div className="px-6 py-5 border-b border-[#2a2a2a]">
           <h2 className="text-xl font-semibold text-white">Choose Your Plan</h2>
-          <p className="text-sm text-[#707070] mt-1">
+          <p className="text-sm text-white mt-1">
             {isSubscribed
               ? 'Manage your subscription'
               : 'Upgrade to unlock unlimited outreach'}
@@ -73,26 +73,26 @@ export function PlansModal({ isOpen, onClose, isSubscribed }: PlansModalProps) {
             }`}
           >
             {!isSubscribed && (
-              <span className="absolute -top-2.5 left-4 px-2 py-0.5 bg-[#1a1a1a] text-[#707070] text-xs font-medium rounded">
+              <span className="absolute -top-2.5 left-4 px-2 py-0.5 bg-[#1a1a1a] text-white text-xs font-medium rounded">
                 Current Plan
               </span>
             )}
             <div className="flex items-start justify-between">
               <div>
                 <h3 className="text-lg font-semibold text-white">Free</h3>
-                <p className="text-[#707070] text-sm mt-1">
+                <p className="text-white text-sm mt-1">
                   For getting started with networking
                 </p>
               </div>
               <div className="text-right">
                 <span className="text-2xl font-bold text-white">$0</span>
-                <span className="text-[#505050] text-sm">/month</span>
+                <span className="text-white text-sm">/month</span>
               </div>
             </div>
             <ul className="mt-4 space-y-2">
-              <li className="flex items-center gap-2 text-sm text-[#a0a0a0]">
+              <li className="flex items-center gap-2 text-sm text-white">
                 <svg
-                  className="w-4 h-4 text-[#505050]"
+                  className="w-4 h-4 text-white"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -106,9 +106,9 @@ export function PlansModal({ isOpen, onClose, isSubscribed }: PlansModalProps) {
                 </svg>
                 {EMAIL_LIMITS.DEFAULT_DAILY_LIMIT} emails per day
               </li>
-              <li className="flex items-center gap-2 text-sm text-[#a0a0a0]">
+              <li className="flex items-center gap-2 text-sm text-white">
                 <svg
-                  className="w-4 h-4 text-[#505050]"
+                  className="w-4 h-4 text-white"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -122,9 +122,9 @@ export function PlansModal({ isOpen, onClose, isSubscribed }: PlansModalProps) {
                 </svg>
                 AI-powered email personalization
               </li>
-              <li className="flex items-center gap-2 text-sm text-[#a0a0a0]">
+              <li className="flex items-center gap-2 text-sm text-white">
                 <svg
-                  className="w-4 h-4 text-[#505050]"
+                  className="w-4 h-4 text-white"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -162,17 +162,17 @@ export function PlansModal({ isOpen, onClose, isSubscribed }: PlansModalProps) {
             <div className="flex items-start justify-between">
               <div>
                 <h3 className="text-lg font-semibold text-white">Pro</h3>
-                <p className="text-[#707070] text-sm mt-1">
+                <p className="text-white text-sm mt-1">
                   For serious networkers
                 </p>
               </div>
               <div className="text-right">
                 <span className="text-2xl font-bold text-white">$20</span>
-                <span className="text-[#505050] text-sm">/month</span>
+                <span className="text-white text-sm">/month</span>
               </div>
             </div>
             <ul className="mt-4 space-y-2">
-              <li className="flex items-center gap-2 text-sm text-[#a0a0a0]">
+              <li className="flex items-center gap-2 text-sm text-white">
                 <svg
                   className="w-4 h-4 text-[#3b82f6]"
                   fill="none"
@@ -188,7 +188,7 @@ export function PlansModal({ isOpen, onClose, isSubscribed }: PlansModalProps) {
                 </svg>
                 <span className="text-white font-medium">Unlimited</span> emails
               </li>
-              <li className="flex items-center gap-2 text-sm text-[#a0a0a0]">
+              <li className="flex items-center gap-2 text-sm text-white">
                 <svg
                   className="w-4 h-4 text-[#3b82f6]"
                   fill="none"
@@ -204,7 +204,7 @@ export function PlansModal({ isOpen, onClose, isSubscribed }: PlansModalProps) {
                 </svg>
                 AI-powered email personalization
               </li>
-              <li className="flex items-center gap-2 text-sm text-[#a0a0a0]">
+              <li className="flex items-center gap-2 text-sm text-white">
                 <svg
                   className="w-4 h-4 text-[#3b82f6]"
                   fill="none"
@@ -220,7 +220,7 @@ export function PlansModal({ isOpen, onClose, isSubscribed }: PlansModalProps) {
                 </svg>
                 Priority contact discovery
               </li>
-              <li className="flex items-center gap-2 text-sm text-[#a0a0a0]">
+              <li className="flex items-center gap-2 text-sm text-white">
                 <svg
                   className="w-4 h-4 text-[#3b82f6]"
                   fill="none"
@@ -292,7 +292,7 @@ export function PlansModal({ isOpen, onClose, isSubscribed }: PlansModalProps) {
               <button
                 onClick={handleManageSubscription}
                 disabled={isPortalLoading}
-                className="w-full mt-5 py-2.5 bg-[#2a2a2a] text-[#c0c0c0] font-medium rounded-lg hover:bg-[#333333] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                className="w-full mt-5 py-2.5 bg-[#2a2a2a] text-white font-medium rounded-lg hover:bg-[#333333] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
               >
                 {isPortalLoading ? (
                   <>
@@ -329,7 +329,7 @@ export function PlansModal({ isOpen, onClose, isSubscribed }: PlansModalProps) {
         <div className="px-6 py-4 border-t border-[#2a2a2a] flex justify-end">
           <button
             onClick={onClose}
-            className="text-sm font-medium text-[#707070] hover:text-[#a0a0a0] transition-colors"
+            className="text-sm font-medium text-white hover:text-white transition-colors"
           >
             Close
           </button>

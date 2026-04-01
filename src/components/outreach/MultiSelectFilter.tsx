@@ -67,8 +67,8 @@ export function MultiSelectFilter({
         onClick={() => setIsOpen(!isOpen)}
         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-['Inter'] transition-colors ${
           hasSelection
-            ? 'bg-[#6364FF]/20 border-[#6364FF] text-[#E0E0E0]'
-            : 'bg-[#1a1a1a] border-[#3a3a3a] text-[#E0E0E0] hover:border-[#505050]'
+            ? 'bg-[#6364FF]/20 border-[#6364FF] text-white'
+            : 'bg-[#1a1a1a] border-[#3a3a3a] text-white hover:border-[#505050]'
         }`}
       >
         <span>{label}</span>
@@ -77,7 +77,7 @@ export function MultiSelectFilter({
             {selected.length}
           </span>
         )}
-        <svg className="w-3 h-3 text-[#707070]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
@@ -87,7 +87,7 @@ export function MultiSelectFilter({
           {/* Search input */}
           <div className="p-2 border-b border-[#3a3a3a]">
             <div className="flex items-center gap-2 bg-[#1a1a1a] border border-[#3a3a3a] rounded-md px-2.5 py-1.5">
-              <svg className="w-3.5 h-3.5 text-[#505050] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3.5 h-3.5 text-white shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
               <input
@@ -96,7 +96,7 @@ export function MultiSelectFilter({
                 placeholder={`Search ${label.toLowerCase()}...`}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-transparent text-xs text-[#E0E0E0] placeholder-[#505050] outline-none w-full font-['Inter']"
+                className="bg-transparent text-xs text-white placeholder-[#505050] outline-none w-full font-['Inter']"
               />
             </div>
           </div>
@@ -108,7 +108,7 @@ export function MultiSelectFilter({
                 <div className="w-4 h-4 border-2 border-[#505050] border-t-[#808080] rounded-full animate-spin" />
               </div>
             ) : filteredOptions.length === 0 ? (
-              <div className="px-3 py-4 text-center text-xs text-[#707070] font-['Inter']">
+              <div className="px-3 py-4 text-center text-xs text-white font-['Inter']">
                 {searchQuery ? 'No matches found' : 'No options available'}
               </div>
             ) : (
@@ -133,11 +133,11 @@ export function MultiSelectFilter({
                       )}
                     </div>
                     {/* Value */}
-                    <span className={`text-[13px] font-['Inter'] flex-1 truncate ${isSelected ? 'text-[#E0E0E0]' : 'text-[#b0b0b0]'}`}>
+                    <span className={`text-[13px] font-['Inter'] flex-1 truncate ${isSelected ? 'text-white' : 'text-white'}`}>
                       {option.value}
                     </span>
                     {/* Count */}
-                    <span className="text-[11px] text-[#606060] font-['Inter'] shrink-0">
+                    <span className="text-[11px] text-white font-['Inter'] shrink-0">
                       {option.count}
                     </span>
                   </button>
@@ -151,7 +151,7 @@ export function MultiSelectFilter({
             <div className="border-t border-[#3a3a3a] p-2">
               <button
                 onClick={clearSelection}
-                className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-['Inter'] text-[#909090] hover:text-[#E0E0E0] hover:bg-[#353535] transition-colors"
+                className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-['Inter'] text-white hover:text-white hover:bg-[#353535] transition-colors"
               >
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

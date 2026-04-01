@@ -70,7 +70,7 @@ export function NewHeader({ onToggleSidebar, showSidebarToggle, isAuthenticated 
             {showSidebarToggle && (
               <button
                 onClick={onToggleSidebar}
-                className="lg:hidden flex items-center justify-center w-8 h-8 rounded-lg text-[#808080] hover:text-white transition-colors"
+                className="lg:hidden flex items-center justify-center w-8 h-8 rounded-lg text-white hover:text-white transition-colors"
                 aria-label="Toggle sidebar"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -81,7 +81,7 @@ export function NewHeader({ onToggleSidebar, showSidebarToggle, isAuthenticated 
             {showLogo && (
               <Link href="/" className="flex items-center gap-2 group">
                 <MascotSVG className="w-7 h-7" />
-                <span className="text-xl font-bold text-white group-hover:text-[#a0a0a0] transition-colors">
+                <span className="text-xl font-bold text-white group-hover:text-white transition-colors">
                   Signl
                 </span>
               </Link>
@@ -100,7 +100,7 @@ export function NewHeader({ onToggleSidebar, showSidebarToggle, isAuthenticated 
                     className={`text-sm font-medium transition-colors duration-200 ${
                       isActive
                         ? 'text-white'
-                        : 'text-[#505050] hover:text-[#808080]'
+                        : 'text-white hover:text-white'
                     }`}
                   >
                     {tab.name}

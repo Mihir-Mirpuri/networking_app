@@ -11,16 +11,16 @@ export function HistoryEmptyState() {
     <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
       {/* Icon */}
       <div className="w-20 h-20 rounded-full bg-[#2a2a2a] flex items-center justify-center mb-6">
-        <svg className="w-10 h-10 text-[#505050]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
       </div>
 
       {/* Title */}
-      <h2 className="text-2xl font-bold text-[#E0E0E0] mb-2">Your History</h2>
+      <h2 className="text-2xl font-bold text-white mb-2">Your History</h2>
 
       {/* Description */}
-      <p className="text-[#707070] max-w-md mb-8">
+      <p className="text-white max-w-md mb-8">
         Sign in to track your outreach, see sent emails, and manage your conversations all in one place.
       </p>
 

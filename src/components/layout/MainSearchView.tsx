@@ -198,12 +198,12 @@ function IdleAnimation() {
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-120px)]">
         {/* Typewriter text */}
         <div className="h-12 flex items-center justify-center">
-          <p className="text-3xl text-[#707070] font-medium">
+          <p className="text-3xl text-white font-medium">
             {typewriterText}
             <span className="inline-block w-0.5 h-8 bg-[#505050] ml-1 animate-pulse" />
           </p>
         </div>
-        <p className="text-sm text-[#505050] mt-6">
+        <p className="text-sm text-white mt-6">
           Type a search in the sidebar to get started
         </p>
       </div>
@@ -676,7 +676,7 @@ export function MainSearchView({
         {/* No results state - centered */}
         {activeFilterEntries.length > 0 && showChat && !isSearching && !hasResults && (
           <div className="flex flex-col items-center justify-center min-h-[60vh]">
-            <p className="text-3xl font-medium text-[#707070]">No results</p>
+            <p className="text-3xl font-medium text-white">No results</p>
           </div>
         )}
 

@@ -51,7 +51,7 @@ export function LoginPromptModal({ isOpen, onClose, title, message }: LoginPromp
           <h2 className="text-xl font-bold text-white mb-2">{title}</h2>
 
           {/* Message */}
-          <p className="text-[#808080] mb-8">{message}</p>
+          <p className="text-white mb-8">{message}</p>
 
           {/* Sign in button */}
           <button
@@ -68,7 +68,7 @@ export function LoginPromptModal({ isOpen, onClose, title, message }: LoginPromp
           </button>
 
           {/* Secondary text */}
-          <p className="text-sm text-[#505050] mt-4">
+          <p className="text-sm text-white mt-4">
             Free to use. No credit card required.
           </p>
         </div>

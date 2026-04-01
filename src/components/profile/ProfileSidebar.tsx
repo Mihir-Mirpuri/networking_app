@@ -25,7 +25,7 @@ function MascotSVG({ className }: { className?: string }) {
 
 const FallbackAvatar = () => (
   <div className="w-20 h-20 rounded-full bg-[#2a2a2a] flex items-center justify-center ring-2 ring-[#303030]">
-    <svg className="w-10 h-10 text-[#505050]" fill="currentColor" viewBox="0 0 24 24">
+    <svg className="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 24 24">
       <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
     </svg>
   </div>
@@ -129,7 +129,7 @@ export function ProfileSidebar({
       <div className="px-4 py-3 flex items-center">
         <Link href="/app" className="flex items-center gap-2 group">
           <MascotSVG className="w-7 h-7" />
-          <span className="text-xl font-bold text-white group-hover:text-[#a0a0a0] transition-colors">
+          <span className="text-xl font-bold text-white group-hover:text-white transition-colors">
             Signl
           </span>
         </Link>
@@ -143,16 +143,16 @@ export function ProfileSidebar({
       {/* Info */}
       <div className="flex flex-col items-center gap-1">
         <span className="text-lg font-bold text-white">{userName || 'User'}</span>
-        {university && <span className="text-xs text-[#707070]">{university}</span>}
-        {details && <span className="text-[11px] text-[#505050]">{details}</span>}
-        <span className="text-[10px] text-[#505050]">{userEmail}</span>
+        {university && <span className="text-xs text-white">{university}</span>}
+        {details && <span className="text-[11px] text-white">{details}</span>}
+        <span className="text-[10px] text-white">{userEmail}</span>
       </div>
 
       {/* Plan badge */}
       <span className={`px-3 py-1 rounded-full text-[10px] font-semibold ${
         isSubscribed
           ? 'bg-[#6364FF]/15 text-[#6364FF]'
-          : 'bg-[#303030] text-[#808080]'
+          : 'bg-[#303030] text-white'
       }`}>
         {isSubscribed ? 'PRO Plan' : 'Free Plan'}
       </span>
@@ -171,10 +171,10 @@ export function ProfileSidebar({
               className={`flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-left transition-colors ${
                 isActive
                   ? 'bg-[#2a2a2a] text-white'
-                  : 'text-[#606060] hover:bg-[#252525] hover:text-[#909090]'
+                  : 'text-white hover:bg-[#252525] hover:text-white'
               }`}
             >
-              <span className={isActive ? 'text-white' : 'text-[#606060]'}>{item.icon}</span>
+              <span className={isActive ? 'text-white' : 'text-white'}>{item.icon}</span>
               <span className="text-[13px] font-medium">{item.label}</span>
             </button>
           );

@@ -308,7 +308,7 @@ export function OutreachTrackerClient({
         />
       ) : isLoading && trackers.length === 0 ? (
         <div className="flex items-center justify-center h-64">
-          <div className="flex items-center gap-3 text-[#707070]">
+          <div className="flex items-center gap-3 text-white">
             <LoadingSpinner size="md" />
             Loading...
           </div>
@@ -351,15 +351,15 @@ export function OutreachTrackerClient({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
             </div>
-            <h3 className="text-xl font-semibold text-center text-[#E0E0E0] mb-2">Clear All History</h3>
-            <p className="text-[#808080] text-center mb-6">
-              Are you sure you want to delete all <span className="font-medium text-[#E0E0E0]">{trackers.length}</span> contacts from your history? This action cannot be undone.
+            <h3 className="text-xl font-semibold text-center text-white mb-2">Clear All History</h3>
+            <p className="text-white text-center mb-6">
+              Are you sure you want to delete all <span className="font-medium text-white">{trackers.length}</span> contacts from your history? This action cannot be undone.
             </p>
             <div className="flex gap-3 justify-center">
               <button
                 onClick={() => setShowClearConfirm(false)}
                 disabled={isClearing}
-                className="px-5 py-2.5 text-sm font-medium bg-[#333333] text-[#c0c0c0] rounded-lg hover:bg-[#3a3a3a] transition-all disabled:opacity-50"
+                className="px-5 py-2.5 text-sm font-medium bg-[#333333] text-white rounded-lg hover:bg-[#3a3a3a] transition-all disabled:opacity-50"
               >
                 Cancel
               </button>

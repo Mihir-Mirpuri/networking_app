@@ -9,7 +9,7 @@ import type { PersonInsightResponse } from '@/app/actions/person-insights';
 const SOURCE_COLORS: Record<string, { bg: string; text: string }> = {
   linkedin: { bg: 'bg-[#0A66C2]/20', text: 'text-[#4A9FE5]' },
   google: { bg: 'bg-[#4285f4]/20', text: 'text-[#7EB1F7]' },
-  website: { bg: 'bg-[#808080]/20', text: 'text-[#909090]' },
+  website: { bg: 'bg-[#808080]/20', text: 'text-white' },
   database: { bg: 'bg-[#10b981]/20', text: 'text-[#34d399]' },
 };
 
@@ -107,16 +107,16 @@ function InsightRow({ insight, isSelected, isExpanded, onToggleSelect, onToggleE
               className="flex items-center gap-1 text-left"
             >
               <span className={`text-xs leading-relaxed transition-all ${
-                isSelected ? 'text-white' : 'text-[#e0e0e0]'
+                isSelected ? 'text-white' : 'text-white'
               } ${isTitleHovered ? 'underline text-white' : ''}`}>
                 {insight.label}
               </span>
-              <svg className={`w-3 h-3 flex-shrink-0 transition-colors ${isTitleHovered ? 'text-white' : 'text-[#606060]'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg className={`w-3 h-3 flex-shrink-0 transition-colors ${isTitleHovered ? 'text-white' : 'text-white'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
               </svg>
             </button>
           ) : (
-            <span className={`text-xs leading-relaxed ${isSelected ? 'text-white' : 'text-[#e0e0e0]'}`}>
+            <span className={`text-xs leading-relaxed ${isSelected ? 'text-white' : 'text-white'}`}>
               {insight.label}
             </span>
           )}
@@ -124,7 +124,7 @@ function InsightRow({ insight, isSelected, isExpanded, onToggleSelect, onToggleE
 
         {/* Detail - shown on hover of the row */}
         {showDetail && (
-          <p className="text-[11px] text-[#a0a0a0] leading-relaxed mt-0.5">{insight.detail}</p>
+          <p className="text-[11px] text-white leading-relaxed mt-0.5">{insight.detail}</p>
         )}
       </div>
     </div>
@@ -167,9 +167,9 @@ function InsightSectionGroup({
       >
         {icon}
         <span className="text-xs font-medium text-white">{title}</span>
-        <span className="text-[10px] text-[#a0a0a0]">({insights.length})</span>
+        <span className="text-[10px] text-white">({insights.length})</span>
         <svg
-          className={`w-3 h-3 text-[#a0a0a0] ml-auto transition-transform ${isOpen ? 'rotate-180' : ''}`}
+          className={`w-3 h-3 text-white ml-auto transition-transform ${isOpen ? 'rotate-180' : ''}`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -274,7 +274,7 @@ export function InsightsSection() {
     <div className="border-b border-[#252525]">
       {/* Header */}
       <div className="flex items-center justify-center gap-2 px-3 py-3">
-        <span className="text-sm font-semibold text-[#E0E0E0]">About {firstName}</span>
+        <span className="text-sm font-semibold text-white">About {firstName}</span>
         {selectedCount > 0 && (
           <span className="px-1.5 py-0.5 text-[10px] font-medium bg-[#0b57d0]/20 text-[#7EB1F7] rounded-full">
             {selectedCount}
@@ -305,7 +305,7 @@ export function InsightsSection() {
           </div>
         ) : insights.length === 0 ? (
           <div className="px-3 py-2">
-            <span className="text-xs text-[#505050]">No additional info found</span>
+            <span className="text-xs text-white">No additional info found</span>
           </div>
         ) : (
           <>
@@ -415,7 +415,7 @@ export function EmailChatPanel() {
         {/* Empty state */}
         {messages.length === 0 && !isProcessing && (
           <div className="h-full flex flex-col items-center justify-center px-6 text-center">
-            <p className="text-sm text-[#606060] mb-2">How can I help with this email?</p>
+            <p className="text-sm text-white mb-2">How can I help with this email?</p>
             <div className="flex flex-wrap gap-2 justify-center">
               {['Make it shorter', 'More professional', 'Add a hook'].map((suggestion) => (
                 <button
@@ -424,7 +424,7 @@ export function EmailChatPanel() {
                     setInputValue(suggestion);
                     inputRef.current?.focus();
                   }}
-                  className="px-3 py-1.5 text-xs text-[#606060] border border-[#303030] rounded-full hover:border-[#404040] hover:text-[#808080] transition-colors"
+                  className="px-3 py-1.5 text-xs text-white border border-[#303030] rounded-full hover:border-[#404040] hover:text-white transition-colors"
                 >
                   {suggestion}
                 </button>
@@ -442,19 +442,19 @@ export function EmailChatPanel() {
                   // User message - minimal, right-aligned text
                   <div className="flex justify-end">
                     <div className="max-w-[90%] text-right">
-                      <p className="text-sm text-[#c0c0c0] whitespace-pre-wrap">{message.content}</p>
+                      <p className="text-sm text-white whitespace-pre-wrap">{message.content}</p>
                     </div>
                   </div>
                 ) : (
                   // AI message - left-aligned with subtle styling
                   <div className="flex gap-2">
                     <div className="flex-shrink-0 w-5 h-5 rounded bg-[#252525] flex items-center justify-center mt-0.5">
-                      <svg className="w-3 h-3 text-[#606060]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" />
                       </svg>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-[#909090] whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                      <p className="text-sm text-white whitespace-pre-wrap leading-relaxed">{message.content}</p>
                     </div>
                   </div>
                 )}
@@ -465,7 +465,7 @@ export function EmailChatPanel() {
             {isProcessing && (
               <div className="flex gap-2">
                 <div className="flex-shrink-0 w-5 h-5 rounded bg-[#252525] flex items-center justify-center mt-0.5">
-                  <svg className="w-3 h-3 text-[#606060]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" />
                   </svg>
                 </div>
@@ -491,13 +491,13 @@ export function EmailChatPanel() {
               placeholder="Ask anything..."
               disabled={isProcessing}
               rows={1}
-              className="w-full px-3 py-2.5 pr-10 text-sm bg-[#1a1a1a] border border-[#303030] rounded-lg text-[#c0c0c0] placeholder:text-[#404040] focus:outline-none focus:ring-0 focus:border-[#303030] disabled:opacity-50 disabled:cursor-not-allowed resize-none transition-colors"
+              className="w-full px-3 py-2.5 pr-10 text-sm bg-[#1a1a1a] border border-[#303030] rounded-lg text-white placeholder:text-[#404040] focus:outline-none focus:ring-0 focus:border-[#303030] disabled:opacity-50 disabled:cursor-not-allowed resize-none transition-colors"
               style={{ minHeight: '42px', maxHeight: '120px' }}
             />
             <button
               type="submit"
               disabled={!inputValue.trim() || isProcessing}
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded text-[#404040] hover:text-[#808080] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded text-[#404040] hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />

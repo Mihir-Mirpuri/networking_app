@@ -62,7 +62,7 @@ export function CreditsDisplay({ onStatusChange, refreshTrigger }: CreditsDispla
 
   if (isLoading) {
     return (
-      <div className="flex items-center gap-2 text-sm text-gray-400">
+      <div className="flex items-center gap-2 text-sm text-white">
         <div className="w-16 h-4 bg-gray-200 rounded animate-pulse" />
       </div>
     );
@@ -80,7 +80,7 @@ export function CreditsDisplay({ onStatusChange, refreshTrigger }: CreditsDispla
           </svg>
           <span className="font-semibold text-white">Pro</span>
         </div>
-        <span className="text-gray-500">Unlimited emails</span>
+        <span className="text-white">Unlimited emails</span>
       </div>
     );
   }
@@ -92,7 +92,7 @@ export function CreditsDisplay({ onStatusChange, refreshTrigger }: CreditsDispla
     <div className="flex items-center gap-3 text-sm">
       <div className="flex items-center gap-1.5">
         <svg
-          className={`w-4 h-4 ${isEmpty ? 'text-red-500' : isLow ? 'text-amber-500' : 'text-gray-400'}`}
+          className={`w-4 h-4 ${isEmpty ? 'text-red-500' : isLow ? 'text-amber-500' : 'text-white'}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -104,7 +104,7 @@ export function CreditsDisplay({ onStatusChange, refreshTrigger }: CreditsDispla
             d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
           />
         </svg>
-        <span className="text-gray-500">Daily emails sent:</span>
+        <span className="text-white">Daily emails sent:</span>
         <span
           className={`font-medium ${
             isEmpty ? 'text-red-600' : isLow ? 'text-amber-600' : 'text-gray-900'

@@ -131,7 +131,7 @@ export default function Loading() {
 
       {/* Centered text */}
       <div className="relative z-10 flex flex-col items-center justify-center min-h-screen pointer-events-none">
-        <p className="text-3xl font-medium text-[#707070] flex items-center gap-1">
+        <p className="text-3xl font-medium text-white flex items-center gap-1">
           Loading
           <span className="flex gap-1 ml-1">
             <span className="w-2 h-2 rounded-full bg-[#505050] animate-bounce" style={{ animationDelay: '0ms' }} />

@@ -149,7 +149,7 @@ export function SearchSidebar({
             {onToggleSidebar && (
               <button
                 onClick={onToggleSidebar}
-                className="lg:hidden flex items-center justify-center w-8 h-8 rounded-lg text-[#808080] hover:text-white transition-colors"
+                className="lg:hidden flex items-center justify-center w-8 h-8 rounded-lg text-white hover:text-white transition-colors"
                 aria-label="Toggle sidebar"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -159,7 +159,7 @@ export function SearchSidebar({
             )}
             <Link href="/" className="flex items-center gap-2 group">
               <MascotSVG className="w-7 h-7" />
-              <span className="text-xl font-bold text-white group-hover:text-[#a0a0a0] transition-colors">
+              <span className="text-xl font-bold text-white group-hover:text-white transition-colors">
                 Signl
               </span>
             </Link>
@@ -169,8 +169,8 @@ export function SearchSidebar({
               onClick={() => onAiModeChange(!aiMode)}
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
                 !aiMode
-                  ? 'bg-[#2a2a2a] text-[#c0c0c0] border border-[#404040]'
-                  : 'bg-[#1a1a1a] text-[#606060] border border-[#2a2a2a] hover:text-[#808080] hover:border-[#333333]'
+                  ? 'bg-[#2a2a2a] text-white border border-[#404040]'
+                  : 'bg-[#1a1a1a] text-white border border-[#2a2a2a] hover:text-white hover:border-[#333333]'
               }`}
             >
               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -203,8 +203,8 @@ export function SearchSidebar({
                             <div
                               className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${
                                 msg.role === 'user'
-                                  ? 'bg-[#2a2a2a] text-[#c0c0c0] rounded-br-md'
-                                  : 'bg-[#1a1a1a] text-[#909090] rounded-bl-md'
+                                  ? 'bg-[#2a2a2a] text-white rounded-br-md'
+                                  : 'bg-[#1a1a1a] text-white rounded-bl-md'
                               }`}
                             >
                               {msg.isLoading ? (
@@ -223,7 +223,7 @@ export function SearchSidebar({
                                           key={s.filterValue}
                                           onClick={() => onSelectableClick(s)}
                                           disabled={isExtracting || isSearching}
-                                          className="px-2.5 py-1 text-xs font-medium text-[#a0a0a0] bg-[#252525] border border-[#383838] rounded-full hover:bg-[#333333] hover:border-[#484848] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                          className="px-2.5 py-1 text-xs font-medium text-white bg-[#252525] border border-[#383838] rounded-full hover:bg-[#333333] hover:border-[#484848] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                           {s.label}
                                         </button>
@@ -232,7 +232,7 @@ export function SearchSidebar({
                                         <button
                                           onClick={() => onShowMoreSelectables(msg.id)}
                                           disabled={isExtracting || isSearching}
-                                          className="px-2.5 py-1 text-xs font-medium text-[#707070] bg-[#1a1a1a] border border-[#333333] rounded-full hover:bg-[#252525] hover:text-[#909090] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                          className="px-2.5 py-1 text-xs font-medium text-white bg-[#1a1a1a] border border-[#333333] rounded-full hover:bg-[#252525] hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                           Show more...
                                         </button>
@@ -249,7 +249,7 @@ export function SearchSidebar({
                     </div>
                   ) : (
                     <div className="flex-1 flex items-center justify-center">
-                      <p className="text-sm text-[#505050] text-center px-4">
+                      <p className="text-sm text-white text-center px-4">
                         Ask me who you want to find...
                       </p>
                     </div>
@@ -257,7 +257,7 @@ export function SearchSidebar({
                   {messages.length > 0 && (
                     <button
                       onClick={onClearChat}
-                      className="mt-2 self-center px-3 py-1 text-xs text-[#606060] hover:text-[#909090] transition-colors"
+                      className="mt-2 self-center px-3 py-1 text-xs text-white hover:text-white transition-colors"
                     >
                       Clear chat
                     </button>
@@ -266,7 +266,7 @@ export function SearchSidebar({
               ) : (
                 /* Filter mode: dropdowns with sentence context */
                 <div className="px-4 py-6 space-y-3">
-                  <p className="text-sm text-[#606060] text-center">I&apos;m looking for a</p>
+                  <p className="text-sm text-white text-center">I&apos;m looking for a</p>
                   <SearchableCombobox
                     options={[
                       { label: 'Any Role', value: '' },
@@ -279,7 +279,7 @@ export function SearchSidebar({
                     id="sidebar-role"
                     allowFreeText
                   />
-                  <p className="text-sm text-[#606060] text-center">at</p>
+                  <p className="text-sm text-white text-center">at</p>
                   <SearchableCombobox
                     options={[
                       { label: 'Any Company', value: '' },
@@ -292,7 +292,7 @@ export function SearchSidebar({
                     id="sidebar-company"
                     allowFreeText
                   />
-                  <p className="text-sm text-[#606060] text-center">in the</p>
+                  <p className="text-sm text-white text-center">in the</p>
                   <SearchableCombobox
                     options={[
                       { label: 'Any Location', value: '' },
@@ -308,7 +308,7 @@ export function SearchSidebar({
                     id="sidebar-location"
                     allowFreeText
                   />
-                  <p className="text-sm text-[#606060] text-center">office who went to</p>
+                  <p className="text-sm text-white text-center">office who went to</p>
                   <SearchableCombobox
                     options={[
                       { label: 'Any University', value: '' },
@@ -327,7 +327,7 @@ export function SearchSidebar({
                     {hasFilters && (
                       <button
                         onClick={handleClearFilters}
-                        className="px-3 py-2 text-sm text-[#707070] hover:text-[#a0a0a0] transition-colors"
+                        className="px-3 py-2 text-sm text-white hover:text-white transition-colors"
                       >
                         Clear
                       </button>
@@ -335,7 +335,7 @@ export function SearchSidebar({
                     <button
                       onClick={handleFilterSearch}
                       disabled={!hasFilters || isSearching}
-                      className="flex-1 py-2 text-sm font-medium rounded-lg bg-[#2a2a2a] text-[#c0c0c0] hover:bg-[#333333] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      className="flex-1 py-2 text-sm font-medium rounded-lg bg-[#2a2a2a] text-white hover:bg-[#333333] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                     >
                       {isSearching ? 'Searching...' : 'Search'}
                     </button>
@@ -359,12 +359,12 @@ export function SearchSidebar({
                     }}
                     placeholder="Who do you want to find?"
                     disabled={isSearching}
-                    className="flex-1 min-w-0 text-sm bg-transparent border-none text-[#c0c0c0] placeholder:text-[#505050] focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="flex-1 min-w-0 text-sm bg-transparent border-none text-white placeholder:text-white focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
                   />
                   <button
                     onClick={handleAiSubmit}
                     disabled={!inputValue.trim() || isSearching}
-                    className="flex-shrink-0 w-7 h-7 rounded-md flex items-center justify-center text-[#505050] hover:text-[#a0a0a0] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    className="flex-shrink-0 w-7 h-7 rounded-md flex items-center justify-center text-white hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />

@@ -29,7 +29,7 @@ export function LandingPage() {
         <div className="flex items-center gap-4">
           <button
             onClick={handleLogIn}
-            className="text-sm font-medium text-[#909090] hover:text-white transition-colors hidden sm:block"
+            className="text-sm font-medium text-white hover:text-white transition-colors hidden sm:block"
           >
             Log In
           </button>
@@ -49,7 +49,7 @@ export function LandingPage() {
           {/* Badge */}
           <div className="flex items-center gap-2 bg-[#1a1a1a] border border-[#303030] rounded-full px-5 py-2 w-fit">
             <span className="text-sm">🚀</span>
-            <span className="text-[13px] font-medium text-[#909090]">Now in beta — Join 500+ students</span>
+            <span className="text-[13px] font-medium text-white">Now in beta — Join 500+ students</span>
             <span className="text-sm text-[#6364FF]">→</span>
           </div>
 
@@ -83,13 +83,13 @@ export function LandingPage() {
               <path d="M8 5v14l11-7z" />
             </svg>
           </div>
-          <span className="text-sm font-medium text-[#808080]">Product Demo</span>
+          <span className="text-sm font-medium text-white">Product Demo</span>
         </div>
       </section>
 
       {/* Trusted By */}
       <section className="flex flex-col items-center py-6 gap-4 overflow-hidden">
-        <p className="text-[15px] font-semibold text-[#606060] tracking-wide text-center">
+        <p className="text-[15px] font-semibold text-white tracking-wide text-center">
           Trusted by students who landed offers at...
         </p>
         <div className="relative w-full">
@@ -101,7 +101,7 @@ export function LandingPage() {
             {[...LOGOS, ...LOGOS].map((name, i) => (
               <span
                 key={`${name}-${i}`}
-                className="text-2xl sm:text-3xl font-bold text-[#555555] shrink-0 whitespace-nowrap"
+                className="text-2xl sm:text-3xl font-bold text-white shrink-0 whitespace-nowrap"
                 style={{ fontFamily: 'Georgia, serif' }}
               >
                 {name}

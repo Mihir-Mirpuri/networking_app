@@ -451,13 +451,13 @@ export function ExpandedReview({
         {/* Header bar */}
         <div className="flex items-center justify-between px-4 py-2.5 bg-[#252525] rounded-t-xl border-b border-[#333]">
           <div className="flex items-center gap-3 min-w-0">
-            <h2 className="text-sm font-medium text-[#E0E0E0] truncate">New Message</h2>
+            <h2 className="text-sm font-medium text-white truncate">New Message</h2>
           </div>
           <div className="flex items-center gap-1 flex-shrink-0">
             {/* Mobile chat button */}
             <button
               onClick={() => setShowMobileChat(true)}
-              className="lg:hidden p-1 hover:bg-[#404040] rounded text-[#808080] hover:text-[#E0E0E0] transition-colors"
+              className="lg:hidden p-1 hover:bg-[#404040] rounded text-white hover:text-white transition-colors"
               aria-label="Open AI chat"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -466,7 +466,7 @@ export function ExpandedReview({
             </button>
             <button
               onClick={onClose}
-              className="p-1 hover:bg-[#404040] rounded text-[#808080] hover:text-[#E0E0E0] transition-colors"
+              className="p-1 hover:bg-[#404040] rounded text-white hover:text-white transition-colors"
               aria-label="Close"
             >
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
@@ -480,8 +480,8 @@ export function ExpandedReview({
         <div className="flex-1 overflow-y-auto bg-[#212121]">
           {/* To field (read-only, showing recipient) */}
           <div className="flex items-center border-b border-[#333] px-4">
-            <span className="text-sm text-[#808080] w-10 flex-shrink-0">To</span>
-            <span className="flex-1 py-2.5 text-sm text-[#E0E0E0]">
+            <span className="text-sm text-white w-10 flex-shrink-0">To</span>
+            <span className="flex-1 py-2.5 text-sm text-white">
               {currentPerson.linkedinUrl ? (
                 <a
                   href={currentPerson.linkedinUrl}
@@ -495,7 +495,7 @@ export function ExpandedReview({
                 currentPerson.fullName
               )}
               {(currentPerson.role || currentPerson.company) && (
-                <span className="text-[#606060] ml-2 text-xs">
+                <span className="text-white ml-2 text-xs">
                   {currentPerson.role ? `${currentPerson.role} at ` : ''}{currentPerson.company}
                 </span>
               )}
@@ -509,11 +509,11 @@ export function ExpandedReview({
               value={subject}
               onChange={(e) => { userEditedRef.current = true; setSubject(e.target.value); }}
               placeholder="Subject"
-              className={`flex-1 py-2.5 text-sm text-[#E0E0E0] bg-transparent outline-none placeholder-[#606060] focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 ${isRegenerating || isGeneratingDraft ? 'opacity-50' : ''}`}
+              className={`flex-1 py-2.5 text-sm text-white bg-transparent outline-none placeholder-[#606060] focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 ${isRegenerating || isGeneratingDraft ? 'opacity-50' : ''}`}
             />
             {isGeneratingDraft && (
-              <span className="text-xs text-[#808080] flex items-center gap-1 flex-shrink-0">
-                <LoadingDots className="text-[#808080]" /> Personalizing
+              <span className="text-xs text-white flex items-center gap-1 flex-shrink-0">
+                <LoadingDots className="text-white" /> Personalizing
               </span>
             )}
           </div>
@@ -525,7 +525,7 @@ export function ExpandedReview({
               onChange={(e) => { userEditedRef.current = true; setBody(e.target.value); }}
               rows={12}
               placeholder=""
-              className={`w-full text-sm text-[#E0E0E0] bg-transparent outline-none resize-none leading-relaxed focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 ${isRegenerating || isGeneratingDraft ? 'opacity-50' : ''}`}
+              className={`w-full text-sm text-white bg-transparent outline-none resize-none leading-relaxed focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 ${isRegenerating || isGeneratingDraft ? 'opacity-50' : ''}`}
             />
           </div>
 
@@ -536,12 +536,12 @@ export function ExpandedReview({
                 <svg className="w-4 h-4 text-emerald-400" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" />
                 </svg>
-                <span className="text-xs text-[#A0A0A0]">
+                <span className="text-xs text-white">
                   {resumes.find(r => r.id === selectedResumeId)?.filename || 'Resume attached'}
                 </span>
                 <button
                   onClick={() => setSelectedResumeId(null)}
-                  className="ml-1 text-[#606060] hover:text-[#A0A0A0]"
+                  className="ml-1 text-white hover:text-white"
                   title="Remove attachment"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -553,7 +553,7 @@ export function ExpandedReview({
           )}
 
           {/* Refine hint */}
-          <div className="px-4 pb-2 hidden lg:flex items-center gap-2 text-xs text-[#606060]">
+          <div className="px-4 pb-2 hidden lg:flex items-center gap-2 text-xs text-white">
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" />
             </svg>
@@ -572,10 +572,10 @@ export function ExpandedReview({
                 onTemplateChange(e.target.value, internalIndex);
               }}
               disabled={!canSend || isRegenerating}
-              className="py-1.5 px-2 text-sm text-[#A0A0A0] bg-[#333] rounded-lg border border-[#404040] outline-none cursor-pointer disabled:opacity-50 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 hover:bg-[#3a3a3a]"
+              className="py-1.5 px-2 text-sm text-white bg-[#333] rounded-lg border border-[#404040] outline-none cursor-pointer disabled:opacity-50 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 hover:bg-[#3a3a3a]"
             >
               {templates.map((t) => (
-                <option key={t.id} value={t.id} className="bg-[#2a2a2a] text-[#E0E0E0]">
+                <option key={t.id} value={t.id} className="bg-[#2a2a2a] text-white">
                   {t.name}{t.isDefault ? ' (Default)' : ''}
                 </option>
               ))}
@@ -591,7 +591,7 @@ export function ExpandedReview({
                 className={`p-2 rounded-full transition-colors disabled:opacity-30 ${
                   selectedResumeId
                     ? 'bg-emerald-900/30 text-emerald-400 hover:bg-emerald-900/50'
-                    : 'text-[#808080] hover:bg-[#333] hover:text-[#E0E0E0]'
+                    : 'text-white hover:bg-[#333] hover:text-white'
                 }`}
                 title={selectedResumeId ? 'Resume attached (click to change)' : 'Attach resume'}
               >
@@ -609,7 +609,7 @@ export function ExpandedReview({
                       setShowResumeDropdown(false);
                     }}
                     className={`w-full text-left px-3 py-2 text-sm hover:bg-[#333] ${
-                      !selectedResumeId ? 'text-[#E0E0E0] bg-[#333]' : 'text-[#A0A0A0]'
+                      !selectedResumeId ? 'text-white bg-[#333]' : 'text-white'
                     }`}
                   >
                     No resume
@@ -622,7 +622,7 @@ export function ExpandedReview({
                         setShowResumeDropdown(false);
                       }}
                       className={`w-full text-left px-3 py-2 text-sm hover:bg-[#333] truncate ${
-                        selectedResumeId === resume.id ? 'text-[#E0E0E0] bg-[#333]' : 'text-[#A0A0A0]'
+                        selectedResumeId === resume.id ? 'text-white bg-[#333]' : 'text-white'
                       }`}
                     >
                       {resume.filename}
@@ -640,7 +640,7 @@ export function ExpandedReview({
           <button
             onClick={limitReached ? () => onLimitReached?.() : () => setShowScheduleModal(true)}
             disabled={!canSend || isSending}
-            className="p-2 rounded-full text-[#808080] hover:bg-[#333] hover:text-[#E0E0E0] transition-colors disabled:opacity-30"
+            className="p-2 rounded-full text-white hover:bg-[#333] hover:text-white transition-colors disabled:opacity-30"
             title="Schedule send"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -663,10 +663,10 @@ export function ExpandedReview({
       {showScheduleModal && (
         <div className="fixed inset-0 lg:left-80 bg-black/40 flex items-center justify-center z-[60] p-4">
           <div className="bg-[#2a2a2a] rounded-xl shadow-2xl border border-[#404040] max-w-sm w-full p-6">
-            <h3 className="text-base font-semibold text-[#E0E0E0] mb-4">Schedule send</h3>
+            <h3 className="text-base font-semibold text-white mb-4">Schedule send</h3>
 
             <div className="mb-4">
-              <label className="block text-sm font-medium text-[#A0A0A0] mb-2">
+              <label className="block text-sm font-medium text-white mb-2">
                 Date & Time
               </label>
               <input
@@ -679,7 +679,7 @@ export function ExpandedReview({
                 min={new Date(new Date().getTime() + 5 * 60 * 1000).toISOString().slice(0, 16)}
                 className="input text-sm"
               />
-              <p className="mt-1 text-xs text-[#707070]">
+              <p className="mt-1 text-xs text-white">
                 Minimum: 5 minutes from now
               </p>
             </div>
@@ -769,18 +769,18 @@ function MobileChatPanel({ onClose }: { onClose: () => void }) {
         <div className="flex items-center justify-between px-4 py-3 border-b border-[#2a2a2a]">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-full bg-[#2a2a2a] flex items-center justify-center">
-              <svg className="w-3.5 h-3.5 text-[#808080]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" />
               </svg>
             </div>
             <div>
-              <p className="text-sm font-medium text-[#c0c0c0]">AI Editor</p>
-              <p className="text-xs text-[#606060]">Email to {currentPersonName}</p>
+              <p className="text-sm font-medium text-white">AI Editor</p>
+              <p className="text-xs text-white">Email to {currentPersonName}</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-[#606060] hover:text-[#a0a0a0] hover:bg-[#2a2a2a] transition-colors"
+            className="p-1.5 rounded-lg text-white hover:text-white hover:bg-[#2a2a2a] transition-colors"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
@@ -791,8 +791,8 @@ function MobileChatPanel({ onClose }: { onClose: () => void }) {
         {/* Current email preview */}
         {currentEmail && (
           <div className="px-4 py-2 border-b border-[#2a2a2a]">
-            <p className="text-xs text-[#505050] mb-0.5">Subject:</p>
-            <p className="text-sm text-[#909090] truncate">{currentEmail.subject}</p>
+            <p className="text-xs text-white mb-0.5">Subject:</p>
+            <p className="text-sm text-white truncate">{currentEmail.subject}</p>
           </div>
         )}
 
@@ -804,8 +804,8 @@ function MobileChatPanel({ onClose }: { onClose: () => void }) {
           {/* Welcome message if no messages */}
           {messages.length === 0 && !isProcessing && (
             <div className="text-center py-4">
-              <p className="text-sm text-[#707070]">How should I refine the email?</p>
-              <p className="text-xs text-[#505050] mt-1">e.g. &quot;Make it shorter&quot;</p>
+              <p className="text-sm text-white">How should I refine the email?</p>
+              <p className="text-xs text-white mt-1">e.g. &quot;Make it shorter&quot;</p>
             </div>
           )}
 
@@ -818,8 +818,8 @@ function MobileChatPanel({ onClose }: { onClose: () => void }) {
               <div
                 className={`max-w-[85%] rounded-xl px-3 py-2 ${
                   message.role === 'user'
-                    ? 'bg-[#404040] text-[#e0e0e0]'
-                    : 'bg-[#1a1a1a] border border-[#2a2a2a] text-[#c0c0c0]'
+                    ? 'bg-[#404040] text-white'
+                    : 'bg-[#1a1a1a] border border-[#2a2a2a] text-white'
                 }`}
               >
                 <p className="text-sm whitespace-pre-wrap">{message.content}</p>
@@ -831,7 +831,7 @@ function MobileChatPanel({ onClose }: { onClose: () => void }) {
           {isProcessing && (
             <div className="flex justify-start">
               <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2">
-                <LoadingDots className="text-[#808080]" />
+                <LoadingDots className="text-white" />
               </div>
             </div>
           )}
@@ -849,12 +849,12 @@ function MobileChatPanel({ onClose }: { onClose: () => void }) {
                 onChange={(e) => setInputValue(e.target.value)}
                 placeholder="How should I change it?"
                 disabled={isProcessing}
-                className="flex-1 min-w-0 text-sm bg-transparent border-none text-[#c0c0c0] placeholder:text-[#505050] focus:outline-none disabled:opacity-60"
+                className="flex-1 min-w-0 text-sm bg-transparent border-none text-white placeholder:text-white focus:outline-none disabled:opacity-60"
               />
               <button
                 type="submit"
                 disabled={!inputValue.trim() || isProcessing}
-                className="flex-shrink-0 w-7 h-7 rounded-md flex items-center justify-center text-[#505050] hover:text-[#a0a0a0] disabled:opacity-40 transition-colors"
+                className="flex-shrink-0 w-7 h-7 rounded-md flex items-center justify-center text-white hover:text-white disabled:opacity-40 transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />

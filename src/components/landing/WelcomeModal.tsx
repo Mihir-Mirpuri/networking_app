@@ -146,7 +146,7 @@ export function WelcomeModal({ onClose }: WelcomeModalProps) {
           </h1>
 
           {/* Description */}
-          <p className="text-[#808080] text-center mb-8">
+          <p className="text-white text-center mb-8">
             Send high-quality personalized emails at mass
           </p>
 
@@ -160,7 +160,7 @@ export function WelcomeModal({ onClose }: WelcomeModalProps) {
               </div>
               <div>
                 <h3 className="text-white font-semibold mb-0.5">Discover</h3>
-                <p className="text-sm text-[#606060]">Search by company, role, location, or university</p>
+                <p className="text-sm text-white">Search by company, role, location, or university</p>
               </div>
             </div>
 
@@ -172,7 +172,7 @@ export function WelcomeModal({ onClose }: WelcomeModalProps) {
               </div>
               <div>
                 <h3 className="text-white font-semibold mb-0.5">Personalize</h3>
-                <p className="text-sm text-[#606060]">AI writes emails that actually sound like you</p>
+                <p className="text-sm text-white">AI writes emails that actually sound like you</p>
               </div>
             </div>
 
@@ -184,7 +184,7 @@ export function WelcomeModal({ onClose }: WelcomeModalProps) {
               </div>
               <div>
                 <h3 className="text-white font-semibold mb-0.5">Send</h3>
-                <p className="text-sm text-[#606060]">One-click send directly from your Gmail</p>
+                <p className="text-sm text-white">One-click send directly from your Gmail</p>
               </div>
             </div>
           </div>
@@ -199,7 +199,7 @@ export function WelcomeModal({ onClose }: WelcomeModalProps) {
             </button>
             <button
               onClick={handleSignIn}
-              className="w-full py-2.5 px-6 rounded-xl bg-transparent border border-[#303030] hover:border-[#404040] text-[#808080] hover:text-white text-sm font-medium transition-colors"
+              className="w-full py-2.5 px-6 rounded-xl bg-transparent border border-[#303030] hover:border-[#404040] text-white hover:text-white text-sm font-medium transition-colors"
             >
               Already have an account? Sign in
             </button>
@@ -208,7 +208,7 @@ export function WelcomeModal({ onClose }: WelcomeModalProps) {
 
         {/* Company ticker */}
         <div className="relative border-t border-[#1a1a1a] bg-black/40 py-6 overflow-hidden">
-          <p className="text-center text-xs font-semibold uppercase tracking-widest text-[#505050] mb-4">
+          <p className="text-center text-xs font-semibold uppercase tracking-widest text-white mb-4">
             UT Students landed offers at
           </p>
           <div className="relative">

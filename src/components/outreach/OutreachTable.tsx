@@ -41,17 +41,17 @@ const SortIcon = ({ field, sortField, sortDirection }: { field: SortField | null
   if (!field) return null;
   if (sortField !== field) {
     return (
-      <svg className="w-3 h-3 text-[#606060]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
       </svg>
     );
   }
   return sortDirection === 'asc' ? (
-    <svg className="w-3 h-3 text-[#909090]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
     </svg>
   ) : (
-    <svg className="w-3 h-3 text-[#909090]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
     </svg>
   );
@@ -108,10 +108,10 @@ export function OutreachTable({
         </div>
 
         <div className="flex flex-col items-center gap-2 max-w-[400px]">
-          <h3 className="text-xl font-semibold text-[#E0E0E0] font-['Inter'] text-center">
+          <h3 className="text-xl font-semibold text-white font-['Inter'] text-center">
             No emails sent yet
           </h3>
-          <p className="text-sm text-[#707070] font-['Inter'] text-center max-w-[380px]">
+          <p className="text-sm text-white font-['Inter'] text-center max-w-[380px]">
             Once you send your first outreach email, it will appear here. Start by searching for people to connect with.
           </p>
         </div>
@@ -147,16 +147,16 @@ export function OutreachTable({
                 {sortKey ? (
                   <button
                     onClick={() => onSort(sortKey)}
-                    className="flex items-center gap-1 hover:text-[#c0c0c0] transition-colors"
+                    className="flex items-center gap-1 hover:text-white transition-colors"
                   >
-                    <span className="text-[13px] font-semibold text-[#909090] font-['Inter'] truncate">
+                    <span className="text-[13px] font-semibold text-white font-['Inter'] truncate">
                       {COLUMN_LABELS[col]}
                     </span>
                     <SortIcon field={sortKey} sortField={sortField} sortDirection={sortDirection} />
                   </button>
                 ) : (
                   <div className="flex items-center gap-1">
-                    <span className="text-[13px] font-semibold text-[#909090] font-['Inter'] truncate">
+                    <span className="text-[13px] font-semibold text-white font-['Inter'] truncate">
                       {COLUMN_LABELS[col]}
                     </span>
                   </div>
@@ -201,7 +201,7 @@ export function OutreachTable({
             <button
               onClick={onLoadMore}
               disabled={isLoadingMore}
-              className="px-5 py-2.5 text-sm font-medium bg-[#252525] border border-[#3a3a3a] text-[#E0E0E0] rounded-lg hover:bg-[#303030] transition-all disabled:opacity-50"
+              className="px-5 py-2.5 text-sm font-medium bg-[#252525] border border-[#3a3a3a] text-white rounded-lg hover:bg-[#303030] transition-all disabled:opacity-50"
             >
               {isLoadingMore ? (
                 <span className="flex items-center gap-2">

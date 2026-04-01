@@ -103,7 +103,7 @@ export function PersonCard({
             className={`p-1.5 rounded-lg transition-all ${
               person.savedForLater
                 ? 'text-[#6364FF] hover:text-[#5354EE] hover:bg-[#6364FF]/10'
-                : 'text-[#707070] hover:text-[#A0A0A0] hover:bg-[#404040]'
+                : 'text-white hover:text-white hover:bg-[#404040]'
             }`}
             title={person.savedForLater ? 'Remove from saved' : 'Save for later'}
           >
@@ -118,7 +118,7 @@ export function PersonCard({
         {onHide && person.userCandidateId && (
           <button
             onClick={onHide}
-            className="p-1.5 text-[#707070] hover:text-[#A0A0A0] hover:bg-[#404040] rounded-lg transition-all"
+            className="p-1.5 text-white hover:text-white hover:bg-[#404040] rounded-lg transition-all"
             title="Don't show again"
           >
             <svg
@@ -167,7 +167,7 @@ export function PersonCard({
 
       {/* Name and LinkedIn */}
       <div className="mb-1 flex items-center gap-2">
-        <h3 className="font-semibold text-[#E0E0E0] text-base">{person.fullName}</h3>
+        <h3 className="font-semibold text-white text-base">{person.fullName}</h3>
         {person.linkedinUrl && (
           <a
             href={person.linkedinUrl}
@@ -190,7 +190,7 @@ export function PersonCard({
       )}
 
       {/* Role */}
-      <p className="text-sm text-[#A0A0A0] font-medium mb-4 truncate w-full" title={person.role || 'Professional'}>
+      <p className="text-sm text-white font-medium mb-4 truncate w-full" title={person.role || 'Professional'}>
         {person.role || 'Professional'}
       </p>
 
@@ -198,15 +198,15 @@ export function PersonCard({
       <div className="w-full space-y-2 text-left mb-4">
         {/* Company */}
         <div className="flex items-center gap-2">
-          <BuildingOfficeIcon className="w-4 h-4 text-[#707070] flex-shrink-0" />
-          <p className="text-sm text-[#707070] truncate">{person.company}</p>
+          <BuildingOfficeIcon className="w-4 h-4 text-white flex-shrink-0" />
+          <p className="text-sm text-white truncate">{person.company}</p>
         </div>
 
         {/* University */}
         {person.educationSchool && (
           <div className="flex items-center gap-2">
-            <AcademicCapIcon className="w-4 h-4 text-[#707070] flex-shrink-0" />
-            <p className="text-sm text-[#707070] truncate">
+            <AcademicCapIcon className="w-4 h-4 text-white flex-shrink-0" />
+            <p className="text-sm text-white truncate">
               {person.educationSchool}
             </p>
           </div>
@@ -215,8 +215,8 @@ export function PersonCard({
         {/* Location */}
         {(person.city || person.state || person.country) && (
           <div className="flex items-center gap-2">
-            <MapPinIcon className="w-4 h-4 text-[#707070] flex-shrink-0" />
-            <p className="text-sm text-[#707070] truncate">
+            <MapPinIcon className="w-4 h-4 text-white flex-shrink-0" />
+            <p className="text-sm text-white truncate">
               {[person.city, person.state].filter(Boolean).join(', ') || person.country}
             </p>
           </div>

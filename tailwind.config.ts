@@ -42,11 +42,11 @@ const config: Config = {
           100: '#1a1a1a',  // Card backgrounds
           200: '#252525',  // Borders
           300: '#303030',  // Elevated surfaces
-          400: '#808080',  // Muted text
-          500: '#909090',  // Medium text
-          600: '#b0b0b0',  // Secondary text
-          700: '#c0c0c0',  // Body text
-          800: '#e0e0e0',  // Strong text
+          400: '#b0b0b0',  // Muted text
+          500: '#d0d0d0',  // Medium text
+          600: '#e8e8e8',  // Secondary text
+          700: '#f0f0f0',  // Body text
+          800: '#ffffff',  // Strong text
           900: '#ffffff',  // Headings
         },
       },

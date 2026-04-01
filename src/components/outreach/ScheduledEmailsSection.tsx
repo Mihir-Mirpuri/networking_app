@@ -71,12 +71,12 @@ export function ScheduledEmailsSection({
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <div className="w-12 h-12 rounded-full bg-[#2a2a2a] flex items-center justify-center mb-4">
-          <svg className="w-6 h-6 text-[#505050]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         </div>
-        <p className="text-[#707070] text-sm font-['Inter']">No scheduled emails</p>
-        <p className="text-[#505050] text-xs font-['Inter'] mt-1">
+        <p className="text-white text-sm font-['Inter']">No scheduled emails</p>
+        <p className="text-white text-xs font-['Inter'] mt-1">
           Schedule emails from the compose page to see them here
         </p>
       </div>
@@ -144,10 +144,10 @@ export function ScheduledEmailsSection({
         <svg className="w-4 h-4 text-[#6364FF]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
-        <h3 className="text-sm font-semibold text-[#E0E0E0] font-['Inter']">
+        <h3 className="text-sm font-semibold text-white font-['Inter']">
           Scheduled Sends
         </h3>
-        <span className="text-xs text-[#707070] font-['Inter']">
+        <span className="text-xs text-white font-['Inter']">
           ({scheduledEmails.length})
         </span>
       </div>
@@ -179,24 +179,24 @@ export function ScheduledEmailsSection({
 
                 {/* Name & Email */}
                 <div className="flex flex-col gap-0.5 min-w-0 w-[180px] mr-4">
-                  <span className="text-[13px] font-medium text-[#E0E0E0] font-['Inter'] truncate">
+                  <span className="text-[13px] font-medium text-white font-['Inter'] truncate">
                     {email.contactName || email.toEmail}
                   </span>
-                  <span className="text-[11px] text-[#707070] font-['Inter'] truncate">
+                  <span className="text-[11px] text-white font-['Inter'] truncate">
                     {email.toEmail}
                   </span>
                 </div>
 
                 {/* Company */}
                 <div className="w-[120px] mr-4">
-                  <span className="text-[13px] text-[#909090] font-['Inter'] truncate block">
+                  <span className="text-[13px] text-white font-['Inter'] truncate block">
                     {email.company || '--'}
                   </span>
                 </div>
 
                 {/* Subject */}
                 <div className="flex-1 min-w-0 mr-4">
-                  <span className="text-[13px] text-[#707070] font-['Inter'] truncate block">
+                  <span className="text-[13px] text-white font-['Inter'] truncate block">
                     {email.subject}
                   </span>
                 </div>
@@ -209,14 +209,14 @@ export function ScheduledEmailsSection({
                     </svg>
                     {formatScheduledDate(email.scheduledFor)}
                   </span>
-                  <span className="text-[11px] text-[#707070] font-['Inter'] w-[60px] text-right">
+                  <span className="text-[11px] text-white font-['Inter'] w-[60px] text-right">
                     {formatCountdown(email.scheduledFor)}
                   </span>
                 </div>
 
                 {/* Expand chevron */}
                 <svg
-                  className={`w-4 h-4 text-[#606060] ml-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                  className={`w-4 h-4 text-white ml-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -230,12 +230,12 @@ export function ScheduledEmailsSection({
                 <div className="px-4 pb-4 pt-1 bg-[#222222] border-t border-[#2a2a2a]">
                   {/* Email preview */}
                   <div className="mb-3">
-                    <p className="text-xs text-[#606060] font-['Inter'] mb-1">Subject</p>
-                    <p className="text-[13px] text-[#c0c0c0] font-['Inter']">{email.subject}</p>
+                    <p className="text-xs text-white font-['Inter'] mb-1">Subject</p>
+                    <p className="text-[13px] text-white font-['Inter']">{email.subject}</p>
                   </div>
                   <div className="mb-4">
-                    <p className="text-xs text-[#606060] font-['Inter'] mb-1">Body</p>
-                    <p className="text-[13px] text-[#909090] font-['Inter'] whitespace-pre-wrap max-h-[120px] overflow-y-auto">
+                    <p className="text-xs text-white font-['Inter'] mb-1">Body</p>
+                    <p className="text-[13px] text-white font-['Inter'] whitespace-pre-wrap max-h-[120px] overflow-y-auto">
                       {email.body}
                     </p>
                   </div>
@@ -247,7 +247,7 @@ export function ScheduledEmailsSection({
                         e.stopPropagation();
                         handleEditOpen(email);
                       }}
-                      className="px-3 py-1.5 text-xs font-medium bg-[#2a2a2a] border border-[#3a3a3a] text-[#c0c0c0] rounded-lg hover:bg-[#333333] transition-colors font-['Inter'] flex items-center gap-1.5"
+                      className="px-3 py-1.5 text-xs font-medium bg-[#2a2a2a] border border-[#3a3a3a] text-white rounded-lg hover:bg-[#333333] transition-colors font-['Inter'] flex items-center gap-1.5"
                     >
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -285,11 +285,11 @@ export function ScheduledEmailsSection({
           }}
         >
           <div className="bg-[#2a2a2a] rounded-2xl shadow-lg shadow-black/40 max-w-sm w-full p-6 animate-scale-in border border-[#3a3a3a]">
-            <h3 className="text-lg font-semibold mb-4 text-[#E0E0E0] font-['Inter']">Edit Scheduled Time</h3>
+            <h3 className="text-lg font-semibold mb-4 text-white font-['Inter']">Edit Scheduled Time</h3>
 
             <input
               type="datetime-local"
-              className="w-full px-3 py-2 bg-[#1a1a1a] border border-[#3a3a3a] rounded-lg text-[#E0E0E0] text-sm font-['Inter'] mb-3 focus:outline-none focus:border-[#6364FF]"
+              className="w-full px-3 py-2 bg-[#1a1a1a] border border-[#3a3a3a] rounded-lg text-white text-sm font-['Inter'] mb-3 focus:outline-none focus:border-[#6364FF]"
               value={editDateTime}
               onChange={(e) => {
                 setEditDateTime(e.target.value);
@@ -308,7 +308,7 @@ export function ScheduledEmailsSection({
                   setEditDateTime('');
                   setEditError(null);
                 }}
-                className="px-4 py-2 text-sm font-medium bg-[#333333] text-[#c0c0c0] rounded-lg hover:bg-[#3a3a3a] transition-all font-['Inter']"
+                className="px-4 py-2 text-sm font-medium bg-[#333333] text-white rounded-lg hover:bg-[#3a3a3a] transition-all font-['Inter']"
               >
                 Cancel
               </button>

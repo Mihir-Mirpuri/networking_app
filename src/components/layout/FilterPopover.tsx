@@ -25,7 +25,7 @@ export function FilterPopover({ onApply, onClose, initialFilters }: FilterPopove
   return (
     <div className="absolute bottom-full left-0 right-0 mb-2 p-4 bg-[#111111] border border-[#2a2a2a] rounded-xl shadow-lg z-50 animate-fade-in">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-[#e0e0e0]">Filters</h3>
+        <h3 className="text-sm font-semibold text-white">Filters</h3>
         <button
           onClick={onClose}
           className="text-surface-400 hover:text-surface-600 transition-colors"
