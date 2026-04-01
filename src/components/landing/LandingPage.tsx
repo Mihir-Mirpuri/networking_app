@@ -11,7 +11,7 @@ export function LandingPage() {
   const router = useRouter();
 
   const handleGetStarted = () => {
-    router.push('/app');
+    signIn('google', { callbackUrl: '/app' });
   };
 
   const handleLogIn = () => {
