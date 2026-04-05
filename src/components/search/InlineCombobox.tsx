@@ -44,7 +44,7 @@ export function InlineCombobox({
       <div className="relative inline-block">
         <Combobox.Input
           id={id}
-          className="bg-transparent border-0 border-b border-dashed border-[#505050] rounded-none text-[#E0E0E0] font-medium placeholder:text-[#606060] focus:outline-none focus:border-[#808080] text-sm w-auto min-w-[60px] cursor-pointer px-0 py-0"
+          className="bg-transparent border-0 border-b border-dashed border-[#505050] rounded-none text-white font-medium placeholder:text-white focus:outline-none focus:border-[#808080] text-sm w-auto min-w-[60px] cursor-pointer px-0 py-0"
           style={{ width: `${Math.max((displayValue || placeholder).length, 6) * 0.55 + 1.5}em` }}
           displayValue={() => displayValue}
           onChange={(event) => {
@@ -61,7 +61,7 @@ export function InlineCombobox({
               value={query}
               className={({ active }) =>
                 `cursor-pointer select-none py-2 px-3 transition-colors ${
-                  active ? 'bg-[#383838] text-white' : 'text-[#A0A0A0]'
+                  active ? 'bg-[#383838] text-white' : 'text-white'
                 }`
               }
             >
@@ -69,7 +69,7 @@ export function InlineCombobox({
             </Combobox.Option>
           )}
           {filteredOptions.length === 0 && query !== '' && !allowFreeText ? (
-            <div className="px-3 py-2 text-[#606060]">No results found.</div>
+            <div className="px-3 py-2 text-white">No results found.</div>
           ) : (
             filteredOptions.map((option) => (
               <Combobox.Option
@@ -77,7 +77,7 @@ export function InlineCombobox({
                 value={option.value}
                 className={({ active }) =>
                   `cursor-pointer select-none py-2 pl-8 pr-3 transition-colors ${
-                    active ? 'bg-[#383838] text-white' : 'text-[#A0A0A0]'
+                    active ? 'bg-[#383838] text-white' : 'text-white'
                   }`
                 }
               >
@@ -87,7 +87,7 @@ export function InlineCombobox({
                       {option.label}
                     </span>
                     {selected && (
-                      <span className="absolute inset-y-0 left-0 flex items-center pl-2 text-[#808080]">
+                      <span className="absolute inset-y-0 left-0 flex items-center pl-2 text-white">
                         <CheckIcon className="h-4 w-4" aria-hidden="true" />
                       </span>
                     )}

@@ -18,7 +18,7 @@ function TypingIndicator() {
 function AIIcon() {
   return (
     <div className="flex-shrink-0 w-5 h-5 rounded bg-[#252525] flex items-center justify-center mt-0.5">
-      <svg className="w-3 h-3 text-[#606060]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" />
       </svg>
     </div>
@@ -55,7 +55,7 @@ export function ChatMessages({
             // User message - minimal, right-aligned text
             <div className="flex justify-end">
               <div className="max-w-[90%] text-right">
-                <p className="text-sm text-[#c0c0c0] whitespace-pre-wrap">{message.content}</p>
+                <p className="text-sm text-white whitespace-pre-wrap">{message.content}</p>
               </div>
             </div>
           ) : (
@@ -63,7 +63,7 @@ export function ChatMessages({
             <div className="flex gap-2">
               <AIIcon />
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-[#909090] whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                <p className="text-sm text-white whitespace-pre-wrap leading-relaxed">{message.content}</p>
               </div>
             </div>
           )}

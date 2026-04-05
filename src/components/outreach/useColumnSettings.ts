@@ -10,13 +10,13 @@ const MAX_WIDTH = 500;
 // All columns in default order
 export const ALL_COLUMNS: ColumnKey[] = [
   'name', 'firm', 'role', 'location', 'group', 'connection',
-  'firstEmailDate', 'lastEmailDate', 'followUps', 'subject', 'notes'
+  'firstEmailDate', 'lastEmailDate', 'followUps', 'response', 'subject', 'notes'
 ];
 
 // Default visible columns
 const DEFAULT_VISIBLE: ColumnKey[] = [
   'name', 'firm', 'role', 'group', 'connection',
-  'firstEmailDate', 'lastEmailDate', 'followUps', 'notes'
+  'firstEmailDate', 'lastEmailDate', 'followUps', 'response', 'notes'
 ];
 
 // Default widths in pixels
@@ -30,6 +30,7 @@ const DEFAULT_WIDTHS: Record<ColumnKey, number> = {
   firstEmailDate: 100,
   lastEmailDate: 100,
   followUps: 80,
+  response: 90,
   subject: 200,
   notes: 60,
 };
@@ -45,6 +46,7 @@ export const COLUMN_LABELS: Record<ColumnKey, string> = {
   firstEmailDate: 'First Email',
   lastEmailDate: 'Last Email',
   followUps: 'Follow-ups',
+  response: 'Response?',
   subject: 'Subject',
   notes: 'Notes',
 };

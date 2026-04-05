@@ -49,13 +49,13 @@ export function TemplateCard({ template, onClick, disabled }: TemplateCardProps)
     >
       <div className="flex items-start gap-3">
         <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-[#252525] flex items-center justify-center group-hover:bg-[#303030] transition-colors">
-          <IconComponent className="w-4 h-4 text-[#808080]" />
+          <IconComponent className="w-4 h-4 text-white" />
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-medium text-[#e0e0e0] mb-0.5">
+          <h3 className="text-sm font-medium text-white mb-0.5">
             {template.name}
           </h3>
-          <p className="text-xs text-[#606060] leading-relaxed">
+          <p className="text-xs text-white leading-relaxed">
             {template.description}
           </p>
         </div>

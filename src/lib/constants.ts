@@ -968,9 +968,16 @@ export type EmailTemplate = (typeof EMAIL_TEMPLATES)[number];
 
 // Email Credit System
 export const EMAIL_LIMITS = {
-  DEFAULT_DAILY_LIMIT: 10,
-  FREE_LIFETIME_LIMIT: 3,
+  FREE_LIFETIME_LIMIT: 2, // Free users get 2 emails total (lifetime)
   CREDITS_ON_INVITE_SENT: 10,
   MAX_INVITES_PER_DAY: 1,
   MAX_CREDITS: 10,
+} as const;
+
+// Subscription Pricing
+export const SUBSCRIPTION_PRICING = {
+  MONTHLY_PRICE: 20, // $20/month recurring
+  UPFRONT_PRICE_PER_MONTH: 10, // $10/month when paid upfront
+  MIN_UPFRONT_MONTHS: 4,
+  MAX_UPFRONT_MONTHS: 12,
 } as const;

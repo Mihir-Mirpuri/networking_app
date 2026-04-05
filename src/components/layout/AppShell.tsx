@@ -9,10 +9,9 @@ import { EmailChatProvider } from '@/contexts/EmailChatContext';
 
 interface AppShellProps {
   initialRemainingDaily: number;
-  isAuthenticated?: boolean;
 }
 
-export function AppShell({ initialRemainingDaily, isAuthenticated = true }: AppShellProps) {
+export function AppShell({ initialRemainingDaily }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pendingQuery, setPendingQuery] = useState<string | null>(null);
   const [pendingFilters, setPendingFilters] = useState<ParsedFilters | null>(null);
@@ -97,7 +96,6 @@ export function AppShell({ initialRemainingDaily, isAuthenticated = true }: AppS
           <NewHeader
             onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
             showSidebarToggle
-            isAuthenticated={isAuthenticated}
           />
           <main className="flex-1 overflow-hidden">
             <MainSearchView
@@ -106,7 +104,6 @@ export function AppShell({ initialRemainingDaily, isAuthenticated = true }: AppS
               pendingFilters={pendingFilters}
               onQueryProcessed={handleQueryProcessed}
               aiMode={aiMode}
-              isAuthenticated={isAuthenticated}
               messages={messages}
               setMessages={setMessages}
               currentFilters={currentFilters}

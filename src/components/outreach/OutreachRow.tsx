@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import { OutreachTrackerEntry, updateOutreachTracker } from '@/app/actions/outreach';
 import { NotesModal } from './NotesModal';
 import { InteractionModal } from './InteractionModal';
@@ -40,24 +40,9 @@ function getInitials(name: string | null, email: string): string {
 }
 
 export function OutreachRow({ tracker, onUpdate, onDelete, onToggleStar, onRowClick, visibleColumns, columnWidths }: OutreachRowProps) {
-  const [showMenu, setShowMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [showInteractionModal, setShowInteractionModal] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  // Close menu on outside click
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setShowMenu(false);
-      }
-    };
-    if (showMenu) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-  }, [showMenu]);
 
   const formatDate = (date: Date | null) => {
     if (!date) return '-';
@@ -110,10 +95,10 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onToggleStar, onRowCl
             </div>
             {/* Name + Email */}
             <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-              <span className="text-[13px] font-medium text-[#E0E0E0] font-['Inter'] truncate">
+              <span className="text-[13px] font-medium text-white font-['Inter'] truncate">
                 {tracker.contactName || tracker.contactEmail}
               </span>
-              <span className="text-[11px] text-[#707070] font-['Inter'] truncate">
+              <span className="text-[11px] text-white font-['Inter'] truncate">
                 {tracker.contactEmail}
               </span>
             </div>
@@ -122,47 +107,47 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onToggleStar, onRowCl
       case 'firm':
         return (
           <div className="px-2 shrink-0" style={{ width }} data-column={col}>
-            <span className="text-[13px] text-[#909090] font-['Inter'] truncate block">
-              {tracker.company || <span className="text-[#505050]">--</span>}
+            <span className="text-[13px] text-white font-['Inter'] truncate block">
+              {tracker.company || <span className="text-white">--</span>}
             </span>
           </div>
         );
       case 'role':
         return (
           <div className="px-2 shrink-0" style={{ width }} data-column={col}>
-            <span className="text-[13px] text-[#909090] font-['Inter'] truncate block">
-              {tracker.role || <span className="text-[#505050]">--</span>}
+            <span className="text-[13px] text-white font-['Inter'] truncate block">
+              {tracker.role || <span className="text-white">--</span>}
             </span>
           </div>
         );
       case 'location':
         return (
           <div className="px-2 shrink-0" style={{ width }} data-column={col}>
-            <span className="text-[13px] text-[#909090] font-['Inter'] truncate block">
-              {tracker.location || <span className="text-[#505050]">--</span>}
+            <span className="text-[13px] text-white font-['Inter'] truncate block">
+              {tracker.location || <span className="text-white">--</span>}
             </span>
           </div>
         );
       case 'group':
         return (
           <div className="px-2 shrink-0" style={{ width }} data-column={col}>
-            <span className="text-[13px] text-[#909090] font-['Inter'] truncate block">
-              {tracker.group || <span className="text-[#505050]">--</span>}
+            <span className="text-[13px] text-white font-['Inter'] truncate block">
+              {tracker.group || <span className="text-white">--</span>}
             </span>
           </div>
         );
       case 'connection':
         return (
           <div className="px-2 shrink-0" style={{ width }} data-column={col}>
-            <span className="text-[13px] text-[#909090] font-['Inter'] truncate block">
-              {tracker.connectionType || <span className="text-[#505050]">--</span>}
+            <span className="text-[13px] text-white font-['Inter'] truncate block">
+              {tracker.connectionType || <span className="text-white">--</span>}
             </span>
           </div>
         );
       case 'firstEmailDate':
         return (
           <div className="px-2 shrink-0" style={{ width }} data-column={col}>
-            <span className="text-[13px] text-[#707070] font-['Inter'] truncate block whitespace-nowrap">
+            <span className="text-[13px] text-white font-['Inter'] truncate block whitespace-nowrap">
               {formatDate(tracker.dateEmailed)}
             </span>
           </div>
@@ -170,7 +155,7 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onToggleStar, onRowCl
       case 'lastEmailDate':
         return (
           <div className="px-2 shrink-0" style={{ width }} data-column={col}>
-            <span className="text-[13px] text-[#707070] font-['Inter'] truncate block whitespace-nowrap">
+            <span className="text-[13px] text-white font-['Inter'] truncate block whitespace-nowrap">
               {formatDate(tracker.lastEmailDate)}
             </span>
           </div>
@@ -178,16 +163,28 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onToggleStar, onRowCl
       case 'followUps':
         return (
           <div className="px-2 shrink-0" style={{ width }} data-column={col}>
-            <span className="text-[13px] text-[#707070] font-['Inter'] truncate block text-center">
-              {tracker.followUpCount > 0 ? tracker.followUpCount : <span className="text-[#505050]">0</span>}
+            <span className="text-[13px] text-white font-['Inter'] truncate block text-center">
+              {tracker.followUpCount > 0 ? tracker.followUpCount : <span className="text-white">0</span>}
             </span>
+          </div>
+        );
+      case 'response':
+        return (
+          <div className="px-2 flex justify-center shrink-0" style={{ width }} data-column={col}>
+            {tracker.responseReceivedAt ? (
+              <svg className="w-4 h-4 text-[#22c55e]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            ) : (
+              <span className="text-white">--</span>
+            )}
           </div>
         );
       case 'subject':
         return (
           <div className="px-2 shrink-0" style={{ width }} data-column={col}>
-            <span className="text-[13px] text-[#707070] font-['Inter'] truncate block">
-              {tracker.emailSubject || <span className="text-[#505050]">--</span>}
+            <span className="text-[13px] text-white font-['Inter'] truncate block">
+              {tracker.emailSubject || <span className="text-white">--</span>}
             </span>
           </div>
         );
@@ -200,7 +197,7 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onToggleStar, onRowCl
                 <path d="M8 12h8v2H8zm0 4h8v2H8z"/>
               </svg>
             ) : (
-              <span className="text-[#505050]">--</span>
+              <span className="text-white">--</span>
             )}
           </div>
         );
@@ -213,58 +210,39 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onToggleStar, onRowCl
         className="flex items-center px-4 py-2.5 bg-[#1a1a1a] border-b border-[#2a2a2a] hover:bg-[#252525] cursor-pointer transition-colors group"
         onClick={handleRowClick}
       >
+        {/* Star button - always visible */}
+        <div className="w-10 min-w-[40px] flex justify-center shrink-0">
+          <button
+            onClick={(e) => { e.stopPropagation(); onToggleStar(tracker.id); }}
+            className="p-1 transition-colors rounded"
+          >
+            <svg
+              className={`w-4 h-4 ${tracker.starred ? 'text-[#f59e0b]' : 'text-[#505050] hover:text-[#f59e0b]'}`}
+              fill={tracker.starred ? 'currentColor' : 'none'}
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+            </svg>
+          </button>
+        </div>
+
         {visibleColumns.map((col) => (
           <div key={col} className="contents">
             {renderCell(col)}
           </div>
         ))}
 
-        {/* Three-dots menu */}
-        <div className="w-10 min-w-[40px] flex justify-center relative shrink-0" ref={menuRef}>
+        {/* Delete button - visible on hover */}
+        <div className="w-10 min-w-[40px] flex justify-center shrink-0">
           <button
-            onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
-            className="p-1 text-[#707070] hover:text-[#E0E0E0] opacity-0 group-hover:opacity-100 transition-all rounded"
+            onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm(true); }}
+            className="p-1 text-[#505050] hover:text-[#ef4444] opacity-0 group-hover:opacity-100 transition-all rounded"
           >
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-              <circle cx="12" cy="5" r="1.5" />
-              <circle cx="12" cy="12" r="1.5" />
-              <circle cx="12" cy="19" r="1.5" />
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
             </svg>
           </button>
-
-          {/* Dropdown */}
-          {showMenu && (
-            <div className="absolute right-0 top-full mt-1 w-40 bg-[#2a2a2a] border border-[#3a3a3a] rounded-lg shadow-lg shadow-black/40 z-50 py-1">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleStar(tracker.id);
-                  setShowMenu(false);
-                }}
-                className="flex items-center gap-2.5 w-full px-3.5 py-2.5 hover:bg-[#353535] transition-colors"
-              >
-                <svg className={`w-3.5 h-3.5 ${tracker.starred ? 'text-[#f59e0b]' : 'text-[#E0E0E0]'}`} fill={tracker.starred ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                </svg>
-                <span className="text-[13px] text-[#E0E0E0] font-['Inter']">
-                  {tracker.starred ? 'Unstar' : 'Star'}
-                </span>
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowMenu(false);
-                  setShowDeleteConfirm(true);
-                }}
-                className="flex items-center gap-2.5 w-full px-3.5 py-2.5 hover:bg-[#353535] transition-colors"
-              >
-                <svg className="w-3.5 h-3.5 text-[#ef4444]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-                <span className="text-[13px] text-[#ef4444] font-['Inter']">Delete</span>
-              </button>
-            </div>
-          )}
         </div>
       </div>
 
@@ -296,16 +274,16 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onToggleStar, onRowCl
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
             </div>
-            <h3 className="text-lg font-semibold text-center text-[#E0E0E0] mb-2">Delete Contact</h3>
-            <p className="text-[#808080] text-center mb-6">
+            <h3 className="text-lg font-semibold text-center text-white mb-2">Delete Contact</h3>
+            <p className="text-white text-center mb-6">
               Are you sure you want to delete{' '}
-              <span className="font-medium text-[#E0E0E0]">{tracker.contactName || tracker.contactEmail}</span>?
+              <span className="font-medium text-white">{tracker.contactName || tracker.contactEmail}</span>?
               This cannot be undone.
             </p>
             <div className="flex gap-3 justify-center">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
-                className="px-4 py-2.5 text-sm font-medium bg-[#333333] text-[#c0c0c0] rounded-lg hover:bg-[#3a3a3a] transition-all"
+                className="px-4 py-2.5 text-sm font-medium bg-[#333333] text-white rounded-lg hover:bg-[#3a3a3a] transition-all"
               >
                 Cancel
               </button>

@@ -98,31 +98,33 @@ export function PersonCard({
       className={`group relative card-hover p-5 flex flex-col items-center text-center hover:-translate-y-0.5 cursor-pointer ${
       (isSent || isFailed) ? 'opacity-60 saturate-50' : ''
     }`}>
-      {/* Bookmark button — split out so saved state stays visible without hover */}
+      {/* Top left - Save for later button */}
       {onToggleSaveForLater && person.userCandidateId && (
-        <button
-          onClick={(e) => { e.stopPropagation(); setJustToggled(true); onToggleSaveForLater(); }}
-          onAnimationEnd={() => setJustToggled(false)}
-          className={`absolute top-3 right-10 p-1.5 rounded-lg transition-all ${
-            person.savedForLater
-              ? 'opacity-100 text-[#6364FF] hover:text-[#5354EE] hover:bg-[#6364FF]/10'
-              : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 text-[#707070] hover:text-[#A0A0A0] hover:bg-[#404040]'
-          }`}
-          title={person.savedForLater ? 'Remove from saved' : 'Save for later'}
-        >
-          {person.savedForLater ? (
-            <BookmarkIconSolid className={`w-4 h-4 ${justToggled ? 'animate-bookmark-pop' : ''}`} />
-          ) : (
-            <BookmarkIcon className={`w-4 h-4 ${justToggled ? 'animate-bookmark-pop' : ''}`} />
-          )}
-        </button>
+        <div className="absolute top-3 left-3">
+          <button
+            onClick={(e) => { e.stopPropagation(); onToggleSaveForLater(); }}
+            className={`p-1.5 rounded-lg transition-all ${
+              person.savedForLater
+                ? 'text-[#6364FF] hover:text-[#5354EE] hover:bg-[#6364FF]/10'
+                : 'text-white hover:text-white hover:bg-[#404040]'
+            }`}
+            title={person.savedForLater ? 'Remove from saved' : 'Save for later'}
+          >
+            {person.savedForLater ? (
+              <BookmarkIconSolid className="w-4 h-4" />
+            ) : (
+              <BookmarkIcon className="w-4 h-4" />
+            )}
+          </button>
+        </div>
       )}
-      {/* Hide button — hover-only */}
-      <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all">
-        {onHide && person.userCandidateId && (
+
+      {/* Top right - Hide button */}
+      {onHide && person.userCandidateId && (
+        <div className="absolute top-3 right-3">
           <button
             onClick={(e) => { e.stopPropagation(); onHide(); }}
-            className="p-1.5 text-[#707070] hover:text-[#A0A0A0] hover:bg-[#404040] rounded-lg transition-all"
+            className="p-1.5 text-white hover:text-white hover:bg-[#404040] rounded-lg transition-all"
             title="Don't show again"
           >
             <svg
@@ -139,8 +141,8 @@ export function PersonCard({
               />
             </svg>
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Avatar */}
       <div className="mb-4">
@@ -171,7 +173,7 @@ export function PersonCard({
 
       {/* Name and LinkedIn */}
       <div className="mb-1 flex items-center gap-2">
-        <h3 className="font-semibold text-[#E0E0E0] text-base">{person.fullName}</h3>
+        <h3 className="font-semibold text-white text-base">{person.fullName}</h3>
         {person.linkedinUrl && (
           <a
             href={person.linkedinUrl}
@@ -195,7 +197,7 @@ export function PersonCard({
       )}
 
       {/* Role */}
-      <p className="text-sm text-[#A0A0A0] font-medium mb-4 truncate w-full" title={person.role || 'Professional'}>
+      <p className="text-sm text-white font-medium mb-4 truncate w-full" title={person.role || 'Professional'}>
         {person.role || 'Professional'}
       </p>
 
@@ -203,15 +205,15 @@ export function PersonCard({
       <div className="w-full space-y-2 text-left mb-4">
         {/* Company */}
         <div className="flex items-center gap-2">
-          <BuildingOfficeIcon className="w-4 h-4 text-[#707070] flex-shrink-0" />
-          <p className="text-sm text-[#707070] truncate">{person.company}</p>
+          <BuildingOfficeIcon className="w-4 h-4 text-white flex-shrink-0" />
+          <p className="text-sm text-white truncate">{person.company}</p>
         </div>
 
         {/* University */}
         {person.educationSchool && (
           <div className="flex items-center gap-2">
-            <AcademicCapIcon className="w-4 h-4 text-[#707070] flex-shrink-0" />
-            <p className="text-sm text-[#707070] truncate">
+            <AcademicCapIcon className="w-4 h-4 text-white flex-shrink-0" />
+            <p className="text-sm text-white truncate">
               {person.educationSchool}
             </p>
           </div>
@@ -220,8 +222,8 @@ export function PersonCard({
         {/* Location */}
         {(person.city || person.state || person.country) && (
           <div className="flex items-center gap-2">
-            <MapPinIcon className="w-4 h-4 text-[#707070] flex-shrink-0" />
-            <p className="text-sm text-[#707070] truncate">
+            <MapPinIcon className="w-4 h-4 text-white flex-shrink-0" />
+            <p className="text-sm text-white truncate">
               {[person.city, person.state].filter(Boolean).join(', ') || person.country}
             </p>
           </div>
@@ -232,36 +234,33 @@ export function PersonCard({
       {/* Action button */}
       <div className="w-full mt-auto" onClick={(e) => e.stopPropagation()}>
         {isSent ? (
-          <button
-            onClick={onExpand}
-            className="text-sm w-full justify-center btn-secondary text-emerald-600 border-emerald-200"
+          <div
+            className="text-sm w-full justify-center btn-secondary text-emerald-600 border-emerald-200 flex items-center"
           >
             <CheckIcon className="w-4 h-4 mr-1.5" />
             Sent
-          </button>
+          </div>
         ) : isFailed ? (
-          <button
-            onClick={onExpand}
-            className="text-sm w-full justify-center btn-secondary text-red-600 border-red-200"
+          <div
+            className="text-sm w-full justify-center btn-secondary text-red-600 border-red-200 flex items-center"
           >
             Failed
-          </button>
+          </div>
         ) : limitReached ? (
-          <button
-            onClick={() => onLimitReached?.()}
-            className="text-sm w-full justify-center btn-primary opacity-50 cursor-not-allowed"
+          <div
+            onClick={(e) => { e.stopPropagation(); onLimitReached?.(); }}
+            className="text-sm w-full justify-center btn-primary opacity-50 cursor-not-allowed flex items-center"
           >
             <EnvelopeIcon className="w-4 h-4 mr-1.5" />
             Limit reached
-          </button>
+          </div>
         ) : (
-          <button
-            onClick={onExpand}
-            className="text-sm w-full justify-center btn-primary"
+          <div
+            className="text-sm w-full justify-center btn-primary flex items-center"
           >
             <EnvelopeIcon className="w-4 h-4 mr-1.5" />
             Send Email
-          </button>
+          </div>
         )}
       </div>
     </div>

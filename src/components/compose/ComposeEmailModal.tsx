@@ -523,7 +523,7 @@ export function ComposeEmailModal({
             <div className="flex-1 overflow-y-auto bg-[#1a1a1a]">
               {/* To field */}
               <div className="flex items-center border-b border-[#303030] px-4">
-                <span className="text-sm text-[#808080] w-10 flex-shrink-0">To</span>
+                <span className="text-sm text-white w-10 flex-shrink-0">To</span>
                 <input
                   type="email"
                   value={recipientEmail}
@@ -542,7 +542,7 @@ export function ComposeEmailModal({
 
               {/* Recipient Name field */}
               <div className="flex items-center border-b border-[#303030] px-4">
-                <span className="text-sm text-[#808080] w-10 flex-shrink-0">Name</span>
+                <span className="text-sm text-white w-10 flex-shrink-0">Name</span>
                 <input
                   type="text"
                   value={recipientName}
@@ -577,7 +577,7 @@ export function ComposeEmailModal({
               {/* Video link input (toggle) */}
               {showVideoInput && (
                 <div className="flex items-center border-t border-[#303030] px-4 mx-4 mt-1">
-                  <IconVideo className="w-4 h-4 text-[#808080] mr-2 flex-shrink-0" />
+                  <IconVideo className="w-4 h-4 text-white mr-2 flex-shrink-0" />
                   <input
                     type="url"
                     value={videoLink}
@@ -587,7 +587,7 @@ export function ComposeEmailModal({
                   />
                   <button
                     onClick={() => { setShowVideoInput(false); setVideoLink(''); }}
-                    className="p-1 text-[#606060] hover:text-white transition-colors"
+                    className="p-1 text-white hover:text-white transition-colors"
                   >
                     <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
@@ -622,16 +622,16 @@ export function ComposeEmailModal({
                     key={attachment.id}
                     className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[#303030] border border-[#404040] rounded-full"
                   >
-                    <IconAttach className="w-3.5 h-3.5 text-[#909090] flex-shrink-0" />
+                    <IconAttach className="w-3.5 h-3.5 text-white flex-shrink-0" />
                     <span className="text-xs text-white truncate max-w-[140px]">
                       {attachment.name}
                     </span>
-                    <span className="text-[10px] text-[#606060] flex-shrink-0">
+                    <span className="text-[10px] text-white flex-shrink-0">
                       {formatFileSize(attachment.size)}
                     </span>
                     <button
                       onClick={() => handleRemoveFile(attachment.id)}
-                      className="p-0.5 text-[#606060] hover:text-white transition-colors"
+                      className="p-0.5 text-white hover:text-white transition-colors"
                     >
                       <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
@@ -695,7 +695,7 @@ export function ComposeEmailModal({
                 />
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="p-2 rounded-full text-[#909090] hover:bg-[#303030] transition-colors"
+                  className="p-2 rounded-full text-white hover:bg-[#303030] transition-colors"
                   title="Attach files"
                   disabled={fileAttachments.length >= MAX_ATTACHMENTS}
                 >
@@ -705,14 +705,14 @@ export function ComposeEmailModal({
                 {/* Link */}
                 <button
                   onClick={() => setShowVideoInput(!showVideoInput)}
-                  className={`p-2 rounded-full transition-colors ${showVideoInput ? 'bg-[#303030] text-[#6b9fff]' : 'text-[#909090] hover:bg-[#303030]'}`}
+                  className={`p-2 rounded-full transition-colors ${showVideoInput ? 'bg-[#303030] text-[#6b9fff]' : 'text-white hover:bg-[#303030]'}`}
                   title="Insert video link"
                 >
                   <IconLink className="w-5 h-5" />
                 </button>
 
                 {/* Emoji */}
-                <button className="p-2 rounded-full text-[#909090] hover:bg-[#303030] transition-colors" title="Insert emoji">
+                <button className="p-2 rounded-full text-white hover:bg-[#303030] transition-colors" title="Insert emoji">
                   <IconEmoji className="w-5 h-5" />
                 </button>
 
@@ -731,7 +731,7 @@ export function ComposeEmailModal({
                         }
                       }
                     }}
-                    className={`p-2 rounded-full transition-colors ${attachResume ? 'bg-[#303030] text-[#6b9fff]' : 'text-[#909090] hover:bg-[#303030]'}`}
+                    className={`p-2 rounded-full transition-colors ${attachResume ? 'bg-[#303030] text-[#6b9fff]' : 'text-white hover:bg-[#303030]'}`}
                     title={attachResume ? 'Remove resume' : 'Attach resume'}
                   >
                     <IconResume className="w-5 h-5" />
@@ -742,7 +742,7 @@ export function ComposeEmailModal({
                 <div className="relative" ref={templateDropdownRef}>
                   <button
                     onClick={() => setShowTemplateDropdown(!showTemplateDropdown)}
-                    className={`p-2 rounded-full transition-colors ${showTemplateDropdown ? 'bg-[#303030] text-[#6b9fff]' : 'text-[#909090] hover:bg-[#303030]'}`}
+                    className={`p-2 rounded-full transition-colors ${showTemplateDropdown ? 'bg-[#303030] text-[#6b9fff]' : 'text-white hover:bg-[#303030]'}`}
                     title="Choose template"
                   >
                     <IconTemplate className="w-5 h-5" />
@@ -757,7 +757,7 @@ export function ComposeEmailModal({
                             setShowTemplateDropdown(false);
                           }}
                           className={`w-full text-left px-4 py-2 text-sm hover:bg-[#303030] transition-colors ${
-                            selectedTemplateId === template.id ? 'text-[#6b9fff] font-medium bg-[#303030]' : 'text-[#c0c0c0]'
+                            selectedTemplateId === template.id ? 'text-[#6b9fff] font-medium bg-[#303030]' : 'text-white'
                           }`}
                         >
                           {template.name} {template.isDefault ? '(Default)' : ''}
@@ -774,7 +774,7 @@ export function ComposeEmailModal({
               {/* Delete/discard */}
               <button
                 onClick={handleClose}
-                className="p-2 rounded-full text-[#909090] hover:bg-[#303030] transition-colors"
+                className="p-2 rounded-full text-white hover:bg-[#303030] transition-colors"
                 title="Discard"
               >
                 <IconDelete className="w-5 h-5" />

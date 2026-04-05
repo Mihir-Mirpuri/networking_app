@@ -83,7 +83,7 @@ export function SuggestionsClient() {
     return (
       <div className="flex flex-col items-center justify-center py-16">
         <LoadingSpinner size="lg" className="mb-4" />
-        <p className="text-gray-600">Loading suggestions...</p>
+        <p className="text-white">Loading suggestions...</p>
       </div>
     );
   }
@@ -93,7 +93,7 @@ export function SuggestionsClient() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Meeting Suggestions</h1>
-          <p className="text-gray-600 mt-1">
+          <p className="text-white mt-1">
             AI-detected meetings from your emails
           </p>
         </div>
@@ -114,7 +114,7 @@ export function SuggestionsClient() {
       {suggestions.length === 0 ? (
         <div className="text-center py-16 bg-surface-100 rounded-lg shadow">
           <svg
-            className="mx-auto h-12 w-12 text-gray-400"
+            className="mx-auto h-12 w-12 text-white"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -127,7 +127,7 @@ export function SuggestionsClient() {
             />
           </svg>
           <h3 className="mt-4 text-lg font-medium text-gray-900">No pending suggestions</h3>
-          <p className="mt-2 text-gray-500">
+          <p className="mt-2 text-white">
             When we detect meetings in your emails, they&apos;ll appear here.
           </p>
           <Link

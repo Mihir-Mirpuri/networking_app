@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { OutreachFilterOptions } from '@/app/actions/outreach';
 import { MultiSelectFilter } from './MultiSelectFilter';
 
-export type ColumnKey = 'name' | 'firm' | 'role' | 'location' | 'group' | 'connection' | 'firstEmailDate' | 'lastEmailDate' | 'followUps' | 'subject' | 'notes';
+export type ColumnKey = 'name' | 'firm' | 'role' | 'location' | 'group' | 'connection' | 'firstEmailDate' | 'lastEmailDate' | 'followUps' | 'response' | 'subject' | 'notes';
 
 interface OutreachFiltersProps {
   searchQuery: string;
@@ -151,7 +151,7 @@ export function OutreachFilters({
       {/* Search Row */}
       <div className="flex items-center gap-2">
         <div className="flex items-center gap-2 flex-1 bg-[#1a1a1a] border border-[#3a3a3a] rounded-lg px-4 py-3">
-          <svg className="w-4 h-4 text-[#505050] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4 text-white shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           <input
@@ -159,7 +159,7 @@ export function OutreachFilters({
             placeholder="Search by name, email, company, or subject..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="bg-transparent text-sm text-[#E0E0E0] placeholder-[#505050] outline-none w-full font-['Inter']"
+            className="bg-transparent text-sm text-white placeholder-[#505050] outline-none w-full font-['Inter']"
           />
           {isLoading && (
             <div className="w-4 h-4 border-2 border-[#505050] border-t-[#808080] rounded-full animate-spin shrink-0" />
@@ -167,8 +167,8 @@ export function OutreachFilters({
         </div>
 
         <button className="flex items-center gap-2 bg-[#1a1a1a] border border-[#3a3a3a] rounded-lg px-4 py-3 shrink-0">
-          <span className="text-sm text-[#E0E0E0] font-['Inter']">All time</span>
-          <svg className="w-4 h-4 text-[#707070]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <span className="text-sm text-white font-['Inter']">All time</span>
+          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
         </button>
@@ -183,15 +183,15 @@ export function OutreachFilters({
 
       {/* Filter Toolbar */}
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-[13px] text-[#707070] font-['Inter']">Filter by:</span>
+        <span className="text-[13px] text-white font-['Inter']">Filter by:</span>
 
         {/* Starred filter */}
         <button
           onClick={() => onStarredFilterChange(starredActive ? undefined : true)}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-['Inter'] transition-colors ${
             starredActive
-              ? 'bg-[#6364FF]/20 border-[#6364FF] text-[#E0E0E0]'
-              : 'bg-[#1a1a1a] border-[#3a3a3a] text-[#E0E0E0] hover:border-[#505050]'
+              ? 'bg-[#6364FF]/20 border-[#6364FF] text-white'
+              : 'bg-[#1a1a1a] border-[#3a3a3a] text-white hover:border-[#505050]'
           }`}
         >
           <svg className="w-3 h-3 text-[#f59e0b]" fill="currentColor" viewBox="0 0 24 24">
@@ -205,8 +205,8 @@ export function OutreachFilters({
           onClick={() => onScheduledFilterChange(scheduledActive ? undefined : true)}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-['Inter'] transition-colors ${
             scheduledActive
-              ? 'bg-[#6364FF]/20 border-[#6364FF] text-[#E0E0E0]'
-              : 'bg-[#1a1a1a] border-[#3a3a3a] text-[#E0E0E0] hover:border-[#505050]'
+              ? 'bg-[#6364FF]/20 border-[#6364FF] text-white'
+              : 'bg-[#1a1a1a] border-[#3a3a3a] text-white hover:border-[#505050]'
           }`}
         >
           <svg className="w-3 h-3 text-[#6364FF]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -276,11 +276,11 @@ export function OutreachFilters({
             onClick={() => setShowColumnsDropdown(!showColumnsDropdown)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#1a1a1a] border border-[#3a3a3a] text-xs font-['Inter'] hover:border-[#505050] transition-colors"
           >
-            <svg className="w-3.5 h-3.5 text-[#E0E0E0]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 4v16M15 4v16M3 8h18M3 16h18" />
             </svg>
-            <span className="text-[#E0E0E0] font-medium">Columns</span>
-            <svg className="w-3 h-3 text-[#707070]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <span className="text-white font-medium">Columns</span>
+            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
           </button>
@@ -289,8 +289,8 @@ export function OutreachFilters({
           {showColumnsDropdown && (
             <div className="absolute right-0 top-full mt-2 w-[260px] bg-[#2a2a2a] border border-[#3a3a3a] rounded-lg shadow-lg shadow-black/40 z-50 py-2">
               <div className="px-3.5 py-2 flex items-center justify-between">
-                <span className="text-[13px] font-semibold text-[#E0E0E0] font-['Inter']">Manage Columns</span>
-                <span className="text-[11px] text-[#606060] font-['Inter']">Drag to reorder</span>
+                <span className="text-[13px] font-semibold text-white font-['Inter']">Manage Columns</span>
+                <span className="text-[11px] text-white font-['Inter']">Drag to reorder</span>
               </div>
               <div className="h-px bg-[#3a3a3a]" />
 
@@ -315,7 +315,7 @@ export function OutreachFilters({
                       } ${isDragOver ? 'bg-[#3a3a3a]' : ''}`}
                     >
                       {/* Drag handle */}
-                      <div className="flex flex-col gap-0.5 text-[#505050] shrink-0">
+                      <div className="flex flex-col gap-0.5 text-white shrink-0">
                         <div className="flex gap-0.5">
                           <div className="w-1 h-1 bg-current rounded-full" />
                           <div className="w-1 h-1 bg-current rounded-full" />
@@ -344,13 +344,13 @@ export function OutreachFilters({
                       </button>
 
                       {/* Column name */}
-                      <span className={`text-[13px] font-['Inter'] flex-1 ${isActive ? 'text-[#E0E0E0]' : 'text-[#707070]'}`}>
+                      <span className={`text-[13px] font-['Inter'] flex-1 ${isActive ? 'text-white' : 'text-white'}`}>
                         {columnLabels[col]}
                       </span>
 
                       {/* Position number */}
                       {visibleNum && (
-                        <span className="w-5 h-5 rounded bg-[#3a3a3a] text-[11px] text-[#909090] font-medium font-['Inter'] flex items-center justify-center">
+                        <span className="w-5 h-5 rounded bg-[#3a3a3a] text-[11px] text-white font-medium font-['Inter'] flex items-center justify-center">
                           {visibleNum}
                         </span>
                       )}
@@ -366,7 +366,7 @@ export function OutreachFilters({
         {showClearAll && (
           <button
             onClick={onClearAll}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#1a1a1a] border border-[#3a3a3a] text-xs font-['Inter'] text-[#909090] hover:text-red-400 hover:border-red-400/50 hover:bg-red-900/20 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#1a1a1a] border border-[#3a3a3a] text-xs font-['Inter'] text-white hover:text-red-400 hover:border-red-400/50 hover:bg-red-900/20 transition-colors"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />

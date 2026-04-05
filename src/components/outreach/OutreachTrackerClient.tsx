@@ -1,26 +1,24 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import {
   OutreachTrackerEntry,
   OutreachStats,
+  HistorySidebarStats,
   ScheduledEmailEntry,
-  DraftEntry,
-  SortField,
-  SortDirection,
-  OutreachFilterOptions,
+  HistorySection,
+  ActiveFilter,
   getOutreachTrackers,
-  getOutreachFilterOptions,
-  getDrafts,
   deleteOutreachTracker,
   toggleStarOutreachTracker,
   clearAllOutreachTrackers,
 } from '@/app/actions/outreach';
 import { OutreachTable } from './OutreachTable';
-import { OutreachFilters, ColumnKey } from './OutreachFilters';
 import { ScheduledEmailsSection } from './ScheduledEmailsSection';
-import { DraftsSection } from './DraftsSection';
 import { ThreadPanel } from './ThreadPanel';
+import { HistorySidebar } from './HistorySidebar';
+import { FilterSearchBar } from './FilterSearchBar';
+import { NewHeader } from '@/components/layout/NewHeader';
 import { LoadingSpinner } from '@/components/search/LoadingSpinner';
 import { useColumnSettings, COLUMN_LABELS } from './useColumnSettings';
 
@@ -30,7 +28,7 @@ interface OutreachTrackerClientProps {
   initialHasMore: boolean;
   initialStats: OutreachStats;
   initialScheduledEmails: ScheduledEmailEntry[];
-  initialDrafts: DraftEntry[];
+  initialSidebarStats: HistorySidebarStats;
 }
 
 export function OutreachTrackerClient({
@@ -39,21 +37,16 @@ export function OutreachTrackerClient({
   initialHasMore,
   initialStats,
   initialScheduledEmails,
-  initialDrafts,
+  initialSidebarStats,
 }: OutreachTrackerClientProps) {
   const [trackers, setTrackers] = useState<OutreachTrackerEntry[]>(initialTrackers);
   const [scheduledEmails, setScheduledEmails] = useState<ScheduledEmailEntry[]>(initialScheduledEmails);
-  const [drafts, setDrafts] = useState<DraftEntry[]>(initialDrafts);
   const [stats, setStats] = useState<OutreachStats>(initialStats);
   const [cursor, setCursor] = useState<string | null>(initialCursor);
   const [hasMore, setHasMore] = useState(initialHasMore);
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortField, setSortField] = useState<SortField>('createdAt');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-  const [starredFilter, setStarredFilter] = useState<boolean | undefined>(undefined);
-  const [scheduledFilter, setScheduledFilter] = useState<boolean | undefined>(undefined);
-  const [draftsFilter, setDraftsFilter] = useState<boolean | undefined>(undefined);
+  const [activeSection, setActiveSection] = useState<HistorySection>('all');
+  const [activeFilters, setActiveFilters] = useState<ActiveFilter[]>([]);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -61,49 +54,20 @@ export function OutreachTrackerClient({
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
 
-  // Multi-select filter state
-  const [filterOptions, setFilterOptions] = useState<OutreachFilterOptions | null>(null);
-  const [filterOptionsLoading, setFilterOptionsLoading] = useState(true);
-  const [selectedFirms, setSelectedFirms] = useState<string[]>([]);
-  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
-  const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
-  const [selectedConnections, setSelectedConnections] = useState<string[]>([]);
-
   // Column settings hook
   const columnSettings = useColumnSettings();
 
-  // Fetch filter options on mount
-  useEffect(() => {
-    const loadFilterOptions = async () => {
-      setFilterOptionsLoading(true);
-      try {
-        const result = await getOutreachFilterOptions();
-        if (result.success) {
-          setFilterOptions(result.options);
-        }
-      } catch (error) {
-        console.error('Error fetching filter options:', error);
-      } finally {
-        setFilterOptionsLoading(false);
-      }
-    };
-    loadFilterOptions();
-  }, []);
-
   const fetchTrackers = useCallback(
-    async (resetCursor = true) => {
+    async (resetCursor = true, filtersOverride?: ActiveFilter[]) => {
       setIsLoading(true);
+      const filtersToUse = filtersOverride ?? activeFilters;
       try {
         const result = await getOutreachTrackers({
-          search: searchQuery || undefined,
-          sortField,
-          sortDirection,
-          starred: starredFilter,
+          starred: activeSection === 'starred' ? true : undefined,
+          savedForLater: activeSection === 'savedForLater' ? true : undefined,
+          hasResponse: activeSection === 'hasResponse' ? true : undefined,
           cursor: resetCursor ? undefined : cursor || undefined,
-          firms: selectedFirms.length > 0 ? selectedFirms : undefined,
-          roles: selectedRoles.length > 0 ? selectedRoles : undefined,
-          groups: selectedGroups.length > 0 ? selectedGroups : undefined,
-          connections: selectedConnections.length > 0 ? selectedConnections : undefined,
+          filters: filtersToUse.length > 0 ? filtersToUse : undefined,
         });
 
         if (result.success) {
@@ -121,27 +85,19 @@ export function OutreachTrackerClient({
         setIsLoading(false);
       }
     },
-    [searchQuery, sortField, sortDirection, starredFilter, cursor, selectedFirms, selectedRoles, selectedGroups, selectedConnections]
+    [activeSection, cursor, activeFilters]
   );
-
-  const handleSearch = () => {
-    fetchTrackers(true);
-  };
 
   const handleLoadMore = async () => {
     if (!cursor || isLoadingMore) return;
     setIsLoadingMore(true);
     try {
       const result = await getOutreachTrackers({
-        search: searchQuery || undefined,
-        sortField,
-        sortDirection,
-        starred: starredFilter,
+        starred: activeSection === 'starred' ? true : undefined,
+        savedForLater: activeSection === 'savedForLater' ? true : undefined,
+        hasResponse: activeSection === 'hasResponse' ? true : undefined,
         cursor,
-        firms: selectedFirms.length > 0 ? selectedFirms : undefined,
-        roles: selectedRoles.length > 0 ? selectedRoles : undefined,
-        groups: selectedGroups.length > 0 ? selectedGroups : undefined,
-        connections: selectedConnections.length > 0 ? selectedConnections : undefined,
+        filters: activeFilters.length > 0 ? activeFilters : undefined,
       });
 
       if (result.success) {
@@ -156,64 +112,23 @@ export function OutreachTrackerClient({
     }
   };
 
-  const handleSort = (field: SortField) => {
-    if (field === sortField) {
-      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortField(field);
-      setSortDirection('desc');
-    }
-    setTimeout(() => fetchTrackers(true), 0);
-  };
-
-  const handleStarredFilterChange = (starred: boolean | undefined) => {
-    setStarredFilter(starred);
-    if (starred === true) {
-      setScheduledFilter(undefined);
-      setDraftsFilter(undefined);
-    }
-    setTimeout(() => fetchTrackers(true), 0);
-  };
-
-  const handleScheduledFilterChange = (scheduled: boolean | undefined) => {
-    setScheduledFilter(scheduled);
-    if (scheduled === true) {
-      setStarredFilter(undefined);
-      setDraftsFilter(undefined);
+  const handleSectionChange = (section: HistorySection) => {
+    setActiveSection(section);
+    if (section !== 'scheduled') {
+      setTimeout(() => fetchTrackers(true), 0);
     }
   };
 
-  const handleDraftsFilterChange = async (draftsActive: boolean | undefined) => {
-    setDraftsFilter(draftsActive);
-    if (draftsActive === true) {
-      setStarredFilter(undefined);
-      setScheduledFilter(undefined);
-      // Refresh drafts when filter is activated
-      const result = await getDrafts(searchQuery || undefined);
-      if (result.success) {
-        setDrafts(result.drafts);
-      }
-    }
+  const handleAddFilter = (filter: ActiveFilter) => {
+    const newFilters = [...activeFilters, filter];
+    setActiveFilters(newFilters);
+    setTimeout(() => fetchTrackers(true, newFilters), 0);
   };
 
-  const handleFirmsChange = (firms: string[]) => {
-    setSelectedFirms(firms);
-    setTimeout(() => fetchTrackers(true), 0);
-  };
-
-  const handleRolesChange = (roles: string[]) => {
-    setSelectedRoles(roles);
-    setTimeout(() => fetchTrackers(true), 0);
-  };
-
-  const handleGroupsChange = (groups: string[]) => {
-    setSelectedGroups(groups);
-    setTimeout(() => fetchTrackers(true), 0);
-  };
-
-  const handleConnectionsChange = (connections: string[]) => {
-    setSelectedConnections(connections);
-    setTimeout(() => fetchTrackers(true), 0);
+  const handleRemoveFilter = (index: number) => {
+    const newFilters = activeFilters.filter((_, i) => i !== index);
+    setActiveFilters(newFilters);
+    setTimeout(() => fetchTrackers(true, newFilters), 0);
   };
 
   const recomputeStats = (trackerList: OutreachTrackerEntry[]) => {
@@ -275,72 +190,34 @@ export function OutreachTrackerClient({
   };
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* Filters - Fixed at top */}
-      <div className="flex-shrink-0 pb-4">
-        <OutreachFilters
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          onSearch={handleSearch}
-          isLoading={isLoading}
-          starredFilter={starredFilter}
-          onStarredFilterChange={handleStarredFilterChange}
-          scheduledFilter={scheduledFilter}
-          onScheduledFilterChange={handleScheduledFilterChange}
-          draftsFilter={draftsFilter}
-          onDraftsFilterChange={handleDraftsFilterChange}
-          draftsCount={drafts.length}
-          columnOrder={columnSettings.columnOrder}
-          isColumnVisible={columnSettings.isVisible}
-          onToggleColumn={columnSettings.toggleColumn}
-          onReorderColumns={columnSettings.reorderColumns}
-          columnLabels={COLUMN_LABELS}
-          showClearAll={trackers.length > 0}
-          onClearAll={() => setShowClearConfirm(true)}
-          filterOptions={filterOptions}
-          filterOptionsLoading={filterOptionsLoading}
-          selectedFirms={selectedFirms}
-          selectedRoles={selectedRoles}
-          selectedGroups={selectedGroups}
-          selectedConnections={selectedConnections}
-          onFirmsChange={handleFirmsChange}
-          onRolesChange={handleRolesChange}
-          onGroupsChange={handleGroupsChange}
-          onConnectionsChange={handleConnectionsChange}
-        />
-      </div>
+    <div className="flex w-full h-full overflow-hidden">
+      <HistorySidebar
+        stats={initialSidebarStats}
+        filterProps={{
+          isLoading,
+          activeSection,
+          onSectionChange: handleSectionChange,
+          columnOrder: columnSettings.columnOrder,
+          isColumnVisible: columnSettings.isVisible,
+          onToggleColumn: columnSettings.toggleColumn,
+          onReorderColumns: columnSettings.reorderColumns,
+          columnLabels: COLUMN_LABELS,
+        }}
+      />
 
-      {/* Content area - Drafts, Scheduled emails, or Outreach table */}
-      {draftsFilter === true ? (
-        <DraftsSection
-          drafts={searchQuery
-            ? drafts.filter((d) => {
-                const q = searchQuery.toLowerCase();
-                return (
-                  d.contactName.toLowerCase().includes(q) ||
-                  (d.contactEmail && d.contactEmail.toLowerCase().includes(q)) ||
-                  d.company.toLowerCase().includes(q) ||
-                  d.subject.toLowerCase().includes(q)
-                );
-              })
-            : drafts}
-          onDraftDeleted={(id) => {
-            setDrafts((prev) => prev.filter((d) => d.id !== id));
-          }}
-        />
-      ) : scheduledFilter === true ? (
+      <div className="flex-1 flex flex-col overflow-hidden">
+      <NewHeader />
+      <div className="flex-1 flex flex-col overflow-hidden px-4 py-4">
+      <FilterSearchBar
+        activeFilters={activeFilters}
+        onAddFilter={handleAddFilter}
+        onRemoveFilter={handleRemoveFilter}
+      />
+
+      {/* Content area - Scheduled emails or Outreach table */}
+      {activeSection === 'scheduled' ? (
         <ScheduledEmailsSection
-          scheduledEmails={searchQuery
-            ? scheduledEmails.filter((e) => {
-                const q = searchQuery.toLowerCase();
-                return (
-                  (e.contactName && e.contactName.toLowerCase().includes(q)) ||
-                  e.toEmail.toLowerCase().includes(q) ||
-                  (e.company && e.company.toLowerCase().includes(q)) ||
-                  e.subject.toLowerCase().includes(q)
-                );
-              })
-            : scheduledEmails}
+          scheduledEmails={scheduledEmails}
           onEmailCancelled={(id) => {
             setScheduledEmails((prev) => prev.filter((e) => e.id !== id));
           }}
@@ -354,7 +231,7 @@ export function OutreachTrackerClient({
         />
       ) : isLoading && trackers.length === 0 ? (
         <div className="flex items-center justify-center h-64">
-          <div className="flex items-center gap-3 text-[#707070]">
+          <div className="flex items-center gap-3 text-white">
             <LoadingSpinner size="md" />
             Loading...
           </div>
@@ -362,9 +239,6 @@ export function OutreachTrackerClient({
       ) : (
         <OutreachTable
           trackers={trackers}
-          sortField={sortField}
-          sortDirection={sortDirection}
-          onSort={handleSort}
           onUpdate={handleUpdate}
           onDelete={handleDelete}
           onToggleStar={handleToggleStar}
@@ -387,6 +261,8 @@ export function OutreachTrackerClient({
           onClose={() => setSelectedTracker(null)}
         />
       )}
+      </div>
+      </div>
 
       {/* Clear All Confirmation Modal */}
       {showClearConfirm && (
@@ -397,15 +273,15 @@ export function OutreachTrackerClient({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
             </div>
-            <h3 className="text-xl font-semibold text-center text-[#E0E0E0] mb-2">Clear All History</h3>
-            <p className="text-[#808080] text-center mb-6">
-              Are you sure you want to delete all <span className="font-medium text-[#E0E0E0]">{trackers.length}</span> contacts from your history? This action cannot be undone.
+            <h3 className="text-xl font-semibold text-center text-white mb-2">Clear All History</h3>
+            <p className="text-white text-center mb-6">
+              Are you sure you want to delete all <span className="font-medium text-white">{trackers.length}</span> contacts from your history? This action cannot be undone.
             </p>
             <div className="flex gap-3 justify-center">
               <button
                 onClick={() => setShowClearConfirm(false)}
                 disabled={isClearing}
-                className="px-5 py-2.5 text-sm font-medium bg-[#333333] text-[#c0c0c0] rounded-lg hover:bg-[#3a3a3a] transition-all disabled:opacity-50"
+                className="px-5 py-2.5 text-sm font-medium bg-[#333333] text-white rounded-lg hover:bg-[#3a3a3a] transition-all disabled:opacity-50"
               >
                 Cancel
               </button>

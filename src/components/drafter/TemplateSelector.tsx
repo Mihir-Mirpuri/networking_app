@@ -24,10 +24,10 @@ export function TemplateSelector() {
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="px-4 pt-4 pb-3">
-        <h2 className="text-sm font-medium text-[#e0e0e0] mb-1">
+        <h2 className="text-sm font-medium text-white mb-1">
           Draft an Email
         </h2>
-        <p className="text-xs text-[#606060]">
+        <p className="text-xs text-white">
           Choose a template or paste your own
         </p>
       </div>
@@ -51,7 +51,7 @@ export function TemplateSelector() {
             {/* Divider */}
             <div className="flex items-center gap-3 my-4">
               <div className="flex-1 h-px bg-[#303030]" />
-              <span className="text-xs text-[#505050]">or</span>
+              <span className="text-xs text-white">or</span>
               <div className="flex-1 h-px bg-[#303030]" />
             </div>
 
@@ -59,7 +59,7 @@ export function TemplateSelector() {
             <button
               onClick={() => setShowCustomInput(true)}
               disabled={isProcessing}
-              className="w-full p-3 text-center text-sm text-[#808080] border border-dashed border-[#303030] rounded-lg hover:border-[#404040] hover:text-[#a0a0a0] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full p-3 text-center text-sm text-white border border-dashed border-[#303030] rounded-lg hover:border-[#404040] hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Paste your own template
             </button>
@@ -69,13 +69,13 @@ export function TemplateSelector() {
             {/* Custom template input */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-[#808080]">Your template</span>
+                <span className="text-xs text-white">Your template</span>
                 <button
                   onClick={() => {
                     setShowCustomInput(false);
                     setCustomTemplate('');
                   }}
-                  className="text-xs text-[#606060] hover:text-[#808080] transition-colors"
+                  className="text-xs text-white hover:text-white transition-colors"
                 >
                   Cancel
                 </button>
@@ -92,13 +92,13 @@ Hi {{recruiter_name}},
 
 I'm interested in {{role}} at {{company}}..."
                 disabled={isProcessing}
-                className="w-full h-64 px-3 py-2.5 text-sm bg-[#1a1a1a] border border-[#303030] rounded-lg text-[#c0c0c0] placeholder:text-[#404040] focus:outline-none focus:border-[#404040] disabled:opacity-50 disabled:cursor-not-allowed resize-none"
+                className="w-full h-64 px-3 py-2.5 text-sm bg-[#1a1a1a] border border-[#303030] rounded-lg text-white placeholder:text-[#404040] focus:outline-none focus:border-[#404040] disabled:opacity-50 disabled:cursor-not-allowed resize-none"
               />
 
               <button
                 onClick={handleCustomSubmit}
                 disabled={!customTemplate.trim() || isProcessing}
-                className="w-full py-2.5 text-sm font-medium bg-[#303030] text-[#e0e0e0] rounded-lg hover:bg-[#404040] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-2.5 text-sm font-medium bg-[#303030] text-white rounded-lg hover:bg-[#404040] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isProcessing ? 'Processing...' : 'Use this template'}
               </button>

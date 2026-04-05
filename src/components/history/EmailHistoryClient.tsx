@@ -632,7 +632,7 @@ export function EmailHistoryClient({
                       >
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-3">
-                            <span className="font-medium text-[#e0e0e0]">
+                            <span className="font-medium text-white">
                               {log.toName || log.toEmail}
                             </span>
                             {log.isDirectSend && (

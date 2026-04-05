@@ -21,10 +21,10 @@ export function DraftBubble({ draft, onCopy }: DraftBubbleProps) {
     <div className="bg-[#1a1a1a] border border-[#303030] rounded-lg overflow-hidden">
       {/* Header with copy button */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-[#252525]">
-        <span className="text-xs text-[#606060]">Draft</span>
+        <span className="text-xs text-white">Draft</span>
         <button
           onClick={handleCopy}
-          className="flex items-center gap-1.5 px-2 py-1 text-xs text-[#808080] hover:text-[#a0a0a0] hover:bg-[#252525] rounded transition-colors"
+          className="flex items-center gap-1.5 px-2 py-1 text-xs text-white hover:text-white hover:bg-[#252525] rounded transition-colors"
         >
           {copied ? (
             <>
@@ -48,10 +48,10 @@ export function DraftBubble({ draft, onCopy }: DraftBubbleProps) {
       <div className="p-3 space-y-3">
         {/* Subject */}
         <div>
-          <div className="text-[10px] uppercase tracking-wider text-[#505050] mb-1">
+          <div className="text-[10px] uppercase tracking-wider text-white mb-1">
             Subject
           </div>
-          <div className="text-sm text-[#c0c0c0]">{draft.subject}</div>
+          <div className="text-sm text-white">{draft.subject}</div>
         </div>
 
         {/* Divider */}
@@ -59,10 +59,10 @@ export function DraftBubble({ draft, onCopy }: DraftBubbleProps) {
 
         {/* Body */}
         <div>
-          <div className="text-[10px] uppercase tracking-wider text-[#505050] mb-1">
+          <div className="text-[10px] uppercase tracking-wider text-white mb-1">
             Body
           </div>
-          <div className="text-sm text-[#a0a0a0] whitespace-pre-wrap leading-relaxed">
+          <div className="text-sm text-white whitespace-pre-wrap leading-relaxed">
             {draft.body}
           </div>
         </div>

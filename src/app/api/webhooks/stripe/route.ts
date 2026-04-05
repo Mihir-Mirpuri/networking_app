@@ -50,7 +50,41 @@ export async function POST(req: NextRequest) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
 
-        if (session.mode === 'subscription' && session.subscription) {
+        // Handle one-time upfront payment
+        if (session.mode === 'payment' && session.metadata?.type === 'upfront') {
+          const months = parseInt(session.metadata.months || '0', 10);
+          const userId = session.metadata.userId;
+
+          if (months > 0 && userId) {
+            // Calculate access expiration date
+            const accessExpiresAt = new Date();
+            accessExpiresAt.setMonth(accessExpiresAt.getMonth() + months);
+
+            await prisma.user.update({
+              where: { id: userId },
+              data: {
+                accessExpiresAt,
+                subscriptionStatus: 'active', // Mark as active for UI purposes
+              },
+            });
+
+            console.log(`Upfront payment processed: ${months} months access for user ${userId}, expires ${accessExpiresAt}`);
+
+            // Track referral paid conversion
+            const subscribedUser = await prisma.user.findUnique({
+              where: { id: userId },
+              select: { referralLinkId: true },
+            });
+            if (subscribedUser?.referralLinkId) {
+              await prisma.referralLink.update({
+                where: { id: subscribedUser.referralLinkId },
+                data: { paidCount: { increment: 1 } },
+              });
+            }
+          }
+        }
+        // Handle recurring subscription
+        else if (session.mode === 'subscription' && session.subscription) {
           const subscriptionId = typeof session.subscription === 'string'
             ? session.subscription
             : session.subscription.id;

@@ -27,12 +27,12 @@ async function getRemainingDailyLimit(userId: string): Promise<number> {
 export default async function AppPage() {
   const session = await getServerSession(authOptions);
 
-  // For unauthenticated users, show the app with 0 sends (can browse, can't send)
+  // Require authentication
   if (!session?.user?.id) {
-    return <AppWrapper initialRemainingDaily={0} />;
+    redirect('/');
   }
 
-  // For authenticated users, check account and onboarding
+  // Check account and onboarding
   const account = await prisma.account.findFirst({
     where: {
       userId: session.user.id,

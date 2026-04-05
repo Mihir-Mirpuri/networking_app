@@ -20,39 +20,16 @@ const TICKER_COMPANIES = [
   { name: 'Jefferies', domain: 'jefferies.com' },
 ];
 
-// Mascot SVG component
-function MascotSVG({ className }: { className?: string }) {
+function SignalLogo({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="60" cy="60" r="54" fill="url(#mascotBgWelcome)" opacity="0.9"/>
-      <path
-        d="M18 60 Q25 42 32 60 Q39 78 46 60 Q53 42 60 60 Q67 78 74 60 Q81 42 88 60 Q95 78 102 60"
-        stroke="url(#waveGradWelcome)"
-        strokeWidth="4.5"
-        strokeLinecap="round"
-        fill="none"
-      />
-      <circle cx="52" cy="52" r="5" fill="white"/>
-      <circle cx="68" cy="52" r="5" fill="white"/>
-      <circle cx="53.5" cy="53.5" r="2.5" fill="#0A0E1A"/>
-      <circle cx="69.5" cy="53.5" r="2.5" fill="#0A0E1A"/>
-      <circle cx="54.5" cy="52.5" r="1" fill="white" opacity="0.8"/>
-      <circle cx="70.5" cy="52.5" r="1" fill="white" opacity="0.8"/>
-      <path d="M52 70 Q60 77 68 70" stroke="white" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
-      <line x1="60" y1="6" x2="60" y2="22" stroke="#6364FF" strokeWidth="2.5" strokeLinecap="round"/>
-      <circle cx="60" cy="5" r="3.5" fill="#6364FF"/>
-      <circle cx="60" cy="5" r="6" fill="rgba(99,100,255,0.2)"/>
-      <defs>
-        <linearGradient id="waveGradWelcome" x1="18" y1="60" x2="102" y2="60" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#0053CC"/>
-          <stop offset="50%" stopColor="#6364FF"/>
-          <stop offset="100%" stopColor="#0053CC"/>
-        </linearGradient>
-        <radialGradient id="mascotBgWelcome" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#1E3B8A" stopOpacity="0.9"/>
-          <stop offset="100%" stopColor="#0A0E1A" stopOpacity="0.95"/>
-        </radialGradient>
-      </defs>
+    <svg className={className} viewBox="0 0 200 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="100" cy="80" r="12" fill="white" />
+      <path d="M78 56 A30 30 0 0 0 78 104" stroke="white" strokeWidth="10" strokeLinecap="round" fill="none" />
+      <path d="M122 56 A30 30 0 0 1 122 104" stroke="white" strokeWidth="10" strokeLinecap="round" fill="none" />
+      <path d="M58 38 A55 55 0 0 0 58 122" stroke="white" strokeWidth="10" strokeLinecap="round" fill="none" />
+      <path d="M142 38 A55 55 0 0 1 142 122" stroke="white" strokeWidth="10" strokeLinecap="round" fill="none" />
+      <path d="M38 20 A80 80 0 0 0 38 140" stroke="white" strokeWidth="10" strokeLinecap="round" fill="none" />
+      <path d="M162 20 A80 80 0 0 1 162 140" stroke="white" strokeWidth="10" strokeLinecap="round" fill="none" />
     </svg>
   );
 }
@@ -127,7 +104,7 @@ export function WelcomeModal({ onClose }: WelcomeModalProps) {
           {/* Mascot */}
           <div className="flex justify-center mb-6">
             <div className="relative">
-              <MascotSVG className="w-24 h-24 animate-bounce-slow" />
+              <SignalLogo className="w-24 h-24 animate-bounce-slow" />
               {/* Glow effect */}
               <div className="absolute inset-0 blur-2xl bg-[#6364FF]/20 -z-10" />
             </div>
@@ -146,7 +123,7 @@ export function WelcomeModal({ onClose }: WelcomeModalProps) {
           </h1>
 
           {/* Description */}
-          <p className="text-[#808080] text-center mb-8">
+          <p className="text-white text-center mb-8">
             Send high-quality personalized emails at mass
           </p>
 
@@ -160,7 +137,7 @@ export function WelcomeModal({ onClose }: WelcomeModalProps) {
               </div>
               <div>
                 <h3 className="text-white font-semibold mb-0.5">Discover</h3>
-                <p className="text-sm text-[#606060]">Search by company, role, location, or university</p>
+                <p className="text-sm text-white">Search by company, role, location, or university</p>
               </div>
             </div>
 
@@ -172,7 +149,7 @@ export function WelcomeModal({ onClose }: WelcomeModalProps) {
               </div>
               <div>
                 <h3 className="text-white font-semibold mb-0.5">Personalize</h3>
-                <p className="text-sm text-[#606060]">AI writes emails that actually sound like you</p>
+                <p className="text-sm text-white">AI writes emails that actually sound like you</p>
               </div>
             </div>
 
@@ -184,7 +161,7 @@ export function WelcomeModal({ onClose }: WelcomeModalProps) {
               </div>
               <div>
                 <h3 className="text-white font-semibold mb-0.5">Send</h3>
-                <p className="text-sm text-[#606060]">One-click send directly from your Gmail</p>
+                <p className="text-sm text-white">One-click send directly from your Gmail</p>
               </div>
             </div>
           </div>
@@ -199,7 +176,7 @@ export function WelcomeModal({ onClose }: WelcomeModalProps) {
             </button>
             <button
               onClick={handleSignIn}
-              className="w-full py-2.5 px-6 rounded-xl bg-transparent border border-[#303030] hover:border-[#404040] text-[#808080] hover:text-white text-sm font-medium transition-colors"
+              className="w-full py-2.5 px-6 rounded-xl bg-transparent border border-[#303030] hover:border-[#404040] text-white hover:text-white text-sm font-medium transition-colors"
             >
               Already have an account? Sign in
             </button>
@@ -208,7 +185,7 @@ export function WelcomeModal({ onClose }: WelcomeModalProps) {
 
         {/* Company ticker */}
         <div className="relative border-t border-[#1a1a1a] bg-black/40 py-6 overflow-hidden">
-          <p className="text-center text-xs font-semibold uppercase tracking-widest text-[#505050] mb-4">
+          <p className="text-center text-xs font-semibold uppercase tracking-widest text-white mb-4">
             UT Students landed offers at
           </p>
           <div className="relative">

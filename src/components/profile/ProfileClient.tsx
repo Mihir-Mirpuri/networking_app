@@ -25,9 +25,9 @@ import {
   getSubscriptionStatus,
 } from '@/app/actions/subscription';
 import { SearchableCombobox } from '@/components/search/SearchableCombobox';
-import { UNIVERSITIES, CLASSIFICATIONS } from '@/lib/constants';
+import { UNIVERSITIES, CLASSIFICATIONS, EMAIL_LIMITS } from '@/lib/constants';
 
-type ProfileTab = 'profile' | 'resumes' | 'templates' | 'billing' | 'settings';
+type ProfileTab = 'profile' | 'resumes' | 'templates' | 'billing' | 'settings' | 'feedback';
 
 interface ProfileClientProps {
   userEmail: string;
@@ -103,6 +103,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
   const [isUploadingResume, setIsUploadingResume] = useState(false);
   const [resumeError, setResumeError] = useState<string | null>(null);
   const [resumeSuccess, setResumeSuccess] = useState(false);
+  const [expandedResume, setExpandedResume] = useState<ResumeData | null>(null);
 
   // Subscription state
   const [subscription, setSubscription] = useState<{
@@ -112,6 +113,11 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
   const [isLoadingSubscription, setIsLoadingSubscription] = useState(true);
   const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
   const [isPortalLoading, setIsPortalLoading] = useState(false);
+
+  // Feedback state
+  const [feedback, setFeedback] = useState('');
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+  const [feedbackSent, setFeedbackSent] = useState(false);
 
   useEffect(() => {
     if (status === 'authenticated') {
@@ -351,8 +357,9 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
     profile: { title: 'Profile', subtitle: 'Manage your personal information and preferences' },
     resumes: { title: 'Attachments', subtitle: 'Upload and manage files to personalize your outreach' },
     templates: { title: 'Templates', subtitle: 'Browse and manage your email templates' },
-    billing: { title: 'Billing', subtitle: 'Manage your subscription and payment details' },
+    billing: { title: 'Billing & Plans', subtitle: 'Manage your subscription, plan, and payment details' },
     settings: { title: 'Settings', subtitle: 'Customize your application preferences' },
+    feedback: { title: 'Send Feedback', subtitle: 'Help us improve by sharing your thoughts' },
   };
 
   const currentTab = activeTab || 'profile';
@@ -364,7 +371,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
       <header className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-[22px] font-bold tracking-tight">{tabInfo.title}</h1>
-          <p className="text-[#606060] text-[13px] mt-1">{tabInfo.subtitle}</p>
+          <p className="text-white text-[13px] mt-1">{tabInfo.subtitle}</p>
         </div>
         {currentTab === 'profile' && (
           <button
@@ -444,7 +451,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
               {/* Row 1: Name + Email */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-[#707070]">Full Name</label>
+                  <label className="text-[11px] font-medium text-white">Full Name</label>
                   <input
                     type="text"
                     value={profile.name || ''}
@@ -454,7 +461,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-[#707070]">Email</label>
+                  <label className="text-[11px] font-medium text-white">Email</label>
                   <div className="flex items-center gap-2 h-11 bg-[#212121] border border-[#2a2a2a] rounded-lg px-4">
                     <svg className="w-3 h-3 text-[#404040] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
@@ -467,7 +474,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
               {/* Row 2: University + Classification */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-[#707070]">University</label>
+                  <label className="text-[11px] font-medium text-white">University</label>
                   <SearchableCombobox
                     options={UNIVERSITIES}
                     value={profile.university || ''}
@@ -478,7 +485,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-[#707070]">Classification</label>
+                  <label className="text-[11px] font-medium text-white">Classification</label>
                   <select
                     value={profile.classification || ''}
                     onChange={(e) => setProfile({ ...profile, classification: e.target.value })}
@@ -495,7 +502,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
               {/* Row 3: Major + Career */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-[#707070]">Major</label>
+                  <label className="text-[11px] font-medium text-white">Major</label>
                   <input
                     type="text"
                     value={profile.major || ''}
@@ -505,7 +512,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-[#707070]">Career Interest</label>
+                  <label className="text-[11px] font-medium text-white">Career Interest</label>
                   <input
                     type="text"
                     value={profile.career || ''}
@@ -527,11 +534,11 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
           <div className="bg-[#252525] border border-[#3a3a3a] rounded-lg p-6 space-y-5">
             <div>
               <h3 className="text-base font-semibold text-white">Email Preferences</h3>
-              <p className="text-[12px] text-[#606060] mt-1">Configure your default email settings for outreach</p>
+              <p className="text-[12px] text-white mt-1">Configure your default email settings for outreach</p>
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[11px] font-medium text-[#707070]">Email Style Instructions</label>
+              <label className="text-[11px] font-medium text-white">Email Style Instructions</label>
               <textarea
                 value={profile.emailInstructions || ''}
                 onChange={(e) => setProfile({ ...profile, emailInstructions: e.target.value || null })}
@@ -539,14 +546,14 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                 className="w-full bg-[#1a1a1a] border border-[#3a3a3a] rounded-lg text-[13px] text-white p-4 focus:outline-none focus:ring-1 focus:ring-[#6364FF] transition-colors resize-none leading-relaxed"
                 placeholder="e.g. Keep emails under 3 sentences. Always mention I'm looking for a summer internship."
               />
-              <p className="text-[10px] text-[#505050]">These instructions will be applied to every AI-generated email.</p>
+              <p className="text-[10px] text-white">These instructions will be applied to every AI-generated email.</p>
             </div>
 
             {/* Auto-Personalize Toggle */}
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <span className="text-[13px] font-medium text-[#E0E0E0]">Auto-Personalize Emails</span>
-                <p className="text-[11px] text-[#606060]">Automatically personalize emails with AI when opening review</p>
+                <span className="text-[13px] font-medium text-white">Auto-Personalize Emails</span>
+                <p className="text-[11px] text-white">Automatically personalize emails with AI when opening review</p>
               </div>
               <button
                 type="button"
@@ -567,8 +574,8 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
             <h3 className="text-base font-semibold text-[#ef4444]">Danger Zone</h3>
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <span className="text-[13px] font-medium text-[#E0E0E0]">Delete Account</span>
-                <p className="text-[11px] text-[#606060]">Permanently delete your account and all associated data</p>
+                <span className="text-[13px] font-medium text-white">Delete Account</span>
+                <p className="text-[11px] text-white">Permanently delete your account and all associated data</p>
               </div>
               <button className="text-[12px] font-semibold text-[#ef4444] border border-[#ef4444] rounded-lg px-4 py-2 hover:bg-[#ef4444]/10 transition-colors">
                 Delete Account
@@ -592,58 +599,66 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
           )}
 
           {isLoadingResumes ? (
-            <div className="text-center py-12 text-[#606060] text-sm">Loading attachments...</div>
+            <div className="text-center py-12 text-white text-sm">Loading attachments...</div>
           ) : resumes.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-center">
               <div className="w-16 h-16 rounded-2xl bg-[#252525] flex items-center justify-center mb-4">
-                <svg className="w-8 h-8 text-[#505050]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
                 </svg>
               </div>
-              <p className="text-[#808080] text-sm font-medium mb-1">No attachments yet</p>
-              <p className="text-[#505050] text-xs">Upload resumes, cover letters, or other files</p>
+              <p className="text-white text-sm font-medium mb-1">No attachments yet</p>
+              <p className="text-white text-xs">Upload resumes, cover letters, or other files</p>
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
               {resumes.map((resume) => (
                 <div key={resume.id} className="group flex flex-col items-center gap-2">
                   {/* Document thumbnail */}
-                  <a
-                    href={`/api/resume/view?id=${resume.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`relative w-full aspect-[3/4] rounded-md bg-[#F5F5F5] overflow-hidden flex flex-col p-3 gap-1.5 cursor-pointer transition-all hover:shadow-lg ${
+                  <div
+                    className={`relative w-full aspect-[3/4] rounded-md bg-[#F5F5F5] overflow-hidden cursor-pointer transition-all hover:shadow-lg ${
                       resume.isActive
                         ? 'ring-2 ring-[#6364FF] shadow-[0_2px_12px_rgba(99,100,255,0.15)]'
                         : 'hover:ring-1 hover:ring-[#505050]'
                     }`}
+                    onClick={() => setExpandedResume(resume)}
                   >
-                    {/* Mini document content preview */}
-                    <div className="text-[6px] font-bold text-[#1a1a1a] tracking-wider uppercase">{(profile.name || userName || 'Name').toUpperCase()}</div>
-                    <div className="w-full h-px bg-[#1a1a1a]" />
-                    <div className="text-[3.5px] text-[#707070]">{userEmail}</div>
-                    <div className="mt-1 text-[4px] font-bold text-[#1a1a1a] tracking-wide">EDUCATION</div>
-                    <div className="text-[3.5px] text-[#505050] leading-relaxed">{profile.university || 'University'}<br/>{profile.major || 'Major'}</div>
-                    <div className="mt-1 text-[4px] font-bold text-[#1a1a1a] tracking-wide">EXPERIENCE</div>
-                    <div className="h-2 w-3/4 bg-[#e0e0e0] rounded-sm" />
-                    <div className="h-2 w-full bg-[#ebebeb] rounded-sm" />
-                    <div className="h-2 w-2/3 bg-[#e0e0e0] rounded-sm" />
-                    <div className="mt-1 text-[4px] font-bold text-[#1a1a1a] tracking-wide">SKILLS</div>
-                    <div className="h-2 w-4/5 bg-[#ebebeb] rounded-sm" />
+                    {/* Document preview with fallback */}
+                    {resume.mimeType === 'application/pdf' ? (
+                      <object
+                        data={`/api/resume/view?id=${resume.id}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
+                        type="application/pdf"
+                        className="w-full h-full pointer-events-none"
+                        title={resume.filename}
+                      >
+                        {/* Fallback if PDF fails to load */}
+                        <div className="w-full h-full flex flex-col items-center justify-center bg-[#F5F5F5] p-3">
+                          <svg className="w-10 h-10 text-[#6364FF] mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                          </svg>
+                          <span className="text-[10px] text-[#1a1a1a] font-medium text-center truncate max-w-full px-2">
+                            {resume.filename}
+                          </span>
+                          <span className="text-[9px] text-[#666] mt-1">PDF</span>
+                        </div>
+                      </object>
+                    ) : (
+                      /* Fallback for non-PDF files (DOC, DOCX) */
+                      <div className="w-full h-full flex flex-col items-center justify-center bg-[#F5F5F5] p-3">
+                        <svg className="w-10 h-10 text-[#6364FF] mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                        </svg>
+                        <span className="text-[10px] text-[#1a1a1a] font-medium text-center truncate max-w-full px-2">
+                          {resume.filename}
+                        </span>
+                        <span className="text-[9px] text-[#666] mt-1">
+                          {resume.filename.split('.').pop()?.toUpperCase()}
+                        </span>
+                      </div>
+                    )}
 
                     {/* Hover overlay with actions */}
-                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                      {!resume.isActive && (
-                        <button
-                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleSetActiveResume(resume.id); }}
-                          className="p-2 bg-[#6364FF] rounded-lg text-white hover:bg-[#5354EE] transition-colors"
-                          title="Set as active"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                          </svg>
-                        </button>
-                      )}
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                       <button
                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDeleteResume(resume.id); }}
                         className="p-2 bg-[#ef4444]/80 rounded-lg text-white hover:bg-[#ef4444] transition-colors"
@@ -654,10 +669,10 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                         </svg>
                       </button>
                     </div>
-                  </a>
+                  </div>
 
                   {/* Filename */}
-                  <p className="text-[11px] text-[#E0E0E0] font-medium truncate max-w-full text-center">{resume.filename}</p>
+                  <p className="text-[11px] text-white font-medium truncate max-w-full text-center">{resume.filename}</p>
 
                   {/* Active badge */}
                   {resume.isActive && (
@@ -666,16 +681,6 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                 </div>
               ))}
 
-              {/* Upload new slot */}
-              <label className="flex flex-col items-center gap-2 cursor-pointer group">
-                <div className="w-full aspect-[3/4] rounded-md border border-dashed border-[#3a3a3a] flex flex-col items-center justify-center gap-2 hover:border-[#606060] transition-colors">
-                  <svg className="w-6 h-6 text-[#505050] group-hover:text-[#707070] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                  </svg>
-                  <span className="text-[10px] text-[#505050] group-hover:text-[#707070] font-medium transition-colors">Upload</span>
-                </div>
-                <input type="file" accept=".pdf,.doc,.docx" onChange={handleUploadResume} disabled={isUploadingResume} className="hidden" />
-              </label>
             </div>
           )}
         </div>
@@ -689,141 +694,158 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
           )}
 
           {isLoadingTemplates ? (
-            <div className="text-center py-12 text-[#606060] text-sm">Loading templates...</div>
+            <div className="text-center py-12 text-white text-sm">Loading templates...</div>
           ) : isCreating ? (
             /* Create Template Form */
             <div className="max-w-2xl mx-auto p-6 bg-[#252525] border border-[#3a3a3a] rounded-xl">
               <h4 className="font-semibold text-white text-lg mb-5">New Template</h4>
               <div className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-[#707070]">Name</label>
+                  <label className="text-[11px] font-medium text-white">Name</label>
                   <input type="text" value={newTemplate.name} onChange={(e) => setNewTemplate({ ...newTemplate, name: e.target.value })} className="w-full h-11 bg-[#1a1a1a] border border-[#3a3a3a] rounded-lg text-[13px] text-white px-4 focus:outline-none focus:ring-1 focus:ring-[#6364FF]" placeholder="Template name" />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-[#707070]">Subject</label>
+                  <label className="text-[11px] font-medium text-white">Subject</label>
                   <input type="text" value={newTemplate.subject} onChange={(e) => setNewTemplate({ ...newTemplate, subject: e.target.value })} className="w-full h-11 bg-[#1a1a1a] border border-[#3a3a3a] rounded-lg text-[13px] text-white px-4 focus:outline-none focus:ring-1 focus:ring-[#6364FF]" placeholder="Email subject" />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-[#707070]">Body</label>
+                  <label className="text-[11px] font-medium text-white">Body</label>
                   <textarea value={newTemplate.body} onChange={(e) => setNewTemplate({ ...newTemplate, body: e.target.value })} rows={8} className="w-full bg-[#1a1a1a] border border-[#3a3a3a] rounded-lg text-[13px] text-white p-4 focus:outline-none focus:ring-1 focus:ring-[#6364FF] resize-none" placeholder="Email body" />
                 </div>
                 <div className="p-3 bg-[#1a1a1a] rounded-lg">
-                  <p className="text-[10px] font-medium text-[#707070] mb-2">Placeholders:</p>
+                  <p className="text-[10px] font-medium text-white mb-2">Placeholders:</p>
                   <div className="flex flex-wrap gap-1.5">
                     {DEFAULT_PLACEHOLDERS.map((p) => (
-                      <button key={p} type="button" onClick={() => setNewTemplate({ ...newTemplate, body: newTemplate.body + p })} className="text-[10px] px-2 py-1 bg-[#252525] text-[#808080] rounded-full hover:bg-[#303030] transition-colors">{p}</button>
+                      <button key={p} type="button" onClick={() => setNewTemplate({ ...newTemplate, body: newTemplate.body + p })} className="text-[10px] px-2 py-1 bg-[#252525] text-white rounded-full hover:bg-[#303030] transition-colors">{p}</button>
                     ))}
                   </div>
                 </div>
                 {resumes.length > 0 && (
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" checked={newTemplate.attachResume} onChange={(e) => { const checked = e.target.checked; const active = resumes.find(r => r.isActive); setNewTemplate({ ...newTemplate, attachResume: checked, resumeId: checked ? (active?.id || resumes[0]?.id || null) : null }); }} className="w-4 h-4 rounded border-[#3a3a3a]" />
-                    <span className="text-sm text-[#c0c0c0]">Attach resume</span>
+                    <span className="text-sm text-white">Attach resume</span>
                   </label>
                 )}
                 <div className="flex gap-3 pt-2">
                   <button onClick={handleCreateTemplate} disabled={isSavingTemplate} className="bg-[#6364FF] text-white px-6 py-2.5 rounded-lg font-semibold text-sm hover:bg-[#5354EE] transition-colors disabled:opacity-50">{isSavingTemplate ? 'Creating...' : 'Create Template'}</button>
-                  <button onClick={() => { setIsCreating(false); setNewTemplate({ name: '', subject: '', body: '', attachResume: false, resumeId: null }); }} className="px-6 py-2.5 rounded-lg text-sm text-[#808080] hover:text-white transition-colors">Cancel</button>
+                  <button onClick={() => { setIsCreating(false); setNewTemplate({ name: '', subject: '', body: '', attachResume: false, resumeId: null }); }} className="px-6 py-2.5 rounded-lg text-sm text-white hover:text-white transition-colors">Cancel</button>
                 </div>
               </div>
             </div>
           ) : (() => {
-            /* Carousel view */
+            /* Grid view */
             const allTemplates = [
               { id: '__default__', name: 'Default Template', subject: DEFAULT_TEMPLATE.subject, body: DEFAULT_TEMPLATE.body, isDefault: !templates.some(t => t.isDefault), attachResume: false, resumeId: null },
               ...templates,
             ];
-            const idx = Math.min(carouselIndex, allTemplates.length - 1);
-            const current = allTemplates[idx];
-            if (!current) return <div className="text-center py-12 text-[#606060] text-sm">No templates yet</div>;
 
             return (
-              <div className="relative flex flex-col items-center" style={{ minHeight: 580 }}>
-                {/* Card stack area */}
-                <div className="relative mx-auto" style={{ width: 420, height: 540 }}>
-                  {/* Back card 2 — rotated 3deg, offset right+down */}
-                  {allTemplates.length > 2 && (
-                    <div
-                      className="absolute bg-[#252525] border border-[#3a3a3a] rounded-xl"
-                      style={{ inset: 0, transform: 'rotate(3deg)', transformOrigin: 'center', left: 40, top: 20, opacity: 0.25 }}
-                    />
-                  )}
-                  {/* Back card 1 — rotated 1.5deg, offset right+down */}
-                  {allTemplates.length > 1 && (
-                    <div
-                      className="absolute bg-[#2a2a2a] border border-[#3a3a3a] rounded-xl"
-                      style={{ inset: 0, transform: 'rotate(1.5deg)', transformOrigin: 'center', left: 20, top: 10, opacity: 0.5 }}
-                    />
-                  )}
-                  {/* Front card */}
-                  <div className="absolute inset-0 bg-[#252525] border-2 border-[#6364FF] rounded-xl flex flex-col overflow-hidden" style={{ boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
-                    {/* Card header */}
-                    <div className="px-5 pt-5 pb-0 flex items-center justify-between">
-                      <h3 className="text-[15px] font-semibold text-white">{current.name}</h3>
-                      <div className="flex items-center gap-2">
-                        {current.isDefault && (
-                          <span className="text-[10px] font-semibold text-[#6364FF] bg-[#6364FF]/15 px-2.5 py-0.5 rounded-full">Default</span>
-                        )}
-                        {current.id !== '__default__' && (
-                          <>
-                            <button onClick={() => setSelectedTemplate(current as TemplateData)} className="p-1.5 text-[#707070] hover:text-white transition-colors" title="Edit">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" /></svg>
-                            </button>
-                            <button onClick={() => handleDeleteTemplate(current.id)} className="p-1.5 text-[#707070] hover:text-[#ef4444] transition-colors" title="Delete">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                            </button>
-                          </>
-                        )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {allTemplates.map((template) => (
+                  <div key={template.id} className="group flex flex-col">
+                    {/* Mini email preview card */}
+                    <button
+                      onClick={() => template.id === '__default__' ? setShowDefaultTemplate(true) : setSelectedTemplate(template as TemplateData)}
+                      className={`relative w-full bg-white rounded-lg overflow-hidden cursor-pointer transition-all hover:shadow-lg text-left ${
+                        template.isDefault
+                          ? 'ring-2 ring-[#6364FF] shadow-[0_2px_12px_rgba(99,100,255,0.15)]'
+                          : 'hover:ring-1 hover:ring-[#505050]'
+                      }`}
+                      style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}
+                    >
+                      {/* Mini subject bar */}
+                      <div className="px-3 py-2 border-b border-gray-200 bg-gray-50">
+                        <p className="text-[11px] font-medium text-gray-900 truncate">
+                          {template.subject || <span className="text-gray-400 italic">No subject</span>}
+                        </p>
                       </div>
-                    </div>
-                    {/* Subject line */}
-                    {current.subject && (
-                      <div className="px-5 pt-3 flex items-center gap-1.5">
-                        <span className="text-[11px] text-[#505050] font-medium">Subject:</span>
-                        <span className="text-[11px] text-[#A0A0A0]">{current.subject}</span>
+
+                      {/* Mini sender row */}
+                      <div className="px-3 py-2 flex items-center gap-2 border-b border-gray-100">
+                        <div className="w-6 h-6 rounded-full bg-[#6364FF] flex items-center justify-center text-white font-semibold text-[8px] shrink-0">
+                          {(profile.name || userName || 'U').split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[10px] font-medium text-gray-900 truncate">{profile.name || userName || 'You'}</p>
+                          <p className="text-[9px] text-gray-500">to recipient</p>
+                        </div>
                       </div>
+
+                      {/* Mini body preview */}
+                      <div className="px-3 py-3 h-[120px] overflow-hidden">
+                        <p className="text-[10px] text-gray-600 leading-[1.6] line-clamp-6 whitespace-pre-wrap">
+                          {template.body}
+                        </p>
+                      </div>
+
+                      {/* Attachment indicator */}
+                      {template.attachResume && (
+                        <div className="px-3 py-1.5 border-t border-gray-100 bg-gray-50">
+                          <div className="flex items-center gap-1 text-gray-500 text-[9px]">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
+                            </svg>
+                            <span>Resume</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Hover overlay with actions */}
+                      {template.id !== '__default__' && (
+                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setSelectedTemplate(template as TemplateData); setEditingTemplate(template as TemplateData); }}
+                            className="p-2 bg-[#6364FF] rounded-lg text-white hover:bg-[#5354EE] transition-colors"
+                            title="Edit"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+                            </svg>
+                          </button>
+                          {!template.isDefault && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleSetDefault(template.id); }}
+                              className="p-2 bg-[#404040] rounded-lg text-white hover:bg-[#505050] transition-colors"
+                              title="Set as default"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                              </svg>
+                            </button>
+                          )}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleDeleteTemplate(template.id); }}
+                            className="p-2 bg-[#ef4444]/80 rounded-lg text-white hover:bg-[#ef4444] transition-colors"
+                            title="Delete"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
+                      )}
+                    </button>
+
+                    {/* Template name below */}
+                    <p className="text-[11px] text-white font-medium truncate mt-2 text-center">{template.name}</p>
+
+                    {/* Default badge */}
+                    {template.isDefault && (
+                      <span className="text-[9px] font-semibold text-[#6364FF] bg-[#6364FF]/15 px-2.5 py-0.5 rounded-full mt-1 mx-auto">Default</span>
                     )}
-                    {/* Divider */}
-                    <div className="mx-5 my-3 h-px bg-[#3a3a3a]" />
-                    {/* Email body */}
-                    <div className="px-5 pb-5 flex-1 overflow-y-auto">
-                      <p className="text-[13px] text-[#C0C0C0] whitespace-pre-wrap leading-[1.7]">{current.body}</p>
-                    </div>
-                    {/* Footer stats */}
-                    <div className="px-5 pb-4">
-                      <span className="text-[10px] text-[#505050]">Used {current.id === '__default__' ? 'as fallback' : '—'} · Last used recently</span>
-                    </div>
                   </div>
-                </div>
+                ))}
 
-                {/* Left arrow — positioned at left edge of content area, vertically centered on card */}
+                {/* Create new template card */}
                 <button
-                  onClick={() => setCarouselIndex(Math.max(0, idx - 1))}
-                  disabled={idx === 0}
-                  className="absolute w-9 h-9 rounded-full bg-[#252525] border border-[#3a3a3a] flex items-center justify-center text-[#E0E0E0] hover:bg-[#303030] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                  style={{ left: 'calc(50% - 260px)', top: 270 }}
+                  onClick={() => setIsCreating(true)}
+                  className="flex flex-col items-center justify-center gap-2 min-h-[220px] rounded-lg border border-dashed border-[#3a3a3a] hover:border-[#606060] transition-colors group"
                 >
-                  <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" /></svg>
+                  <svg className="w-6 h-6 text-white group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                  </svg>
+                  <span className="text-[10px] text-white group-hover:text-white font-medium transition-colors">Create Template</span>
                 </button>
-                {/* Right arrow */}
-                <button
-                  onClick={() => setCarouselIndex(Math.min(allTemplates.length - 1, idx + 1))}
-                  disabled={idx === allTemplates.length - 1}
-                  className="absolute w-9 h-9 rounded-full bg-[#252525] border border-[#3a3a3a] flex items-center justify-center text-[#E0E0E0] hover:bg-[#303030] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                  style={{ right: 'calc(50% - 260px)', top: 270 }}
-                >
-                  <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
-                </button>
-
-                {/* Dots + counter */}
-                <div className="flex flex-col items-center gap-2 mt-5">
-                  <div className="flex gap-2 items-center">
-                    {allTemplates.map((_, i) => (
-                      <button key={i} onClick={() => setCarouselIndex(i)} className={`rounded-full transition-all ${i === idx ? 'w-2.5 h-2.5 bg-[#6364FF]' : 'w-2 h-2 bg-[#3a3a3a] hover:bg-[#505050]'}`} />
-                    ))}
-                  </div>
-                  <span className="text-[11px] text-[#505050]">{idx + 1} of {allTemplates.length}</span>
-                </div>
               </div>
             );
           })()}
@@ -834,7 +856,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
         {currentTab === 'billing' && (
         <div className="space-y-5">
           {isLoadingSubscription ? (
-            <div className="text-center py-12 text-[#606060] text-sm">Loading plan details...</div>
+            <div className="text-center py-12 text-white text-sm">Loading plan details...</div>
           ) : (
             <>
               {/* Plan card */}
@@ -842,11 +864,11 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                 <div className="space-y-2">
                   <div className="flex items-center gap-3">
                     <span className="text-lg font-bold text-white">{subscription.isSubscribed ? 'PRO Plan' : 'Free Plan'}</span>
-                    <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full ${subscription.isSubscribed ? 'bg-[#22C55E]/15 text-[#22C55E]' : 'bg-[#303030] text-[#808080]'}`}>
+                    <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full ${subscription.isSubscribed ? 'bg-[#22C55E]/15 text-[#22C55E]' : 'bg-[#303030] text-white'}`}>
                       {subscription.isSubscribed ? 'Active' : 'Current'}
                     </span>
                   </div>
-                  <p className="text-[13px] text-[#707070]">
+                  <p className="text-[13px] text-white">
                     {subscription.isSubscribed
                       ? `$20/month · Renews ${subscription.currentPeriodEnd ? new Date(subscription.currentPeriodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'soon'}`
                       : '10 emails/day · Free forever'}
@@ -875,19 +897,163 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
               {/* Stats row */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-[#252525] border border-[#3a3a3a] rounded-lg p-5 space-y-2">
-                  <p className="text-[12px] text-[#606060]">Emails Sent</p>
+                  <p className="text-[12px] text-white">Emails Sent</p>
                   <p className="text-xl font-bold text-white">{subscription.isSubscribed ? 'Unlimited' : '10/day'}</p>
                 </div>
                 <div className="bg-[#252525] border border-[#3a3a3a] rounded-lg p-5 space-y-2">
-                  <p className="text-[12px] text-[#606060]">Templates</p>
+                  <p className="text-[12px] text-white">Templates</p>
                   <p className="text-xl font-bold text-white">{templates.length}</p>
                 </div>
                 <div className="bg-[#252525] border border-[#3a3a3a] rounded-lg p-5 space-y-2">
-                  <p className="text-[12px] text-[#606060]">Attachments</p>
+                  <p className="text-[12px] text-white">Attachments</p>
                   <p className="text-xl font-bold text-white">{resumes.length}</p>
                 </div>
               </div>
+
+              {/* Plans comparison */}
+              <div className="space-y-4 mt-2">
+                <h3 className="text-[15px] font-semibold text-white">Compare Plans</h3>
+                {/* Free Plan */}
+                <div className={`relative rounded-xl border p-5 transition-all ${!subscription.isSubscribed ? 'border-[#404040] bg-[#252525]' : 'border-[#3a3a3a] bg-[#1a1a1a]'}`}>
+                  {!subscription.isSubscribed && (
+                    <span className="absolute -top-2.5 left-4 px-2 py-0.5 bg-[#252525] text-white text-xs font-medium rounded">Current Plan</span>
+                  )}
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h4 className="text-lg font-semibold text-white">Free</h4>
+                      <p className="text-white text-sm mt-1">For getting started with networking</p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-2xl font-bold text-white">$0</span>
+                      <span className="text-white text-sm">/month</span>
+                    </div>
+                  </div>
+                  <ul className="mt-4 space-y-2">
+                    {[`${EMAIL_LIMITS.FREE_LIFETIME_LIMIT} free emails`, 'AI-powered email personalization', 'Basic contact discovery'].map((feature) => (
+                      <li key={feature} className="flex items-center gap-2 text-sm text-white">
+                        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                {/* Pro Plan */}
+                <div className={`relative rounded-xl border p-5 transition-all ${subscription.isSubscribed ? 'border-[#404040] bg-[#252525]' : 'border-[#3b82f6]/30 bg-gradient-to-br from-[#252525] to-[#0f172a]'}`}>
+                  {subscription.isSubscribed && (
+                    <span className="absolute -top-2.5 left-4 px-2 py-0.5 bg-[#252525] text-[#3b82f6] text-xs font-medium rounded border border-[#3b82f6]/30">Current Plan</span>
+                  )}
+                  {!subscription.isSubscribed && (
+                    <span className="absolute -top-2.5 right-4 px-2 py-0.5 bg-[#3b82f6] text-white text-xs font-medium rounded">Recommended</span>
+                  )}
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h4 className="text-lg font-semibold text-white">Pro</h4>
+                      <p className="text-white text-sm mt-1">For serious networkers</p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-2xl font-bold text-white">$20</span>
+                      <span className="text-white text-sm">/month</span>
+                    </div>
+                  </div>
+                  <ul className="mt-4 space-y-2">
+                    {[
+                      <><span className="text-white font-medium">Unlimited</span> emails</>,
+                      'AI-powered email personalization',
+                      'Priority contact discovery',
+                      'Email open tracking',
+                    ].map((feature, i) => (
+                      <li key={i} className="flex items-center gap-2 text-sm text-white">
+                        <svg className="w-4 h-4 text-[#3b82f6]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+                  {!subscription.isSubscribed && (
+                    <button
+                      onClick={async () => { setIsCheckoutLoading(true); try { await createCheckoutSession(); } catch { setIsCheckoutLoading(false); } }}
+                      disabled={isCheckoutLoading}
+                      className="w-full mt-5 py-2.5 bg-[#3b82f6] text-white font-medium rounded-lg hover:bg-[#2563eb] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                    >
+                      {isCheckoutLoading ? 'Loading...' : (
+                        <>
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                          Upgrade to Pro
+                        </>
+                      )}
+                    </button>
+                  )}
+                  {subscription.isSubscribed && (
+                    <button
+                      onClick={async () => { setIsPortalLoading(true); try { await createCustomerPortalSession(); } catch { setIsPortalLoading(false); } }}
+                      disabled={isPortalLoading}
+                      className="w-full mt-5 py-2.5 bg-[#2a2a2a] text-white font-medium rounded-lg hover:bg-[#333333] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {isPortalLoading ? 'Loading...' : 'Manage Subscription'}
+                    </button>
+                  )}
+                </div>
+              </div>
             </>
+          )}
+        </div>
+        )}
+
+        {/* Feedback */}
+        {currentTab === 'feedback' && (
+        <div className="space-y-5">
+          {feedbackSent ? (
+            <div className="bg-[#252525] border border-[#3a3a3a] rounded-lg p-8 text-center space-y-3">
+              <div className="w-12 h-12 mx-auto rounded-full bg-[#22C55E]/15 flex items-center justify-center">
+                <svg className="w-6 h-6 text-[#22C55E]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <p className="text-white font-semibold">Thanks for your feedback!</p>
+              <p className="text-white text-sm">We appreciate you taking the time to help us improve.</p>
+              <button
+                onClick={() => { setFeedbackSent(false); setFeedback(''); }}
+                className="mt-2 px-4 py-2 text-sm font-medium bg-[#2a2a2a] text-white rounded-lg hover:bg-[#333333] transition-colors"
+              >
+                Send More Feedback
+              </button>
+            </div>
+          ) : (
+            <div className="bg-[#252525] border border-[#3a3a3a] rounded-lg p-6 space-y-4">
+              <p className="text-white text-sm">What&apos;s on your mind? We&apos;d love to hear your thoughts, suggestions, or bug reports.</p>
+              <textarea
+                value={feedback}
+                onChange={(e) => setFeedback(e.target.value)}
+                placeholder="Tell us what you think..."
+                rows={6}
+                className="w-full px-4 py-3 text-sm bg-[#1a1a1a] border border-[#3a3a3a] rounded-lg text-white placeholder:text-[#666] focus:outline-none focus:border-[#505050] resize-none"
+              />
+              <div className="flex justify-end">
+                <button
+                  onClick={async () => {
+                    if (!feedback.trim()) return;
+                    setFeedbackSubmitting(true);
+                    try {
+                      const response = await fetch('/api/feedback', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ feedback: feedback.trim(), page: '/profile' }),
+                      });
+                      if (response.ok) {
+                        setFeedbackSent(true);
+                      }
+                    } catch {
+                      // silently fail
+                    } finally {
+                      setFeedbackSubmitting(false);
+                    }
+                  }}
+                  disabled={!feedback.trim() || feedbackSubmitting}
+                  className="px-5 py-2.5 text-[13px] font-semibold bg-[#6364FF] text-white rounded-lg hover:bg-[#5354EE] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  {feedbackSubmitting ? 'Sending...' : 'Send Feedback'}
+                </button>
+              </div>
+            </div>
           )}
         </div>
         )}
@@ -909,7 +1075,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                     setShowDefaultTemplate(false);
                     setEditingTemplate(null);
                   }}
-                  className="p-2 text-[#808080] hover:text-[#b0b0b0] hover:bg-[#1a1a1a] rounded-lg transition-colors"
+                  className="p-2 text-white hover:text-white hover:bg-[#1a1a1a] rounded-lg transition-colors"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -920,22 +1086,22 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
               {showDefaultTemplate ? (
                 <div className="space-y-5">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-[#909090]">Subject</label>
-                    <div className="px-4 py-3 bg-[#111111] rounded-lg text-[#c0c0c0] text-sm">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-white">Subject</label>
+                    <div className="px-4 py-3 bg-[#111111] rounded-lg text-white text-sm">
                       {DEFAULT_TEMPLATE.subject}
                     </div>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-[#909090]">Body</label>
-                    <div className="px-4 py-3 bg-[#111111] rounded-lg text-[#c0c0c0] text-sm whitespace-pre-wrap">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-white">Body</label>
+                    <div className="px-4 py-3 bg-[#111111] rounded-lg text-white text-sm whitespace-pre-wrap">
                       {DEFAULT_TEMPLATE.body}
                     </div>
                   </div>
                   <div className="p-4 bg-[#111111] rounded-xl">
-                    <p className="text-xs font-semibold text-[#c0c0c0] mb-2">Available Placeholders:</p>
+                    <p className="text-xs font-semibold text-white mb-2">Available Placeholders:</p>
                     <div className="flex flex-wrap gap-1.5">
                       {DEFAULT_PLACEHOLDERS.map((p) => (
-                        <span key={p} className="text-xs px-2.5 py-1 bg-white/10 text-[#808080] rounded-full font-medium">
+                        <span key={p} className="text-xs px-2.5 py-1 bg-white/10 text-white rounded-full font-medium">
                           {p}
                         </span>
                       ))}
@@ -945,7 +1111,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
               ) : selectedTemplate && editingTemplate?.id === selectedTemplate.id ? (
                 <div className="space-y-5">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-[#909090]">Name</label>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-white">Name</label>
                     <input
                       type="text"
                       value={editingTemplate.name}
@@ -954,7 +1120,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-[#909090]">Subject</label>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-white">Subject</label>
                     <input
                       type="text"
                       value={editingTemplate.subject}
@@ -963,7 +1129,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-[#909090]">Body</label>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-white">Body</label>
                     <textarea
                       value={editingTemplate.body}
                       onChange={(e) => setEditingTemplate({ ...editingTemplate, body: e.target.value })}
@@ -972,14 +1138,14 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                     />
                   </div>
                   <div className="p-3 bg-[#111111] rounded-xl">
-                    <p className="text-xs font-semibold text-[#c0c0c0] mb-2">Available Placeholders:</p>
+                    <p className="text-xs font-semibold text-white mb-2">Available Placeholders:</p>
                     <div className="flex flex-wrap gap-1.5">
                       {DEFAULT_PLACEHOLDERS.map((p) => (
                         <button
                           key={p}
                           type="button"
                           onClick={() => setEditingTemplate({ ...editingTemplate, body: editingTemplate.body + p })}
-                          className="text-xs px-2.5 py-1 bg-white/10 text-[#808080] rounded-full font-medium hover:bg-white/15 transition-colors cursor-pointer"
+                          className="text-xs px-2.5 py-1 bg-white/10 text-white rounded-full font-medium hover:bg-white/15 transition-colors cursor-pointer"
                         >
                           {p}
                         </button>
@@ -1001,9 +1167,9 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                               resumeId: checked ? (editingTemplate.resumeId || activeResume?.id || resumes[0]?.id || null) : null,
                             });
                           }}
-                          className="w-4 h-4 text-[#808080] border-[#303030] rounded"
+                          className="w-4 h-4 text-white border-[#303030] rounded"
                         />
-                        <span className="text-sm text-[#c0c0c0]">Attach resume</span>
+                        <span className="text-sm text-white">Attach resume</span>
                       </label>
                       {editingTemplate.attachResume && (
                         <select
@@ -1033,7 +1199,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                     </button>
                     <button
                       onClick={() => setEditingTemplate(null)}
-                      className="px-6 py-2.5 rounded-xl font-semibold hover:bg-[#1a1a1a] transition-all text-[#b0b0b0]"
+                      className="px-6 py-2.5 rounded-xl font-semibold hover:bg-[#1a1a1a] transition-all text-white"
                     >
                       Cancel
                     </button>
@@ -1043,21 +1209,21 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                 <div className="space-y-5">
                   <div className="flex items-center gap-2">
                     {selectedTemplate.isDefault && (
-                      <span className="bg-white/10 text-[#808080] text-[10px] px-2.5 py-1 rounded-full font-bold uppercase">Default</span>
+                      <span className="bg-white/10 text-white text-[10px] px-2.5 py-1 rounded-full font-bold uppercase">Default</span>
                     )}
                     {selectedTemplate.attachResume && (
                       <span className="bg-green-900/30 text-green-400 text-[10px] px-2.5 py-1 rounded-full font-bold uppercase">Resume</span>
                     )}
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-[#909090]">Subject</label>
-                    <div className="px-4 py-3 bg-[#111111] rounded-lg text-[#c0c0c0] text-sm">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-white">Subject</label>
+                    <div className="px-4 py-3 bg-[#111111] rounded-lg text-white text-sm">
                       {selectedTemplate.subject || '(No subject)'}
                     </div>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-[#909090]">Body</label>
-                    <div className="px-4 py-3 bg-[#111111] rounded-lg text-[#c0c0c0] text-sm whitespace-pre-wrap max-h-64 overflow-y-auto">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-white">Body</label>
+                    <div className="px-4 py-3 bg-[#111111] rounded-lg text-white text-sm whitespace-pre-wrap max-h-64 overflow-y-auto">
                       {selectedTemplate.body}
                     </div>
                   </div>
@@ -1071,7 +1237,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                     {!selectedTemplate.isDefault && (
                       <button
                         onClick={() => handleSetDefault(selectedTemplate.id)}
-                        className="px-6 py-2.5 rounded-xl font-semibold border border-[#252525] hover:bg-[#111111] transition-all text-[#c0c0c0]"
+                        className="px-6 py-2.5 rounded-xl font-semibold border border-[#252525] hover:bg-[#111111] transition-all text-white"
                       >
                         Set as Default
                       </button>
@@ -1088,6 +1254,80 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                   </div>
                 </div>
               ) : null}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Expanded Attachment Modal */}
+      {expandedResume && (
+        <div
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={() => setExpandedResume(null)}
+        >
+          <div
+            className="bg-[#1a1a1a] rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#252525]">
+              <div className="flex items-center gap-3">
+                <svg className="w-5 h-5 text-[#6364FF]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                </svg>
+                <div>
+                  <h3 className="text-sm font-semibold text-white">{expandedResume.filename}</h3>
+                  <p className="text-xs text-white">{formatFileSize(expandedResume.fileSize)}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href={`/api/resume/view?id=${expandedResume.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2 text-white hover:text-white hover:bg-[#252525] rounded-lg transition-colors"
+                  title="Open in new tab"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                  </svg>
+                </a>
+                <button
+                  onClick={() => setExpandedResume(null)}
+                  className="p-2 text-white hover:text-white hover:bg-[#252525] rounded-lg transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Document viewer */}
+            <div className="flex-1 bg-[#404040] min-h-[70vh]">
+              {expandedResume.mimeType === 'application/pdf' ? (
+                <iframe
+                  src={`/api/resume/view?id=${expandedResume.id}`}
+                  className="w-full h-full min-h-[70vh]"
+                  title={expandedResume.filename}
+                />
+              ) : (
+                <div className="w-full h-full min-h-[70vh] flex flex-col items-center justify-center text-white">
+                  <svg className="w-16 h-16 text-[#6364FF] mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                  </svg>
+                  <p className="text-lg font-medium mb-2">{expandedResume.filename}</p>
+                  <p className="text-sm text-white mb-4">Preview not available for this file type</p>
+                  <a
+                    href={`/api/resume/view?id=${expandedResume.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2 bg-[#6364FF] text-white rounded-lg hover:bg-[#5354EE] transition-colors text-sm font-medium"
+                  >
+                    Download File
+                  </a>
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -4,28 +4,23 @@ import { useState } from 'react';
 import { signOut } from 'next-auth/react';
 import Link from 'next/link';
 
-function MascotSVG({ className }: { className?: string }) {
+function SignalLogo({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="60" cy="60" r="54" fill="url(#mascotBgProfile)"/>
-      <path d="M18 60 Q25 42 32 60 Q39 78 46 60 Q53 42 60 60 Q67 78 74 60 Q81 42 88 60 Q95 78 102 60" stroke="url(#waveGradProfile)" strokeWidth="4.5" strokeLinecap="round" fill="none"/>
-      <circle cx="52" cy="52" r="5" fill="#e0e0e0"/><circle cx="68" cy="52" r="5" fill="#e0e0e0"/>
-      <circle cx="53.5" cy="53.5" r="2.5" fill="#1a1a1a"/><circle cx="69.5" cy="53.5" r="2.5" fill="#1a1a1a"/>
-      <circle cx="54.5" cy="52.5" r="1" fill="white" opacity="0.8"/><circle cx="70.5" cy="52.5" r="1" fill="white" opacity="0.8"/>
-      <path d="M52 70 Q60 77 68 70" stroke="#e0e0e0" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
-      <line x1="60" y1="6" x2="60" y2="22" stroke="#808080" strokeWidth="2.5" strokeLinecap="round"/>
-      <circle cx="60" cy="5" r="3.5" fill="#a0a0a0"/>
-      <defs>
-        <radialGradient id="mascotBgProfile" cx="0.5" cy="0.5" r="0.5"><stop offset="0%" stopColor="#3a3a3a"/><stop offset="100%" stopColor="#2a2a2a"/></radialGradient>
-        <linearGradient id="waveGradProfile" x1="18" y1="60" x2="102" y2="60"><stop offset="0%" stopColor="#808080"/><stop offset="50%" stopColor="#a0a0a0"/><stop offset="100%" stopColor="#808080"/></linearGradient>
-      </defs>
+    <svg className={className} viewBox="0 0 200 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="100" cy="80" r="12" fill="white" />
+      <path d="M78 56 A30 30 0 0 0 78 104" stroke="white" strokeWidth="10" strokeLinecap="round" fill="none" />
+      <path d="M122 56 A30 30 0 0 1 122 104" stroke="white" strokeWidth="10" strokeLinecap="round" fill="none" />
+      <path d="M58 38 A55 55 0 0 0 58 122" stroke="white" strokeWidth="10" strokeLinecap="round" fill="none" />
+      <path d="M142 38 A55 55 0 0 1 142 122" stroke="white" strokeWidth="10" strokeLinecap="round" fill="none" />
+      <path d="M38 20 A80 80 0 0 0 38 140" stroke="white" strokeWidth="10" strokeLinecap="round" fill="none" />
+      <path d="M162 20 A80 80 0 0 1 162 140" stroke="white" strokeWidth="10" strokeLinecap="round" fill="none" />
     </svg>
   );
 }
 
 const FallbackAvatar = () => (
   <div className="w-20 h-20 rounded-full bg-[#2a2a2a] flex items-center justify-center ring-2 ring-[#303030]">
-    <svg className="w-10 h-10 text-[#505050]" fill="currentColor" viewBox="0 0 24 24">
+    <svg className="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 24 24">
       <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
     </svg>
   </div>
@@ -47,7 +42,7 @@ function AvatarWithFallback({ src, alt }: { src: string; alt: string }) {
   );
 }
 
-export type ProfileTab = 'profile' | 'resumes' | 'templates' | 'billing' | 'settings';
+export type ProfileTab = 'profile' | 'resumes' | 'templates' | 'billing' | 'settings' | 'feedback';
 
 interface ProfileSidebarProps {
   userName: string;
@@ -108,6 +103,15 @@ const NAV_ITEMS: { key: ProfileTab; label: string; icon: React.ReactNode }[] = [
       </svg>
     ),
   },
+  {
+    key: 'feedback',
+    label: 'Send Feedback',
+    icon: (
+      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 0 1-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8Z" />
+      </svg>
+    ),
+  },
 ];
 
 export function ProfileSidebar({
@@ -128,8 +132,8 @@ export function ProfileSidebar({
       {/* Logo header - matches home sidebar */}
       <div className="px-4 py-3 flex items-center">
         <Link href="/app" className="flex items-center gap-2 group">
-          <MascotSVG className="w-7 h-7" />
-          <span className="text-xl font-bold text-white group-hover:text-[#a0a0a0] transition-colors">
+          <SignalLogo className="w-7 h-7" />
+          <span className="text-xl font-bold text-white group-hover:text-white transition-colors">
             Signl
           </span>
         </Link>
@@ -143,16 +147,16 @@ export function ProfileSidebar({
       {/* Info */}
       <div className="flex flex-col items-center gap-1">
         <span className="text-lg font-bold text-white">{userName || 'User'}</span>
-        {university && <span className="text-xs text-[#707070]">{university}</span>}
-        {details && <span className="text-[11px] text-[#505050]">{details}</span>}
-        <span className="text-[10px] text-[#505050]">{userEmail}</span>
+        {university && <span className="text-xs text-white">{university}</span>}
+        {details && <span className="text-[11px] text-white">{details}</span>}
+        <span className="text-[10px] text-white">{userEmail}</span>
       </div>
 
       {/* Plan badge */}
       <span className={`px-3 py-1 rounded-full text-[10px] font-semibold ${
         isSubscribed
           ? 'bg-[#6364FF]/15 text-[#6364FF]'
-          : 'bg-[#303030] text-[#808080]'
+          : 'bg-[#303030] text-white'
       }`}>
         {isSubscribed ? 'PRO Plan' : 'Free Plan'}
       </span>
@@ -171,10 +175,10 @@ export function ProfileSidebar({
               className={`flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-left transition-colors ${
                 isActive
                   ? 'bg-[#2a2a2a] text-white'
-                  : 'text-[#606060] hover:bg-[#252525] hover:text-[#909090]'
+                  : 'text-white hover:bg-[#252525] hover:text-white'
               }`}
             >
-              <span className={isActive ? 'text-white' : 'text-[#606060]'}>{item.icon}</span>
+              <span className={isActive ? 'text-white' : 'text-white'}>{item.icon}</span>
               <span className="text-[13px] font-medium">{item.label}</span>
             </button>
           );

@@ -44,34 +44,44 @@ export interface OutreachStats {
   ongoingConversations: number;
 }
 
-export type SortField =
-  | 'contactName'
-  | 'company'
-  | 'role'
-  | 'location'
-  | 'group'
-  | 'connectionType'
-  | 'dateEmailed'
-  | 'lastEmailDate'
-  | 'followUpCount'
-  | 'status'
-  | 'createdAt';
+export interface HistorySidebarStats {
+  totalEmailsSent: number;
+  totalTrackers: number;
+  emailsSentThisWeek: number;
+  emailsSentThisMonth: number;
+  avgEmailsPerWeek: number;
+  currentSendingStreak: number;
+  mostRecentSendDate: string | null;
+  responsesReceived: number;
+  scheduledEmailsPending: number;
+  savedForLaterCount: number;
+  starredCount: number;
+}
 
-export type SortDirection = 'asc' | 'desc';
+export type HistorySection = 'all' | 'starred' | 'scheduled' | 'savedForLater' | 'hasResponse';
+
+export type FilterField = 'name' | 'company' | 'role' | 'location' | 'group' | 'connection';
+
+export interface ActiveFilter {
+  field: FilterField;
+  value: string;
+}
+
+export interface FilterSuggestion {
+  field: FilterField;
+  label: string;
+  value: string;
+  count: number;
+}
 
 export interface GetOutreachTrackersParams {
-  search?: string;
   status?: OutreachStatus[];
   starred?: boolean;
-  sortField?: SortField;
-  sortDirection?: SortDirection;
+  savedForLater?: boolean;
+  hasResponse?: boolean;
   cursor?: string;
   limit?: number;
-  // Multi-select filters
-  firms?: string[];
-  roles?: string[];
-  groups?: string[];
-  connections?: string[];
+  filters?: ActiveFilter[];
 }
 
 export interface FilterOption {
@@ -152,6 +162,82 @@ export async function getOutreachFilterOptions(): Promise<{
   }
 }
 
+const FILTER_FIELD_LABELS: Record<FilterField, string> = {
+  name: 'Name',
+  company: 'Company',
+  role: 'Role',
+  location: 'Location',
+  group: 'Group',
+  connection: 'Connection',
+};
+
+export async function getFilterSuggestions(
+  query: string
+): Promise<{ success: true; suggestions: FilterSuggestion[] } | { success: false; error: string }> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return { success: false, error: 'Not authenticated' };
+  }
+
+  if (!query || query.trim().length === 0) {
+    return { success: true, suggestions: [] };
+  }
+
+  const userId = session.user.id;
+  const q = query.trim();
+
+  try {
+    const fieldConfigs: { field: FilterField; dbField: string }[] = [
+      { field: 'name', dbField: 'contactName' },
+      { field: 'company', dbField: 'company' },
+      { field: 'role', dbField: 'role' },
+      { field: 'location', dbField: 'location' },
+      { field: 'group', dbField: 'group' },
+      { field: 'connection', dbField: 'connectionType' },
+    ];
+
+    const results = await Promise.all(
+      fieldConfigs.map(({ dbField }) =>
+        prisma.outreachTracker.groupBy({
+          by: [dbField as 'contactName'],
+          where: {
+            userId,
+            [dbField]: { contains: q, mode: 'insensitive' as const },
+          },
+          _count: { id: true },
+          orderBy: { _count: { id: 'desc' } },
+          take: 5,
+        })
+      )
+    );
+
+    const suggestions: FilterSuggestion[] = [];
+    results.forEach((groupResult, i) => {
+      const { field } = fieldConfigs[i];
+      const dbField = fieldConfigs[i].dbField;
+      groupResult.forEach((row: Record<string, unknown>) => {
+        const value = row[dbField] as string | null;
+        if (value) {
+          suggestions.push({
+            field,
+            label: FILTER_FIELD_LABELS[field],
+            value,
+            count: (row as Record<string, unknown> & { _count: { id: number } })._count.id,
+          });
+        }
+      });
+    });
+
+    return { success: true, suggestions };
+  } catch (error) {
+    console.error('[Outreach] Error fetching filter suggestions:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch suggestions',
+    };
+  }
+}
+
 export async function getOutreachTrackers(
   params: GetOutreachTrackersParams = {}
 ): Promise<{
@@ -166,36 +252,19 @@ export async function getOutreachTrackers(
   }
 
   const {
-    search,
     status,
     starred,
-    sortField = 'createdAt',
-    sortDirection = 'desc',
+    savedForLater,
+    hasResponse,
     cursor,
     limit = 50,
-    firms,
-    roles,
-    groups,
-    connections,
+    filters,
   } = params;
 
   try {
     const where: Prisma.OutreachTrackerWhereInput = {
       userId: session.user.id,
     };
-
-    // Add search filter
-    if (search) {
-      where.OR = [
-        { contactName: { contains: search, mode: 'insensitive' } },
-        { contactEmail: { contains: search, mode: 'insensitive' } },
-        { company: { contains: search, mode: 'insensitive' } },
-        { role: { contains: search, mode: 'insensitive' } },
-        { location: { contains: search, mode: 'insensitive' } },
-        { emailSubject: { contains: search, mode: 'insensitive' } },
-        { notes: { contains: search, mode: 'insensitive' } },
-      ];
-    }
 
     // Add status filter
     if (status && status.length > 0) {
@@ -207,23 +276,36 @@ export async function getOutreachTrackers(
       where.starred = starred;
     }
 
-    // Add multi-select filters
-    if (firms && firms.length > 0) {
-      where.company = { in: firms };
-    }
-    if (roles && roles.length > 0) {
-      where.role = { in: roles };
-    }
-    if (groups && groups.length > 0) {
-      where.group = { in: groups };
-    }
-    if (connections && connections.length > 0) {
-      where.connectionType = { in: connections };
+    // Add saved for later filter (through UserCandidate relation)
+    if (savedForLater) {
+      where.userCandidate = { savedForLater: true };
     }
 
-    // Build orderBy
+    // Add has response filter
+    if (hasResponse) {
+      where.responseReceivedAt = { not: null };
+    }
+
+    // Apply active filters
+    if (filters && filters.length > 0) {
+      const names = filters.filter(f => f.field === 'name').map(f => f.value);
+      const companies = filters.filter(f => f.field === 'company').map(f => f.value);
+      const roles = filters.filter(f => f.field === 'role').map(f => f.value);
+      const locations = filters.filter(f => f.field === 'location').map(f => f.value);
+      const groups = filters.filter(f => f.field === 'group').map(f => f.value);
+      const connections = filters.filter(f => f.field === 'connection').map(f => f.value);
+
+      if (names.length > 0) where.contactName = { in: names };
+      if (companies.length > 0) where.company = { in: companies };
+      if (roles.length > 0) where.role = { in: roles };
+      if (locations.length > 0) where.location = { in: locations };
+      if (groups.length > 0) where.group = { in: groups };
+      if (connections.length > 0) where.connectionType = { in: connections };
+    }
+
+    // Always order by date emailed descending (most recent first)
     const orderBy: Prisma.OutreachTrackerOrderByWithRelationInput = {
-      [sortField]: sortDirection,
+      dateEmailed: 'desc',
     };
 
     // Add cursor if provided
@@ -1181,6 +1263,148 @@ export async function getThreadMessages(threadId: string): Promise<{
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to fetch thread messages',
+    };
+  }
+}
+
+export async function getHistorySidebarStats(): Promise<{
+  success: true;
+  stats: HistorySidebarStats;
+} | { success: false; error: string }> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return { success: false, error: 'Not authenticated' };
+  }
+
+  const userId = session.user.id;
+
+  try {
+    const now = new Date();
+
+    // Start of this week (Monday)
+    const startOfWeek = new Date(now);
+    startOfWeek.setHours(0, 0, 0, 0);
+    startOfWeek.setDate(startOfWeek.getDate() - ((startOfWeek.getDay() + 6) % 7));
+
+    // Start of this month
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const [
+      totalEmailsSent,
+      totalTrackers,
+      emailsSentThisWeek,
+      emailsSentThisMonth,
+      scheduledEmailsPending,
+      savedForLaterCount,
+      starredCount,
+      responsesReceived,
+      mostRecentSend,
+      firstSend,
+      sendDates,
+    ] = await Promise.all([
+      prisma.sendLog.count({
+        where: { userId, status: 'SUCCESS' },
+      }),
+      prisma.outreachTracker.count({
+        where: { userId },
+      }),
+      prisma.sendLog.count({
+        where: { userId, status: 'SUCCESS', sentAt: { gte: startOfWeek } },
+      }),
+      prisma.sendLog.count({
+        where: { userId, status: 'SUCCESS', sentAt: { gte: startOfMonth } },
+      }),
+      prisma.scheduledEmail.count({
+        where: { userId, status: 'PENDING' },
+      }),
+      prisma.userCandidate.count({
+        where: { userId, savedForLater: true },
+      }),
+      prisma.outreachTracker.count({
+        where: { userId, starred: true },
+      }),
+      prisma.outreachTracker.count({
+        where: { userId, responseReceivedAt: { not: null } },
+      }),
+      prisma.sendLog.findFirst({
+        where: { userId, status: 'SUCCESS' },
+        orderBy: { sentAt: 'desc' },
+        select: { sentAt: true },
+      }),
+      prisma.sendLog.findFirst({
+        where: { userId, status: 'SUCCESS' },
+        orderBy: { sentAt: 'asc' },
+        select: { sentAt: true },
+      }),
+      // Get distinct send dates for streak calculation
+      prisma.$queryRaw<{ send_date: Date }[]>`
+        SELECT DISTINCT DATE("sentAt") as send_date
+        FROM "SendLog"
+        WHERE "userId" = ${userId} AND "status" = 'SUCCESS'
+        ORDER BY send_date DESC
+        LIMIT 60
+      `,
+    ]);
+
+    // Calculate average emails per week
+    let avgEmailsPerWeek = 0;
+    if (firstSend && totalEmailsSent > 0) {
+      const weeksActive = Math.max(1, Math.ceil(
+        (now.getTime() - firstSend.sentAt.getTime()) / (7 * 24 * 60 * 60 * 1000)
+      ));
+      avgEmailsPerWeek = Math.round((totalEmailsSent / weeksActive) * 10) / 10;
+    }
+
+    // Calculate sending streak
+    let currentSendingStreak = 0;
+    if (sendDates.length > 0) {
+      const today = new Date(now);
+      today.setHours(0, 0, 0, 0);
+
+      const dates = sendDates.map(d => {
+        const date = new Date(d.send_date);
+        date.setHours(0, 0, 0, 0);
+        return date.getTime();
+      });
+
+      // Check if the streak starts today or yesterday
+      const todayTime = today.getTime();
+      const yesterdayTime = todayTime - 24 * 60 * 60 * 1000;
+
+      if (dates[0] === todayTime || dates[0] === yesterdayTime) {
+        currentSendingStreak = 1;
+        for (let i = 1; i < dates.length; i++) {
+          const expectedPrev = dates[i - 1] - 24 * 60 * 60 * 1000;
+          if (dates[i] === expectedPrev) {
+            currentSendingStreak++;
+          } else {
+            break;
+          }
+        }
+      }
+    }
+
+    return {
+      success: true,
+      stats: {
+        totalEmailsSent,
+        totalTrackers,
+        emailsSentThisWeek,
+        emailsSentThisMonth,
+        avgEmailsPerWeek,
+        currentSendingStreak,
+        mostRecentSendDate: mostRecentSend?.sentAt.toISOString() ?? null,
+        responsesReceived,
+        scheduledEmailsPending,
+        savedForLaterCount,
+        starredCount,
+      },
+    };
+  } catch (error) {
+    console.error('[Outreach] Error fetching history sidebar stats:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch history sidebar stats',
     };
   }
 }

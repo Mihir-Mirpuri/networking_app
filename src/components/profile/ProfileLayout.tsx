@@ -53,7 +53,7 @@ export function ProfileLayout({ userEmail, userName, userImage }: ProfileLayoutP
       />
       {/* Right side: header + content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <NewHeader isAuthenticated={true} />
+        <NewHeader />
         <div className="flex-1 overflow-y-auto">
           <ProfileClient
             userEmail={userEmail}

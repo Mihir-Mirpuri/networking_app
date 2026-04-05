@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { signIn } from 'next-auth/react';
 import { SearchResultWithDraft } from '@/app/actions/search';
 import { TemplateData } from '@/app/actions/profile';
 import { SearchableCombobox } from './SearchableCombobox';
@@ -14,8 +13,6 @@ interface BulkReviewProps {
   templates?: TemplateData[];
   onApplyTemplateToAll?: (templateId: string) => Promise<void>;
   isRegenerating?: boolean;
-  isAuthenticated?: boolean;
-  onLoginRequired?: () => void;
 }
 
 interface EmailDraft {
@@ -31,8 +28,6 @@ export function BulkReview({
   templates,
   onApplyTemplateToAll,
   isRegenerating,
-  isAuthenticated = true,
-  onLoginRequired,
 }: BulkReviewProps) {
   const [drafts, setDrafts] = useState<Map<number, EmailDraft>>(new Map());
   const [isSending, setIsSending] = useState(false);
@@ -84,12 +79,6 @@ export function BulkReview({
   };
 
   const handleSendAll = async () => {
-    // Redirect to sign in if not authenticated
-    if (!isAuthenticated) {
-      signIn('google', { callbackUrl: '/app' });
-      return;
-    }
-
     const emailsToSend = sendableResults
       .filter(({ index }) => {
         const draft = drafts.get(index);

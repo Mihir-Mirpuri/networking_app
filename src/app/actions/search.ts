@@ -27,6 +27,7 @@ import { resolveCompanyAliases } from '@/lib/services/company-alias';
 import { generateEmailWithLLM, getUserResumeSummary, getRecentSentEmails, refineEmailWithLLM } from '@/lib/services/personalization';
 import { searchLinkedInShort } from '@/lib/services/linkedin-search';
 import { createHash } from 'crypto';
+import { isUserBlocked } from '@/lib/services/credits';
 
 export interface RecentSearch {
   company: string | null;
@@ -388,11 +389,11 @@ export async function searchPeopleV2Action(
     return { success: false, error: 'Search query is required' };
   }
 
-  // Gate free users who have exhausted lifetime sends
+  // Check if user is blocked (hit free limit and not subscribed)
   if (userId) {
-    const creditStatus = await checkEmailCredits(userId);
-    if (!creditStatus.canSend && !creditStatus.isSubscribed) {
-      return { success: false, error: 'LIMIT_REACHED' };
+    const blocked = await isUserBlocked(userId);
+    if (blocked) {
+      return { success: false, error: 'SUBSCRIPTION_BLOCKED' };
     }
   }
 

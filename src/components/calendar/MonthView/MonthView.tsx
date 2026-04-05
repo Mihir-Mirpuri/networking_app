@@ -47,7 +47,7 @@ export function MonthView({
         {DAY_NAMES.map((name) => (
           <div
             key={name}
-            className="py-2 text-center text-sm font-medium text-gray-500 border-r border-gray-200 last:border-r-0"
+            className="py-2 text-center text-sm font-medium text-white border-r border-gray-200 last:border-r-0"
           >
             {name}
           </div>

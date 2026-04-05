@@ -50,7 +50,7 @@ export function SearchableCombobox({
 
   return (
     <div>
-      <label htmlFor={id} className="block text-sm font-medium text-[#A0A0A0] mb-1.5">
+      <label htmlFor={id} className="block text-sm font-medium text-white mb-1.5">
         {label}
       </label>
       <Combobox
@@ -75,7 +75,7 @@ export function SearchableCombobox({
           />
           <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-3">
             <ChevronUpDownIcon
-              className="h-5 w-5 text-[#606060]"
+              className="h-5 w-5 text-white"
               aria-hidden="true"
             />
           </Combobox.Button>
@@ -86,7 +86,7 @@ export function SearchableCombobox({
                 value={query}
                 className={({ active }) =>
                   `relative cursor-pointer select-none py-2.5 pl-4 pr-4 transition-colors ${
-                    active ? 'bg-[#404040] text-[#E0E0E0]' : 'text-[#A0A0A0]'
+                    active ? 'bg-[#404040] text-white' : 'text-white'
                   }`
                 }
               >
@@ -96,7 +96,7 @@ export function SearchableCombobox({
               </Combobox.Option>
             )}
             {filteredOptions.length === 0 && query !== '' && !allowFreeText ? (
-              <div className="relative cursor-default select-none px-4 py-3 text-[#606060]">
+              <div className="relative cursor-default select-none px-4 py-3 text-white">
                 No results found.
               </div>
             ) : (
@@ -106,7 +106,7 @@ export function SearchableCombobox({
                   value={option.value}
                   className={({ active }) =>
                     `relative cursor-pointer select-none py-2.5 pl-10 pr-4 transition-colors ${
-                      active ? 'bg-[#404040] text-[#E0E0E0]' : 'text-[#A0A0A0]'
+                      active ? 'bg-[#404040] text-white' : 'text-white'
                     }`
                   }
                 >
@@ -122,7 +122,7 @@ export function SearchableCombobox({
                       {selected ? (
                         <span
                           className={`absolute inset-y-0 left-0 flex items-center pl-3 ${
-                            active ? 'text-[#E0E0E0]' : 'text-[#A0A0A0]'
+                            active ? 'text-white' : 'text-white'
                           }`}
                         >
                           <CheckIcon className="h-5 w-5" aria-hidden="true" />

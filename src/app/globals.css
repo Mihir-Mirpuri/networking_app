@@ -19,7 +19,7 @@
 
   /* Better default body styling */
   body {
-    @apply bg-surface-50 text-surface-800 antialiased;
+    @apply bg-surface-50 text-white antialiased;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 
@@ -62,7 +62,7 @@
   /* Primary button style */
   .btn-primary {
     @apply inline-flex items-center justify-center px-4 py-2.5
-           bg-[#505050] text-[#E0E0E0] font-medium rounded-lg
+           bg-[#505050] text-white font-medium rounded-lg
            hover:bg-[#606060] active:bg-[#444444]
            shadow-sm hover:shadow-md
            transition-all duration-200
@@ -72,7 +72,7 @@
   /* Secondary button style - dark theme */
   .btn-secondary {
     @apply inline-flex items-center justify-center px-4 py-2.5
-           bg-[#2a2a2a] text-[#A0A0A0] font-medium rounded-lg
+           bg-[#2a2a2a] text-white font-medium rounded-lg
            border border-[#404040]
            hover:bg-[#333333] hover:border-[#505050]
            active:bg-[#383838]
@@ -83,8 +83,8 @@
   /* Ghost button style */
   .btn-ghost {
     @apply inline-flex items-center justify-center px-4 py-2.5
-           text-[#808080] font-medium rounded-lg
-           hover:bg-[#2a2a2a] hover:text-[#E0E0E0]
+           text-white font-medium rounded-lg
+           hover:bg-[#2a2a2a] hover:text-white
            active:bg-[#333333]
            transition-all duration-200;
   }
@@ -93,7 +93,7 @@
   .input {
     @apply w-full px-3.5 py-2.5
            bg-[#212121] border border-[#2a2a2a] rounded-lg
-           text-[#E0E0E0] placeholder:text-[#606060]
+           text-white placeholder:text-[#606060]
            hover:border-[#505050]
            focus:border-[#606060] focus:ring-2 focus:ring-[#606060]/20 focus:outline-none
            transition-all duration-200
@@ -192,4 +192,61 @@
 
 .animate-slide-up {
   animation: slide-up 0.3s ease-out forwards;
+}
+
+/* Signal arc animations:
+   Timeline over 3s cycle:
+   0.0s - just dot
+   0.3s - arc 1 appears
+   0.6s - arc 2 appears
+   0.9s - arc 3 appears
+   1.2s - all visible (hold)
+   1.5s - arc 1 disappears
+   1.8s - arc 2 disappears
+   2.1s - arc 3 disappears
+   2.4s - just dot (hold)
+   3.0s - restart
+*/
+
+/* dot → inner → middle → outer → brief hold → outer off → middle off → inner off → dot hold → repeat */
+@keyframes signal-arc-1 {
+  0%     { opacity: 0; }
+  12%    { opacity: 1; }  /* inner appears */
+  42%    { opacity: 1; }  /* brief hold */
+  72%    { opacity: 1; }
+  83%    { opacity: 0; }  /* inner disappears last */
+  100%   { opacity: 0; }
+}
+
+@keyframes signal-arc-2 {
+  0%     { opacity: 0; }
+  22%    { opacity: 1; }  /* middle appears */
+  42%    { opacity: 1; }  /* brief hold */
+  62%    { opacity: 1; }
+  72%    { opacity: 0; }  /* middle disappears second */
+  100%   { opacity: 0; }
+}
+
+@keyframes signal-arc-3 {
+  0%     { opacity: 0; }
+  33%    { opacity: 1; }  /* outer appears */
+  42%    { opacity: 1; }  /* brief hold */
+  52%    { opacity: 1; }
+  62%    { opacity: 0; }  /* outer disappears first */
+  100%   { opacity: 0; }
+}
+
+.animate-signal-arc-1 {
+  opacity: 0;
+  animation: signal-arc-1 6s ease-in-out infinite;
+}
+
+.animate-signal-arc-2 {
+  opacity: 0;
+  animation: signal-arc-2 6s ease-in-out infinite;
+}
+
+.animate-signal-arc-3 {
+  opacity: 0;
+  animation: signal-arc-3 6s ease-in-out infinite;
 }
