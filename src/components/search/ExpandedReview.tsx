@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { signIn } from 'next-auth/react';
 import { SearchResultWithDraft, generateLLMDraftAction } from '@/app/actions/search';
 import { scheduleEmailAction } from '@/app/actions/send';
 import { getResumesAction, ResumeData } from '@/app/actions/resume';
@@ -27,8 +26,6 @@ interface ExpandedReviewProps {
   limitReached?: boolean;
   onLimitReached?: () => void;
   onDraftGenerated?: (personIndex: number, subject: string, body: string) => void;
-  isAuthenticated?: boolean;
-  onLoginRequired?: () => void;
 }
 
 function SendFailureAnimation({ message }: { message: string }) {
@@ -107,8 +104,6 @@ export function ExpandedReview({
   limitReached,
   onLimitReached,
   onDraftGenerated,
-  isAuthenticated = true,
-  onLoginRequired,
 }: ExpandedReviewProps) {
   const person = results[currentIndex];
   // Start with template - auto-personalization is optional via profile setting
@@ -162,13 +157,12 @@ export function ExpandedReview({
 
   // Fetch resumes on mount
   useEffect(() => {
-    if (!isAuthenticated) return;
     getResumesAction().then((result) => {
       if (result.success) {
         setResumes(result.resumes);
       }
     });
-  }, [isAuthenticated]);
+  }, []);
 
   // Initialize selectedResumeId from currentPerson's template setting
   useEffect(() => {
@@ -296,11 +290,6 @@ export function ExpandedReview({
     if (!currentPerson) return;
 
     // Redirect to sign in if not authenticated
-    if (!isAuthenticated) {
-      signIn('google', { callbackUrl: '/app' });
-      return;
-    }
-
     setIsSending(true);
     const success = await onSend(internalIndex, subject, body, selectedResumeId);
     setIsSending(false);
@@ -583,7 +572,7 @@ export function ExpandedReview({
           )}
 
           {/* Resume attachment toggle */}
-          {isAuthenticated && resumes.length > 0 && (
+          {resumes.length > 0 && (
             <div className="relative" ref={resumeDropdownRef}>
               <button
                 onClick={() => setShowResumeDropdown(!showResumeDropdown)}

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { OutreachFilterOptions } from '@/app/actions/outreach';
 import { MultiSelectFilter } from './MultiSelectFilter';
 
-export type ColumnKey = 'name' | 'firm' | 'role' | 'location' | 'group' | 'connection' | 'firstEmailDate' | 'lastEmailDate' | 'followUps' | 'subject' | 'notes';
+export type ColumnKey = 'name' | 'firm' | 'role' | 'location' | 'group' | 'connection' | 'firstEmailDate' | 'lastEmailDate' | 'followUps' | 'response' | 'subject' | 'notes';
 
 interface OutreachFiltersProps {
   searchQuery: string;

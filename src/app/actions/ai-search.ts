@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { completeJson, GroqJsonParseError } from '@/lib/services/groq';
 import { GroqAction } from '@prisma/client';
 import { fetchCompaniesForCategory } from '@/lib/services/perplexity';
+import { isUserBlocked } from '@/lib/services/credits';
 
 export interface ParsedFilters {
   company?: string;
@@ -60,6 +61,7 @@ export type ExtractFiltersResult =
   | { success: true; status: 'needs_selection'; filters: ParsedFilters; assistantMessage: string; selectables: Selectable[]; allSelectables?: Selectable[] }
   | { success: true; status: 'person_lookup'; assistantMessage: string; personName: string; personCompany?: string }
   | { success: true; status: 'off_topic'; filters: ParsedFilters; assistantMessage: string }
+  | { success: true; status: 'blocked'; assistantMessage: string }
   | { success: false; error: string };
 
 const SYSTEM_PROMPT = `You are a search filter extraction assistant for a professional networking tool. Your job is to help users find people by extracting structured search filters from natural language.
@@ -251,6 +253,16 @@ export async function extractSearchFiltersAction(
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     return { success: false, error: 'Not authenticated' };
+  }
+
+  // Check if user is blocked (hit free limit and not subscribed)
+  const blocked = await isUserBlocked(session.user.id);
+  if (blocked) {
+    return {
+      success: true,
+      status: 'blocked',
+      assistantMessage: "You've reached your free limit. Upgrade to Pro to continue searching for people.",
+    };
   }
 
   try {

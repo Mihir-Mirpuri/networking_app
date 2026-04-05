@@ -1,6 +1,5 @@
 'use client';
 
-import { useSession } from 'next-auth/react';
 import { AppShell } from './AppShell';
 
 interface AppWrapperProps {
@@ -8,14 +7,7 @@ interface AppWrapperProps {
 }
 
 export function AppWrapper({ initialRemainingDaily }: AppWrapperProps) {
-  const { data: session, status } = useSession();
-
-  const isAuthenticated = status === 'loading' ? true : !!session?.user;
-
   return (
-    <AppShell
-      initialRemainingDaily={initialRemainingDaily}
-      isAuthenticated={isAuthenticated}
-    />
+    <AppShell initialRemainingDaily={initialRemainingDaily} />
   );
 }

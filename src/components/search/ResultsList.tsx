@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { signIn } from 'next-auth/react';
 import { SearchResultWithDraft } from '@/app/actions/search';
 import { PersonCard } from './PersonCard';
 
@@ -16,7 +15,6 @@ interface ResultsListProps {
   sendStatuses: Map<string, 'success' | 'failed' | 'pending'>;
   limitReached?: boolean;
   onLimitReached?: () => void;
-  isAuthenticated?: boolean;
 }
 
 export function ResultsList({
@@ -30,7 +28,6 @@ export function ResultsList({
   sendStatuses,
   limitReached,
   onLimitReached,
-  isAuthenticated = true,
 }: ResultsListProps) {
   const [linkedinDropdownOpen, setLinkedinDropdownOpen] = useState(false);
   const [openedLinkedins, setOpenedLinkedins] = useState<Set<string>>(new Set());
@@ -88,13 +85,7 @@ export function ResultsList({
           >
             <PersonCard
               person={person}
-              onExpand={() => {
-                if (!isAuthenticated) {
-                  signIn('google', { callbackUrl: '/app' });
-                  return;
-                }
-                onExpand(index);
-              }}
+              onExpand={() => onExpand(index)}
               onHide={person.userCandidateId && onHide ? () => onHide(person.userCandidateId!) : undefined}
               onToggleSaveForLater={person.userCandidateId && onToggleSaveForLater ? () => onToggleSaveForLater(person.userCandidateId!) : undefined}
               isSending={isSending && sendingIndex === index}

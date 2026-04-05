@@ -60,6 +60,8 @@ model User {
   stripeSubscriptionId       String?                      @unique
   stripeCurrentPeriodEnd     DateTime?
   subscriptionStatus         String?
+  accessExpiresAt            DateTime?                    // For one-time upfront payments
+  totalEmailsSent            Int                          @default(0) // Lifetime emails sent (for free tier limit)
   timezone                   String? // e.g., "America/Chicago"
   emailInstructions          String? // Free-text custom instructions for LLM email generation
   autoPersonalize            Boolean                      @default(false) // Auto-personalize emails with AI when opening review modal

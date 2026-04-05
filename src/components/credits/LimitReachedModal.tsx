@@ -1,9 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { sendInviteAction, hasInvitedTodayAction } from '@/app/actions/invitations';
-import { createCheckoutSession } from '@/app/actions/subscription';
-import { EMAIL_LIMITS } from '@/lib/constants';
+import { createCheckoutSession, createUpfrontCheckoutSession } from '@/app/actions/subscription';
+import { EMAIL_LIMITS, SUBSCRIPTION_PRICING } from '@/lib/constants';
 import { LoadingSpinner } from '@/components/search/LoadingSpinner';
 
 interface LimitReachedModalProps {
@@ -12,24 +11,12 @@ interface LimitReachedModalProps {
   onCreditsAwarded?: (creditsAwarded: number) => void;
 }
 
-export function LimitReachedModal({ isOpen, onClose, onCreditsAwarded }: LimitReachedModalProps) {
-  const [email, setEmail] = useState('');
-  const [isSending, setIsSending] = useState(false);
+export function LimitReachedModal({ isOpen, onClose }: LimitReachedModalProps) {
   const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
+  const [isUpfrontLoading, setIsUpfrontLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [hasInvitedToday, setHasInvitedToday] = useState(false);
-  const [checkingInviteStatus, setCheckingInviteStatus] = useState(true);
-
-  // Check if user already invited someone today
-  useEffect(() => {
-    if (!isOpen) return;
-    setCheckingInviteStatus(true);
-    hasInvitedTodayAction().then((result) => {
-      setHasInvitedToday(result);
-      setCheckingInviteStatus(false);
-    });
-  }, [isOpen]);
+  const [selectedMonths, setSelectedMonths] = useState(6);
+  const [paymentType, setPaymentType] = useState<'monthly' | 'upfront'>('upfront');
 
   // ESC to close
   useEffect(() => {
@@ -43,7 +30,7 @@ export function LimitReachedModal({ isOpen, onClose, onCreditsAwarded }: LimitRe
 
   if (!isOpen) return null;
 
-  const handleSubscribe = async () => {
+  const handleMonthlySubscribe = async () => {
     setIsCheckoutLoading(true);
     setError(null);
     try {
@@ -54,42 +41,34 @@ export function LimitReachedModal({ isOpen, onClose, onCreditsAwarded }: LimitRe
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleUpfrontSubscribe = async () => {
+    setIsUpfrontLoading(true);
     setError(null);
-    setSuccessMessage(null);
-    setIsSending(true);
-
-    const result = await sendInviteAction(email);
-
-    if (result.success) {
-      setSuccessMessage(`Invite sent! +${result.creditsAwarded} credits added to your account.`);
-      setEmail('');
-      setHasInvitedToday(true);
-      onCreditsAwarded?.(result.creditsAwarded || 0);
-    } else {
-      setError(result.error || 'Failed to send invite');
+    try {
+      await createUpfrontCheckoutSession(selectedMonths);
+    } catch (err) {
+      setError('Failed to start checkout. Please try again.');
+      setIsUpfrontLoading(false);
     }
-
-    setIsSending(false);
   };
 
   const handleClose = () => {
-    setEmail('');
     setError(null);
-    setSuccessMessage(null);
     onClose();
   };
 
+  const upfrontTotal = selectedMonths * SUBSCRIPTION_PRICING.UPFRONT_PRICE_PER_MONTH;
+  const monthlySavings = (SUBSCRIPTION_PRICING.MONTHLY_PRICE - SUBSCRIPTION_PRICING.UPFRONT_PRICE_PER_MONTH) * selectedMonths;
+
   return (
-    <div className="fixed inset-0 bg-surface-900/50 flex items-center justify-center z-50 p-4 animate-fade-in" onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}>
-      <div className="bg-surface-100 rounded-xl shadow-xl max-w-md w-full overflow-hidden animate-scale-in">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 animate-fade-in" onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}>
+      <div className="bg-[#111111] rounded-xl shadow-xl max-w-md w-full overflow-hidden animate-scale-in border border-[#2a2a2a]">
         {/* Header */}
-        <div className="bg-gradient-to-r from-amber-50 to-orange-50 px-6 py-5 border-b border-amber-100">
+        <div className="bg-gradient-to-r from-amber-900/20 to-orange-900/20 px-6 py-5 border-b border-[#2a2a2a]">
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
+            <div className="w-12 h-12 bg-amber-900/30 rounded-full flex items-center justify-center flex-shrink-0">
               <svg
-                className="w-6 h-6 text-amber-600"
+                className="w-6 h-6 text-amber-500"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -103,9 +82,9 @@ export function LimitReachedModal({ isOpen, onClose, onCreditsAwarded }: LimitRe
               </svg>
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-surface-900">Daily Limit Reached</h3>
-              <p className="text-sm text-surface-600 mt-1">
-                You&apos;ve used all {EMAIL_LIMITS.DEFAULT_DAILY_LIMIT} emails for today.
+              <h3 className="text-lg font-semibold text-white">Free Trial Ended</h3>
+              <p className="text-sm text-white mt-1">
+                You&apos;ve used all {EMAIL_LIMITS.FREE_LIFETIME_LIMIT} free emails. Upgrade to continue.
               </p>
             </div>
           </div>
@@ -113,161 +92,152 @@ export function LimitReachedModal({ isOpen, onClose, onCreditsAwarded }: LimitRe
 
         {/* Body */}
         <div className="px-6 py-5">
-          {!hasInvitedToday && !successMessage && (
-            <div className="bg-primary-500/10 rounded-lg p-4 mb-5">
-              <div className="flex items-start gap-3">
-                <svg
-                  className="w-5 h-5 text-primary-600 mt-0.5 flex-shrink-0"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z" />
-                </svg>
-                <div>
-                  <p className="text-sm font-medium text-primary-900">
-                    Invite a friend to double your daily limit
-                  </p>
-                  <p className="text-sm text-primary-700 mt-1">
-                    Get <span className="font-semibold">+{EMAIL_LIMITS.CREDITS_ON_INVITE_SENT} bonus emails</span> instantly
-                    when you share Signl with a friend.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Subscribe Option */}
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 mb-4 border border-blue-100">
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+          <div className="bg-gradient-to-r from-[#1a1a1a] to-[#0f172a] rounded-lg p-4 border border-[#3b82f6]/30">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="w-8 h-8 bg-[#3b82f6]/20 rounded-full flex items-center justify-center flex-shrink-0">
+                <svg className="w-4 h-4 text-[#3b82f6]" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M5 2a2 2 0 00-2 2v14l3.5-2 3.5 2 3.5-2 3.5 2V4a2 2 0 00-2-2H5zm2.5 3a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm6.207.293a1 1 0 00-1.414 0l-6 6a1 1 0 101.414 1.414l6-6a1 1 0 000-1.414zM12.5 10a1.5 1.5 0 100 3 1.5 1.5 0 000-3z" clipRule="evenodd" />
                 </svg>
               </div>
               <div className="flex-1">
-                <p className="text-sm font-medium text-blue-900">Unlimited emails with Pro</p>
-                <p className="text-sm text-blue-700 mt-0.5">Send unlimited outreach emails for $20/month</p>
+                <p className="text-sm font-medium text-white">Upgrade to Pro</p>
+                <p className="text-sm text-white mt-0.5">Unlimited emails and people search</p>
               </div>
             </div>
-            <button
-              onClick={handleSubscribe}
-              disabled={isCheckoutLoading}
-              className="w-full mt-3 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-            >
-              {isCheckoutLoading ? (
-                <>
-                  <LoadingSpinner size="sm" />
-                  Loading...
-                </>
-              ) : (
-                <>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                  Upgrade to Pro - $20/month
-                </>
-              )}
-            </button>
+
+            {/* Payment Type Toggle */}
+            <div className="flex gap-2 mb-4">
+              <button
+                onClick={() => setPaymentType('upfront')}
+                className={`flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-all ${
+                  paymentType === 'upfront'
+                    ? 'bg-[#3b82f6] text-white'
+                    : 'bg-[#2a2a2a] text-white hover:bg-[#333333]'
+                }`}
+              >
+                Pay Upfront (Save 50%)
+              </button>
+              <button
+                onClick={() => setPaymentType('monthly')}
+                className={`flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-all ${
+                  paymentType === 'monthly'
+                    ? 'bg-[#3b82f6] text-white'
+                    : 'bg-[#2a2a2a] text-white hover:bg-[#333333]'
+                }`}
+              >
+                Pay Monthly
+              </button>
+            </div>
+
+            {paymentType === 'upfront' ? (
+              <>
+                {/* Month Slider */}
+                <div className="mb-3">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-xs text-white">Recruiting Cycle</span>
+                    <span className="text-xs font-medium text-white">{selectedMonths} months</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={SUBSCRIPTION_PRICING.MIN_UPFRONT_MONTHS}
+                    max={SUBSCRIPTION_PRICING.MAX_UPFRONT_MONTHS}
+                    value={selectedMonths}
+                    onChange={(e) => setSelectedMonths(parseInt(e.target.value))}
+                    className="w-full h-2 bg-[#2a2a2a] rounded-lg appearance-none cursor-pointer accent-[#3b82f6]"
+                  />
+                  <div className="flex justify-between text-xs text-white mt-1">
+                    <span>{SUBSCRIPTION_PRICING.MIN_UPFRONT_MONTHS} mo</span>
+                    <span>{SUBSCRIPTION_PRICING.MAX_UPFRONT_MONTHS} mo</span>
+                  </div>
+                </div>
+
+                {/* Price Display */}
+                <div className="bg-[#0a0a0a] rounded-lg p-3 mb-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-white">
+                      ${SUBSCRIPTION_PRICING.UPFRONT_PRICE_PER_MONTH}/mo x {selectedMonths} mo
+                    </span>
+                    <span className="text-xl font-bold text-white">${upfrontTotal}</span>
+                  </div>
+                  <div className="text-xs text-green-400 mt-1">
+                    Save ${monthlySavings} vs monthly
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleUpfrontSubscribe}
+                  disabled={isUpfrontLoading}
+                  className="w-full py-2.5 bg-[#3b82f6] text-white font-medium rounded-lg hover:bg-[#2563eb] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                >
+                  {isUpfrontLoading ? (
+                    <>
+                      <LoadingSpinner size="sm" />
+                      Loading...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                      Pay ${upfrontTotal} for {selectedMonths} Months
+                    </>
+                  )}
+                </button>
+              </>
+            ) : (
+              <>
+                {/* Monthly Price Display */}
+                <div className="bg-[#0a0a0a] rounded-lg p-3 mb-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-white">Monthly subscription</span>
+                    <div className="text-right">
+                      <span className="text-xl font-bold text-white">${SUBSCRIPTION_PRICING.MONTHLY_PRICE}</span>
+                      <span className="text-white text-xs">/mo</span>
+                    </div>
+                  </div>
+                  <div className="text-xs text-white mt-1">
+                    Cancel anytime
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleMonthlySubscribe}
+                  disabled={isCheckoutLoading}
+                  className="w-full py-2.5 bg-[#3b82f6] text-white font-medium rounded-lg hover:bg-[#2563eb] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                >
+                  {isCheckoutLoading ? (
+                    <>
+                      <LoadingSpinner size="sm" />
+                      Loading...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                      Subscribe for ${SUBSCRIPTION_PRICING.MONTHLY_PRICE}/month
+                    </>
+                  )}
+                </button>
+              </>
+            )}
           </div>
 
-          {/* Divider - only show if invite section is visible */}
-          {(!hasInvitedToday || successMessage) && (
-            <div className="relative my-4">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-surface-200" />
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-surface-100 text-surface-500">or invite a friend</span>
-              </div>
+          {error && (
+            <div className="mt-4 p-3 bg-red-900/20 border border-red-500/30 text-red-400 rounded-lg text-sm">
+              {error}
             </div>
-          )}
-
-          {successMessage ? (
-            <div className="bg-green-900/20 border border-green-200 rounded-lg p-4">
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                  <path
-                    fillRule="evenodd"
-                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                <p className="text-green-800 font-medium">{successMessage}</p>
-              </div>
-              <p className="text-green-700 text-sm mt-2">
-                You&apos;ve used your daily invite. Upgrade to Pro for unlimited emails.
-              </p>
-            </div>
-          ) : hasInvitedToday ? (
-            <div className="bg-surface-50 rounded-lg p-4 mt-4">
-              <p className="text-sm text-surface-600 text-center">
-                You&apos;ve already invited someone today. Upgrade to Pro for unlimited emails, or invite another friend tomorrow.
-              </p>
-            </div>
-          ) : checkingInviteStatus ? (
-            <div className="flex justify-center py-4">
-              <LoadingSpinner size="sm" />
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label htmlFor="invite-email" className="block text-sm font-medium text-surface-700 mb-1">
-                  Friend&apos;s Email Address
-                </label>
-                <input
-                  id="invite-email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="friend@example.com"
-                  className="w-full px-3 py-2.5 border border-surface-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
-                  required
-                  disabled={isSending}
-                />
-              </div>
-
-              {error && (
-                <div className="p-3 bg-red-900/20 border border-red-200 text-red-700 rounded-lg text-sm">
-                  {error}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={isSending || !email}
-                className="w-full py-2.5 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-              >
-                {isSending ? (
-                  <>
-                    <LoadingSpinner size="sm" />
-                    Sending...
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                      />
-                    </svg>
-                    Invite Friend (+{EMAIL_LIMITS.CREDITS_ON_INVITE_SENT} emails)
-                  </>
-                )}
-              </button>
-            </form>
           )}
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 bg-surface-50 border-t flex justify-between items-center">
-          <p className="text-xs text-surface-500">Limits reset daily at midnight</p>
+        <div className="px-6 py-4 bg-[#0a0a0a] border-t border-[#2a2a2a] flex justify-end">
           <button
             onClick={handleClose}
-            className="text-sm font-medium text-surface-600 hover:text-surface-800 transition-colors"
+            className="text-sm font-medium text-white hover:text-white transition-colors"
           >
-            {successMessage ? 'Continue' : 'Close'}
+            Close
           </button>
         </div>
       </div>

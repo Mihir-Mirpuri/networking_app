@@ -91,15 +91,16 @@ export function PersonCard({
   const isFailed = sendStatus === 'failed';
 
   return (
-    <div className={`group relative card-hover p-5 flex flex-col items-center text-center hover:-translate-y-0.5 ${
+    <div
+      onClick={onExpand}
+      className={`group relative card-hover p-5 flex flex-col items-center text-center hover:-translate-y-0.5 cursor-pointer ${
       (isSent || isFailed) ? 'opacity-60 saturate-50' : ''
     }`}>
-      {/* Top right buttons */}
-      <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all">
-        {/* Save for later button */}
-        {onToggleSaveForLater && person.userCandidateId && (
+      {/* Top left - Save for later button */}
+      {onToggleSaveForLater && person.userCandidateId && (
+        <div className="absolute top-3 left-3">
           <button
-            onClick={onToggleSaveForLater}
+            onClick={(e) => { e.stopPropagation(); onToggleSaveForLater(); }}
             className={`p-1.5 rounded-lg transition-all ${
               person.savedForLater
                 ? 'text-[#6364FF] hover:text-[#5354EE] hover:bg-[#6364FF]/10'
@@ -113,11 +114,14 @@ export function PersonCard({
               <BookmarkIcon className="w-4 h-4" />
             )}
           </button>
-        )}
-        {/* Hide button */}
-        {onHide && person.userCandidateId && (
+        </div>
+      )}
+
+      {/* Top right - Hide button */}
+      {onHide && person.userCandidateId && (
+        <div className="absolute top-3 right-3">
           <button
-            onClick={onHide}
+            onClick={(e) => { e.stopPropagation(); onHide(); }}
             className="p-1.5 text-white hover:text-white hover:bg-[#404040] rounded-lg transition-all"
             title="Don't show again"
           >
@@ -135,8 +139,8 @@ export function PersonCard({
               />
             </svg>
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Avatar */}
       <div className="mb-4">
@@ -173,6 +177,7 @@ export function PersonCard({
             href={person.linkedinUrl}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
             className="inline-flex items-center justify-center w-6 h-6 text-xs font-semibold text-white bg-[#0A66C2] rounded hover:bg-[#004182] transition-all"
             title="View LinkedIn Profile"
           >
@@ -227,36 +232,33 @@ export function PersonCard({
       {/* Action button */}
       <div className="w-full mt-auto">
         {isSent ? (
-          <button
-            onClick={onExpand}
-            className="text-sm w-full justify-center btn-secondary text-emerald-600 border-emerald-200"
+          <div
+            className="text-sm w-full justify-center btn-secondary text-emerald-600 border-emerald-200 flex items-center"
           >
             <CheckIcon className="w-4 h-4 mr-1.5" />
             Sent
-          </button>
+          </div>
         ) : isFailed ? (
-          <button
-            onClick={onExpand}
-            className="text-sm w-full justify-center btn-secondary text-red-600 border-red-200"
+          <div
+            className="text-sm w-full justify-center btn-secondary text-red-600 border-red-200 flex items-center"
           >
             Failed
-          </button>
+          </div>
         ) : limitReached ? (
-          <button
-            onClick={() => onLimitReached?.()}
-            className="text-sm w-full justify-center btn-primary opacity-50 cursor-not-allowed"
+          <div
+            onClick={(e) => { e.stopPropagation(); onLimitReached?.(); }}
+            className="text-sm w-full justify-center btn-primary opacity-50 cursor-not-allowed flex items-center"
           >
             <EnvelopeIcon className="w-4 h-4 mr-1.5" />
             Limit reached
-          </button>
+          </div>
         ) : (
-          <button
-            onClick={onExpand}
-            className="text-sm w-full justify-center btn-primary"
+          <div
+            className="text-sm w-full justify-center btn-primary flex items-center"
           >
             <EnvelopeIcon className="w-4 h-4 mr-1.5" />
             Send Email
-          </button>
+          </div>
         )}
       </div>
     </div>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { getCreditStatusAction } from '@/app/actions/invitations';
+import { EMAIL_LIMITS } from '@/lib/constants';
 
 // Custom event name for credit updates
 export const CREDITS_CHANGED_EVENT = 'signl:credits-changed';
@@ -12,11 +13,11 @@ export function dispatchCreditsChanged() {
 }
 
 interface CreditStatus {
-  dailyUsed: number;
-  dailyLimit: number;
-  bonusCredits: number;
+  totalSent: number;
+  lifetimeLimit: number;
   totalRemaining: number;
   isSubscribed: boolean;
+  isBlocked: boolean;
 }
 
 interface CreditsDisplayProps {
@@ -32,11 +33,11 @@ export function CreditsDisplay({ onStatusChange, refreshTrigger }: CreditsDispla
     const result = await getCreditStatusAction();
     if (result.success) {
       const newStatus = {
-        dailyUsed: result.dailyUsed,
-        dailyLimit: result.dailyLimit,
-        bonusCredits: result.bonusCredits,
+        totalSent: result.totalSent,
+        lifetimeLimit: result.lifetimeLimit,
         totalRemaining: result.totalRemaining,
         isSubscribed: result.isSubscribed,
+        isBlocked: result.isBlocked,
       };
       setStatus(newStatus);
       onStatusChange?.(newStatus);
@@ -85,14 +86,13 @@ export function CreditsDisplay({ onStatusChange, refreshTrigger }: CreditsDispla
     );
   }
 
-  const isLow = status.totalRemaining <= 3;
-  const isEmpty = status.totalRemaining === 0;
+  const isBlocked = status.isBlocked;
 
   return (
     <div className="flex items-center gap-3 text-sm">
       <div className="flex items-center gap-1.5">
         <svg
-          className={`w-4 h-4 ${isEmpty ? 'text-red-500' : isLow ? 'text-amber-500' : 'text-white'}`}
+          className={`w-4 h-4 ${isBlocked ? 'text-red-500' : 'text-white'}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -104,27 +104,16 @@ export function CreditsDisplay({ onStatusChange, refreshTrigger }: CreditsDispla
             d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
           />
         </svg>
-        <span className="text-white">Daily emails sent:</span>
+        <span className="text-white">Free emails:</span>
         <span
-          className={`font-medium ${
-            isEmpty ? 'text-red-600' : isLow ? 'text-amber-600' : 'text-gray-900'
-          }`}
+          className={`font-medium ${isBlocked ? 'text-red-500' : 'text-white'}`}
         >
-          {status.dailyUsed}/{status.dailyLimit}
+          {status.totalSent}/{EMAIL_LIMITS.FREE_LIFETIME_LIMIT}
         </span>
+        {isBlocked && (
+          <span className="text-red-500 text-xs ml-1">(Upgrade to continue)</span>
+        )}
       </div>
-      {status.bonusCredits > 0 && (
-        <div className="flex items-center gap-1.5 px-2 py-0.5 bg-primary-50 rounded-full">
-          <svg className="w-3.5 h-3.5 text-primary-600" fill="currentColor" viewBox="0 0 20 20">
-            <path
-              fillRule="evenodd"
-              d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z"
-              clipRule="evenodd"
-            />
-          </svg>
-          <span className="font-medium text-primary-700">{status.bonusCredits}</span>
-        </div>
-      )}
     </div>
   );
 }

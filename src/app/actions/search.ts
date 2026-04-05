@@ -40,6 +40,7 @@ import { bulkUpdatePersonRoleEmbeddings } from '@/lib/services/embeddings';
 import { resolveCompanyAliases } from '@/lib/services/company-alias';
 import { preFilterUrls } from '@/lib/services/snippet-filter';
 import { generateEmailWithLLM, getUserResumeSummary, getRecentSentEmails, refineEmailWithLLM } from '@/lib/services/personalization';
+import { isUserBlocked } from '@/lib/services/credits';
 
 export interface RecentSearch {
   company: string | null;
@@ -462,6 +463,14 @@ export async function searchPeopleAction(
   const session = await getServerSession(authOptions);
   const userId = session?.user?.id || null;
   const isGuest = !userId;
+
+  // Check if user is blocked (hit free limit and not subscribed)
+  if (userId) {
+    const blocked = await isUserBlocked(userId);
+    if (blocked) {
+      return { success: false, error: 'SUBSCRIPTION_BLOCKED' };
+    }
+  }
 
   if (!input.company) {
     return { success: false, error: 'Company is required' };

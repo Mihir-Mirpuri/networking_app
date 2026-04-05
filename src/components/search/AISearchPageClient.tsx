@@ -312,6 +312,19 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
       return;
     }
 
+    // Handle blocked users (no filters property)
+    if (extractResult.status === 'blocked') {
+      setMessages(prev =>
+        prev.map(m =>
+          m.id === assistantMsgId
+            ? { ...m, content: extractResult.assistantMessage, isLoading: false }
+            : m
+        )
+      );
+      setIsExtracting(false);
+      return;
+    }
+
     const { filters, assistantMessage } = extractResult;
     setCurrentFilters(filters);
 
@@ -495,58 +508,33 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
       )}
 
       {showChat && (
-        <>
-          {/* Chat Area */}
-          <div className="mb-4 max-h-80 overflow-y-auto rounded-xl border border-surface-200 bg-surface-50 p-4 relative">
-            {/* Clear chat button — sticky top-right inside chat area */}
-            {messages.length > 0 && (
-              <div className="sticky top-0 z-10 flex justify-end">
-                <button
-                  onClick={() => {
-                    setMessages([]);
-                    setCurrentFilters({});
-                    setSuggestedSearches([]);
-                    hook.resetResults();
-                    try { sessionStorage.removeItem(AI_STORAGE_KEY); } catch {}
-                  }}
-                  disabled={isExtracting || isSearching}
-                  style={{ color: '#ccc', background: '#2a2a2a', border: '1px solid #555', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}
-                >
-                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                  </svg>
-                  Clear chat
-                </button>
-              </div>
-            )}
-            {messages.length === 0 ? (
-              /* Empty State */
-              <div className="flex flex-col items-center justify-center py-8">
-                <div className="w-12 h-12 rounded-full bg-primary-100 flex items-center justify-center mb-4">
-                  <svg className="w-6 h-6 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 0 1 .865-.501 48.172 48.172 0 0 0 3.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" />
-                  </svg>
-                </div>
-                <h3 className="text-base font-semibold text-surface-800 mb-1">
-                  Describe who you&apos;re looking for
-                </h3>
-                <p className="text-sm text-surface-500 text-center mb-4">
-                  Type a natural language query and I&apos;ll find matching professionals.
-                </p>
-                <div className="flex flex-wrap justify-center gap-2">
-                  {EXAMPLE_QUERIES.map((query) => (
-                    <button
-                      key={query}
-                      onClick={() => handleSendMessage(query)}
-                      className="px-3 py-1.5 text-xs font-medium text-surface-600 bg-white border border-surface-200 rounded-full hover:bg-primary-50 hover:text-primary-700 hover:border-primary-200 transition-colors"
-                    >
-                      {query}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              /* Messages */
+        <div className={`mb-6 rounded-lg border border-surface-300 bg-white overflow-hidden ${messages.length > 0 ? 'flex flex-col' : ''}`}>
+          {/* New session button */}
+          {messages.length > 0 && (
+            <div className="flex justify-end px-3 pt-2">
+              <button
+                onClick={() => {
+                  setMessages([]);
+                  setCurrentFilters({});
+                  setSuggestedSearches([]);
+                  hook.resetResults();
+                  try { sessionStorage.removeItem(AI_STORAGE_KEY); } catch {}
+                }}
+                disabled={isExtracting || isSearching}
+                className="text-surface-400 hover:text-surface-600 transition-colors"
+                title="New session"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2 12c0-4.97 4.03-9 9-9h2c4.97 0 9 4.03 9 9 0 4.97-4.03 9-9 9H9l-4.5 3V18.5C2.9 16.8 2 14.5 2 12Z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v8M8 12h8" />
+                </svg>
+              </button>
+            </div>
+          )}
+          {/* Messages area - only shows when there are messages */}
+          {messages.length > 0 && (
+            <div className="max-h-64 overflow-y-auto p-4 border-b border-surface-200">
+              {/* Messages */}
               <div className="space-y-3">
                 {messages.map((msg) => (
                   <div
@@ -557,7 +545,7 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
                       className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm ${
                         msg.role === 'user'
                           ? 'bg-primary-600 text-white rounded-br-md'
-                          : 'bg-white text-surface-700 border border-surface-200 rounded-bl-md'
+                          : 'bg-surface-100 text-surface-700 rounded-bl-md'
                       }`}
                     >
                       {msg.isLoading ? (
@@ -600,11 +588,11 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
                 ))}
                 <div ref={chatEndRef} />
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
-          {/* Input */}
-          <div className="relative mb-6">
+          {/* Input - at the bottom of the container */}
+          <div className="relative">
             <input
               ref={inputRef}
               type="text"
@@ -613,7 +601,7 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
               onKeyDown={handleKeyDown}
               placeholder="Describe who you're looking for..."
               disabled={isExtracting || isSearching}
-              className="w-full pl-4 pr-12 py-3 text-sm border border-surface-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full pl-4 pr-12 py-2.5 text-sm bg-transparent focus:outline-none focus:ring-0 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             />
             {(isExtracting || isSearching) ? (
               <button
@@ -641,7 +629,7 @@ export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClient
               </button>
             )}
           </div>
-        </>
+        </div>
       )}
 
       {/* Loading state for search */}

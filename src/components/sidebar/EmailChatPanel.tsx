@@ -1,8 +1,78 @@
 'use client';
 
 import { useState, useRef, useEffect, useMemo } from 'react';
+import { useSession } from 'next-auth/react';
 import { useEmailChat } from '@/contexts/EmailChatContext';
 import type { PersonInsightResponse } from '@/app/actions/person-insights';
+import { getSubscriptionStatus } from '@/app/actions/subscription';
+
+// Signal logo component
+function SignalLogo({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 200 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="100" cy="80" r="12" fill="currentColor" />
+      <path d="M78 56 A30 30 0 0 0 78 104" stroke="currentColor" strokeWidth="10" strokeLinecap="round" fill="none" />
+      <path d="M122 56 A30 30 0 0 1 122 104" stroke="currentColor" strokeWidth="10" strokeLinecap="round" fill="none" />
+      <path d="M58 38 A55 55 0 0 0 58 122" stroke="currentColor" strokeWidth="10" strokeLinecap="round" fill="none" />
+      <path d="M142 38 A55 55 0 0 1 142 122" stroke="currentColor" strokeWidth="10" strokeLinecap="round" fill="none" />
+      <path d="M38 20 A80 80 0 0 0 38 140" stroke="currentColor" strokeWidth="10" strokeLinecap="round" fill="none" />
+      <path d="M162 20 A80 80 0 0 1 162 140" stroke="currentColor" strokeWidth="10" strokeLinecap="round" fill="none" />
+    </svg>
+  );
+}
+
+// ─── Typewriter placeholder messages for email editing ────────────────────────
+
+const EMAIL_PLACEHOLDER_MESSAGES = [
+  "Make it shorter and more direct",
+  "Add a personal hook based on their background",
+  "Make the tone more casual",
+  "Emphasize my relevant experience",
+  "Add a clear call to action",
+];
+
+function useTypewriterPlaceholder(messages: string[], stopped = false, typingSpeed = 60, deleteSpeed = 30, pauseDuration = 2000) {
+  const [displayText, setDisplayText] = useState('');
+  const [messageIndex, setMessageIndex] = useState(0);
+  const [isTyping, setIsTyping] = useState(true);
+  const [isPaused, setIsPaused] = useState(false);
+
+  useEffect(() => {
+    if (stopped) return;
+    const currentMessage = messages[messageIndex];
+
+    if (isPaused) {
+      const pauseTimer = setTimeout(() => {
+        setIsPaused(false);
+        setIsTyping(false);
+      }, pauseDuration);
+      return () => clearTimeout(pauseTimer);
+    }
+
+    if (isTyping) {
+      if (displayText.length < currentMessage.length) {
+        const timer = setTimeout(() => {
+          setDisplayText(currentMessage.slice(0, displayText.length + 1));
+        }, typingSpeed);
+        return () => clearTimeout(timer);
+      } else {
+        setIsPaused(true);
+      }
+    } else {
+      if (displayText.length > 0) {
+        const timer = setTimeout(() => {
+          setDisplayText(displayText.slice(0, -1));
+        }, deleteSpeed);
+        return () => clearTimeout(timer);
+      } else {
+        setMessageIndex((prev) => (prev + 1) % messages.length);
+        setIsTyping(true);
+      }
+    }
+  }, [displayText, isTyping, isPaused, messageIndex, messages, stopped, typingSpeed, deleteSpeed, pauseDuration]);
+
+  return displayText;
+}
 
 // ─── Source badge colors ──────────────────────────────────────────────────────
 
@@ -358,15 +428,27 @@ export function InsightsSection() {
 // ─── Main Panel ───────────────────────────────────────────────────────────────
 
 export function EmailChatPanel() {
+  const { data: session } = useSession();
   const {
     messages,
     isProcessing,
     sendMessage,
+    clearMessages,
   } = useEmailChat();
 
   const [inputValue, setInputValue] = useState('');
+  const [isFocused, setIsFocused] = useState(false);
+  const [isSubscribed, setIsSubscribed] = useState<boolean | null>(null);
+
+  // Fetch subscription status
+  useEffect(() => {
+    getSubscriptionStatus().then((status) => {
+      setIsSubscribed(status.isSubscribed ?? false);
+    });
+  }, []);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const typewriterPlaceholder = useTypewriterPlaceholder(EMAIL_PLACEHOLDER_MESSAGES, isFocused);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -378,13 +460,16 @@ export function EmailChatPanel() {
     inputRef.current?.focus();
   }, []);
 
-  // Auto-resize textarea
+  // The display value: show typewriter when not focused, no input, and no messages
+  const displayValue = isFocused || inputValue || messages.length > 0 ? inputValue : typewriterPlaceholder;
+
+  // Auto-resize textarea based on content
   useEffect(() => {
-    if (inputRef.current) {
-      inputRef.current.style.height = 'auto';
-      inputRef.current.style.height = `${Math.min(inputRef.current.scrollHeight, 120)}px`;
-    }
-  }, [inputValue]);
+    const ta = inputRef.current;
+    if (!ta) return;
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 80) + 'px';
+  }, [displayValue]);
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -407,6 +492,22 @@ export function EmailChatPanel() {
 
   return (
     <div className="flex flex-col h-full bg-[#141414]">
+      {/* New session button */}
+      {messages.length > 0 && (
+        <div className="flex justify-end px-3 pt-2">
+          <button
+            onClick={clearMessages}
+            className="text-[#888] hover:text-white transition-colors"
+            title="New session"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M2 12c0-4.97 4.03-9 9-9h2c4.97 0 9 4.03 9 9 0 4.97-4.03 9-9 9H9l-4.5 3V18.5C2.9 16.8 2 14.5 2 12Z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v8M8 12h8" />
+            </svg>
+          </button>
+        </div>
+      )}
+
       {/* Insights section */}
       <InsightsSection />
 
@@ -435,26 +536,37 @@ export function EmailChatPanel() {
 
         {/* Chat messages */}
         {messages.length > 0 && (
-          <div className="px-4 py-4 space-y-4">
+          <div className="px-3 py-4 space-y-3">
             {messages.map((message) => (
-              <div key={message.id}>
+              <div
+                key={message.id}
+                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
                 {message.role === 'user' ? (
-                  // User message - minimal, right-aligned text
-                  <div className="flex justify-end">
-                    <div className="max-w-[90%] text-right">
-                      <p className="text-sm text-white whitespace-pre-wrap">{message.content}</p>
+                  // User message - right-aligned with bubble and profile image
+                  <div className="flex gap-2 max-w-[85%]">
+                    <div className="rounded-2xl px-3 py-2 bg-[#2a2a2a] text-white rounded-br-md">
+                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                    </div>
+                    <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#252525] flex items-center justify-center mt-1 overflow-hidden">
+                      {session?.user?.image ? (
+                        <img src={session.user.image} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+                        </svg>
+                      )}
                     </div>
                   </div>
                 ) : (
-                  // AI message - left-aligned with subtle styling
-                  <div className="flex gap-2">
-                    <div className="flex-shrink-0 w-5 h-5 rounded bg-[#252525] flex items-center justify-center mt-0.5">
-                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" />
-                      </svg>
+                  // AI message - left-aligned with bubble and Signal logo
+                  // Blue for premium (like iMessage), green for free (like SMS), neutral while loading
+                  <div className="flex gap-2 max-w-[85%]">
+                    <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#252525] flex items-center justify-center mt-1">
+                      <SignalLogo className="w-3 h-3 text-white" />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-white whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                    <div className={`rounded-2xl px-3 py-2 text-white rounded-bl-md ${isSubscribed === null ? 'bg-[#2a2a2a]' : isSubscribed ? 'bg-[#2563EB]' : 'bg-[#22C55E]'}`}>
+                      <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
                     </div>
                   </div>
                 )}
@@ -463,13 +575,15 @@ export function EmailChatPanel() {
 
             {/* Processing indicator */}
             {isProcessing && (
-              <div className="flex gap-2">
-                <div className="flex-shrink-0 w-5 h-5 rounded bg-[#252525] flex items-center justify-center mt-0.5">
-                  <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" />
-                  </svg>
+              <div className="flex justify-start">
+                <div className="flex gap-2 max-w-[85%]">
+                  <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#252525] flex items-center justify-center mt-1">
+                    <SignalLogo className="w-3 h-3 text-white" />
+                  </div>
+                  <div className={`rounded-2xl px-3 py-2 rounded-bl-md ${isSubscribed === null ? 'bg-[#2a2a2a]' : isSubscribed ? 'bg-[#2563EB]' : 'bg-[#22C55E]'}`}>
+                    <TypingIndicator />
+                  </div>
                 </div>
-                <TypingIndicator />
               </div>
             )}
 
@@ -477,34 +591,37 @@ export function EmailChatPanel() {
             <div ref={chatEndRef} />
           </div>
         )}
+
       </div>
 
-      {/* Input area - Cursor style */}
-      <div className="p-3 border-t border-[#252525]">
-        <form onSubmit={handleSubmit}>
-          <div className="relative">
-            <textarea
-              ref={inputRef}
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Ask anything..."
-              disabled={isProcessing}
-              rows={1}
-              className="w-full px-3 py-2.5 pr-10 text-sm bg-[#1a1a1a] border border-[#303030] rounded-lg text-white placeholder:text-[#404040] focus:outline-none focus:ring-0 focus:border-[#303030] disabled:opacity-50 disabled:cursor-not-allowed resize-none transition-colors"
-              style={{ minHeight: '42px', maxHeight: '120px' }}
-            />
-            <button
-              type="submit"
-              disabled={!inputValue.trim() || isProcessing}
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded text-[#404040] hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />
-              </svg>
-            </button>
-          </div>
-        </form>
+      {/* Input area */}
+      <div className="p-3 border-t border-[#1a1a1a]">
+        <div
+          className="relative bg-[#111111] rounded-lg cursor-text"
+          onClick={() => inputRef.current?.focus()}
+        >
+          <textarea
+            ref={inputRef}
+            value={displayValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            disabled={isProcessing}
+            rows={1}
+            className="w-full px-3 pr-10 py-2.5 text-sm bg-transparent border-none text-white focus:outline-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 disabled:opacity-60 disabled:cursor-not-allowed resize-none"
+            style={{ maxHeight: '80px' }}
+          />
+          <button
+            onClick={handleSubmit}
+            disabled={!inputValue.trim() || isProcessing}
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded text-white disabled:text-[#404040] disabled:cursor-not-allowed transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
   );

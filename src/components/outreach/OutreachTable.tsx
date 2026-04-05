@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useCallback } from 'react';
-import { OutreachTrackerEntry, SortField, SortDirection } from '@/app/actions/outreach';
+import { OutreachTrackerEntry } from '@/app/actions/outreach';
 import { OutreachRow } from './OutreachRow';
 import { ColumnKey } from './OutreachFilters';
 import { LoadingSpinner } from '@/components/search/LoadingSpinner';
@@ -10,9 +10,6 @@ import Link from 'next/link';
 
 interface OutreachTableProps {
   trackers: OutreachTrackerEntry[];
-  sortField: SortField;
-  sortDirection: SortDirection;
-  onSort: (field: SortField) => void;
   onUpdate: (tracker: OutreachTrackerEntry) => void;
   onDelete: (id: string) => void;
   onToggleStar: (id: string) => void;
@@ -26,42 +23,8 @@ interface OutreachTableProps {
   onLoadMore: () => void;
 }
 
-// Map column keys to sortable fields
-const SORT_KEYS: Partial<Record<ColumnKey, SortField>> = {
-  name: 'contactName',
-  firm: 'company',
-  role: 'role',
-  location: 'location',
-  firstEmailDate: 'dateEmailed',
-  lastEmailDate: 'lastEmailDate',
-  followUps: 'followUpCount',
-};
-
-const SortIcon = ({ field, sortField, sortDirection }: { field: SortField | null; sortField: SortField; sortDirection: SortDirection }) => {
-  if (!field) return null;
-  if (sortField !== field) {
-    return (
-      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-      </svg>
-    );
-  }
-  return sortDirection === 'asc' ? (
-    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-    </svg>
-  ) : (
-    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-    </svg>
-  );
-};
-
 export function OutreachTable({
   trackers,
-  sortField,
-  sortDirection,
-  onSort,
   onUpdate,
   onDelete,
   onToggleStar,
@@ -133,10 +96,9 @@ export function OutreachTable({
     <div ref={tableRef} className="flex-1 flex flex-col min-h-0 bg-[#1a1a1a] border border-[#3a3a3a] rounded-lg overflow-hidden">
       {/* Header Row - Fixed */}
       <div className="flex-shrink-0 flex items-center px-4 py-2.5 bg-[#2a2a2a] border-b border-[#3a3a3a]">
-        {visibleColumns.map((col, index) => {
-          const sortKey = SORT_KEYS[col] || null;
-
-          return (
+        {/* Star column header */}
+        <div className="w-10 min-w-[40px] shrink-0" />
+        {visibleColumns.map((col, index) => (
             <div
               key={col}
               className="relative flex items-center shrink-0"
@@ -144,23 +106,9 @@ export function OutreachTable({
               data-column={col}
             >
               <div className="flex-1 px-2 overflow-hidden">
-                {sortKey ? (
-                  <button
-                    onClick={() => onSort(sortKey)}
-                    className="flex items-center gap-1 hover:text-white transition-colors"
-                  >
-                    <span className="text-[13px] font-semibold text-white font-['Inter'] truncate">
-                      {COLUMN_LABELS[col]}
-                    </span>
-                    <SortIcon field={sortKey} sortField={sortField} sortDirection={sortDirection} />
-                  </button>
-                ) : (
-                  <div className="flex items-center gap-1">
-                    <span className="text-[13px] font-semibold text-white font-['Inter'] truncate">
-                      {COLUMN_LABELS[col]}
-                    </span>
-                  </div>
-                )}
+                <span className="text-[13px] font-semibold text-white font-['Inter'] truncate">
+                  {COLUMN_LABELS[col]}
+                </span>
               </div>
 
               {/* Resize handle */}
@@ -174,9 +122,8 @@ export function OutreachTable({
                 </div>
               )}
             </div>
-          );
-        })}
-        {/* Actions column header (empty) */}
+        ))}
+        {/* Delete column header (empty) */}
         <div className="w-10 min-w-[40px] shrink-0" />
       </div>
 
