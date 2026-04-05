@@ -5,7 +5,7 @@
  * Two-tier lookup: DB CompanyAlias table → LLM (Groq).
  * LLM results are persisted so each company is only resolved once.
  *
- * Used by the CSE pre-filter in processRefreshBatch to avoid discarding
+ * Used by search to resolve company name aliases and avoid discarding
  * valid profiles due to company name mismatches.
  */
 

@@ -5,11 +5,13 @@ import {
   OutreachTrackerEntry,
   OutreachStats,
   ScheduledEmailEntry,
+  DraftEntry,
   SortField,
   SortDirection,
   OutreachFilterOptions,
   getOutreachTrackers,
   getOutreachFilterOptions,
+  getDrafts,
   deleteOutreachTracker,
   toggleStarOutreachTracker,
   clearAllOutreachTrackers,
@@ -17,6 +19,7 @@ import {
 import { OutreachTable } from './OutreachTable';
 import { OutreachFilters, ColumnKey } from './OutreachFilters';
 import { ScheduledEmailsSection } from './ScheduledEmailsSection';
+import { DraftsSection } from './DraftsSection';
 import { ThreadPanel } from './ThreadPanel';
 import { LoadingSpinner } from '@/components/search/LoadingSpinner';
 import { useColumnSettings, COLUMN_LABELS } from './useColumnSettings';
@@ -27,6 +30,7 @@ interface OutreachTrackerClientProps {
   initialHasMore: boolean;
   initialStats: OutreachStats;
   initialScheduledEmails: ScheduledEmailEntry[];
+  initialDrafts: DraftEntry[];
 }
 
 export function OutreachTrackerClient({
@@ -35,9 +39,11 @@ export function OutreachTrackerClient({
   initialHasMore,
   initialStats,
   initialScheduledEmails,
+  initialDrafts,
 }: OutreachTrackerClientProps) {
   const [trackers, setTrackers] = useState<OutreachTrackerEntry[]>(initialTrackers);
   const [scheduledEmails, setScheduledEmails] = useState<ScheduledEmailEntry[]>(initialScheduledEmails);
+  const [drafts, setDrafts] = useState<DraftEntry[]>(initialDrafts);
   const [stats, setStats] = useState<OutreachStats>(initialStats);
   const [cursor, setCursor] = useState<string | null>(initialCursor);
   const [hasMore, setHasMore] = useState(initialHasMore);
@@ -47,6 +53,7 @@ export function OutreachTrackerClient({
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [starredFilter, setStarredFilter] = useState<boolean | undefined>(undefined);
   const [scheduledFilter, setScheduledFilter] = useState<boolean | undefined>(undefined);
+  const [draftsFilter, setDraftsFilter] = useState<boolean | undefined>(undefined);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -161,13 +168,32 @@ export function OutreachTrackerClient({
 
   const handleStarredFilterChange = (starred: boolean | undefined) => {
     setStarredFilter(starred);
-    if (starred === true) setScheduledFilter(undefined);
+    if (starred === true) {
+      setScheduledFilter(undefined);
+      setDraftsFilter(undefined);
+    }
     setTimeout(() => fetchTrackers(true), 0);
   };
 
   const handleScheduledFilterChange = (scheduled: boolean | undefined) => {
     setScheduledFilter(scheduled);
-    if (scheduled === true) setStarredFilter(undefined);
+    if (scheduled === true) {
+      setStarredFilter(undefined);
+      setDraftsFilter(undefined);
+    }
+  };
+
+  const handleDraftsFilterChange = async (draftsActive: boolean | undefined) => {
+    setDraftsFilter(draftsActive);
+    if (draftsActive === true) {
+      setStarredFilter(undefined);
+      setScheduledFilter(undefined);
+      // Refresh drafts when filter is activated
+      const result = await getDrafts(searchQuery || undefined);
+      if (result.success) {
+        setDrafts(result.drafts);
+      }
+    }
   };
 
   const handleFirmsChange = (firms: string[]) => {
@@ -261,6 +287,9 @@ export function OutreachTrackerClient({
           onStarredFilterChange={handleStarredFilterChange}
           scheduledFilter={scheduledFilter}
           onScheduledFilterChange={handleScheduledFilterChange}
+          draftsFilter={draftsFilter}
+          onDraftsFilterChange={handleDraftsFilterChange}
+          draftsCount={drafts.length}
           columnOrder={columnSettings.columnOrder}
           isColumnVisible={columnSettings.isVisible}
           onToggleColumn={columnSettings.toggleColumn}
@@ -281,8 +310,25 @@ export function OutreachTrackerClient({
         />
       </div>
 
-      {/* Content area - Scheduled emails or Outreach table */}
-      {scheduledFilter === true ? (
+      {/* Content area - Drafts, Scheduled emails, or Outreach table */}
+      {draftsFilter === true ? (
+        <DraftsSection
+          drafts={searchQuery
+            ? drafts.filter((d) => {
+                const q = searchQuery.toLowerCase();
+                return (
+                  d.contactName.toLowerCase().includes(q) ||
+                  (d.contactEmail && d.contactEmail.toLowerCase().includes(q)) ||
+                  d.company.toLowerCase().includes(q) ||
+                  d.subject.toLowerCase().includes(q)
+                );
+              })
+            : drafts}
+          onDraftDeleted={(id) => {
+            setDrafts((prev) => prev.filter((d) => d.id !== id));
+          }}
+        />
+      ) : scheduledFilter === true ? (
         <ScheduledEmailsSection
           scheduledEmails={searchQuery
             ? scheduledEmails.filter((e) => {

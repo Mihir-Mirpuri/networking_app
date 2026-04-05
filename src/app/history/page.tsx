@@ -2,7 +2,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { NewHeader } from '@/components/layout/NewHeader';
 import { OutreachTrackerClient } from '@/components/outreach/OutreachTrackerClient';
-import { getInitialOutreachTrackers, getOutreachStats, getInitialScheduledEmails } from '@/app/actions/outreach';
+import { getInitialOutreachTrackers, getOutreachStats, getInitialScheduledEmails, getInitialDrafts } from '@/app/actions/outreach';
 import { HistoryEmptyState } from '@/components/history/HistoryEmptyState';
 
 export default async function HistoryPage() {
@@ -29,10 +29,11 @@ export default async function HistoryPage() {
   }
 
   // Fetch initial outreach data on the server for authenticated users
-  const [trackersResult, statsResult, scheduledResult] = await Promise.all([
+  const [trackersResult, statsResult, scheduledResult, draftsResult] = await Promise.all([
     getInitialOutreachTrackers(session.user.id),
     getOutreachStats(),
     getInitialScheduledEmails(session.user.id),
+    getInitialDrafts(session.user.id),
   ]);
 
   return (
@@ -45,6 +46,7 @@ export default async function HistoryPage() {
           initialHasMore={trackersResult.success ? trackersResult.hasMore : false}
           initialStats={statsResult.success ? statsResult.stats : defaultStats}
           initialScheduledEmails={scheduledResult.success ? scheduledResult.emails : []}
+          initialDrafts={draftsResult.success ? draftsResult.drafts : []}
         />
       </main>
     </div>

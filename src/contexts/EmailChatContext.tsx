@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { refineEmailConversationalAction } from '@/app/actions/email-chat';
-import { getPersonInsightsAction, PersonInsightResponse } from '@/app/actions/person-insights';
+import { fullScrapeAndInsightsAction, PersonInsightResponse } from '@/app/actions/person-insights';
 
 export interface ChatMessage {
   id: string;
@@ -69,7 +69,7 @@ export function EmailChatProvider({ children }: EmailChatProviderProps) {
     setInsightsLoading(true);
     setInsightsError(null);
     try {
-      const result = await getPersonInsightsAction(personId);
+      const result = await fullScrapeAndInsightsAction(personId);
       if (result.success) {
         setInsights(result.insights);
       } else {

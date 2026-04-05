@@ -5,6 +5,8 @@ import { authOptions } from '@/lib/auth';
 import { completeJson, GroqJsonParseError } from '@/lib/services/groq';
 import { GroqAction } from '@prisma/client';
 import { fetchCompaniesForCategory } from '@/lib/services/perplexity';
+import { LinkedInFilters } from '@/lib/types/linkedin-filters';
+import { resolveCompanyLinkedInUrl } from '@/lib/services/company-resolver';
 
 export interface ParsedFilters {
   company?: string;
@@ -47,6 +49,27 @@ interface LLMResponse {
     university: string | null;
     location: string | null;
   };
+  linkedin_filters: {
+    search_query?: string;
+    locations?: string[];
+    current_companies?: string[];
+    past_companies?: string[];
+    schools?: string[];
+    current_job_titles?: string[];
+    past_job_titles?: string[];
+    seniority_level_ids?: string[];
+    function_ids?: string[];
+    industry_ids?: string[];
+    company_headcount?: string[];
+    years_of_experience_ids?: string[];
+    years_at_current_company_ids?: string[];
+    recently_changed_jobs?: boolean;
+    exclude_locations?: string[];
+    exclude_current_companies?: string[];
+    exclude_industry_ids?: string[];
+    exclude_seniority_level_ids?: string[];
+    exclude_function_ids?: string[];
+  };
   company_name_ambiguous?: boolean;
   person_name?: string;
   person_company?: string;
@@ -56,7 +79,7 @@ interface LLMResponse {
 }
 
 export type ExtractFiltersResult =
-  | { success: true; status: 'ready'; filters: ParsedFilters; assistantMessage: string; suggestedSearches: SuggestedSearch[]; companyNameAmbiguous?: boolean }
+  | { success: true; status: 'ready'; filters: ParsedFilters; linkedInFilters: LinkedInFilters; assistantMessage: string; suggestedSearches: SuggestedSearch[]; companyNameAmbiguous?: boolean }
   | { success: true; status: 'needs_selection'; filters: ParsedFilters; assistantMessage: string; selectables: Selectable[]; allSelectables?: Selectable[] }
   | { success: true; status: 'person_lookup'; assistantMessage: string; personName: string; personCompany?: string }
   | { success: true; status: 'off_topic'; filters: ParsedFilters; assistantMessage: string }
@@ -71,6 +94,27 @@ You must return JSON with this schema:
   "status": "ready" | "needs_selection" | "off_topic" | "person_lookup",
   "confidence": "high" | "low",
   "filters": { "company": string|null, "role": string|null, "university": string|null, "location": string|null },
+  "linkedin_filters": {
+    "search_query": string|null,
+    "locations": string[]|null,
+    "current_companies": string[]|null,
+    "past_companies": string[]|null,
+    "schools": string[]|null,
+    "current_job_titles": string[]|null,
+    "past_job_titles": string[]|null,
+    "seniority_level_ids": string[]|null,
+    "function_ids": string[]|null,
+    "industry_ids": string[]|null,
+    "company_headcount": string[]|null,
+    "years_of_experience_ids": string[]|null,
+    "years_at_current_company_ids": string[]|null,
+    "recently_changed_jobs": boolean|null,
+    "exclude_locations": string[]|null,
+    "exclude_current_companies": string[]|null,
+    "exclude_industry_ids": string[]|null,
+    "exclude_seniority_level_ids": string[]|null,
+    "exclude_function_ids": string[]|null
+  },
   "company_name_ambiguous": boolean,
   "person_name": string|null,
   "person_company": string|null,
@@ -78,6 +122,24 @@ You must return JSON with this schema:
   "suggested_searches": [{ "label": string, "company": string, "role": string|null }],
   "message": string
 }
+
+LINKEDIN FILTER RULES:
+When status is "ready", you MUST also populate "linkedin_filters" with structured filters for LinkedIn's search API.
+
+- "search_query": General keyword search. Use for role/skill terms (e.g., "Software Engineer", "Product Manager"). For well-known companies (Google, Meta, Apple, Amazon, Microsoft, Goldman Sachs, McKinsey, etc.), include the company name here instead of in current_companies.
+- "locations": LinkedIn location names. Use full names: "New York" (not NYC), "San Francisco" (not SF), "Los Angeles" (not LA), "San Francisco Bay Area" for broader SF area.
+- "current_companies": LinkedIn company page URLs (NOT names). Only use for small/niche companies where search_query alone isn't enough. Leave empty for well-known companies — we resolve URLs separately after your response.
+- "schools": Full official university names: "UT Austin" → "University of Texas at Austin", "MIT" → "Massachusetts Institute of Technology", "Stanford" → "Stanford University", etc.
+- "current_job_titles": Exact current title match. More precise than search_query for roles. E.g., ["Software Engineer"], ["Product Manager"].
+- "seniority_level_ids": "100"=In Training, "110"=Entry Level, "120"=Senior, "130"=Strategic, "200"=Entry Level Manager, "210"=Experienced Manager, "220"=Director, "300"=VP, "310"=CXO, "320"=Owner/Partner. "junior"→["110"], "senior"→["120"], "lead/staff"→["120","130"], "manager"→["200","210"], "director"→["220"], "VP"→["300"], "C-level"→["310"], "founder"→["310","320"].
+- "function_ids": "1"=Accounting, "2"=Administrative, "3"=Arts/Design, "4"=Business Development, "5"=Community, "6"=Consulting, "7"=Education, "8"=Engineering, "9"=Entrepreneurship, "10"=Finance, "11"=Healthcare, "12"=HR, "13"=IT, "14"=Legal, "15"=Marketing, "16"=Media, "17"=Military, "18"=Operations, "19"=Product Management, "20"=Program/Project Management, "21"=Purchasing, "22"=QA, "23"=Real Estate, "24"=Research, "25"=Sales, "26"=Customer Success.
+- "industry_ids": "4"=Software Dev, "6"=IT Consulting, "43"=Financial Services, "44"=Banking, "41"=VC/PE, "46"=Investment Banking, "47"=Investment Management, "96"=Technology/Internet, "133"=Healthcare, "135"=Pharma, "137"=Biotech, "14"=Education, "143"=Legal Services, "147"=Advertising. "tech"→["4","6","96"], "finance"→["43","44","46","47","48"], "fintech"→["43","4"], "healthcare"→["133","135","137"].
+- "company_headcount": "A"=Self-employed, "B"=1-10, "C"=11-50, "D"=51-200, "E"=201-500, "F"=501-1000, "G"=1001-5000, "H"=5001-10000, "I"=10001+. "startup"→["B","C","D"], "mid-size"→["D","E","F"], "large/enterprise"→["G","H","I"].
+- "years_of_experience_ids": "1"=<1yr, "2"=1-2yr, "3"=3-5yr, "4"=6-10yr, "5"=10+yr.
+- "recently_changed_jobs": true for "new role", "just started", "recently joined".
+- Only include filters clearly indicated by the query. Do not infer unstated filters.
+- Prefer search_query over current_job_titles unless user wants exact title match.
+- For non-ready statuses (needs_selection, off_topic, person_lookup), set linkedin_filters to {}.
 
 STATUS RULES:
 - "person_lookup": The user is searching for a SPECIFIC PERSON by name (e.g., "Find John Smith", "Look up Jane Doe at Google", "Do you have Sarah Connor's info?"). Return the person's name in "person_name" and optional company in "person_company". This takes priority over "ready" when a person's full name (first + last) is clearly provided.
@@ -133,25 +195,67 @@ MESSAGE RULES:
 EXAMPLES:
 
 User: "PMs at Google in Austin"
-→ {"status":"ready","filters":{"company":"Google","role":"Product Manager","university":null,"location":"Austin, Texas"},"selectables":[],"suggested_searches":[{"label":"PMs at Meta","company":"Meta","role":"Product Manager"},{"label":"PMs at Apple","company":"Apple","role":"Product Manager"},{"label":"Software Engineers at Google","company":"Google","role":"Software Engineer"}],"message":"Searching for Product Managers at Google in Austin!"}
+→ {"status":"ready","filters":{"company":"Google","role":"Product Manager","university":null,"location":"Austin, Texas"},"linkedin_filters":{"search_query":"Product Manager Google","locations":["Austin"],"current_job_titles":null,"seniority_level_ids":null,"function_ids":null,"industry_ids":null,"company_headcount":null,"years_of_experience_ids":null,"recently_changed_jobs":null},"selectables":[],"suggested_searches":[{"label":"PMs at Meta","company":"Meta","role":"Product Manager"},{"label":"PMs at Apple","company":"Apple","role":"Product Manager"},{"label":"Software Engineers at Google","company":"Google","role":"Software Engineer"}],"message":"Searching for Product Managers at Google in Austin!"}
 
 User: "consultants at top consulting firms from UT Austin"
-→ {"status":"needs_selection","filters":{"company":null,"role":"Consultant","university":"UT Austin","location":null},"selectables":[{"label":"McKinsey","filter_key":"company","filter_value":"McKinsey"},{"label":"BCG","filter_key":"company","filter_value":"BCG"},{"label":"Bain","filter_key":"company","filter_value":"Bain"},{"label":"Deloitte","filter_key":"company","filter_value":"Deloitte"},{"label":"Accenture","filter_key":"company","filter_value":"Accenture"}],"suggested_searches":[],"message":"Which consulting firm are you interested in?"}
+→ {"status":"needs_selection","filters":{"company":null,"role":"Consultant","university":"UT Austin","location":null},"linkedin_filters":{},"selectables":[{"label":"McKinsey","filter_key":"company","filter_value":"McKinsey"},{"label":"BCG","filter_key":"company","filter_value":"BCG"},{"label":"Bain","filter_key":"company","filter_value":"Bain"},{"label":"Deloitte","filter_key":"company","filter_value":"Deloitte"},{"label":"Accenture","filter_key":"company","filter_value":"Accenture"}],"suggested_searches":[],"message":"Which consulting firm are you interested in?"}
 
 User: "people at McKinsey"
-→ {"status":"ready","filters":{"company":"McKinsey","role":null,"university":null,"location":null},"selectables":[],"suggested_searches":[{"label":"Consultants at McKinsey","company":"McKinsey","role":"Consultant"},{"label":"Business Analysts at McKinsey","company":"McKinsey","role":"Business Analyst"},{"label":"Associates at McKinsey","company":"McKinsey","role":"Associate"}],"message":"Searching for people at McKinsey!"}
+→ {"status":"ready","filters":{"company":"McKinsey","role":null,"university":null,"location":null},"linkedin_filters":{"search_query":"McKinsey"},"selectables":[],"suggested_searches":[{"label":"Consultants at McKinsey","company":"McKinsey","role":"Consultant"},{"label":"Business Analysts at McKinsey","company":"McKinsey","role":"Business Analyst"},{"label":"Associates at McKinsey","company":"McKinsey","role":"Associate"}],"message":"Searching for people at McKinsey!"}
 
 User: "engineers at Google and Meta"
-→ {"status":"needs_selection","filters":{"company":null,"role":"Software Engineer","university":null,"location":null},"selectables":[{"label":"Google","filter_key":"company","filter_value":"Google"},{"label":"Meta","filter_key":"company","filter_value":"Meta"}],"suggested_searches":[],"message":"Which company would you like to search first?"}
+→ {"status":"needs_selection","filters":{"company":null,"role":"Software Engineer","university":null,"location":null},"linkedin_filters":{},"selectables":[{"label":"Google","filter_key":"company","filter_value":"Google"},{"label":"Meta","filter_key":"company","filter_value":"Meta"}],"suggested_searches":[],"message":"Which company would you like to search first?"}
 
 User: "Find John Smith at Google"
-→ {"status":"person_lookup","filters":{"company":null,"role":null,"university":null,"location":null},"person_name":"John Smith","person_company":"Google","selectables":[],"suggested_searches":[],"message":"Looking up John Smith at Google!"}
+→ {"status":"person_lookup","filters":{"company":null,"role":null,"university":null,"location":null},"linkedin_filters":{},"person_name":"John Smith","person_company":"Google","selectables":[],"suggested_searches":[],"message":"Looking up John Smith at Google!"}
 
 User: "Do you have Jane Doe's info?"
-→ {"status":"person_lookup","filters":{"company":null,"role":null,"university":null,"location":null},"person_name":"Jane Doe","person_company":null,"selectables":[],"suggested_searches":[],"message":"Looking up Jane Doe!"}
+→ {"status":"person_lookup","filters":{"company":null,"role":null,"university":null,"location":null},"linkedin_filters":{},"person_name":"Jane Doe","person_company":null,"selectables":[],"suggested_searches":[],"message":"Looking up Jane Doe!"}
 
 User: "how is the weather?"
-→ {"status":"off_topic","filters":{"company":null,"role":null,"university":null,"location":null},"selectables":[],"suggested_searches":[],"message":"I'm designed to help you find and reach out to professional contacts! Try something like 'Find software engineers at Google' or 'PMs at McKinsey'."}`;
+→ {"status":"off_topic","filters":{"company":null,"role":null,"university":null,"location":null},"linkedin_filters":{},"selectables":[],"suggested_searches":[],"message":"I'm designed to help you find and reach out to professional contacts! Try something like 'Find software engineers at Google' or 'PMs at McKinsey'."}
+
+User: "senior PMs at fintech startups in NYC"
+→ {"status":"ready","filters":{"company":null,"role":"Product Manager","university":null,"location":"New York, New York"},"linkedin_filters":{"search_query":"Product Manager","locations":["New York"],"seniority_level_ids":["120"],"industry_ids":["43","4"],"company_headcount":["B","C","D"]},"selectables":[],"suggested_searches":[],"message":"Searching for senior Product Managers at fintech startups in NYC!"}`;
+
+/**
+ * Convert snake_case linkedin_filters from LLM to camelCase LinkedInFilters.
+ */
+function convertLinkedInFilters(raw: LLMResponse['linkedin_filters'] | undefined): LinkedInFilters {
+  if (!raw) return {};
+  const result: LinkedInFilters = {};
+  if (raw.search_query) result.searchQuery = raw.search_query;
+  if (raw.locations?.length) result.locations = raw.locations;
+  if (raw.current_companies?.length) result.currentCompanies = raw.current_companies;
+  if (raw.past_companies?.length) result.pastCompanies = raw.past_companies;
+  if (raw.schools?.length) result.schools = raw.schools;
+  if (raw.current_job_titles?.length) result.currentJobTitles = raw.current_job_titles;
+  if (raw.past_job_titles?.length) result.pastJobTitles = raw.past_job_titles;
+  if (raw.seniority_level_ids?.length) result.seniorityLevelIds = raw.seniority_level_ids;
+  if (raw.function_ids?.length) result.functionIds = raw.function_ids;
+  if (raw.industry_ids?.length) result.industryIds = raw.industry_ids;
+  if (raw.company_headcount?.length) result.companyHeadcount = raw.company_headcount;
+  if (raw.years_of_experience_ids?.length) result.yearsOfExperienceIds = raw.years_of_experience_ids;
+  if (raw.years_at_current_company_ids?.length) result.yearsAtCurrentCompanyIds = raw.years_at_current_company_ids;
+  if (raw.recently_changed_jobs) result.recentlyChangedJobs = raw.recently_changed_jobs;
+  if (raw.exclude_locations?.length) result.excludeLocations = raw.exclude_locations;
+  if (raw.exclude_current_companies?.length) result.excludeCurrentCompanies = raw.exclude_current_companies;
+  if (raw.exclude_industry_ids?.length) result.excludeIndustryIds = raw.exclude_industry_ids;
+  if (raw.exclude_seniority_level_ids?.length) result.excludeSeniorityLevelIds = raw.exclude_seniority_level_ids;
+  if (raw.exclude_function_ids?.length) result.excludeFunctionIds = raw.exclude_function_ids;
+  return result;
+}
+
+// Well-known companies that don't need URL resolution (searchQuery alone works)
+const WELL_KNOWN_COMPANIES = new Set([
+  'google', 'meta', 'facebook', 'apple', 'amazon', 'microsoft', 'netflix', 'tesla',
+  'openai', 'anthropic', 'salesforce', 'oracle', 'ibm', 'intel', 'nvidia', 'adobe',
+  'uber', 'lyft', 'airbnb', 'stripe', 'spotify', 'twitter', 'x', 'linkedin', 'snap',
+  'pinterest', 'palantir', 'goldman sachs', 'jpmorgan', 'morgan stanley', 'mckinsey',
+  'bcg', 'bain', 'deloitte', 'pwc', 'ey', 'kpmg', 'accenture', 'coinbase', 'robinhood',
+  'databricks', 'snowflake', 'figma', 'notion', 'discord', 'slack', 'zoom', 'doordash',
+  'instacart', 'shopify', 'square', 'block', 'paypal', 'visa', 'mastercard',
+]);
 
 function buildUserPrompt(input: ExtractFiltersInput): string {
   const parts: string[] = [];
@@ -416,12 +520,30 @@ export async function extractSearchFiltersAction(
       },
     }));
 
+    // Convert linkedin_filters from LLM snake_case to camelCase
+    const linkedInFilters = convertLinkedInFilters(response.content.linkedin_filters);
+    console.log(`[AI Search] LinkedIn filters: ${JSON.stringify(linkedInFilters)}`);
+
+    // Resolve company URL for non-well-known companies
+    if (parsedFilters.company && !WELL_KNOWN_COMPANIES.has(parsedFilters.company.toLowerCase())) {
+      try {
+        const resolved = await resolveCompanyLinkedInUrl(parsedFilters.company);
+        if (resolved.url) {
+          linkedInFilters.currentCompanies = [resolved.url];
+          console.log(`[AI Search] Resolved company URL: ${parsedFilters.company} → ${resolved.url}`);
+        }
+      } catch (err) {
+        console.warn(`[AI Search] Company URL resolution failed for "${parsedFilters.company}":`, err);
+      }
+    }
+
     console.log(`[AI Search] Ready with ${parsedSuggestions.length} suggested searches`);
 
     return {
       success: true,
       status: 'ready',
       filters: parsedFilters,
+      linkedInFilters,
       assistantMessage: message,
       suggestedSearches: parsedSuggestions,
       companyNameAmbiguous: company_name_ambiguous,

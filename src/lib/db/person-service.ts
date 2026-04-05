@@ -456,7 +456,6 @@ export async function saveSearchResult(
 ): Promise<{
   personId: string;
   userCandidateId: string;
-  emailDraftId: string;
   linkedinUrl: string | null;
 }> {
   // Extract LinkedIn URL
@@ -563,13 +562,9 @@ export async function saveSearchResult(
     university,
   });
 
-  // 5. Create/update EmailDraft
-  const emailDraft = await createOrUpdateEmailDraft(userCandidate.id, draftData);
-
   return {
     personId: person.id,
     userCandidateId: userCandidate.id,
-    emailDraftId: emailDraft.id,
     linkedinUrl: finalLinkedInUrl,
   };
 }
@@ -917,6 +912,7 @@ export type PersonResult = {
   educationDegree: string | null;
   educationField: string | null;
   educationYear: string | null;
+  scrapeDepth?: string;
   roleDistance?: number;
   sourceLinks: Array<{
     url: string;
@@ -983,6 +979,7 @@ export async function findPeopleByFilters(filters: PersonFilters): Promise<Perso
       educationDegree: true,
       educationField: true,
       educationYear: true,
+      scrapeDepth: true,
       sourceLinks: {
         where: { kind: 'DISCOVERY' },
         orderBy: { createdAt: 'asc' },
@@ -1120,6 +1117,7 @@ async function findPeopleByFiltersVector(
     educationDegree: string | null;
     educationField: string | null;
     educationYear: string | null;
+    scrapeDepth: string;
     role_distance: number;
   }>>(Prisma.sql`
     SELECT
@@ -1143,6 +1141,7 @@ async function findPeopleByFiltersVector(
       p."educationDegree",
       p."educationField",
       p."educationYear",
+      p."scrapeDepth",
       (p.role_embedding <=> ${vectorString}::vector) as role_distance
     FROM "Person" p
     ${whereClause}
@@ -1252,6 +1251,7 @@ export async function findPeopleByName(params: {
       educationDegree: true,
       educationField: true,
       educationYear: true,
+      scrapeDepth: true,
       sourceLinks: {
         where: { kind: 'DISCOVERY' },
         orderBy: { createdAt: 'asc' as const },
@@ -1689,6 +1689,207 @@ export async function saveScrapedProfile(
           },
         });
         return { personId: existing.id, isNew: false, role: profile.role };
+      }
+    }
+    throw error;
+  }
+}
+
+// ─── Full Profile Upgrade (Phase 3 Step 2) ─────────────────────────────────
+
+/**
+ * Upgrade a short profile to full by applying scraped LinkedIn data.
+ *
+ * - Only overwrites fields where scraped value is non-null (preserves pictureUrl, tenureMonths)
+ * - Does NOT update company (short profile already has correct company)
+ * - Sets scrapeDepth = "full" and scrapedAt = now
+ */
+export async function upgradeToFullProfile(
+  personId: string,
+  profile: ScrapedProfile
+): Promise<void> {
+  const data: Record<string, unknown> = {
+    scrapeDepth: 'full',
+    scrapedAt: new Date(),
+  };
+
+  if (profile.role) data.role = profile.role;
+  if (profile.email) {
+    data.email = profile.email;
+    data.emailStatus = getEmailStatus(profile.email);
+    data.emailConfidence = 50;
+  }
+  if (profile.city) data.city = profile.city;
+  if (profile.state) data.state = profile.state;
+  if (profile.country) data.country = profile.country;
+  if (profile.schools.length > 0) data.schools = profile.schools;
+  if (profile.educationSchool) data.educationSchool = profile.educationSchool;
+  if (profile.experienceHistory?.length) data.experienceHistory = profile.experienceHistory;
+  if (profile.educationHistory?.length) data.educationHistory = profile.educationHistory;
+  if (profile.linkedinUrl) data.linkedinUrl = profile.linkedinUrl;
+
+  await prisma.person.update({
+    where: { id: personId },
+    data,
+  });
+}
+
+// ─── Short Profile Save (Phase 3: LinkedIn Short Profile Discovery) ────────
+
+import type { ShortProfileResult } from '@/lib/services/linkedin-search';
+
+/**
+ * Save a short profile from LinkedIn Short mode search to the Person table.
+ *
+ * - Deduplicates on linkedinUrl first, then fullName+company
+ * - Does NOT overwrite full profiles with short data (preserves richer data)
+ * - Optionally tags with school when search used schools filter
+ * - Sets scrapeDepth = "short" for new profiles
+ *
+ * @returns personId and whether a new Person was created
+ */
+export async function saveShortProfile(
+  profile: ShortProfileResult,
+  schoolTag?: string | null
+): Promise<{ personId: string; isNew: boolean }> {
+  const company = normalizeCompanyForStorage(profile.company || 'Unknown');
+  const fullName = profile.fullName || `${profile.firstName} ${profile.lastName}`.trim();
+
+  if (!fullName) {
+    console.warn(`[saveShortProfile] Skipping profile with no name`);
+    throw new Error('Cannot save profile without a name');
+  }
+
+  // 1. Check by linkedinUrl first (most reliable dedup)
+  if (profile.linkedinUrl) {
+    const existingByUrl = await prisma.person.findFirst({
+      where: { linkedinUrl: profile.linkedinUrl },
+      select: { id: true, scrapeDepth: true },
+    });
+
+    if (existingByUrl) {
+      // Don't overwrite full profiles with short data
+      if (existingByUrl.scrapeDepth === 'full') {
+        console.log(`[saveShortProfile] Full profile exists for "${fullName}" — skipping update`);
+        // Still tag with school if missing
+        if (schoolTag) {
+          await prisma.person.update({
+            where: { id: existingByUrl.id },
+            data: {
+              educationSchool: schoolTag,
+              schools: [schoolTag],
+            },
+          });
+        }
+        return { personId: existingByUrl.id, isNew: false };
+      }
+
+      // Update existing short profile with fresh data
+      await prisma.person.update({
+        where: { id: existingByUrl.id },
+        data: {
+          fullName,
+          firstName: profile.firstName || undefined,
+          lastName: profile.lastName || undefined,
+          company,
+          role: profile.role || undefined,
+          city: profile.city || undefined,
+          state: profile.state || undefined,
+          country: profile.country || undefined,
+          pictureUrl: profile.pictureUrl || undefined,
+          tenureMonths: profile.tenureMonths ?? undefined,
+          openProfile: profile.openProfile,
+          premium: profile.premium,
+          ...(schoolTag && {
+            educationSchool: schoolTag,
+            schools: [schoolTag],
+          }),
+        },
+      });
+      return { personId: existingByUrl.id, isNew: false };
+    }
+  }
+
+  // 2. Check by fullName + company
+  const existingByName = await prisma.person.findUnique({
+    where: { fullName_company: { fullName, company } },
+    select: { id: true, scrapeDepth: true },
+  });
+
+  if (existingByName) {
+    if (existingByName.scrapeDepth === 'full') {
+      console.log(`[saveShortProfile] Full profile exists for "${fullName}" at "${company}" — skipping update`);
+      if (schoolTag) {
+        await prisma.person.update({
+          where: { id: existingByName.id },
+          data: {
+            educationSchool: schoolTag,
+            schools: [schoolTag],
+          },
+        });
+      }
+      return { personId: existingByName.id, isNew: false };
+    }
+
+    // Update existing short profile
+    await prisma.person.update({
+      where: { id: existingByName.id },
+      data: {
+        linkedinUrl: profile.linkedinUrl || undefined,
+        role: profile.role || undefined,
+        city: profile.city || undefined,
+        state: profile.state || undefined,
+        country: profile.country || undefined,
+        pictureUrl: profile.pictureUrl || undefined,
+        tenureMonths: profile.tenureMonths ?? undefined,
+        openProfile: profile.openProfile,
+        premium: profile.premium,
+        ...(schoolTag && {
+          educationSchool: schoolTag,
+          schools: [schoolTag],
+        }),
+      },
+    });
+    return { personId: existingByName.id, isNew: false };
+  }
+
+  // 3. Create new short profile
+  try {
+    const person = await prisma.person.create({
+      data: {
+        fullName,
+        firstName: profile.firstName || null,
+        lastName: profile.lastName || null,
+        company,
+        role: profile.role || null,
+        linkedinUrl: profile.linkedinUrl || null,
+        city: profile.city || null,
+        state: profile.state || null,
+        country: profile.country || null,
+        pictureUrl: profile.pictureUrl || null,
+        tenureMonths: profile.tenureMonths ?? null,
+        openProfile: profile.openProfile,
+        premium: profile.premium,
+        scrapeDepth: 'short',
+        ...(schoolTag && {
+          educationSchool: schoolTag,
+          schools: [schoolTag],
+        }),
+      },
+    });
+
+    console.log(`[saveShortProfile] Created short profile: "${fullName}" at "${company}" (${person.id})`);
+    return { personId: person.id, isNew: true };
+  } catch (error: any) {
+    // Handle race condition (concurrent save)
+    if (error.code === 'P2002') {
+      console.log(`[saveShortProfile] Duplicate for "${fullName}" at "${company}" — fetching existing`);
+      const existing = await prisma.person.findUnique({
+        where: { fullName_company: { fullName, company } },
+        select: { id: true },
+      });
+      if (existing) {
+        return { personId: existing.id, isNew: false };
       }
     }
     throw error;

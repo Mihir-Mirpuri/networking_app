@@ -38,11 +38,6 @@ export function AppShell({ initialRemainingDaily, isAuthenticated = true }: AppS
 
     // If company is set, trigger search via pending filters
     if (updated.company) {
-      const confirmMsgId = `assistant-${Date.now()}`;
-      setMessages(prev => [
-        ...prev,
-        { id: confirmMsgId, role: 'assistant', content: `Searching for ${updated.role ? `${updated.role}s` : 'people'} at ${updated.company}${updated.location ? ` in ${updated.location}` : ''}${updated.university ? ` from ${updated.university}` : ''}!` },
-      ]);
       setPendingFilters(updated);
     } else {
       // Still missing company — send as query

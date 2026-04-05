@@ -657,6 +657,160 @@ export async function getInitialScheduledEmails(userId: string): Promise<{
   }
 }
 
+// ===== DRAFTS =====
+
+export interface DraftEntry {
+  id: string;
+  contactName: string;
+  contactEmail: string | null;
+  company: string;
+  role: string | null;
+  linkedinUrl: string | null;
+  subject: string;
+  body: string;
+  createdAt: Date;
+  updatedAt: Date;
+  userCandidateId: string;
+  personId: string;
+}
+
+export async function getDrafts(search?: string): Promise<{
+  success: true;
+  drafts: DraftEntry[];
+} | { success: false; error: string }> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return { success: false, error: 'Not authenticated' };
+  }
+
+  try {
+    const where: Prisma.EmailDraftWhereInput = {
+      userCandidate: { userId: session.user.id },
+      status: { not: 'SENT' },
+    };
+
+    if (search) {
+      const q = search.toLowerCase();
+      where.OR = [
+        { subject: { contains: q, mode: 'insensitive' } },
+        { body: { contains: q, mode: 'insensitive' } },
+        { userCandidate: { person: { fullName: { contains: q, mode: 'insensitive' } } } },
+        { userCandidate: { person: { company: { contains: q, mode: 'insensitive' } } } },
+      ];
+    }
+
+    const drafts = await prisma.emailDraft.findMany({
+      where,
+      include: {
+        userCandidate: {
+          include: { person: true },
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: 100,
+    });
+
+    return {
+      success: true,
+      drafts: drafts.map((d) => ({
+        id: d.id,
+        contactName: d.userCandidate.person.fullName,
+        contactEmail: d.userCandidate.person.email,
+        company: d.userCandidate.person.company,
+        role: d.userCandidate.person.role,
+        linkedinUrl: d.userCandidate.person.linkedinUrl,
+        subject: d.subject,
+        body: d.body,
+        createdAt: d.createdAt,
+        updatedAt: d.updatedAt,
+        userCandidateId: d.userCandidateId,
+        personId: d.userCandidate.personId,
+      })),
+    };
+  } catch (error) {
+    console.error('[Outreach] Error fetching drafts:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch drafts',
+    };
+  }
+}
+
+export async function getInitialDrafts(userId: string): Promise<{
+  success: true;
+  drafts: DraftEntry[];
+} | { success: false; error: string }> {
+  try {
+    const drafts = await prisma.emailDraft.findMany({
+      where: {
+        userCandidate: { userId },
+        status: { not: 'SENT' },
+      },
+      include: {
+        userCandidate: {
+          include: { person: true },
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: 100,
+    });
+
+    return {
+      success: true,
+      drafts: drafts.map((d) => ({
+        id: d.id,
+        contactName: d.userCandidate.person.fullName,
+        contactEmail: d.userCandidate.person.email,
+        company: d.userCandidate.person.company,
+        role: d.userCandidate.person.role,
+        linkedinUrl: d.userCandidate.person.linkedinUrl,
+        subject: d.subject,
+        body: d.body,
+        createdAt: d.createdAt,
+        updatedAt: d.updatedAt,
+        userCandidateId: d.userCandidateId,
+        personId: d.userCandidate.personId,
+      })),
+    };
+  } catch (error) {
+    console.error('[Outreach] Error fetching initial drafts:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch drafts',
+    };
+  }
+}
+
+export async function deleteDraft(draftId: string): Promise<{
+  success: true;
+} | { success: false; error: string }> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return { success: false, error: 'Not authenticated' };
+  }
+
+  try {
+    // Verify ownership
+    const draft = await prisma.emailDraft.findUnique({
+      where: { id: draftId },
+      include: { userCandidate: true },
+    });
+
+    if (!draft || draft.userCandidate.userId !== session.user.id) {
+      return { success: false, error: 'Draft not found' };
+    }
+
+    await prisma.emailDraft.delete({ where: { id: draftId } });
+    return { success: true };
+  } catch (error) {
+    console.error('[Outreach] Error deleting draft:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to delete draft',
+    };
+  }
+}
+
 export async function clearAllOutreachTrackers(): Promise<{
   success: true;
   deletedCount: number;

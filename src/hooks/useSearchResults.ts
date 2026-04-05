@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { SearchResultWithDraft, loadMorePeopleAction, regenerateDraftAction } from '@/app/actions/search';
+import { SearchResultWithDraft, regenerateDraftAction, loadMoreV2Action, SearchMetaV2 } from '@/app/actions/search';
 import { sendSingleEmailAction, sendEmailsAction, PersonToSend } from '@/app/actions/send';
 import { getTemplatesAction, getAutoPersonalizeAction, TemplateData } from '@/app/actions/profile';
 import { hidePersonAction, toggleSavedForLaterAction } from '@/app/actions/search';
 import { EMAIL_TEMPLATES } from '@/lib/constants';
 import { LimitReachedModal, dispatchCreditsChanged } from '@/components/credits';
 import { useSession } from 'next-auth/react';
+import type { LinkedInFilters, DBFilters } from '@/lib/types/linkedin-filters';
 
 export interface SearchParams {
   company?: string;
@@ -59,6 +60,16 @@ export function useSearchResults({ initialRemainingDaily }: UseSearchResultsOpti
   const retryTimerRef = useRef<NodeJS.Timeout | null>(null);
   const retryCountRef = useRef(0);
   const MAX_RETRIES = 5;
+
+  // V2 advanced query client-side pagination state
+  const [allBatchResults, setAllBatchResults] = useState<SearchResultWithDraft[]>([]);
+  const [visibleCount, setVisibleCount] = useState(0);
+  const [isAdvancedQuery, setIsAdvancedQuery] = useState(false);
+  const [linkedInFilters, setLinkedInFilters] = useState<LinkedInFilters | null>(null);
+  const [dbFilters, setDbFilters] = useState<DBFilters | null>(null);
+  const [linkedInPage, setLinkedInPage] = useState(1);
+  const [totalLinkedInPages, setTotalLinkedInPages] = useState(0);
+  const PAGE_SIZE = 6;
 
   // Cleanup retry timer on unmount
   useEffect(() => {
@@ -118,6 +129,14 @@ export function useSearchResults({ initialRemainingDaily }: UseSearchResultsOpti
     setTotalLoaded(0);
     setHasMore(true);
     setHiddenCount(0);
+    // Reset V2 advanced pagination state
+    setAllBatchResults([]);
+    setVisibleCount(0);
+    setIsAdvancedQuery(false);
+    setLinkedInFilters(null);
+    setDbFilters(null);
+    setLinkedInPage(1);
+    setTotalLinkedInPages(0);
   }, []);
 
   // Apply search results after a search completes
@@ -125,13 +144,38 @@ export function useSearchResults({ initialRemainingDaily }: UseSearchResultsOpti
     newResults: SearchResultWithDraft[],
     meta: SearchResultsMeta,
     newHiddenCount: number,
-    params: SearchParams
+    params: SearchParams,
+    v2Meta?: {
+      isAdvancedQuery: boolean;
+      linkedInFilters: LinkedInFilters;
+      dbFilters: DBFilters;
+      linkedInPage?: number;
+      totalLinkedInPages?: number;
+    }
   ) => {
-    setResults(newResults);
-    setTotalLoaded(newResults.length);
-    setHasMore(meta.hasMore);
     setHiddenCount(newHiddenCount);
     setSearchParams(params);
+
+    if (v2Meta?.isAdvancedQuery) {
+      // Advanced query: store full batch, show first PAGE_SIZE
+      setAllBatchResults(newResults);
+      setIsAdvancedQuery(true);
+      setLinkedInFilters(v2Meta.linkedInFilters);
+      setDbFilters(v2Meta.dbFilters);
+      setLinkedInPage(v2Meta.linkedInPage || 1);
+      setTotalLinkedInPages(v2Meta.totalLinkedInPages || 0);
+      const initialVisible = Math.min(PAGE_SIZE, newResults.length);
+      setVisibleCount(initialVisible);
+      setResults(newResults.slice(0, initialVisible));
+      setTotalLoaded(initialVisible);
+      setHasMore(initialVisible < newResults.length || (v2Meta.totalLinkedInPages || 0) > 1);
+    } else {
+      // Simple query: existing behavior
+      setResults(newResults);
+      setTotalLoaded(newResults.length);
+      setHasMore(meta.hasMore);
+      setIsAdvancedQuery(false);
+    }
   }, []);
 
   const handleSendFromReview = async (index: number, subject: string, body: string, resumeIdOverride?: string | null): Promise<boolean> => {
@@ -263,10 +307,6 @@ export function useSearchResults({ initialRemainingDaily }: UseSearchResultsOpti
           r.userCandidateId === userCandidateId ? { ...r, savedForLater: result.savedForLater } : r
         )
       );
-      setToast({
-        message: result.savedForLater ? 'Saved for later' : 'Removed from saved',
-        type: 'success',
-      });
     } else if (result.error !== 'Not authenticated') {
       setToast({ message: result.error || 'Failed to update', type: 'error' });
     }
@@ -322,42 +362,85 @@ export function useSearchResults({ initialRemainingDaily }: UseSearchResultsOpti
   };
 
   const handleLoadMore = useCallback(async () => {
-    if (!searchParams?.company || isLoadingMore || !hasMore) return;
+    if (isLoadingMore || !hasMore) return;
+
+    if (isAdvancedQuery) {
+      // === ADVANCED QUERY: client-side pagination first, then fetch next LinkedIn page ===
+      const nextVisible = visibleCount + PAGE_SIZE;
+
+      if (nextVisible <= allBatchResults.length) {
+        // More results in local batch — instant client-side pagination
+        const newVisible = Math.min(nextVisible, allBatchResults.length);
+        setVisibleCount(newVisible);
+        setResults(allBatchResults.slice(0, newVisible));
+        setTotalLoaded(newVisible);
+        setHasMore(newVisible < allBatchResults.length || linkedInPage < totalLinkedInPages);
+        return;
+      }
+
+      // Local batch exhausted — fetch next page from LinkedIn
+      if (linkedInPage >= totalLinkedInPages) {
+        setHasMore(false);
+        return;
+      }
+
+      if (!linkedInFilters || !dbFilters) return;
+
+      setIsLoadingMore(true);
+      try {
+        const nextPage = linkedInPage + 1;
+        const result = await loadMoreV2Action({
+          linkedInFilters,
+          dbFilters,
+          linkedInPage: nextPage,
+          excludePersonIds: allBatchResults.map(r => r.id),
+        });
+
+        if (result.success) {
+          const newBatch = [...allBatchResults, ...result.results];
+          setAllBatchResults(newBatch);
+          setLinkedInPage(nextPage);
+          setTotalLinkedInPages(result.totalLinkedInPages);
+          const newVisible = Math.min(visibleCount + PAGE_SIZE, newBatch.length);
+          setVisibleCount(newVisible);
+          setResults(newBatch.slice(0, newVisible));
+          setTotalLoaded(newVisible);
+          setHasMore(newVisible < newBatch.length || nextPage < result.totalLinkedInPages);
+        } else if (result.error !== 'Not authenticated') {
+          setToast({ message: result.error || 'Failed to load more profiles', type: 'error' });
+        }
+      } catch (err) {
+        console.error('[LoadMoreV2] Error:', err);
+        setToast({ message: 'Failed to load more profiles', type: 'error' });
+      }
+      setIsLoadingMore(false);
+      return;
+    }
+
+    // === SIMPLE QUERY: use V2 loadMore with LinkedIn Short ===
+    if (!linkedInFilters || !dbFilters) return;
 
     setIsLoadingMore(true);
-    setIsRetrying(false);
     try {
-      const result = await loadMorePeopleAction({
-        company: searchParams.company,
-        role: searchParams.role,
-        university: searchParams.university,
-        location: searchParams.location,
-        limit: searchParams.limit,
+      const nextPage = linkedInPage + 1;
+      const result = await loadMoreV2Action({
+        linkedInFilters,
+        dbFilters,
+        linkedInPage: nextPage,
         excludePersonIds: results.map(r => r.id),
-        skipLocationInSearch: searchParams.skipLocationInSearch,
-        companyNameAmbiguous: searchParams.companyNameAmbiguous,
       });
 
       if (result.success) {
         if (result.results.length > 0) {
           setResults(prev => [...prev, ...result.results]);
           setTotalLoaded(prev => prev + result.results.length);
-          setHasMore(result.loadMoreMeta.hasMore);
-          retryCountRef.current = 0;
-        } else if (result.loadMoreMeta.prescrapeRunning && retryCountRef.current < MAX_RETRIES) {
-          retryCountRef.current++;
-          setIsRetrying(true);
-          setIsLoadingMore(false);
-          retryTimerRef.current = setTimeout(() => {
-            handleLoadMore();
-          }, 3000);
-          return;
+          setLinkedInPage(nextPage);
+          setTotalLinkedInPages(result.totalLinkedInPages);
+          setHasMore(nextPage < result.totalLinkedInPages);
         } else {
           setHasMore(false);
-          retryCountRef.current = 0;
         }
       } else if (result.error !== 'Not authenticated') {
-        // Don't show error for unauthenticated users
         setToast({ message: result.error || 'Failed to load more profiles', type: 'error' });
       }
     } catch (err) {
@@ -365,9 +448,8 @@ export function useSearchResults({ initialRemainingDaily }: UseSearchResultsOpti
       setToast({ message: 'Failed to load more profiles', type: 'error' });
     }
 
-    setIsRetrying(false);
     setIsLoadingMore(false);
-  }, [searchParams, isLoadingMore, hasMore, results]);
+  }, [searchParams, isLoadingMore, hasMore, results, isAdvancedQuery, visibleCount, allBatchResults, linkedInPage, totalLinkedInPages, linkedInFilters, dbFilters]);
 
   return {
     // State

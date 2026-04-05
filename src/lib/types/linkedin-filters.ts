@@ -1,0 +1,30 @@
+export interface DBFilters {
+  role?: string;
+  company?: string;
+  location?: string;
+  university?: string;
+  minYearsExperience?: number;
+}
+
+export interface LinkedInFilters {
+  searchQuery?: string;
+  locations?: string[];
+  currentCompanies?: string[];        // LinkedIn company URLs
+  pastCompanies?: string[];
+  schools?: string[];
+  currentJobTitles?: string[];
+  pastJobTitles?: string[];
+  seniorityLevelIds?: string[];
+  functionIds?: string[];
+  industryIds?: string[];
+  companyHeadcount?: string[];
+  yearsOfExperienceIds?: string[];
+  yearsAtCurrentCompanyIds?: string[];
+  recentlyChangedJobs?: boolean;
+  // Exclude filters
+  excludeLocations?: string[];
+  excludeCurrentCompanies?: string[];
+  excludeIndustryIds?: string[];
+  excludeSeniorityLevelIds?: string[];
+  excludeFunctionIds?: string[];
+}

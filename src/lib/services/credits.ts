@@ -30,15 +30,15 @@ export async function hasActiveSubscription(userId: string): Promise<boolean> {
 }
 
 /**
- * Check if user can send an email and get full credit status
+ * Check if user can send an email and get full credit status.
+ * Free users get a hard lifetime limit of 3 sends total.
+ * Subscribers get unlimited.
  */
 export async function checkEmailCredits(userId: string): Promise<CreditStatus> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: {
-      dailySendCount: true,
-      lastSendDate: true,
-      emailCredits: true,
+      totalSendCount: true,
       subscriptionStatus: true,
       stripeCurrentPeriodEnd: true,
     },
@@ -54,71 +54,38 @@ export async function checkEmailCredits(userId: string): Promise<CreditStatus> {
   if (isSubscribed) {
     return {
       canSend: true,
-      dailyUsed: user?.dailySendCount || 0,
-      dailyLimit: -1, // -1 indicates unlimited
-      bonusCredits: user?.emailCredits || 0,
-      totalRemaining: -1, // -1 indicates unlimited
+      dailyUsed: 0,
+      dailyLimit: -1,
+      bonusCredits: 0,
+      totalRemaining: -1,
       isSubscribed: true,
     };
   }
 
-  const today = new Date().toDateString();
-  const lastSendDate = user?.lastSendDate?.toDateString();
-  const isNewDay = lastSendDate !== today;
-
-  const dailyUsed = isNewDay ? 0 : (user?.dailySendCount || 0);
-  const dailyLimit = EMAIL_LIMITS.DEFAULT_DAILY_LIMIT;
-  const bonusCredits = user?.emailCredits || 0;
-
-  // Daily remaining + bonus credits
-  const dailyRemaining = Math.max(0, dailyLimit - dailyUsed);
-  const totalRemaining = dailyRemaining + bonusCredits;
+  const totalSent = user?.totalSendCount || 0;
+  const totalRemaining = Math.max(0, EMAIL_LIMITS.FREE_LIFETIME_LIMIT - totalSent);
 
   return {
     canSend: totalRemaining > 0,
-    dailyUsed,
-    dailyLimit,
-    bonusCredits,
+    dailyUsed: totalSent,
+    dailyLimit: EMAIL_LIMITS.FREE_LIFETIME_LIMIT,
+    bonusCredits: 0,
     totalRemaining,
     isSubscribed: false,
   };
 }
 
 /**
- * Consume one email send (use daily first, then bonus credits)
+ * Consume one email send — increments totalSendCount
  */
 export async function consumeEmailCredit(userId: string): Promise<void> {
-  const today = new Date();
-  const user = await prisma.user.findUnique({
+  await prisma.user.update({
     where: { id: userId },
-    select: { dailySendCount: true, lastSendDate: true, emailCredits: true },
+    data: {
+      totalSendCount: { increment: 1 },
+      lastSendDate: new Date(),
+    },
   });
-
-  const isNewDay = user?.lastSendDate?.toDateString() !== today.toDateString();
-  const dailyUsed = isNewDay ? 0 : (user?.dailySendCount || 0);
-  const dailyRemaining = EMAIL_LIMITS.DEFAULT_DAILY_LIMIT - dailyUsed;
-
-  if (dailyRemaining > 0) {
-    // Consume from daily limit
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        dailySendCount: isNewDay ? 1 : dailyUsed + 1,
-        lastSendDate: today,
-      },
-    });
-  } else if ((user?.emailCredits || 0) > 0) {
-    // Consume from bonus credits
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        emailCredits: Math.max(0, (user?.emailCredits || 0) - 1),
-        // Also update lastSendDate to track activity
-        lastSendDate: today,
-      },
-    });
-  }
-  // If neither available, do nothing (caller should have checked canSend first)
 }
 
 /**

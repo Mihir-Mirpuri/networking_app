@@ -969,6 +969,7 @@ export type EmailTemplate = (typeof EMAIL_TEMPLATES)[number];
 // Email Credit System
 export const EMAIL_LIMITS = {
   DEFAULT_DAILY_LIMIT: 10,
+  FREE_LIFETIME_LIMIT: 3,
   CREDITS_ON_INVITE_SENT: 10,
   MAX_INVITES_PER_DAY: 1,
   MAX_CREDITS: 10,
