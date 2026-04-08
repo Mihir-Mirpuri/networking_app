@@ -18,6 +18,7 @@ import {
   PersonResult,
   isVectorRoleMatchingEnabled,
   saveShortProfile,
+  saveShortProfilesBatch,
 } from '@/lib/db/person-service';
 import {
   getCompanyPattern,
@@ -28,6 +29,7 @@ import { generateEmailWithLLM, getUserResumeSummary, getRecentSentEmails, refine
 import { searchLinkedInShort } from '@/lib/services/linkedin-search';
 import { createHash } from 'crypto';
 import { isUserBlocked } from '@/lib/services/credits';
+
 
 export interface RecentSearch {
   company: string | null;
@@ -241,35 +243,47 @@ async function buildResultsWithDrafts(
   template: ResolvedTemplate,
   user: { name: string | null; university: string | null; classification: string | null; major: string | null; career: string | null } | null
 ): Promise<SearchResultWithDraft[]> {
-  return Promise.all(
-    rankedPeople.map(async ({ candidate: person, score, breakdown }) => {
+  // Batch upsert UserCandidates in 2 queries instead of 25 individual upserts.
+  // With connection_limit=1, sequential upserts take ~10s; this takes ~800ms.
+  const userCandidateMap = new Map<string, { id: string; savedForLater: boolean }>();
+  if (userId && rankedPeople.length > 0) {
+    const personIds = rankedPeople.map(({ candidate }) => candidate.id);
+
+    // 1. Bulk insert new UserCandidates (skip existing via ON CONFLICT DO NOTHING)
+    const values = rankedPeople.map(({ candidate: person }) => {
+      const email = person.email || null;
+      const status = person.emailStatus || 'MISSING';
+      const confidence = person.emailConfidence ?? null;
+      return `(gen_random_uuid(), '${userId}', '${person.id}', ${email ? `'${email.replace(/'/g, "''")}'` : 'NULL'}, '${status}'::"EmailStatus", ${confidence !== null ? confidence : 'NULL'}, NOW(), NOW())`;
+    }).join(',\n');
+
+    await prisma.$executeRawUnsafe(`
+      INSERT INTO "UserCandidate" ("id", "userId", "personId", "email", "emailStatus", "emailConfidence", "createdAt", "updatedAt")
+      VALUES ${values}
+      ON CONFLICT ("userId", "personId") DO NOTHING
+    `);
+
+    // 2. Fetch all UserCandidates for these person IDs in one query
+    const existing = await prisma.userCandidate.findMany({
+      where: { userId, personId: { in: personIds } },
+      select: { id: true, personId: true, savedForLater: true },
+    });
+    for (const uc of existing) {
+      userCandidateMap.set(uc.personId, { id: uc.id, savedForLater: uc.savedForLater });
+    }
+  }
+
+  return rankedPeople.map(({ candidate: person, score, breakdown }) => {
       let userCandidateId: string | null = null;
       let draftSubject = '';
       let draftBody = '';
 
       let savedForLater = false;
       if (userId) {
-        // Authenticated user: create UserCandidate and EmailDraft records
-        const userCandidate = await prisma.userCandidate.upsert({
-          where: {
-            userId_personId: { userId, personId: person.id },
-          },
-          create: {
-            userId,
-            personId: person.id,
-            email: person.email,
-            emailStatus: (person.emailStatus as any) || 'MISSING',
-            emailConfidence: person.emailConfidence,
-          },
-          update: {},
-          select: { id: true, savedForLater: true },
-        });
+        const uc = userCandidateMap.get(person.id);
+        savedForLater = uc?.savedForLater ?? false;
+        userCandidateId = uc?.id ?? null;
 
-        savedForLater = userCandidate.savedForLater;
-
-        userCandidateId = userCandidate.id;
-
-        // Generate placeholder-filled template in memory only (draft saved to DB when user opens profile)
         const draft = generateEmailDraft(
           template,
           { firstName: person.firstName, company: person.company, role: person.role },
@@ -279,7 +293,6 @@ async function buildResultsWithDrafts(
         draftSubject = draft.subject;
         draftBody = draft.body;
       } else {
-        // Guest user: generate a simple placeholder draft without saving
         const draft = generateEmailDraft(
           template,
           { firstName: person.firstName, company: person.company, role: person.role },
@@ -325,8 +338,7 @@ async function buildResultsWithDrafts(
         score,
         scoreBreakdown: breakdown,
       };
-    })
-  );
+    });
 }
 
 
@@ -443,7 +455,8 @@ export async function searchPeopleV2Action(
     const dbFilters = input.dbFilters;
     const linkedInFilters = input.linkedInFilters;
     const parseCost = { haikuCalls: 0, serperCalls: 0, costCents: 0 };
-    console.log(`[SearchV2] Using pre-parsed filters — dbFilters=${JSON.stringify(dbFilters)}, linkedInFilters=${JSON.stringify(linkedInFilters)}`);
+    console.log(`[SearchV2] ── New search ──────────────────────────────────`);
+    console.log(`[SearchV2] Filters — db=${JSON.stringify(dbFilters)}, linkedin=${JSON.stringify(linkedInFilters)}`);
 
     // ===== STEP 2: Determine if advanced query =====
     const hasAdvancedFilters = !!(
@@ -469,7 +482,7 @@ export async function searchPeopleV2Action(
 
     if (hasAdvancedFilters) {
       // ===== ADVANCED PATH: Skip DB, call LinkedIn Short directly =====
-      console.log(`[SearchV2] Advanced query — calling LinkedIn Short directly`);
+      console.log(`[SearchV2] PATH: Advanced (LinkedIn-first) — skipping DB`);
       const apiStart = Date.now();
 
       const apiResult = await searchLinkedInShort({
@@ -482,7 +495,7 @@ export async function searchPeopleV2Action(
       totalLinkedInPages = apiResult.pagination.totalPages;
       apiResultCount = apiResult.profiles.length;
 
-      console.log(`[SearchV2] Advanced: ${apiResultCount} profiles (${totalMatchesOnLinkedIn} total, ${totalLinkedInPages} pages) in ${Date.now() - apiStart}ms`);
+      console.log(`[SearchV2] LinkedIn API returned ${apiResultCount} profiles (${totalMatchesOnLinkedIn.toLocaleString()} total on LinkedIn, ${totalLinkedInPages} pages) in ${Date.now() - apiStart}ms`);
 
       // Save profiles to DB + build results in LinkedIn's order
       const schoolTag = linkedInFilters.schools?.[0] || null;
@@ -494,16 +507,17 @@ export async function searchPeopleV2Action(
         template = { id: defaultTemplate.id, subject: defaultTemplate.subject, body: defaultTemplate.body, attachResume: false, resumeId: null };
       }
 
-      // Save all profiles, then look them up by LinkedIn URL to get full PersonWithSource shape
+      // Save all profiles in batch, then look them up by LinkedIn URL to get full PersonWithSource shape
+      const saveStart = Date.now();
+      const saveResults = await saveShortProfilesBatch(apiResult.profiles, schoolTag);
       const savedPersonIds: string[] = [];
-      for (const profile of apiResult.profiles) {
-        try {
-          const { personId } = await saveShortProfile(profile, schoolTag);
-          savedPersonIds.push(personId);
-        } catch (err) {
-          console.warn(`[SearchV2] Failed to save profile "${profile.fullName}": ${err instanceof Error ? err.message : 'unknown'}`);
-        }
+      let saveNewCount = 0;
+      for (const r of saveResults) {
+        savedPersonIds.push(r.personId);
+        if (r.isNew) saveNewCount++;
       }
+      const saveFailCount = saveResults.filter(r => !r.personId).length;
+      console.log(`[SearchV2] Saved ${apiResultCount} profiles (${saveNewCount} new, ${apiResultCount - saveNewCount - saveFailCount} existing, ${saveFailCount} failed) in ${Date.now() - saveStart}ms`);
 
       // Look up saved profiles by LinkedIn URL to get full PersonWithSource data
       const linkedinUrls = apiResult.profiles
@@ -524,15 +538,19 @@ export async function searchPeopleV2Action(
         });
       }
 
+      const draftsStart = Date.now();
       results = await buildResultsWithDrafts(orderedPeople, userId, template, user);
-      console.log(`[SearchV2] Advanced: built ${results.length} results with drafts`);
+      console.log(`[SearchV2] Built ${results.length} results with drafts in ${Date.now() - draftsStart}ms`);
     } else {
       // ===== SIMPLE PATH: DB-first, LinkedIn Short fallback =====
+      console.log(`[SearchV2] PATH: Simple (DB-first)`);
       let companyAliases: string[] = [];
       if (dbFilters.company) {
         const resolved = await resolveCompanyAliases(dbFilters.company);
         companyAliases = resolved.aliases;
-        console.log(`[SearchV2] Company "${dbFilters.company}" → ${companyAliases.length} aliases`);
+        if (companyAliases.length > 0) {
+          console.log(`[SearchV2] Company "${dbFilters.company}" → aliases: [${companyAliases.join(', ')}]`);
+        }
       }
 
       const filters: PersonFilters = {
@@ -551,7 +569,16 @@ export async function searchPeopleV2Action(
       dbResultCount = people.length;
       console.log(`[SearchV2] DB returned ${dbResultCount} results in ${Date.now() - dbStart}ms`);
 
+      let template: ResolvedTemplate;
+      if (userId) {
+        template = await resolveTemplateForUser(userId, input.templateId);
+      } else {
+        const defaultTemplate = EMAIL_TEMPLATES[0];
+        template = { id: defaultTemplate.id, subject: defaultTemplate.subject, body: defaultTemplate.body, attachResume: false, resumeId: null };
+      }
+
       if (dbResultCount < DB_FIRST_THRESHOLD) {
+        // ── LinkedIn fallback: show LinkedIn results directly (like advanced path) ──
         console.log(`[SearchV2] DB has ${dbResultCount} results (< ${DB_FIRST_THRESHOLD}) — calling Short mode API`);
         const apiStart = Date.now();
 
@@ -566,68 +593,98 @@ export async function searchPeopleV2Action(
         console.log(`[SearchV2] Short mode returned ${apiResult.profiles.length} profiles (${totalMatchesOnLinkedIn} total on LinkedIn) in ${Date.now() - apiStart}ms`);
 
         const schoolTag = linkedInFilters.schools?.[0] || null;
+        const saveStart2 = Date.now();
+        const saveResults2 = await saveShortProfilesBatch(apiResult.profiles, schoolTag);
         let newCount = 0;
-        for (const profile of apiResult.profiles) {
-          try {
-            const { isNew } = await saveShortProfile(profile, schoolTag);
-            if (isNew) newCount++;
-          } catch (err) {
-            console.warn(`[SearchV2] Failed to save profile "${profile.fullName}": ${err instanceof Error ? err.message : 'unknown'}`);
-          }
+        for (const r of saveResults2) {
+          if (r.isNew) newCount++;
         }
+        const failCount = saveResults2.filter(r => !r.personId).length;
         apiResultCount = apiResult.profiles.length;
-        console.log(`[SearchV2] Saved ${newCount} new profiles, ${apiResultCount - newCount} already existed`);
+        console.log(`[SearchV2] Saved ${apiResultCount} profiles (${newCount} new, ${apiResultCount - newCount - failCount} existing, ${failCount} failed) in ${Date.now() - saveStart2}ms`);
 
-        people = await findPeopleByFilters(filters);
-        console.log(`[SearchV2] After merge: ${people.length} total results`);
+        // Build results from LinkedIn profiles directly (not re-querying DB)
+        // This avoids losing profiles that lack role embeddings for vector search
+        const linkedinUrls = apiResult.profiles
+          .map(p => p.linkedinUrl)
+          .filter((url): url is string => !!url);
+        const personMap = await findPeopleByLinkedInUrls(linkedinUrls);
+
+        // Also include any DB-only results that weren't in the LinkedIn batch
+        const linkedInPersonIds = new Set(Array.from(personMap.values()).map(p => p.id));
+        const dbOnlyPeople = people.filter(p => !linkedInPersonIds.has(p.id));
+
+        // LinkedIn results first (preserving LinkedIn relevance order), then DB-only results
+        const orderedPeople: Array<{ candidate: PersonWithSource; score: number; breakdown: ScoreBreakdown }> = [];
+        for (const profile of apiResult.profiles) {
+          const person = profile.linkedinUrl ? personMap.get(profile.linkedinUrl) : null;
+          if (!person) continue;
+          if (allExcludedIds.includes(person.id)) continue;
+          orderedPeople.push({
+            candidate: { ...person, emailDeliverable: null, emailVerifiedAt: null, emailVerificationReason: null } as PersonWithSource,
+            score: 0,
+            breakdown: {} as ScoreBreakdown,
+          });
+        }
+        // Append DB-only results at the end
+        for (const person of dbOnlyPeople) {
+          if (allExcludedIds.includes(person.id)) continue;
+          orderedPeople.push({
+            candidate: person as PersonWithSource,
+            score: person.roleDistance != null ? Math.round((1 - person.roleDistance) * 100) : 0,
+            breakdown: {} as ScoreBreakdown,
+          });
+        }
+
+        console.log(`[SearchV2] Merged ${orderedPeople.length} results (${orderedPeople.length - dbOnlyPeople.length} from LinkedIn, ${dbOnlyPeople.length} DB-only)`);
+
+        const draftsStart2 = Date.now();
+        results = await buildResultsWithDrafts(orderedPeople.slice(0, input.limit), userId, template, user);
+        console.log(`[SearchV2] Built ${results.length} results with drafts in ${Date.now() - draftsStart2}ms`);
       } else {
+        // ── DB has enough results: use them directly, skip LinkedIn API ──
         console.log(`[SearchV2] DB has ${dbResultCount} results (>= ${DB_FIRST_THRESHOLD}) — skipping API ($0 cost)`);
+
+        // Rank candidates
+        const vectorActive = isVectorRoleMatchingEnabled() && !!dbFilters.role;
+        let rankedPeople: Array<{ candidate: PersonWithSource; score: number; breakdown: ScoreBreakdown }>;
+
+        if (vectorActive) {
+          rankedPeople = people.map((person) => ({
+            candidate: person as PersonWithSource,
+            score: person.roleDistance != null ? Math.round((1 - person.roleDistance) * 100) : 0,
+            breakdown: {} as ScoreBreakdown,
+          }));
+        } else {
+          const searchCriteria: SearchCriteria = {
+            company: dbFilters.company || undefined,
+            role: dbFilters.role || undefined,
+            university: dbFilters.university || undefined,
+            location: dbFilters.location || undefined,
+          };
+          rankedPeople = rankCandidates(
+            searchCriteria,
+            people,
+            (person): CandidateData => ({
+              company: person.company,
+              role: person.role,
+              email: person.email,
+              emailStatus: (person.emailStatus as 'VERIFIED' | 'UNVERIFIED' | 'MISSING') || 'MISSING',
+              city: person.city,
+              state: person.state,
+              country: person.country,
+              educationSchool: person.educationSchool,
+            }),
+            input.limit
+          );
+        }
+
+        rankedPeople = rankedPeople.slice(0, input.limit);
+
+        const draftsStart2 = Date.now();
+        results = await buildResultsWithDrafts(rankedPeople, userId, template, user);
+        console.log(`[SearchV2] Built ${results.length} results with drafts in ${Date.now() - draftsStart2}ms`);
       }
-
-      // Rank candidates
-      const vectorActive = isVectorRoleMatchingEnabled() && !!dbFilters.role;
-      let rankedPeople: Array<{ candidate: PersonWithSource; score: number; breakdown: ScoreBreakdown }>;
-
-      if (vectorActive) {
-        rankedPeople = people.map((person) => ({
-          candidate: person as PersonWithSource,
-          score: person.roleDistance != null ? Math.round((1 - person.roleDistance) * 100) : 0,
-          breakdown: {} as ScoreBreakdown,
-        }));
-      } else {
-        const searchCriteria: SearchCriteria = {
-          company: dbFilters.company || undefined,
-          role: dbFilters.role || undefined,
-          university: dbFilters.university || undefined,
-          location: dbFilters.location || undefined,
-        };
-        rankedPeople = rankCandidates(
-          searchCriteria,
-          people,
-          (person): CandidateData => ({
-            company: person.company,
-            role: person.role,
-            email: person.email,
-            emailStatus: (person.emailStatus as 'VERIFIED' | 'UNVERIFIED' | 'MISSING') || 'MISSING',
-            city: person.city,
-            state: person.state,
-            country: person.country,
-            educationSchool: person.educationSchool,
-          }),
-          input.limit
-        );
-      }
-
-      rankedPeople = rankedPeople.slice(0, input.limit);
-
-      let template: ResolvedTemplate;
-      if (userId) {
-        template = await resolveTemplateForUser(userId, input.templateId);
-      } else {
-        const defaultTemplate = EMAIL_TEMPLATES[0];
-        template = { id: defaultTemplate.id, subject: defaultTemplate.subject, body: defaultTemplate.body, attachResume: false, resumeId: null };
-      }
-      results = await buildResultsWithDrafts(rankedPeople, userId, template, user);
     }
 
     // ===== Compute cost + save Search record =====
@@ -638,29 +695,58 @@ export async function searchPeopleV2Action(
       .update(JSON.stringify(linkedInFilters))
       .digest('hex');
 
-    await prisma.search.create({
-      data: {
-        queryHash,
-        rawQuery: input.query,
-        parsedFilters: JSON.parse(JSON.stringify({ dbFilters, linkedInFilters })),
-        company: dbFilters.company || null,
-        role: dbFilters.role || null,
-        university: dbFilters.university || null,
-        location: dbFilters.location || null,
-        haikuCalls: parseCost.haikuCalls,
-        shortModePages,
-        totalCostCents,
-        costBreakdown: {
-          haiku: parseCost.costCents,
-          shortMode: shortModePages * 10,
-          serper: parseCost.serperCalls * 0.1,
-          fullScrape: 0,
-        },
-        totalLinkedInMatches: totalMatchesOnLinkedIn > 0 ? totalMatchesOnLinkedIn : null,
-        profilesAdded: apiResultCount,
-        completedAt: new Date(),
+    // Save Search record. The DB has a COALESCE-based unique constraint on
+    // (company, role, university, location) that Prisma doesn't know about.
+    // On duplicate, update the existing row instead.
+    const searchCreateData = {
+      queryHash,
+      rawQuery: input.query,
+      parsedFilters: JSON.parse(JSON.stringify({ dbFilters, linkedInFilters })),
+      company: dbFilters.company || null,
+      role: dbFilters.role || null,
+      university: dbFilters.university || null,
+      location: dbFilters.location || null,
+      haikuCalls: parseCost.haikuCalls,
+      shortModePages,
+      totalCostCents,
+      costBreakdown: {
+        haiku: parseCost.costCents,
+        shortMode: shortModePages * 10,
+        serper: parseCost.serperCalls * 0.1,
+        fullScrape: 0,
       },
-    });
+      totalLinkedInMatches: totalMatchesOnLinkedIn > 0 ? totalMatchesOnLinkedIn : null,
+      profilesAdded: apiResultCount,
+      completedAt: new Date(),
+    };
+
+    try {
+      await prisma.search.create({ data: searchCreateData });
+    } catch (searchErr: any) {
+      if (searchErr.code === 'P2002') {
+        // Duplicate — update existing Search row for these filters
+        await prisma.$executeRaw`
+          UPDATE "Search"
+          SET "queryHash" = ${searchCreateData.queryHash},
+              "rawQuery" = ${searchCreateData.rawQuery},
+              "parsedFilters" = ${JSON.stringify(searchCreateData.parsedFilters)}::jsonb,
+              "haikuCalls" = ${searchCreateData.haikuCalls},
+              "shortModePages" = ${searchCreateData.shortModePages},
+              "totalCostCents" = ${searchCreateData.totalCostCents},
+              "costBreakdown" = ${JSON.stringify(searchCreateData.costBreakdown)}::jsonb,
+              "totalLinkedInMatches" = ${searchCreateData.totalLinkedInMatches},
+              "profilesAdded" = ${searchCreateData.profilesAdded},
+              "completedAt" = NOW(),
+              "updatedAt" = NOW()
+          WHERE COALESCE(company, '') = ${dbFilters.company || ''}
+            AND COALESCE(role, '') = ${dbFilters.role || ''}
+            AND COALESCE(university, '') = ${dbFilters.university || ''}
+            AND COALESCE(location, '') = ${dbFilters.location || ''}
+        `;
+      } else {
+        throw searchErr;
+      }
+    }
 
     if (userId) {
       await prisma.searchLog.create({
@@ -676,14 +762,17 @@ export async function searchPeopleV2Action(
       });
     }
 
-    const hasMore = hasAdvancedFilters
+    // hasMore: if LinkedIn was called (either path), use LinkedIn pagination; otherwise DB count
+    const calledLinkedIn = shortModePages > 0;
+    const hasMore = calledLinkedIn
       ? totalMatchesOnLinkedIn > apiResultCount
-      : (dbResultCount >= input.limit || totalMatchesOnLinkedIn > 25);
+      : dbResultCount >= input.limit;
 
     const elapsed = Date.now() - searchStart;
     console.log(
-      `[SearchV2] Done in ${elapsed}ms — ${results.length} results, hasMore=${hasMore}, advanced=${hasAdvancedFilters}, cost=$${(totalCostCents / 100).toFixed(4)}`
+      `[SearchV2] ✓ Done in ${elapsed}ms — ${results.length} results, hasMore=${hasMore}, path=${hasAdvancedFilters ? 'advanced' : calledLinkedIn ? 'simple+linkedin' : 'simple(db-only)'}, dbHits=${dbResultCount}, apiHits=${apiResultCount}, cost=$${(totalCostCents / 100).toFixed(2)}`
     );
+    console.log(`[SearchV2] ────────────────────────────────────────────────`);
 
     return {
       success: true,
@@ -698,14 +787,16 @@ export async function searchPeopleV2Action(
         dbResultCount,
         apiResultCount,
         totalMatchesOnLinkedIn,
-        linkedInPage: hasAdvancedFilters ? linkedInPage : undefined,
-        totalLinkedInPages: hasAdvancedFilters ? totalLinkedInPages : undefined,
+        linkedInPage: calledLinkedIn ? (linkedInPage || 1) : undefined,
+        totalLinkedInPages: calledLinkedIn ? totalLinkedInPages : undefined,
       },
       remainingDaily,
       hiddenCount,
     };
   } catch (error) {
-    console.error('[SearchV2] Error:', error);
+    const elapsed = Date.now() - searchStart;
+    console.error(`[SearchV2] ✗ FAILED after ${elapsed}ms — query="${input.query}", filters=${JSON.stringify(input.dbFilters)}`, error);
+    console.log(`[SearchV2] ────────────────────────────────────────────────`);
     return { success: false, error: 'Search failed. Please try again.' };
   }
 }
@@ -749,7 +840,8 @@ export async function loadMoreV2Action(
   }
 
   try {
-    console.log(`[LoadMoreV2] Fetching LinkedIn page ${input.linkedInPage}`);
+    const loadStart = Date.now();
+    console.log(`[LoadMoreV2] ── Fetching page ${input.linkedInPage} ──`);
 
     const apiResult = await searchLinkedInShort({
       ...input.linkedInFilters,
@@ -762,15 +854,9 @@ export async function loadMoreV2Action(
 
     console.log(`[LoadMoreV2] Got ${apiResult.profiles.length} profiles (page ${input.linkedInPage}/${totalLinkedInPages})`);
 
-    // Save profiles to DB
+    // Save profiles to DB in batch
     const schoolTag = input.linkedInFilters.schools?.[0] || null;
-    for (const profile of apiResult.profiles) {
-      try {
-        await saveShortProfile(profile, schoolTag);
-      } catch (err) {
-        console.warn(`[LoadMoreV2] Failed to save "${profile.fullName}": ${err instanceof Error ? err.message : 'unknown'}`);
-      }
-    }
+    await saveShortProfilesBatch(apiResult.profiles, schoolTag);
 
     // Look up saved profiles by LinkedIn URL
     const linkedinUrls = apiResult.profiles
@@ -812,7 +898,7 @@ export async function loadMoreV2Action(
     const results = await buildResultsWithDrafts(orderedPeople, userId, template, user);
     const hasMore = input.linkedInPage < totalLinkedInPages;
 
-    console.log(`[LoadMoreV2] Built ${results.length} results, hasMore=${hasMore}`);
+    console.log(`[LoadMoreV2] ✓ Done in ${Date.now() - loadStart}ms — ${results.length} results from page ${input.linkedInPage}/${totalLinkedInPages}, hasMore=${hasMore}`);
 
     return {
       success: true,
@@ -823,7 +909,7 @@ export async function loadMoreV2Action(
       totalMatchesOnLinkedIn,
     };
   } catch (error) {
-    console.error('[LoadMoreV2] Error:', error);
+    console.error(`[LoadMoreV2] ✗ FAILED on page ${input.linkedInPage}:`, error);
     return { success: false, error: 'Failed to load more profiles. Please try again.' };
   }
 }

@@ -22,6 +22,90 @@ export interface PerplexityCompany {
 }
 
 /**
+ * Find the LinkedIn company page URL for a company using Perplexity Sonar.
+ * Used for ambiguous company names where Serper's LinkedIn search returns wrong results.
+ *
+ * @param companyName - The company name to look up
+ * @param context - Optional context to disambiguate (e.g., "agentic browser", "dating app")
+ * @returns The LinkedIn company URL (e.g., "https://www.linkedin.com/company/composite-com") or null
+ */
+export async function findCompanyLinkedInUrl(
+  companyName: string,
+  context?: string
+): Promise<string | null> {
+  const apiKey = process.env.PERPLEXITY_API_KEY;
+  if (!apiKey) {
+    throw new Error('PERPLEXITY_API_KEY not configured');
+  }
+
+  const contextClause = context ? ` (${context})` : '';
+  const prompt = `What is the LinkedIn company page URL for ${companyName}${contextClause}? Return ONLY a JSON object: {"url": "https://www.linkedin.com/company/slug-here"} — the full LinkedIn company URL. If you cannot determine it, return {"url": null}.`;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+
+  try {
+    const response = await fetch('https://api.perplexity.ai/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'sonar',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a research assistant. Return results as valid JSON only.',
+          },
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+        temperature: 0.1,
+        max_tokens: 100,
+      }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      console.error('[Perplexity] findCompanyLinkedInUrl API error:', response.status);
+      return null;
+    }
+
+    const data: PerplexityResponse = await response.json();
+    const rawContent = data.choices[0]?.message?.content || '';
+
+    // Try JSON parse first, then fall back to regex extraction
+    let url: string | null = null;
+    const jsonStr = rawContent.replace(/```json?\n?/g, '').replace(/```\n?/g, '').trim();
+    try {
+      const parsed = JSON.parse(jsonStr) as { url: string | null };
+      url = parsed.url?.trim() || null;
+    } catch {
+      // Perplexity sometimes adds commentary after JSON — try extracting the URL directly
+      const urlMatch = rawContent.match(/https?:\/\/(www\.)?linkedin\.com\/company\/[a-zA-Z0-9_-]+/);
+      url = urlMatch?.[0] || null;
+    }
+
+    // Validate it's actually a LinkedIn company URL
+    if (url && !/linkedin\.com\/company\//.test(url)) {
+      console.warn(`[Perplexity] findCompanyLinkedInUrl returned non-company URL: ${url}`);
+      return null;
+    }
+
+    console.log(`[Perplexity] findCompanyLinkedInUrl("${companyName}", "${context || ''}") → ${url}`);
+    return url;
+  } catch (err) {
+    console.warn(`[Perplexity] findCompanyLinkedInUrl failed for "${companyName}":`, err);
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/**
  * Fetch a list of real, current companies matching a category using Perplexity Sonar.
  * Returns up to `count` companies with names and short descriptions.
  * Throws on failure so the caller can fall back to Groq's suggestions.

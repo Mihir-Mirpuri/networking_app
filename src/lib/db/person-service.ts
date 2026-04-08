@@ -3,7 +3,7 @@ import { SearchResult } from '@/lib/services/discovery';
 import { EmailResult, EducationInfo, EmploymentInfo } from '@/lib/services/enrichment';
 import { EmailStatus } from '@prisma/client';
 import { ScrapedProfile } from '@/lib/services/linkedin-scraper';
-import { getSearchRoleEmbedding } from '@/lib/services/embeddings';
+import { getSearchRoleEmbedding, stampPersonRoleEmbedding } from '@/lib/services/embeddings';
 import { Prisma } from '@prisma/client';
 
 /**
@@ -1585,6 +1585,8 @@ export async function saveScrapedProfile(
       },
     });
 
+    // Fire-and-forget: stamp role embedding from cache
+    if (profile.role) stampPersonRoleEmbedding(existingByUrl.id, profile.role).catch(() => {});
     return { personId: existingByUrl.id, isNew: false, role: profile.role };
   }
 
@@ -1620,6 +1622,8 @@ export async function saveScrapedProfile(
       },
     });
 
+    // Fire-and-forget: stamp role embedding from cache
+    if (profile.role) stampPersonRoleEmbedding(existingByName.id, profile.role).catch(() => {});
     return { personId: existingByName.id, isNew: false, role: profile.role };
   }
 
@@ -1660,6 +1664,8 @@ export async function saveScrapedProfile(
       },
     });
 
+    // Fire-and-forget: stamp role embedding from cache
+    if (profile.role) stampPersonRoleEmbedding(person.id, profile.role).catch(() => {});
     return { personId: person.id, isNew: true, role: profile.role };
   } catch (error: any) {
     // P2002 = Prisma unique constraint violation (concurrent scrape created this person)
@@ -1688,6 +1694,8 @@ export async function saveScrapedProfile(
             scrapedAt: new Date(),
           },
         });
+        // Fire-and-forget: stamp role embedding from cache
+        if (profile.role) stampPersonRoleEmbedding(existing.id, profile.role).catch(() => {});
         return { personId: existing.id, isNew: false, role: profile.role };
       }
     }
@@ -1732,6 +1740,9 @@ export async function upgradeToFullProfile(
     where: { id: personId },
     data,
   });
+
+  // Fire-and-forget: stamp role embedding from cache
+  if (profile.role) stampPersonRoleEmbedding(personId, profile.role).catch(() => {});
 }
 
 // ─── Short Profile Save (Phase 3: LinkedIn Short Profile Discovery) ────────
@@ -1770,7 +1781,6 @@ export async function saveShortProfile(
     if (existingByUrl) {
       // Don't overwrite full profiles with short data
       if (existingByUrl.scrapeDepth === 'full') {
-        console.log(`[saveShortProfile] Full profile exists for "${fullName}" — skipping update`);
         // Still tag with school if missing
         if (schoolTag) {
           await prisma.person.update({
@@ -1806,6 +1816,8 @@ export async function saveShortProfile(
           }),
         },
       });
+      // Fire-and-forget: stamp role embedding from cache
+      if (profile.role) stampPersonRoleEmbedding(existingByUrl.id, profile.role).catch(() => {});
       return { personId: existingByUrl.id, isNew: false };
     }
   }
@@ -1818,7 +1830,6 @@ export async function saveShortProfile(
 
   if (existingByName) {
     if (existingByName.scrapeDepth === 'full') {
-      console.log(`[saveShortProfile] Full profile exists for "${fullName}" at "${company}" — skipping update`);
       if (schoolTag) {
         await prisma.person.update({
           where: { id: existingByName.id },
@@ -1850,6 +1861,8 @@ export async function saveShortProfile(
         }),
       },
     });
+    // Fire-and-forget: stamp role embedding from cache
+    if (profile.role) stampPersonRoleEmbedding(existingByName.id, profile.role).catch(() => {});
     return { personId: existingByName.id, isNew: false };
   }
 
@@ -1879,6 +1892,8 @@ export async function saveShortProfile(
     });
 
     console.log(`[saveShortProfile] Created short profile: "${fullName}" at "${company}" (${person.id})`);
+    // Fire-and-forget: stamp role embedding from cache
+    if (profile.role) stampPersonRoleEmbedding(person.id, profile.role).catch(() => {});
     return { personId: person.id, isNew: true };
   } catch (error: any) {
     // Handle race condition (concurrent save)
@@ -1894,4 +1909,246 @@ export async function saveShortProfile(
     }
     throw error;
   }
+}
+
+/**
+ * Batch version of saveShortProfile — saves multiple profiles with far fewer DB round-trips.
+ * Instead of 2-3 queries per profile, uses batch lookups and createMany.
+ */
+export async function saveShortProfilesBatch(
+  profiles: ShortProfileResult[],
+  schoolTag?: string | null
+): Promise<{ personId: string; isNew: boolean }[]> {
+  if (profiles.length === 0) return [];
+
+  const startTime = Date.now();
+
+  // ── 1. Normalize + filter ──
+  type NormalizedProfile = ShortProfileResult & { _fullName: string; _company: string; _index: number };
+  const normalized: NormalizedProfile[] = [];
+  const results: { personId: string; isNew: boolean }[] = profiles.map(() => ({ personId: '', isNew: false }));
+
+  for (let i = 0; i < profiles.length; i++) {
+    const p = profiles[i];
+    const company = normalizeCompanyForStorage(p.company || 'Unknown');
+    const fullName = p.fullName || `${p.firstName} ${p.lastName}`.trim();
+    if (!fullName) {
+      console.warn(`[saveShortProfilesBatch] Skipping profile at index ${i} with no name`);
+      continue;
+    }
+    normalized.push({ ...p, _fullName: fullName, _company: company, _index: i });
+  }
+
+  if (normalized.length === 0) return results;
+
+  // ── 2. Batch lookup by LinkedIn URL ──
+  const urlsToLookup = normalized
+    .filter(p => !!p.linkedinUrl)
+    .map(p => p.linkedinUrl);
+  const uniqueUrls = Array.from(new Set(urlsToLookup));
+
+  const existingByUrl = uniqueUrls.length > 0
+    ? await prisma.person.findMany({
+        where: { linkedinUrl: { in: uniqueUrls } },
+        select: { id: true, linkedinUrl: true, scrapeDepth: true },
+      })
+    : [];
+
+  const urlToExisting = new Map(existingByUrl.map(p => [p.linkedinUrl!, p]));
+
+  // ── 3. Batch lookup by name+company (for profiles not matched by URL) ──
+  const unmatchedByUrl: NormalizedProfile[] = [];
+  const matchedByUrl: { profile: NormalizedProfile; existing: { id: string; scrapeDepth: string | null } }[] = [];
+
+  for (const p of normalized) {
+    const existing = p.linkedinUrl ? urlToExisting.get(p.linkedinUrl) : undefined;
+    if (existing) {
+      matchedByUrl.push({ profile: p, existing });
+    } else {
+      unmatchedByUrl.push(p);
+    }
+  }
+
+  // Deduplicate name+company pairs for the OR query
+  const nameCompanyPairs = unmatchedByUrl.map(p => ({ fullName: p._fullName, company: p._company }));
+  const uniquePairsMap = new Map<string, { fullName: string; company: string }>();
+  for (const pair of nameCompanyPairs) {
+    const key = `${pair.fullName}|||${pair.company}`;
+    if (!uniquePairsMap.has(key)) uniquePairsMap.set(key, pair);
+  }
+  const uniquePairs = Array.from(uniquePairsMap.values());
+
+  const existingByName = uniquePairs.length > 0
+    ? await prisma.person.findMany({
+        where: {
+          OR: uniquePairs.map(pair => ({
+            fullName: pair.fullName,
+            company: pair.company,
+          })),
+        },
+        select: { id: true, fullName: true, company: true, scrapeDepth: true },
+      })
+    : [];
+
+  const nameToExisting = new Map(
+    existingByName.map(p => [`${p.fullName}|||${p.company}`, p])
+  );
+
+  // ── 4. Categorize all profiles ──
+  type CategorizedProfile = NormalizedProfile & { _existingId?: string; _category: 'full' | 'update-url' | 'update-name' | 'new' };
+  const categorized: CategorizedProfile[] = [];
+
+  for (const { profile, existing } of matchedByUrl) {
+    if (existing.scrapeDepth === 'full') {
+      categorized.push({ ...profile, _existingId: existing.id, _category: 'full' });
+    } else {
+      categorized.push({ ...profile, _existingId: existing.id, _category: 'update-url' });
+    }
+  }
+
+  for (const p of unmatchedByUrl) {
+    const key = `${p._fullName}|||${p._company}`;
+    const existing = nameToExisting.get(key);
+    if (existing) {
+      if (existing.scrapeDepth === 'full') {
+        categorized.push({ ...p, _existingId: existing.id, _category: 'full' });
+      } else {
+        categorized.push({ ...p, _existingId: existing.id, _category: 'update-name' });
+      }
+    } else {
+      categorized.push({ ...p, _category: 'new' });
+    }
+  }
+
+  // ── 5. School-tag full-depth profiles ──
+  const fullDepthIds = categorized
+    .filter(p => p._category === 'full')
+    .map(p => p._existingId!)
+    .filter(Boolean);
+
+  if (fullDepthIds.length > 0 && schoolTag) {
+    await prisma.person.updateMany({
+      where: { id: { in: fullDepthIds } },
+      data: {
+        educationSchool: schoolTag,
+        schools: [schoolTag],
+      },
+    });
+  }
+
+  // Write results for full-depth profiles
+  for (const p of categorized.filter(c => c._category === 'full')) {
+    results[p._index] = { personId: p._existingId!, isNew: false };
+  }
+
+  // ── 6. Update existing short profiles (matched by URL) ──
+  for (const p of categorized.filter(c => c._category === 'update-url')) {
+    await prisma.person.update({
+      where: { id: p._existingId! },
+      data: {
+        fullName: p._fullName,
+        firstName: p.firstName || undefined,
+        lastName: p.lastName || undefined,
+        company: p._company,
+        role: p.role || undefined,
+        city: p.city || undefined,
+        state: p.state || undefined,
+        country: p.country || undefined,
+        pictureUrl: p.pictureUrl || undefined,
+        tenureMonths: p.tenureMonths ?? undefined,
+        openProfile: p.openProfile,
+        premium: p.premium,
+        ...(schoolTag && { educationSchool: schoolTag, schools: [schoolTag] }),
+      },
+    });
+    results[p._index] = { personId: p._existingId!, isNew: false };
+    if (p.role) stampPersonRoleEmbedding(p._existingId!, p.role).catch(() => {});
+  }
+
+  // ── 7. Update existing short profiles (matched by name+company) ──
+  for (const p of categorized.filter(c => c._category === 'update-name')) {
+    await prisma.person.update({
+      where: { id: p._existingId! },
+      data: {
+        linkedinUrl: p.linkedinUrl || undefined,
+        role: p.role || undefined,
+        city: p.city || undefined,
+        state: p.state || undefined,
+        country: p.country || undefined,
+        pictureUrl: p.pictureUrl || undefined,
+        tenureMonths: p.tenureMonths ?? undefined,
+        openProfile: p.openProfile,
+        premium: p.premium,
+        ...(schoolTag && { educationSchool: schoolTag, schools: [schoolTag] }),
+      },
+    });
+    results[p._index] = { personId: p._existingId!, isNew: false };
+    if (p.role) stampPersonRoleEmbedding(p._existingId!, p.role).catch(() => {});
+  }
+
+  // ── 8. Create new profiles ──
+  const newProfiles = categorized.filter(c => c._category === 'new');
+
+  if (newProfiles.length > 0) {
+    // Deduplicate by name+company (keep first occurrence)
+    const seenNewKeys = new Set<string>();
+    const deduplicatedNew: CategorizedProfile[] = [];
+    for (const p of newProfiles) {
+      const key = `${p._fullName}|||${p._company}`;
+      if (!seenNewKeys.has(key)) {
+        seenNewKeys.add(key);
+        deduplicatedNew.push(p);
+      }
+    }
+
+    await prisma.person.createMany({
+      data: deduplicatedNew.map(p => ({
+        fullName: p._fullName,
+        firstName: p.firstName || null,
+        lastName: p.lastName || null,
+        company: p._company,
+        role: p.role || null,
+        linkedinUrl: p.linkedinUrl || null,
+        city: p.city || null,
+        state: p.state || null,
+        country: p.country || null,
+        pictureUrl: p.pictureUrl || null,
+        tenureMonths: p.tenureMonths ?? null,
+        openProfile: p.openProfile,
+        premium: p.premium,
+        scrapeDepth: 'short',
+        ...(schoolTag && { educationSchool: schoolTag, schools: [schoolTag] }),
+      })),
+      skipDuplicates: true,
+    });
+
+    // Fetch back IDs for the newly created profiles
+    const newNameCompanyPairs = deduplicatedNew.map(p => ({ fullName: p._fullName, company: p._company }));
+    const createdPersons = await prisma.person.findMany({
+      where: {
+        OR: newNameCompanyPairs.map(pair => ({
+          fullName: pair.fullName,
+          company: pair.company,
+        })),
+      },
+      select: { id: true, fullName: true, company: true },
+    });
+
+    const createdMap = new Map(
+      createdPersons.map(p => [`${p.fullName}|||${p.company}`, p.id])
+    );
+
+    for (const p of newProfiles) {
+      const key = `${p._fullName}|||${p._company}`;
+      const personId = createdMap.get(key) || '';
+      results[p._index] = { personId, isNew: true };
+      if (personId && p.role) stampPersonRoleEmbedding(personId, p.role).catch(() => {});
+    }
+  }
+
+  const newCount = results.filter(r => r.isNew).length;
+  const existingCount = results.filter(r => r.personId && !r.isNew).length;
+  console.log(`[saveShortProfilesBatch] Saved ${profiles.length} profiles (${newCount} new, ${existingCount} existing) in ${Date.now() - startTime}ms`);
+
+  return results;
 }

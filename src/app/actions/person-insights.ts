@@ -40,7 +40,7 @@ export async function getPersonInsightsAction(
       fromCache: result.fromCache,
     };
   } catch (error) {
-    console.error('[person-insights] Error:', error);
+    console.error('[PersonInsights] Action error:', error);
     return {
       success: false,
       insights: [],

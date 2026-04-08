@@ -13,7 +13,7 @@
 import 'dotenv/config';
 import { parseSearchQuery } from '../src/lib/services/query-parser';
 import { searchLinkedInShort } from '../src/lib/services/linkedin-search';
-import { resolveCompanyLinkedInUrl } from '../src/lib/services/company-resolver';
+import { resolveCompanyUrl } from '../src/lib/services/company-resolver';
 
 const QUERIES = [
   // 1. Big company + role + location (no company URL resolution needed)
@@ -39,8 +39,8 @@ async function testCompanyResolver() {
 
   const companies = ['Anara', 'Google', 'Ramp'];
   for (const name of companies) {
-    const result = await resolveCompanyLinkedInUrl(name);
-    console.log(`  "${name}" → ${result.url || 'NOT FOUND'} (serper calls: ${result.cost.serperCalls})`);
+    const result = await resolveCompanyUrl(name);
+    console.log(`  "${name}" → ${result.url || 'NOT FOUND'} (perplexity calls: ${result.cost.perplexityCalls})`);
   }
 }
 

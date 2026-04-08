@@ -156,14 +156,18 @@ export function useSearchResults({ initialRemainingDaily }: UseSearchResultsOpti
     setHiddenCount(newHiddenCount);
     setSearchParams(params);
 
-    if (v2Meta?.isAdvancedQuery) {
-      // Advanced query: store full batch, show first PAGE_SIZE
-      setAllBatchResults(newResults);
-      setIsAdvancedQuery(true);
+    // Always store LinkedIn filters/pagination when provided (both paths may trigger LinkedIn)
+    if (v2Meta) {
       setLinkedInFilters(v2Meta.linkedInFilters);
       setDbFilters(v2Meta.dbFilters);
       setLinkedInPage(v2Meta.linkedInPage || 1);
       setTotalLinkedInPages(v2Meta.totalLinkedInPages || 0);
+    }
+
+    if (v2Meta?.isAdvancedQuery) {
+      // Advanced query: store full batch, show first PAGE_SIZE
+      setAllBatchResults(newResults);
+      setIsAdvancedQuery(true);
       const initialVisible = Math.min(PAGE_SIZE, newResults.length);
       setVisibleCount(initialVisible);
       setResults(newResults.slice(0, initialVisible));

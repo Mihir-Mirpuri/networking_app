@@ -739,3 +739,10 @@ model CompanyUrl {
   url       String   // LinkedIn company URL
   createdAt DateTime @default(now())
 }
+
+model RoleEmbedding {
+  id        String                          @id @default(cuid())
+  role      String                          @unique // normalized: lowercase, trimmed
+  embedding Unsupported("vector(1536)")
+  createdAt DateTime                        @default(now())
+}
