@@ -89,14 +89,12 @@ You must return JSON with this schema:
     "past_job_titles": string[]|null,
     "seniority_level_ids": string[]|null,
     "function_ids": string[]|null,
-    "industry_ids": string[]|null,
     "company_headcount": string[]|null,
     "years_of_experience_ids": string[]|null,
     "years_at_current_company_ids": string[]|null,
     "recently_changed_jobs": boolean|null,
     "exclude_locations": string[]|null,
     "exclude_current_companies": string[]|null,
-    "exclude_industry_ids": string[]|null,
     "exclude_seniority_level_ids": string[]|null,
     "exclude_function_ids": string[]|null
   },
@@ -117,13 +115,12 @@ When status is "ready", you MUST also populate "linkedin_filters" with structure
 - "schools": Full official university names: "UT Austin" → "University of Texas at Austin", "MIT" → "Massachusetts Institute of Technology", "Stanford" → "Stanford University", etc.
 - "current_job_titles": Exact current title match. More precise than search_query for roles. E.g., ["Software Engineer"], ["Product Manager"].
 - "seniority_level_ids": "100"=In Training, "110"=Entry Level, "120"=Senior, "130"=Strategic, "200"=Entry Level Manager, "210"=Experienced Manager, "220"=Director, "300"=VP, "310"=CXO, "320"=Owner/Partner. "junior"→["110"], "senior"→["120"], "lead/staff"→["120","130"], "manager"→["200","210"], "director"→["220"], "VP"→["300"], "C-level"→["310"], "founder"→["310","320"].
-- "function_ids": "1"=Accounting, "2"=Administrative, "3"=Arts/Design, "4"=Business Development, "5"=Community, "6"=Consulting, "7"=Education, "8"=Engineering, "9"=Entrepreneurship, "10"=Finance, "11"=Healthcare, "12"=HR, "13"=IT, "14"=Legal, "15"=Marketing, "16"=Media, "17"=Military, "18"=Operations, "19"=Product Management, "20"=Program/Project Management, "21"=Purchasing, "22"=QA, "23"=Real Estate, "24"=Research, "25"=Sales, "26"=Customer Success.
-- "industry_ids": "4"=Software Dev, "6"=IT Consulting, "43"=Financial Services, "44"=Banking, "41"=VC/PE, "46"=Investment Banking, "47"=Investment Management, "96"=Technology/Internet, "133"=Healthcare, "135"=Pharma, "137"=Biotech, "14"=Education, "143"=Legal Services, "147"=Advertising. "tech"→["4","6","96"], "finance"→["43","44","46","47","48"], "fintech"→["43","4"], "healthcare"→["133","135","137"].
+- "function_ids": Use ONLY when the user names a broad department/discipline word ("engineers", "marketers", "salespeople", "designers", "lawyers", "recruiters", "ops people", "HR", "finance folks") — words that are too vague or title-varied for search_query to work cleanly. Do NOT populate when the user gave a specific title (e.g., "Senior Product Manager", "Solutions Architect"). Never populate both function_ids and search_query for the same role concept — pick one. ID map: "1"=Accounting, "2"=Administrative, "3"=Arts/Design, "4"=Business Development, "5"=Community, "6"=Consulting, "7"=Education, "8"=Engineering, "9"=Entrepreneurship, "10"=Finance, "11"=Healthcare, "12"=HR, "13"=IT, "14"=Legal, "15"=Marketing, "16"=Media, "17"=Military, "18"=Operations, "19"=Product Management, "20"=Program/Project Management, "21"=Purchasing, "22"=QA, "23"=Real Estate, "24"=Research, "25"=Sales, "26"=Customer Success.
 - "company_headcount": "A"=Self-employed, "B"=1-10, "C"=11-50, "D"=51-200, "E"=201-500, "F"=501-1000, "G"=1001-5000, "H"=5001-10000, "I"=10001+. "startup"→["B","C","D"], "mid-size"→["D","E","F"], "large/enterprise"→["G","H","I"].
 - "years_of_experience_ids": "1"=<1yr, "2"=1-2yr, "3"=3-5yr, "4"=6-10yr, "5"=10+yr.
 - "recently_changed_jobs": true for "new role", "just started", "recently joined".
 - Only include filters clearly indicated by the query. Do not infer unstated filters.
-- Prefer search_query over current_job_titles unless user wants exact title match.
+- Use "current_job_titles" ONLY when the user's phrasing explicitly signals exactness: quoted titles (e.g., "Staff Engineer"), "whose title is X", "exactly X", or "literally X". In all other cases — even for specific multi-word titles — use "search_query". Never populate both.
 - For non-ready statuses (needs_selection, off_topic, person_lookup), set linkedin_filters to {}.
 
 STATUS RULES:
@@ -178,8 +175,11 @@ User: "PMs at Google in Austin"
 User: "consultants at top consulting firms from UT Austin"
 → {"status":"needs_selection","filters":{"company":null,"role":"Consultant","university":"UT Austin","location":null},"linkedin_filters":{},"selectables":[{"label":"McKinsey","filter_key":"company","filter_value":"McKinsey"},{"label":"BCG","filter_key":"company","filter_value":"BCG"},{"label":"Bain","filter_key":"company","filter_value":"Bain"}],"suggested_searches":[],"message":"Which consulting firm are you interested in?"}
 
-User: "senior PMs at fintech startups in NYC"
-→ {"status":"ready","filters":{"company":null,"role":"Product Manager","university":null,"location":"New York, New York"},"linkedin_filters":{"search_query":"Product Manager","locations":["New York"],"seniority_level_ids":["120"],"industry_ids":["43","4"],"company_headcount":["B","C","D"]},"selectables":[],"suggested_searches":[],"message":"Searching for senior Product Managers at fintech startups in NYC!"}`;
+User: "senior engineers at Citadel"
+→ {"status":"ready","filters":{"company":"Citadel","role":null,"university":null,"location":null},"linkedin_filters":{"function_ids":["8"],"seniority_level_ids":["120"]},"selectables":[],"suggested_searches":[{"label":"Senior Engineers at Jane Street","company":"Jane Street","role":null},{"label":"Senior Engineers at Two Sigma","company":"Two Sigma","role":null}],"message":"Searching for senior engineers at Citadel!"}
+
+User: "marketers at Stripe"
+→ {"status":"ready","filters":{"company":"Stripe","role":null,"university":null,"location":null},"linkedin_filters":{"function_ids":["15"]},"selectables":[],"suggested_searches":[{"label":"Marketers at Square","company":"Square","role":null},{"label":"Marketers at Brex","company":"Brex","role":null}],"message":"Searching for marketers at Stripe!"}`;
 
 function buildUserPrompt(
   message: string,
@@ -218,14 +218,12 @@ function convertToCamelCase(raw: Record<string, unknown>): Record<string, unknow
     past_job_titles: 'pastJobTitles',
     seniority_level_ids: 'seniorityLevelIds',
     function_ids: 'functionIds',
-    industry_ids: 'industryIds',
     company_headcount: 'companyHeadcount',
     years_of_experience_ids: 'yearsOfExperienceIds',
     years_at_current_company_ids: 'yearsAtCurrentCompanyIds',
     recently_changed_jobs: 'recentlyChangedJobs',
     exclude_locations: 'excludeLocations',
     exclude_current_companies: 'excludeCurrentCompanies',
-    exclude_industry_ids: 'excludeIndustryIds',
     exclude_seniority_level_ids: 'excludeSeniorityLevelIds',
     exclude_function_ids: 'excludeFunctionIds',
   };
@@ -282,7 +280,7 @@ function buildPostProcessing(
   } else if (status === 'ready' && !company) {
     steps.push({
       label: 'No company specified',
-      description: 'Relies on industry/headcount/other filters',
+      description: 'Relies on headcount/other filters',
       applied: true,
     });
   } else {
@@ -318,9 +316,9 @@ function buildApifyParams(status: string, finalLinkedinFilters: Record<string, u
     const keys = [
       'searchQuery', 'locations', 'currentCompanies', 'pastCompanies', 'schools',
       'currentJobTitles', 'pastJobTitles', 'seniorityLevelIds', 'functionIds',
-      'industryIds', 'companyHeadcount', 'yearsOfExperienceIds', 'yearsAtCurrentCompanyIds',
+      'companyHeadcount', 'yearsOfExperienceIds', 'yearsAtCurrentCompanyIds',
       'recentlyChangedJobs', 'excludeLocations', 'excludeCurrentCompanies',
-      'excludeIndustryIds', 'excludeSeniorityLevelIds', 'excludeFunctionIds',
+      'excludeSeniorityLevelIds', 'excludeFunctionIds',
     ];
     for (const key of keys) {
       const value = finalLinkedinFilters[key];

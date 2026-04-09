@@ -24,12 +24,6 @@ const FUNCTION_MAP: Record<string, string> = {
   '19': 'Product Mgmt', '20': 'Program Mgmt', '21': 'Purchasing', '22': 'QA',
   '23': 'Real Estate', '24': 'Research', '25': 'Sales', '26': 'Customer Success',
 };
-const INDUSTRY_MAP: Record<string, string> = {
-  '4': 'Software Dev', '6': 'IT Consulting', '14': 'Education', '41': 'VC/PE',
-  '43': 'Financial Services', '44': 'Banking', '46': 'Investment Banking',
-  '47': 'Investment Mgmt', '96': 'Tech/Internet', '133': 'Healthcare',
-  '135': 'Pharma', '137': 'Biotech', '143': 'Legal', '147': 'Advertising',
-};
 const HEADCOUNT_MAP: Record<string, string> = {
   'A': 'Self-employed', 'B': '1-10', 'C': '11-50', 'D': '51-200',
   'E': '201-500', 'F': '501-1K', 'G': '1K-5K', 'H': '5K-10K', 'I': '10K+',
@@ -82,7 +76,6 @@ function FilterValue({ filterKey, value }: { filterKey: string; value: unknown }
   let display: string;
   if (filterKey === 'seniorityLevelIds' && arr) display = resolveIds(arr, SENIORITY_MAP);
   else if (filterKey === 'functionIds' && arr) display = resolveIds(arr, FUNCTION_MAP);
-  else if (filterKey === 'industryIds' && arr) display = resolveIds(arr, INDUSTRY_MAP);
   else if (filterKey === 'companyHeadcount' && arr) display = resolveIds(arr, HEADCOUNT_MAP);
   else if (filterKey === 'yearsOfExperienceIds' && arr) display = resolveIds(arr, YOE_MAP);
   else if (Array.isArray(value)) display = (value as string[]).join(', ');

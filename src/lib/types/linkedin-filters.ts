@@ -16,7 +16,6 @@ export interface LinkedInFilters {
   pastJobTitles?: string[];
   seniorityLevelIds?: string[];
   functionIds?: string[];
-  industryIds?: string[];
   companyHeadcount?: string[];
   yearsOfExperienceIds?: string[];
   yearsAtCurrentCompanyIds?: string[];
@@ -24,7 +23,6 @@ export interface LinkedInFilters {
   // Exclude filters
   excludeLocations?: string[];
   excludeCurrentCompanies?: string[];
-  excludeIndustryIds?: string[];
   excludeSeniorityLevelIds?: string[];
   excludeFunctionIds?: string[];
 }
