@@ -29,6 +29,12 @@ import { generateEmailWithLLM, getUserResumeSummary, getRecentSentEmails, refine
 import { searchLinkedInShort } from '@/lib/services/linkedin-search';
 import { createHash } from 'crypto';
 import { isUserBlocked } from '@/lib/services/credits';
+import {
+  log,
+  createLoggerForQuery,
+  withLogger,
+  APIFY_SHORT_COST_PER_PAGE,
+} from '@/lib/services/discovery-logger';
 
 
 export interface RecentSearch {
@@ -409,6 +415,15 @@ export async function searchPeopleV2Action(
     }
   }
 
+  const logger = createLoggerForQuery(`search:${input.query}`);
+  const run = async (): Promise<SearchActionV2Result> => {
+    log.info('search-v2', 'Received search request', {
+      query: input.query,
+      dbFilters: input.dbFilters,
+      linkedInFilterKeys: Object.keys(input.linkedInFilters),
+      limit: input.limit,
+      excludeCount: input.excludePersonIds?.length || 0,
+    });
   try {
     // ===== AUTH & USER SETUP =====
     let user = null;
@@ -461,7 +476,6 @@ export async function searchPeopleV2Action(
     // ===== STEP 2: Determine if advanced query =====
     const hasAdvancedFilters = !!(
       linkedInFilters.seniorityLevelIds?.length ||
-      linkedInFilters.industryIds?.length ||
       linkedInFilters.companyHeadcount?.length ||
       linkedInFilters.functionIds?.length ||
       linkedInFilters.yearsOfExperienceIds?.length ||
@@ -483,6 +497,23 @@ export async function searchPeopleV2Action(
     if (hasAdvancedFilters) {
       // ===== ADVANCED PATH: Skip DB, call LinkedIn Short directly =====
       console.log(`[SearchV2] PATH: Advanced (LinkedIn-first) — skipping DB`);
+      log.decision('search-v2', 'Advanced path taken', {
+        hasAdvancedFilters: true,
+        advancedFilterKeys: Object.entries(linkedInFilters)
+          .filter(
+            ([k, v]) =>
+              [
+                'seniorityLevelIds',
+                'companyHeadcount',
+                'functionIds',
+                'yearsOfExperienceIds',
+                'pastCompanies',
+                'pastJobTitles',
+                'recentlyChangedJobs',
+              ].includes(k) && v
+          )
+          .map(([k]) => k),
+      });
       const apiStart = Date.now();
 
       const apiResult = await searchLinkedInShort({
@@ -496,6 +527,13 @@ export async function searchPeopleV2Action(
       apiResultCount = apiResult.profiles.length;
 
       console.log(`[SearchV2] LinkedIn API returned ${apiResultCount} profiles (${totalMatchesOnLinkedIn.toLocaleString()} total on LinkedIn, ${totalLinkedInPages} pages) in ${Date.now() - apiStart}ms`);
+      log.info('search-v2', 'LinkedIn Short returned (advanced)', {
+        profileCount: apiResultCount,
+        totalMatchesOnLinkedIn,
+        totalLinkedInPages,
+        durationMs: Date.now() - apiStart,
+        costUsd: APIFY_SHORT_COST_PER_PAGE,
+      });
 
       // Save profiles to DB + build results in LinkedIn's order
       const schoolTag = linkedInFilters.schools?.[0] || null;
@@ -518,6 +556,12 @@ export async function searchPeopleV2Action(
       }
       const saveFailCount = saveResults.filter(r => !r.personId).length;
       console.log(`[SearchV2] Saved ${apiResultCount} profiles (${saveNewCount} new, ${apiResultCount - saveNewCount - saveFailCount} existing, ${saveFailCount} failed) in ${Date.now() - saveStart}ms`);
+      log.info('search-v2', 'Profiles saved (advanced)', {
+        total: apiResultCount,
+        new: saveNewCount,
+        failed: saveFailCount,
+        durationMs: Date.now() - saveStart,
+      });
 
       // Look up saved profiles by LinkedIn URL to get full PersonWithSource data
       const linkedinUrls = apiResult.profiles
@@ -544,6 +588,7 @@ export async function searchPeopleV2Action(
     } else {
       // ===== SIMPLE PATH: DB-first, LinkedIn Short fallback =====
       console.log(`[SearchV2] PATH: Simple (DB-first)`);
+      log.decision('search-v2', 'Simple path taken', {});
       let companyAliases: string[] = [];
       if (dbFilters.company) {
         const resolved = await resolveCompanyAliases(dbFilters.company);
@@ -551,6 +596,10 @@ export async function searchPeopleV2Action(
         if (companyAliases.length > 0) {
           console.log(`[SearchV2] Company "${dbFilters.company}" → aliases: [${companyAliases.join(', ')}]`);
         }
+        log.info('search-v2', 'Company aliases resolved', {
+          company: dbFilters.company,
+          aliases: companyAliases,
+        });
       }
 
       const filters: PersonFilters = {
@@ -568,6 +617,11 @@ export async function searchPeopleV2Action(
       let people = await findPeopleByFilters(filters);
       dbResultCount = people.length;
       console.log(`[SearchV2] DB returned ${dbResultCount} results in ${Date.now() - dbStart}ms`);
+      log.info('search-v2', 'DB query complete', {
+        resultCount: dbResultCount,
+        durationMs: Date.now() - dbStart,
+        aliasesUsed: companyAliases.length,
+      });
 
       let template: ResolvedTemplate;
       if (userId) {
@@ -580,6 +634,10 @@ export async function searchPeopleV2Action(
       if (dbResultCount < DB_FIRST_THRESHOLD) {
         // ── LinkedIn fallback: show LinkedIn results directly (like advanced path) ──
         console.log(`[SearchV2] DB has ${dbResultCount} results (< ${DB_FIRST_THRESHOLD}) — calling Short mode API`);
+        log.decision('search-v2', 'DB insufficient — calling LinkedIn Short', {
+          dbResultCount,
+          threshold: DB_FIRST_THRESHOLD,
+        });
         const apiStart = Date.now();
 
         const apiResult = await searchLinkedInShort({
@@ -591,6 +649,12 @@ export async function searchPeopleV2Action(
         totalLinkedInPages = apiResult.pagination.totalPages;
 
         console.log(`[SearchV2] Short mode returned ${apiResult.profiles.length} profiles (${totalMatchesOnLinkedIn} total on LinkedIn) in ${Date.now() - apiStart}ms`);
+        log.info('search-v2', 'LinkedIn Short returned (simple)', {
+          profileCount: apiResult.profiles.length,
+          totalMatchesOnLinkedIn,
+          durationMs: Date.now() - apiStart,
+          costUsd: APIFY_SHORT_COST_PER_PAGE,
+        });
 
         const schoolTag = linkedInFilters.schools?.[0] || null;
         const saveStart2 = Date.now();
@@ -602,6 +666,12 @@ export async function searchPeopleV2Action(
         const failCount = saveResults2.filter(r => !r.personId).length;
         apiResultCount = apiResult.profiles.length;
         console.log(`[SearchV2] Saved ${apiResultCount} profiles (${newCount} new, ${apiResultCount - newCount - failCount} existing, ${failCount} failed) in ${Date.now() - saveStart2}ms`);
+        log.info('search-v2', 'Profiles saved (simple)', {
+          total: apiResultCount,
+          new: newCount,
+          failed: failCount,
+          durationMs: Date.now() - saveStart2,
+        });
 
         // Build results from LinkedIn profiles directly (not re-querying DB)
         // This avoids losing profiles that lack role embeddings for vector search
@@ -644,6 +714,11 @@ export async function searchPeopleV2Action(
       } else {
         // ── DB has enough results: use them directly, skip LinkedIn API ──
         console.log(`[SearchV2] DB has ${dbResultCount} results (>= ${DB_FIRST_THRESHOLD}) — skipping API ($0 cost)`);
+        log.decision('search-v2', 'DB sufficient — skipping API', {
+          dbResultCount,
+          threshold: DB_FIRST_THRESHOLD,
+          vectorActive: isVectorRoleMatchingEnabled() && !!dbFilters.role,
+        });
 
         // Rank candidates
         const vectorActive = isVectorRoleMatchingEnabled() && !!dbFilters.role;
@@ -773,6 +848,16 @@ export async function searchPeopleV2Action(
       `[SearchV2] ✓ Done in ${elapsed}ms — ${results.length} results, hasMore=${hasMore}, path=${hasAdvancedFilters ? 'advanced' : calledLinkedIn ? 'simple+linkedin' : 'simple(db-only)'}, dbHits=${dbResultCount}, apiHits=${apiResultCount}, cost=$${(totalCostCents / 100).toFixed(2)}`
     );
     console.log(`[SearchV2] ────────────────────────────────────────────────`);
+    log.info('search-v2', 'Returning results', {
+      resultCount: results.length,
+      hasMore,
+      path: hasAdvancedFilters ? 'advanced' : calledLinkedIn ? 'simple+linkedin' : 'simple(db-only)',
+      dbHits: dbResultCount,
+      apiHits: apiResultCount,
+      totalMatchesOnLinkedIn,
+      totalCostCents,
+      elapsedMs: elapsed,
+    });
 
     return {
       success: true,
@@ -797,8 +882,25 @@ export async function searchPeopleV2Action(
     const elapsed = Date.now() - searchStart;
     console.error(`[SearchV2] ✗ FAILED after ${elapsed}ms — query="${input.query}", filters=${JSON.stringify(input.dbFilters)}`, error);
     console.log(`[SearchV2] ────────────────────────────────────────────────`);
+    log.error('search-v2', 'Search threw', {
+      error: String(error),
+      elapsedMs: elapsed,
+    });
     return { success: false, error: 'Search failed. Please try again.' };
   }
+  };
+
+  if (logger) {
+    try {
+      const result = await withLogger(logger, run);
+      await logger.finalize(result.success ? 'success' : 'error', result.success ? undefined : result.error);
+      return result;
+    } catch (err) {
+      await logger.finalize('error', String(err));
+      throw err;
+    }
+  }
+  return run();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1219,10 +1321,37 @@ export async function lookupPersonAction(
     return { success: false, error: 'Name must be at least 2 characters' };
   }
 
-  try {
-    const userId = session.user.id;
+  const logger = createLoggerForQuery(
+    `lookup:${input.name}${input.company ? `@${input.company}` : ''}`
+  );
+  const run = async (): Promise<LookupActionResult> => {
+    log.info('lookup', 'Received person lookup', {
+      name: input.name,
+      company: input.company,
+    });
+    return runLookup();
+  };
 
-    const user = await prisma.user.findUnique({
+  if (logger) {
+    try {
+      const result = await withLogger(logger, run);
+      await logger.finalize(
+        result.success ? 'success' : 'error',
+        result.success ? undefined : result.error
+      );
+      return result;
+    } catch (err) {
+      await logger.finalize('error', String(err));
+      throw err;
+    }
+  }
+  return runLookup();
+
+  async function runLookup(): Promise<LookupActionResult> {
+    try {
+      const userId = session!.user!.id;
+
+      const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
         name: true,
@@ -1442,9 +1571,10 @@ export async function lookupPersonAction(
 
     console.log(`[Lookup] Returning ${results.length} results for "${cleanName}" ${Date.now() - lookupStart}ms`);
     return { success: true, results };
-  } catch (error) {
-    console.error('[Lookup] Error:', error);
-    return { success: false, error: 'Lookup failed. Please try again.' };
+    } catch (error) {
+      console.error('[Lookup] Error:', error);
+      return { success: false, error: 'Lookup failed. Please try again.' };
+    }
   }
 }
 

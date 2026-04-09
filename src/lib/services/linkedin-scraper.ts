@@ -19,6 +19,11 @@
  */
 
 import { ApifyClient } from 'apify-client';
+import {
+  log,
+  APIFY_FULL_COST_PER_PROFILE_EMAIL,
+  APIFY_FULL_COST_PER_PROFILE_NO_EMAIL,
+} from '@/lib/services/discovery-logger';
 
 const APIFY_API_KEY = process.env.APIFY_API_KEY;
 const ACTOR_ID = 'LpVuK3Zozwuipa5bp';
@@ -640,13 +645,52 @@ export async function scrapeLinkedInProfiles(
       await Promise.all(callbackPromises);
     }
 
+    const elapsed = Date.now() - scrapeStart;
     console.log(
-      `[Scraper] Completed: ${allProfiles.length} succeeded, ${failedUrls.length} failed ${Date.now() - scrapeStart}ms`
+      `[Scraper] Completed: ${allProfiles.length} succeeded, ${failedUrls.length} failed ${elapsed}ms`
     );
+
+    const costPerProfile = includeEmail
+      ? APIFY_FULL_COST_PER_PROFILE_EMAIL
+      : APIFY_FULL_COST_PER_PROFILE_NO_EMAIL;
+    log.api('linkedin-scraper', {
+      service: 'apify-linkedin-full',
+      request: {
+        actor: ACTOR_ID,
+        mode: includeEmail ? 'email' : 'no-email',
+        urlCount: linkedinUrls.length,
+        urls: linkedinUrls,
+        batchCount: batches.length,
+      },
+      response: {
+        profileCount: allProfiles.length,
+        failedCount: failedUrls.length,
+        sample: allProfiles.slice(0, 3).map((p) => ({
+          name: p.fullName,
+          role: p.role,
+          company: p.company,
+        })),
+      },
+      durationMs: elapsed,
+      // Charged per-profile for profiles actually returned (matches Apify billing)
+      costUsd: allProfiles.length * costPerProfile,
+    });
 
     return allProfiles;
   } catch (error) {
+    const elapsed = Date.now() - scrapeStart;
     console.error('[Scraper] Scrape error:', error);
+    log.api('linkedin-scraper', {
+      service: 'apify-linkedin-full',
+      request: {
+        actor: ACTOR_ID,
+        mode: includeEmail ? 'email' : 'no-email',
+        urlCount: linkedinUrls.length,
+        urls: linkedinUrls,
+      },
+      durationMs: elapsed,
+      error: error instanceof Error ? error.message : String(error),
+    });
     throw error;
   }
 }

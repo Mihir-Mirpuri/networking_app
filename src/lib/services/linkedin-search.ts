@@ -11,6 +11,7 @@
  */
 
 import { ApifyClient } from 'apify-client';
+import { log, APIFY_SHORT_COST_PER_PAGE } from '@/lib/services/discovery-logger';
 
 const APIFY_API_KEY = process.env.APIFY_API_KEY;
 const ACTOR_ID = 'harvestapi/linkedin-profile-search';
@@ -40,7 +41,6 @@ export interface LinkedInSearchParams {
   yearsAtCurrentCompanyIds?: string[];
   seniorityLevelIds?: string[];
   functionIds?: string[];
-  industryIds?: string[];
   profileLanguages?: string[];
   companyHeadcount?: string[];
   companyHeadquarterLocations?: string[];
@@ -53,7 +53,6 @@ export interface LinkedInSearchParams {
   excludeSchools?: string[];
   excludeCurrentJobTitles?: string[];
   excludePastJobTitles?: string[];
-  excludeIndustryIds?: string[];
   excludeSeniorityLevelIds?: string[];
   excludeFunctionIds?: string[];
   excludeCompanyHeadquarterLocations?: string[];
@@ -256,7 +255,6 @@ export async function searchLinkedInShort(
     ['yearsAtCurrentCompanyIds', 'yearsAtCurrentCompanyIds'],
     ['seniorityLevelIds', 'seniorityLevelIds'],
     ['functionIds', 'functionIds'],
-    ['industryIds', 'industryIds'],
     ['profileLanguages', 'profileLanguages'],
     ['companyHeadcount', 'companyHeadcount'],
     ['companyHeadquarterLocations', 'companyHeadquarterLocations'],
@@ -267,7 +265,6 @@ export async function searchLinkedInShort(
     ['excludeSchools', 'excludeSchools'],
     ['excludeCurrentJobTitles', 'excludeCurrentJobTitles'],
     ['excludePastJobTitles', 'excludePastJobTitles'],
-    ['excludeIndustryIds', 'excludeIndustryIds'],
     ['excludeSeniorityLevelIds', 'excludeSeniorityLevelIds'],
     ['excludeFunctionIds', 'excludeFunctionIds'],
     ['excludeCompanyHeadquarterLocations', 'excludeCompanyHeadquarterLocations'],
@@ -335,6 +332,23 @@ export async function searchLinkedInShort(
       console.log(`[LinkedInSearch] Sample results: ${sample}`);
     }
 
+    log.api('linkedin-search', {
+      service: 'apify-linkedin-short',
+      request: actorInput,
+      response: {
+        profileCount: profiles.length,
+        totalElements: pagination.totalElements,
+        totalPages: pagination.totalPages,
+        sample: profiles.slice(0, 3).map(p => ({
+          name: p.fullName,
+          role: p.role,
+          company: p.company,
+        })),
+      },
+      durationMs: elapsed,
+      costUsd: takePages * APIFY_SHORT_COST_PER_PAGE,
+    });
+
     return {
       profiles,
       pagination,
@@ -346,6 +360,12 @@ export async function searchLinkedInShort(
   } catch (error) {
     const elapsed = Date.now() - searchStart;
     console.error(`[LinkedInSearch] Search failed after ${elapsed}ms:`, error instanceof Error ? error.message : error);
+    log.api('linkedin-search', {
+      service: 'apify-linkedin-short',
+      request: actorInput,
+      durationMs: elapsed,
+      error: error instanceof Error ? error.message : String(error),
+    });
     throw error;
   }
 }

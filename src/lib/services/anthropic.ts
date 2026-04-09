@@ -5,6 +5,7 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import { logGroqUsage, GroqUsageMetadata } from '@/lib/services/groq/logging';
+import { log, anthropicHaikuCost } from '@/lib/services/discovery-logger';
 
 // Singleton client
 let client: Anthropic | null = null;
@@ -58,7 +59,21 @@ export async function completeJsonAnthropic<T>(
       model,
       max_tokens: maxTokens,
       temperature,
-      ...(systemPrompt ? { system: systemPrompt } : {}),
+      // Wrap the system prompt in a cache_control block so Anthropic caches
+      // it server-side. Cached reads cost ~10% of normal input tokens, so
+      // any user who issues ≥2 queries within a 5-min window pays ~$0.0004
+      // per subsequent query instead of ~$0.004.
+      ...(systemPrompt
+        ? {
+            system: [
+              {
+                type: 'text' as const,
+                text: systemPrompt,
+                cache_control: { type: 'ephemeral' as const },
+              },
+            ],
+          }
+        : {}),
       messages: [{ role: 'user', content: userPrompt }],
     });
 
@@ -72,12 +87,46 @@ export async function completeJsonAnthropic<T>(
       totalTokens: response.usage.input_tokens + response.usage.output_tokens,
     };
 
+    // Anthropic prompt caching telemetry. Field names may lag SDK types —
+    // cast to any to read them safely. Undefined → 0.
+    const cacheCreationTokens =
+      (response.usage as unknown as { cache_creation_input_tokens?: number })
+        .cache_creation_input_tokens ?? 0;
+    const cacheReadTokens =
+      (response.usage as unknown as { cache_read_input_tokens?: number })
+        .cache_read_input_tokens ?? 0;
+
     if (metadata) {
       logGroqUsage(metadata, usage, response.model, durationMs);
     }
 
     const cleanedText = text.replace(/^```json\s*/, '').replace(/\s*```$/, '');
     const parsed = JSON.parse(cleanedText) as T;
+
+    // Emit structured log entry (no-op when logger not in context).
+    log.llm('anthropic', {
+      provider: 'anthropic',
+      model: response.model,
+      systemPrompt,
+      userPrompt,
+      rawResponse: text,
+      parsedResponse: parsed,
+      promptTokens: usage.promptTokens,
+      completionTokens: usage.completionTokens,
+      totalTokens: usage.totalTokens,
+      cacheCreationTokens,
+      cacheReadTokens,
+      durationMs,
+      costUsd: response.model.includes('haiku')
+        ? anthropicHaikuCost(
+            usage.promptTokens,
+            usage.completionTokens,
+            cacheReadTokens,
+            cacheCreationTokens
+          )
+        : undefined,
+    });
+
     return { content: parsed, usage, model: response.model };
   } catch (error) {
     const durationMs = Date.now() - startTime;
@@ -90,6 +139,18 @@ export async function completeJsonAnthropic<T>(
         true
       );
     }
+    log.llm('anthropic', {
+      provider: 'anthropic',
+      model,
+      systemPrompt,
+      userPrompt,
+      rawResponse: '',
+      promptTokens: 0,
+      completionTokens: 0,
+      totalTokens: 0,
+      durationMs,
+      error: error instanceof Error ? error.message : String(error),
+    });
     throw error;
   }
 }
