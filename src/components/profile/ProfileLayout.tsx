@@ -16,10 +16,8 @@ interface ProfileLayoutProps {
 
 export function ProfileLayout({ userEmail, userName, userImage }: ProfileLayoutProps) {
   const { status } = useSession();
-  const [activeTab, setActiveTab] = useState<ProfileTab>('profile');
+  const [activeTab, setActiveTab] = useState<ProfileTab>('account');
   const [university, setUniversity] = useState<string | null>(null);
-  const [classification, setClassification] = useState<string | null>(null);
-  const [major, setMajor] = useState<string | null>(null);
   const [isSubscribed, setIsSubscribed] = useState(false);
 
   useEffect(() => {
@@ -27,8 +25,6 @@ export function ProfileLayout({ userEmail, userName, userImage }: ProfileLayoutP
       getProfileAction().then((result) => {
         if (result.success) {
           setUniversity(result.profile.university);
-          setClassification(result.profile.classification);
-          setMajor(result.profile.major);
         }
       });
       getSubscriptionStatus().then((result) => {
@@ -45,8 +41,6 @@ export function ProfileLayout({ userEmail, userName, userImage }: ProfileLayoutP
         userEmail={userEmail}
         userImage={userImage}
         university={university}
-        classification={classification}
-        major={major}
         isSubscribed={isSubscribed}
         activeTab={activeTab}
         onTabChange={setActiveTab}
