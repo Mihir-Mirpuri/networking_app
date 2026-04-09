@@ -640,6 +640,49 @@ export async function toggleStarOutreachTracker(
   }
 }
 
+export async function toggleResponseReceived(
+  id: string
+): Promise<{ success: true; hasResponse: boolean; responseReceivedAt: Date | null } | { success: false; error: string }> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return { success: false, error: 'Not authenticated' };
+  }
+
+  try {
+    const existing = await prisma.outreachTracker.findFirst({
+      where: { id, userId: session.user.id },
+    });
+
+    if (!existing) {
+      return { success: false, error: 'Outreach tracker not found' };
+    }
+
+    // Toggle: if has response, clear it; if no response, set it to now
+    const newResponseReceivedAt = existing.responseReceivedAt ? null : new Date();
+    const newStatus = newResponseReceivedAt ? 'RESPONDED' : (existing.dateEmailed ? 'SENT' : 'NOT_STARTED');
+
+    const updated = await prisma.outreachTracker.update({
+      where: { id },
+      data: {
+        responseReceivedAt: newResponseReceivedAt,
+        status: newStatus as OutreachStatus,
+      },
+    });
+
+    return {
+      success: true,
+      hasResponse: updated.responseReceivedAt !== null,
+      responseReceivedAt: updated.responseReceivedAt,
+    };
+  } catch (error) {
+    console.error('[Outreach] Error toggling response:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to toggle response',
+    };
+  }
+}
+
 export interface ScheduledEmailEntry {
   id: string;
   toEmail: string;
@@ -735,6 +778,132 @@ export async function getInitialScheduledEmails(userId: string): Promise<{
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to fetch scheduled emails',
+    };
+  }
+}
+
+export interface SavedForLaterEntry {
+  id: string; // UserCandidate ID
+  personId: string;
+  contactEmail: string | null;
+  contactName: string;
+  company: string;
+  role: string | null;
+  location: string | null;
+  linkedinUrl: string | null;
+  createdAt: Date;
+}
+
+export async function getSavedForLaterProfiles(): Promise<{
+  success: true;
+  profiles: SavedForLaterEntry[];
+} | { success: false; error: string }> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return { success: false, error: 'Not authenticated' };
+  }
+
+  try {
+    const profiles = await prisma.userCandidate.findMany({
+      where: {
+        userId: session.user.id,
+        savedForLater: true,
+      },
+      include: {
+        person: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return {
+      success: true,
+      profiles: profiles.map((uc) => ({
+        id: uc.id,
+        personId: uc.personId,
+        contactEmail: uc.email || uc.person.email,
+        contactName: uc.person.fullName,
+        company: uc.person.company,
+        role: uc.person.role,
+        location: uc.person.city && uc.person.state
+          ? `${uc.person.city}, ${uc.person.state}`
+          : uc.person.city || uc.person.state || null,
+        linkedinUrl: uc.person.linkedinUrl,
+        createdAt: uc.createdAt,
+      })),
+    };
+  } catch (error) {
+    console.error('[Outreach] Error fetching saved for later profiles:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch saved profiles',
+    };
+  }
+}
+
+export async function getInitialSavedForLaterProfiles(userId: string): Promise<{
+  success: true;
+  profiles: SavedForLaterEntry[];
+} | { success: false; error: string }> {
+  try {
+    const profiles = await prisma.userCandidate.findMany({
+      where: {
+        userId,
+        savedForLater: true,
+      },
+      include: {
+        person: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return {
+      success: true,
+      profiles: profiles.map((uc) => ({
+        id: uc.id,
+        personId: uc.personId,
+        contactEmail: uc.email || uc.person.email,
+        contactName: uc.person.fullName,
+        company: uc.person.company,
+        role: uc.person.role,
+        location: uc.person.city && uc.person.state
+          ? `${uc.person.city}, ${uc.person.state}`
+          : uc.person.city || uc.person.state || null,
+        linkedinUrl: uc.person.linkedinUrl,
+        createdAt: uc.createdAt,
+      })),
+    };
+  } catch (error) {
+    console.error('[Outreach] Error fetching initial saved for later profiles:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch saved profiles',
+    };
+  }
+}
+
+export async function removeSavedForLater(
+  userCandidateId: string
+): Promise<{ success: true } | { success: false; error: string }> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return { success: false, error: 'Not authenticated' };
+  }
+
+  try {
+    await prisma.userCandidate.update({
+      where: {
+        id: userCandidateId,
+        userId: session.user.id,
+      },
+      data: { savedForLater: false },
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('[Outreach] Error removing saved for later:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to remove from saved',
     };
   }
 }

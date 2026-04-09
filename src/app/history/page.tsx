@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { OutreachTrackerClient } from '@/components/outreach/OutreachTrackerClient';
-import { getInitialOutreachTrackers, getOutreachStats, getInitialScheduledEmails, getHistorySidebarStats } from '@/app/actions/outreach';
+import { getInitialOutreachTrackers, getOutreachStats, getInitialScheduledEmails, getInitialSavedForLaterProfiles, getHistorySidebarStats } from '@/app/actions/outreach';
 
 export default async function HistoryPage() {
   const session = await getServerSession(authOptions);
@@ -12,10 +12,11 @@ export default async function HistoryPage() {
   }
 
   // Fetch initial outreach data on the server
-  const [trackersResult, statsResult, scheduledResult, sidebarStatsResult] = await Promise.all([
+  const [trackersResult, statsResult, scheduledResult, savedForLaterResult, sidebarStatsResult] = await Promise.all([
     getInitialOutreachTrackers(session.user.id),
     getOutreachStats(),
     getInitialScheduledEmails(session.user.id),
+    getInitialSavedForLaterProfiles(session.user.id),
     getHistorySidebarStats(),
   ]);
 
@@ -49,6 +50,7 @@ export default async function HistoryPage() {
           initialHasMore={trackersResult.success ? trackersResult.hasMore : false}
           initialStats={statsResult.success ? statsResult.stats : defaultStats}
           initialScheduledEmails={scheduledResult.success ? scheduledResult.emails : []}
+          initialSavedForLater={savedForLaterResult.success ? savedForLaterResult.profiles : []}
           initialSidebarStats={sidebarStatsResult.success ? sidebarStatsResult.stats : defaultSidebarStats}
         />
       </main>

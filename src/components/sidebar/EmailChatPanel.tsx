@@ -21,67 +21,6 @@ function SignalLogo({ className }: { className?: string }) {
   );
 }
 
-// ─── Typewriter placeholder messages for email editing ────────────────────────
-
-const EMAIL_PLACEHOLDER_MESSAGES = [
-  "Make it shorter and more direct",
-  "Add a personal hook based on their background",
-  "Make the tone more casual",
-  "Emphasize my relevant experience",
-  "Add a clear call to action",
-];
-
-function useTypewriterPlaceholder(messages: string[], stopped = false, typingSpeed = 60, deleteSpeed = 30, pauseDuration = 2000) {
-  const [displayText, setDisplayText] = useState('');
-  const [messageIndex, setMessageIndex] = useState(0);
-  const [isTyping, setIsTyping] = useState(true);
-  const [isPaused, setIsPaused] = useState(false);
-
-  useEffect(() => {
-    if (stopped) return;
-    const currentMessage = messages[messageIndex];
-
-    if (isPaused) {
-      const pauseTimer = setTimeout(() => {
-        setIsPaused(false);
-        setIsTyping(false);
-      }, pauseDuration);
-      return () => clearTimeout(pauseTimer);
-    }
-
-    if (isTyping) {
-      if (displayText.length < currentMessage.length) {
-        const timer = setTimeout(() => {
-          setDisplayText(currentMessage.slice(0, displayText.length + 1));
-        }, typingSpeed);
-        return () => clearTimeout(timer);
-      } else {
-        setIsPaused(true);
-      }
-    } else {
-      if (displayText.length > 0) {
-        const timer = setTimeout(() => {
-          setDisplayText(displayText.slice(0, -1));
-        }, deleteSpeed);
-        return () => clearTimeout(timer);
-      } else {
-        setMessageIndex((prev) => (prev + 1) % messages.length);
-        setIsTyping(true);
-      }
-    }
-  }, [displayText, isTyping, isPaused, messageIndex, messages, stopped, typingSpeed, deleteSpeed, pauseDuration]);
-
-  return displayText;
-}
-
-// ─── Source badge colors ──────────────────────────────────────────────────────
-
-const SOURCE_COLORS: Record<string, { bg: string; text: string }> = {
-  linkedin: { bg: 'bg-[#0A66C2]/20', text: 'text-[#4A9FE5]' },
-  google: { bg: 'bg-[#4285f4]/20', text: 'text-[#7EB1F7]' },
-  website: { bg: 'bg-[#808080]/20', text: 'text-white' },
-  database: { bg: 'bg-[#10b981]/20', text: 'text-[#34d399]' },
-};
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -108,169 +47,9 @@ function InsightsSkeleton() {
   );
 }
 
-// ─── Insight Row Component ─────────────────────────────────────────────────────
+// ─── Initial Greeting Component ───────────────────────────────────────────────
 
-interface InsightRowProps {
-  insight: PersonInsightResponse;
-  isSelected: boolean;
-  isExpanded: boolean;
-  onToggleSelect: () => void;
-  onToggleExpand: () => void;
-}
-
-function InsightRow({ insight, isSelected, isExpanded, onToggleSelect, onToggleExpand }: InsightRowProps) {
-  const [isRowHovered, setIsRowHovered] = useState(false);
-  const [isTitleHovered, setIsTitleHovered] = useState(false);
-  const showDetail = isExpanded || isRowHovered;
-  const hasLink = !!insight.sourceUrl;
-
-  const handleRowClick = (e: React.MouseEvent) => {
-    // Don't toggle if clicking the title link
-    if ((e.target as HTMLElement).closest('[data-title-link]')) {
-      return;
-    }
-    onToggleSelect();
-  };
-
-  const handleTitleClick = (e: React.MouseEvent) => {
-    if (hasLink && insight.sourceUrl) {
-      e.stopPropagation();
-      window.open(insight.sourceUrl, '_blank', 'noopener,noreferrer');
-    }
-  };
-
-  return (
-    <div
-      className={`flex items-start gap-2 cursor-pointer rounded-md transition-colors hover:bg-[#1a1a1a]/50 ${
-        isSelected ? 'bg-[#1a1a1a]' : ''
-      }`}
-      onClick={handleRowClick}
-      onMouseEnter={() => setIsRowHovered(true)}
-      onMouseLeave={() => setIsRowHovered(false)}
-    >
-      {/* Checkbox */}
-      <div className="flex-shrink-0 mt-1.5 ml-2">
-        <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
-          isSelected
-            ? 'bg-[#0b57d0] border-[#0b57d0]'
-            : 'border-[#404040] hover:border-[#606060]'
-        }`}>
-          {isSelected && (
-            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-            </svg>
-          )}
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 min-w-0 px-1 py-1">
-        {/* Title row with confidence dot */}
-        <div className="flex items-center gap-1.5">
-          {/* Title + link icon as one clickable unit */}
-          {hasLink ? (
-            <button
-              data-title-link
-              onClick={handleTitleClick}
-              onMouseEnter={() => setIsTitleHovered(true)}
-              onMouseLeave={() => setIsTitleHovered(false)}
-              className="flex items-center gap-1 text-left"
-            >
-              <span className={`text-xs leading-relaxed transition-all ${
-                isSelected ? 'text-white' : 'text-white'
-              } ${isTitleHovered ? 'underline text-white' : ''}`}>
-                {insight.label}
-              </span>
-              <svg className={`w-3 h-3 flex-shrink-0 transition-colors ${isTitleHovered ? 'text-white' : 'text-white'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-              </svg>
-            </button>
-          ) : (
-            <span className={`text-xs leading-relaxed ${isSelected ? 'text-white' : 'text-white'}`}>
-              {insight.label}
-            </span>
-          )}
-        </div>
-
-        {/* Detail - shown on hover of the row */}
-        {showDetail && (
-          <p className="text-[11px] text-white leading-relaxed mt-0.5">{insight.detail}</p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── Collapsible Section Component ─────────────────────────────────────────────
-
-interface InsightSectionGroupProps {
-  title: string;
-  icon: React.ReactNode;
-  insights: PersonInsightResponse[];
-  selectedInsightIds: Set<string>;
-  expandedInsightIds: Set<string>;
-  onToggleInsight: (id: string) => void;
-  onToggleExpand: (id: string) => void;
-  defaultOpen?: boolean;
-}
-
-function InsightSectionGroup({
-  title,
-  icon,
-  insights,
-  selectedInsightIds,
-  expandedInsightIds,
-  onToggleInsight,
-  onToggleExpand,
-  defaultOpen = true,
-}: InsightSectionGroupProps) {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
-
-  if (insights.length === 0) return null;
-
-  return (
-    <div className="border-b border-[#1a1a1a] last:border-b-0">
-      {/* Section header */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-[#1a1a1a]/30 transition-colors"
-      >
-        {icon}
-        <span className="text-xs font-medium text-white">{title}</span>
-        <span className="text-[10px] text-white">({insights.length})</span>
-        <svg
-          className={`w-3 h-3 text-white ml-auto transition-transform ${isOpen ? 'rotate-180' : ''}`}
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-        </svg>
-      </button>
-
-      {/* Section content */}
-      {isOpen && (
-        <div className="space-y-0.5 pb-2">
-          {insights.map((insight) => (
-            <InsightRow
-              key={insight.id}
-              insight={insight}
-              isSelected={selectedInsightIds.has(insight.id)}
-              isExpanded={expandedInsightIds.has(insight.id)}
-              onToggleSelect={() => onToggleInsight(insight.id)}
-              onToggleExpand={() => onToggleExpand(insight.id)}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Main Insights Section ─────────────────────────────────────────────────────
-
-export function InsightsSection() {
+function InitialGreeting({ isSubscribed }: { isSubscribed: boolean | null }) {
   const {
     insights,
     selectedInsightIds,
@@ -285,6 +64,8 @@ export function InsightsSection() {
   } = useEmailChat();
 
   const [expandedInsightIds, setExpandedInsightIds] = useState<Set<string>>(new Set());
+  const [linkedinOpen, setLinkedinOpen] = useState(true);
+  const [googleOpen, setGoogleOpen] = useState(true);
 
   const toggleExpand = (id: string) => {
     setExpandedInsightIds((prev) => {
@@ -307,7 +88,6 @@ export function InsightsSection() {
       if (insight.source === 'linkedin' || insight.source === 'database') {
         linkedin.push(insight);
       } else {
-        // google, website go here
         google.push(insight);
       }
     }
@@ -340,86 +120,162 @@ export function InsightsSection() {
     </svg>
   );
 
-  return (
-    <div className="border-b border-[#252525]">
-      {/* Header */}
-      <div className="flex items-center justify-center gap-2 px-3 py-3">
-        <span className="text-sm font-semibold text-white">About {firstName}</span>
-        {selectedCount > 0 && (
-          <span className="px-1.5 py-0.5 text-[10px] font-medium bg-[#0b57d0]/20 text-[#7EB1F7] rounded-full">
-            {selectedCount}
-          </span>
-        )}
-        {insightsLoading && (
-          <div className="flex items-center gap-1">
-            <div className="w-1.5 h-1.5 bg-[#404040] rounded-full animate-pulse" />
+  // Show loading state - when actively loading OR when no insights yet (initial state)
+  if (insightsLoading || (insights.length === 0 && !insightsError)) {
+    return (
+      <div className="px-3 py-4">
+        <div className="flex gap-2 w-fit">
+          <div className="w-5 h-5 rounded-full bg-[#252525] flex items-center justify-center mt-1">
+            <SignalLogo className="w-3 h-3 text-white" />
           </div>
-        )}
+          <div className={`w-fit rounded-2xl px-3 py-2 rounded-bl-md ${isSubscribed === null ? 'bg-[#2a2a2a]' : isSubscribed ? 'bg-[#2563EB]' : 'bg-[#22C55E]'}`}>
+            <TypingIndicator />
+          </div>
+        </div>
       </div>
+    );
+  }
 
-      {/* Content */}
-      <div className="pb-2">
-        {insightsLoading && insights.length === 0 ? (
-          <InsightsSkeleton />
-        ) : insightsError ? (
-          <div className="px-3 py-2 flex items-center gap-2">
-            <span className="text-xs text-[#666]">{insightsError}</span>
-            {currentPersonId && (
-              <button
-                onClick={() => fetchInsights(currentPersonId)}
-                className="text-xs text-[#7EB1F7] hover:text-[#4A9FE5] transition-colors"
-              >
-                Retry
-              </button>
-            )}
-          </div>
-        ) : insights.length === 0 ? (
-          <div className="px-3 py-2">
-            <span className="text-xs text-white">No additional info found</span>
-          </div>
-        ) : (
-          <>
-            {/* LinkedIn section */}
-            <InsightSectionGroup
-              title="From LinkedIn"
-              icon={linkedinIcon}
-              insights={linkedinInsights}
-              selectedInsightIds={selectedInsightIds}
-              expandedInsightIds={expandedInsightIds}
-              onToggleInsight={toggleInsight}
-              onToggleExpand={toggleExpand}
-              defaultOpen={true}
-            />
+  return (
+    <div className="px-3 py-4">
+      <div className="flex gap-2">
+        <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#252525] flex items-center justify-center mt-1">
+          <SignalLogo className="w-3 h-3 text-white" />
+        </div>
+        <div className={`flex-1 rounded-2xl px-3 py-2 text-sm text-white rounded-bl-md ${isSubscribed === null ? 'bg-[#2a2a2a]' : isSubscribed ? 'bg-[#2563EB]' : 'bg-[#22C55E]'}`}>
+          <p className="mb-2">Here&apos;s what I found on {firstName}:</p>
 
-            {/* Google section */}
-            <InsightSectionGroup
-              title="From Google"
-              icon={googleIcon}
-              insights={googleInsights}
-              selectedInsightIds={selectedInsightIds}
-              expandedInsightIds={expandedInsightIds}
-              onToggleInsight={toggleInsight}
-              onToggleExpand={toggleExpand}
-              defaultOpen={true}
-            />
+          {/* Insights content */}
+          {insightsError ? (
+            <div className="flex items-center gap-2 py-1">
+              <span className="text-xs text-white/70">{insightsError}</span>
+              {currentPersonId && (
+                <button
+                  onClick={() => fetchInsights(currentPersonId)}
+                  className="text-xs text-white/90 hover:text-white underline transition-colors"
+                >
+                  Retry
+                </button>
+              )}
+            </div>
+          ) : insights.length === 0 ? (
+            <p className="text-xs text-white/70 py-1">No additional info found</p>
+          ) : (
+            <div className="space-y-1">
+              {/* LinkedIn section */}
+              {linkedinInsights.length > 0 && (
+                <div className="rounded-lg bg-black/20 overflow-hidden">
+                  <button
+                    onClick={() => setLinkedinOpen(!linkedinOpen)}
+                    className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-black/10 transition-colors"
+                  >
+                    {linkedinIcon}
+                    <span className="text-xs font-medium text-white">LinkedIn</span>
+                    <span className="text-[10px] text-white/70">({linkedinInsights.length})</span>
+                    <svg
+                      className={`w-3 h-3 text-white/70 ml-auto transition-transform ${linkedinOpen ? 'rotate-180' : ''}`}
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                    </svg>
+                  </button>
+                  {linkedinOpen && (
+                    <div className="px-2 pb-2 space-y-0.5">
+                      {linkedinInsights.map((insight) => (
+                        <div
+                          key={insight.id}
+                          onClick={() => toggleInsight(insight.id)}
+                          className={`flex items-start gap-2 px-2 py-1 rounded cursor-pointer transition-colors hover:bg-black/20 ${
+                            selectedInsightIds.has(insight.id) ? 'bg-black/30' : ''
+                          }`}
+                        >
+                          <div className={`flex-shrink-0 mt-0.5 w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors ${
+                            selectedInsightIds.has(insight.id)
+                              ? 'bg-white border-white'
+                              : 'border-white/50 hover:border-white'
+                          }`}>
+                            {selectedInsightIds.has(insight.id) && (
+                              <svg className="w-2.5 h-2.5 text-[#2563EB]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                              </svg>
+                            )}
+                          </div>
+                          <span className="text-xs text-white/90 leading-relaxed">{insight.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
-            {/* Apply button */}
-            {selectedCount > 0 && (
-              <div className="px-3 pt-2">
+              {/* Google section */}
+              {googleInsights.length > 0 && (
+                <div className="rounded-lg bg-black/20 overflow-hidden">
+                  <button
+                    onClick={() => setGoogleOpen(!googleOpen)}
+                    className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-black/10 transition-colors"
+                  >
+                    {googleIcon}
+                    <span className="text-xs font-medium text-white">Google</span>
+                    <span className="text-[10px] text-white/70">({googleInsights.length})</span>
+                    <svg
+                      className={`w-3 h-3 text-white/70 ml-auto transition-transform ${googleOpen ? 'rotate-180' : ''}`}
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                    </svg>
+                  </button>
+                  {googleOpen && (
+                    <div className="px-2 pb-2 space-y-0.5">
+                      {googleInsights.map((insight) => (
+                        <div
+                          key={insight.id}
+                          onClick={() => toggleInsight(insight.id)}
+                          className={`flex items-start gap-2 px-2 py-1 rounded cursor-pointer transition-colors hover:bg-black/20 ${
+                            selectedInsightIds.has(insight.id) ? 'bg-black/30' : ''
+                          }`}
+                        >
+                          <div className={`flex-shrink-0 mt-0.5 w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors ${
+                            selectedInsightIds.has(insight.id)
+                              ? 'bg-white border-white'
+                              : 'border-white/50 hover:border-white'
+                          }`}>
+                            {selectedInsightIds.has(insight.id) && (
+                              <svg className="w-2.5 h-2.5 text-[#22C55E]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                              </svg>
+                            )}
+                          </div>
+                          <span className="text-xs text-white/90 leading-relaxed">{insight.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Apply button */}
+              {selectedCount > 0 && (
                 <button
                   onClick={handleApply}
                   disabled={isProcessing}
-                  className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-[#0b57d0]/15 text-[#7EB1F7] rounded-md hover:bg-[#0b57d0]/25 disabled:opacity-50 transition-colors"
+                  className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 mt-2 text-xs font-medium bg-white/20 text-white rounded-lg hover:bg-white/30 disabled:opacity-50 transition-colors"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" />
                   </svg>
-                  Apply {selectedCount} insight{selectedCount !== 1 ? 's' : ''} to email
+                  Apply {selectedCount} insight{selectedCount !== 1 ? 's' : ''}
                 </button>
-              </div>
-            )}
-          </>
-        )}
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -437,7 +293,6 @@ export function EmailChatPanel() {
   } = useEmailChat();
 
   const [inputValue, setInputValue] = useState('');
-  const [isFocused, setIsFocused] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState<boolean | null>(null);
 
   // Fetch subscription status
@@ -448,7 +303,6 @@ export function EmailChatPanel() {
   }, []);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const typewriterPlaceholder = useTypewriterPlaceholder(EMAIL_PLACEHOLDER_MESSAGES, isFocused);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -460,16 +314,13 @@ export function EmailChatPanel() {
     inputRef.current?.focus();
   }, []);
 
-  // The display value: show typewriter when not focused, no input, and no messages
-  const displayValue = isFocused || inputValue || messages.length > 0 ? inputValue : typewriterPlaceholder;
-
   // Auto-resize textarea based on content
   useEffect(() => {
     const ta = inputRef.current;
     if (!ta) return;
     ta.style.height = 'auto';
     ta.style.height = Math.min(ta.scrollHeight, 80) + 'px';
-  }, [displayValue]);
+  }, [inputValue]);
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -508,31 +359,10 @@ export function EmailChatPanel() {
         </div>
       )}
 
-      {/* Insights section */}
-      <InsightsSection />
-
       {/* Messages area */}
       <div className="flex-1 overflow-y-auto">
-        {/* Empty state */}
-        {messages.length === 0 && !isProcessing && (
-          <div className="h-full flex flex-col items-center justify-center px-6 text-center">
-            <p className="text-sm text-white mb-2">How can I help with this email?</p>
-            <div className="flex flex-wrap gap-2 justify-center">
-              {['Make it shorter', 'More professional', 'Add a hook'].map((suggestion) => (
-                <button
-                  key={suggestion}
-                  onClick={() => {
-                    setInputValue(suggestion);
-                    inputRef.current?.focus();
-                  }}
-                  className="px-3 py-1.5 text-xs text-white border border-[#303030] rounded-full hover:border-[#404040] hover:text-white transition-colors"
-                >
-                  {suggestion}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Initial greeting with insights - always shown at top */}
+        <InitialGreeting isSubscribed={isSubscribed} />
 
         {/* Chat messages */}
         {messages.length > 0 && (
@@ -602,14 +432,13 @@ export function EmailChatPanel() {
         >
           <textarea
             ref={inputRef}
-            value={displayValue}
+            value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)}
+            placeholder="Ask me to edit this email..."
             disabled={isProcessing}
             rows={1}
-            className="w-full px-3 pr-10 py-2.5 text-sm bg-transparent border-none text-white focus:outline-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 disabled:opacity-60 disabled:cursor-not-allowed resize-none"
+            className="w-full px-3 pr-10 py-2.5 text-sm bg-transparent border-none text-white placeholder-[#505050] focus:outline-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 disabled:opacity-60 disabled:cursor-not-allowed resize-none"
             style={{ maxHeight: '80px' }}
           />
           <button

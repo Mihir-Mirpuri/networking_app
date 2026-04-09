@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
-import { OutreachTrackerEntry, updateOutreachTracker } from '@/app/actions/outreach';
+import { useState, useRef, useEffect } from 'react';
+import { OutreachTrackerEntry, updateOutreachTracker, toggleResponseReceived } from '@/app/actions/outreach';
 import { NotesModal } from './NotesModal';
 import { InteractionModal } from './InteractionModal';
 import { ColumnKey } from './OutreachFilters';
+import { ALL_COLUMNS } from './useColumnSettings';
 import { InteractionType } from '@prisma/client';
 
 interface OutreachRowProps {
@@ -12,9 +13,13 @@ interface OutreachRowProps {
   onUpdate: (tracker: OutreachTrackerEntry) => void;
   onDelete: (id: string) => void;
   onToggleStar: (id: string) => void;
+  onToggleResponse: (id: string) => void;
   onRowClick: (tracker: OutreachTrackerEntry) => void;
   visibleColumns: ColumnKey[];
-  columnWidths: Record<ColumnKey, number>;
+  columnWidths: Record<string, number>;
+  getColumnLabel: (column: ColumnKey) => string;
+  getCustomCellValue: (trackerId: string, columnKey: string) => string;
+  onCustomCellChange: (trackerId: string, columnKey: string, value: string) => void;
 }
 
 // Deterministic avatar color from name
@@ -39,7 +44,70 @@ function getInitials(name: string | null, email: string): string {
   return email.slice(0, 2).toUpperCase();
 }
 
-export function OutreachRow({ tracker, onUpdate, onDelete, onToggleStar, onRowClick, visibleColumns, columnWidths }: OutreachRowProps) {
+function CustomCell({ trackerId, columnKey, width, getValue, onChange }: {
+  trackerId: string;
+  columnKey: string;
+  width: number;
+  getValue: (trackerId: string, columnKey: string) => string;
+  onChange: (trackerId: string, columnKey: string, value: string) => void;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isEditing]);
+
+  const value = getValue(trackerId, columnKey);
+
+  const handleStartEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditValue(value);
+    setIsEditing(true);
+  };
+
+  const handleFinish = () => {
+    onChange(trackerId, columnKey, editValue);
+    setIsEditing(false);
+  };
+
+  if (isEditing) {
+    return (
+      <div className="px-2 shrink-0" style={{ width }} data-column={columnKey}>
+        <input
+          ref={inputRef}
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onBlur={handleFinish}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleFinish();
+            if (e.key === 'Escape') setIsEditing(false);
+          }}
+          onClick={(e) => e.stopPropagation()}
+          className="w-full bg-[#333] border border-[#505050] rounded px-1.5 py-0.5 text-[13px] text-white outline-none focus:border-[#6364FF] font-['Inter']"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="px-2 shrink-0 cursor-text"
+      style={{ width }}
+      data-column={columnKey}
+      onClick={handleStartEdit}
+    >
+      <span className="text-[13px] text-white font-['Inter'] truncate block">
+        {value || <span className="text-[#555]">--</span>}
+      </span>
+    </div>
+  );
+}
+
+export function OutreachRow({ tracker, onUpdate, onDelete, onToggleStar, onToggleResponse, onRowClick, visibleColumns, columnWidths, getColumnLabel, getCustomCellValue, onCustomCellChange }: OutreachRowProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [showInteractionModal, setShowInteractionModal] = useState(false);
@@ -171,13 +239,20 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onToggleStar, onRowCl
       case 'response':
         return (
           <div className="px-2 flex justify-center shrink-0" style={{ width }} data-column={col}>
-            {tracker.responseReceivedAt ? (
-              <svg className="w-4 h-4 text-[#22c55e]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            ) : (
-              <span className="text-white">--</span>
-            )}
+            <button
+              onClick={(e) => { e.stopPropagation(); onToggleResponse(tracker.id); }}
+              className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                tracker.responseReceivedAt
+                  ? 'bg-[#22c55e] border-[#22c55e]'
+                  : 'border-[#505050] hover:border-[#22c55e]'
+              }`}
+            >
+              {tracker.responseReceivedAt && (
+                <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+            </button>
           </div>
         );
       case 'subject':
@@ -201,6 +276,20 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onToggleStar, onRowCl
             )}
           </div>
         );
+      default:
+        // Custom column — inline editable
+        if (!ALL_COLUMNS.includes(col as any)) {
+          return (
+            <CustomCell
+              trackerId={tracker.id}
+              columnKey={col}
+              width={width}
+              getValue={getCustomCellValue}
+              onChange={onCustomCellChange}
+            />
+          );
+        }
+        return null;
     }
   };
 

@@ -55,12 +55,6 @@ interface AISearchPageState {
   savedAt: number;
 }
 
-const EXAMPLE_QUERIES = [
-  'Product managers at Google in Austin',
-  'Software engineers at Meta from Stanford',
-  'Analysts at Goldman Sachs in New York',
-  'Find John Smith at Google',
-];
 
 export function AISearchPageClient({ initialRemainingDaily }: AISearchPageClientProps) {
   const hook = useSearchResults({ initialRemainingDaily });

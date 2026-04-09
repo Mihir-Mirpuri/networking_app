@@ -132,23 +132,6 @@ export function DrafterPanel() {
                   </div>
                 </form>
 
-                {/* Quick actions in refinement phase */}
-                {phase === 'refinement' && !isProcessing && (
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {['Make it shorter', 'More professional', 'Add a hook'].map((suggestion) => (
-                      <button
-                        key={suggestion}
-                        onClick={() => {
-                          setInputValue(suggestion);
-                          inputRef.current?.focus();
-                        }}
-                        className="px-2.5 py-1 text-xs text-white border border-[#303030] rounded-full hover:border-[#404040] hover:text-white transition-colors"
-                      >
-                        {suggestion}
-                      </button>
-                    ))}
-                  </div>
-                )}
               </div>
             </>
           ) : null}

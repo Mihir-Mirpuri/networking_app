@@ -1,26 +1,31 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import {
   OutreachTrackerEntry,
   OutreachStats,
   HistorySidebarStats,
   ScheduledEmailEntry,
+  SavedForLaterEntry,
   HistorySection,
   ActiveFilter,
   getOutreachTrackers,
+  getSavedForLaterProfiles,
   deleteOutreachTracker,
   toggleStarOutreachTracker,
+  toggleResponseReceived,
   clearAllOutreachTrackers,
 } from '@/app/actions/outreach';
 import { OutreachTable } from './OutreachTable';
 import { ScheduledEmailsSection } from './ScheduledEmailsSection';
-import { ThreadPanel } from './ThreadPanel';
+import { SavedForLaterSection } from './SavedForLaterSection';
+import { ExpandedHistoryReview } from './ExpandedHistoryReview';
 import { HistorySidebar } from './HistorySidebar';
 import { FilterSearchBar } from './FilterSearchBar';
 import { NewHeader } from '@/components/layout/NewHeader';
 import { LoadingSpinner } from '@/components/search/LoadingSpinner';
-import { useColumnSettings, COLUMN_LABELS } from './useColumnSettings';
+import { useColumnSettings } from './useColumnSettings';
+import { EmailChatProvider } from '@/contexts/EmailChatContext';
 
 interface OutreachTrackerClientProps {
   initialTrackers: OutreachTrackerEntry[];
@@ -28,6 +33,7 @@ interface OutreachTrackerClientProps {
   initialHasMore: boolean;
   initialStats: OutreachStats;
   initialScheduledEmails: ScheduledEmailEntry[];
+  initialSavedForLater: SavedForLaterEntry[];
   initialSidebarStats: HistorySidebarStats;
 }
 
@@ -37,10 +43,12 @@ export function OutreachTrackerClient({
   initialHasMore,
   initialStats,
   initialScheduledEmails,
+  initialSavedForLater,
   initialSidebarStats,
 }: OutreachTrackerClientProps) {
   const [trackers, setTrackers] = useState<OutreachTrackerEntry[]>(initialTrackers);
   const [scheduledEmails, setScheduledEmails] = useState<ScheduledEmailEntry[]>(initialScheduledEmails);
+  const [savedForLater, setSavedForLater] = useState<SavedForLaterEntry[]>(initialSavedForLater);
   const [stats, setStats] = useState<OutreachStats>(initialStats);
   const [cursor, setCursor] = useState<string | null>(initialCursor);
   const [hasMore, setHasMore] = useState(initialHasMore);
@@ -57,15 +65,18 @@ export function OutreachTrackerClient({
   // Column settings hook
   const columnSettings = useColumnSettings();
 
+  // Table ref for auto-fit all
+  const tableRef = useRef<HTMLDivElement>(null);
+
   const fetchTrackers = useCallback(
-    async (resetCursor = true, filtersOverride?: ActiveFilter[]) => {
+    async (resetCursor = true, filtersOverride?: ActiveFilter[], sectionOverride?: HistorySection) => {
       setIsLoading(true);
       const filtersToUse = filtersOverride ?? activeFilters;
+      const section = sectionOverride ?? activeSection;
       try {
         const result = await getOutreachTrackers({
-          starred: activeSection === 'starred' ? true : undefined,
-          savedForLater: activeSection === 'savedForLater' ? true : undefined,
-          hasResponse: activeSection === 'hasResponse' ? true : undefined,
+          starred: section === 'starred' ? true : undefined,
+          hasResponse: section === 'hasResponse' ? true : undefined,
           cursor: resetCursor ? undefined : cursor || undefined,
           filters: filtersToUse.length > 0 ? filtersToUse : undefined,
         });
@@ -94,7 +105,6 @@ export function OutreachTrackerClient({
     try {
       const result = await getOutreachTrackers({
         starred: activeSection === 'starred' ? true : undefined,
-        savedForLater: activeSection === 'savedForLater' ? true : undefined,
         hasResponse: activeSection === 'hasResponse' ? true : undefined,
         cursor,
         filters: activeFilters.length > 0 ? activeFilters : undefined,
@@ -112,23 +122,41 @@ export function OutreachTrackerClient({
     }
   };
 
-  const handleSectionChange = (section: HistorySection) => {
+  const handleSectionChange = async (section: HistorySection) => {
     setActiveSection(section);
-    if (section !== 'scheduled') {
-      setTimeout(() => fetchTrackers(true), 0);
+    if (section === 'scheduled') {
+      // Scheduled emails are already loaded
+      return;
     }
+    if (section === 'savedForLater') {
+      // Fetch fresh saved for later profiles
+      setIsLoading(true);
+      try {
+        const result = await getSavedForLaterProfiles();
+        if (result.success) {
+          setSavedForLater(result.profiles);
+        }
+      } catch (error) {
+        console.error('Error fetching saved for later:', error);
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+    // For other sections, fetch trackers with the new section
+    fetchTrackers(true, undefined, section);
   };
 
   const handleAddFilter = (filter: ActiveFilter) => {
     const newFilters = [...activeFilters, filter];
     setActiveFilters(newFilters);
-    setTimeout(() => fetchTrackers(true, newFilters), 0);
+    fetchTrackers(true, newFilters, activeSection);
   };
 
   const handleRemoveFilter = (index: number) => {
     const newFilters = activeFilters.filter((_, i) => i !== index);
     setActiveFilters(newFilters);
-    setTimeout(() => fetchTrackers(true, newFilters), 0);
+    fetchTrackers(true, newFilters, activeSection);
   };
 
   const recomputeStats = (trackerList: OutreachTrackerEntry[]) => {
@@ -171,6 +199,15 @@ export function OutreachTrackerClient({
     }
   };
 
+  const handleToggleResponse = async (id: string) => {
+    const result = await toggleResponseReceived(id);
+    if (result.success) {
+      setTrackers((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, responseReceivedAt: result.responseReceivedAt } : t))
+      );
+    }
+  };
+
   const handleClearAll = async () => {
     setIsClearing(true);
     try {
@@ -189,6 +226,10 @@ export function OutreachTrackerClient({
     }
   };
 
+  const handleAutoFitAll = useCallback(() => {
+    columnSettings.autoFitAllColumns(tableRef);
+  }, [columnSettings]);
+
   return (
     <div className="flex w-full h-full overflow-hidden">
       <HistorySidebar
@@ -201,20 +242,19 @@ export function OutreachTrackerClient({
           isColumnVisible: columnSettings.isVisible,
           onToggleColumn: columnSettings.toggleColumn,
           onReorderColumns: columnSettings.reorderColumns,
-          columnLabels: COLUMN_LABELS,
+          getColumnLabel: columnSettings.getColumnLabel,
+          onAddCustomColumn: columnSettings.addCustomColumn,
+          onRemoveCustomColumn: columnSettings.removeCustomColumn,
+          onRenameCustomColumn: columnSettings.renameCustomColumn,
+          onAutoFitAll: handleAutoFitAll,
+          onResetDefaults: columnSettings.resetToDefaults,
         }}
       />
 
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden bg-[#212121]">
       <NewHeader />
       <div className="flex-1 flex flex-col overflow-hidden px-4 py-4">
-      <FilterSearchBar
-        activeFilters={activeFilters}
-        onAddFilter={handleAddFilter}
-        onRemoveFilter={handleRemoveFilter}
-      />
-
-      {/* Content area - Scheduled emails or Outreach table */}
+      {/* Content area - Scheduled emails, Saved for later, or Outreach table */}
       {activeSection === 'scheduled' ? (
         <ScheduledEmailsSection
           scheduledEmails={scheduledEmails}
@@ -229,6 +269,22 @@ export function OutreachTrackerClient({
             );
           }}
         />
+      ) : activeSection === 'savedForLater' ? (
+        isLoading ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="flex items-center gap-3 text-white">
+              <LoadingSpinner size="md" />
+              Loading...
+            </div>
+          </div>
+        ) : (
+          <SavedForLaterSection
+            profiles={savedForLater}
+            onProfileRemoved={(id) => {
+              setSavedForLater((prev) => prev.filter((p) => p.id !== id));
+            }}
+          />
+        )
       ) : isLoading && trackers.length === 0 ? (
         <div className="flex items-center justify-center h-64">
           <div className="flex items-center gap-3 text-white">
@@ -237,29 +293,44 @@ export function OutreachTrackerClient({
           </div>
         </div>
       ) : (
-        <OutreachTable
-          trackers={trackers}
-          onUpdate={handleUpdate}
-          onDelete={handleDelete}
-          onToggleStar={handleToggleStar}
-          onRowClick={setSelectedTracker}
-          visibleColumns={columnSettings.visibleColumns}
-          columnWidths={columnSettings.widths}
-          onStartResize={columnSettings.startResize}
-          onAutoFitColumn={columnSettings.autoFitColumn}
-          hasMore={hasMore}
-          isLoadingMore={isLoadingMore}
-          onLoadMore={handleLoadMore}
-        />
+        <div className="flex-1 flex flex-col min-h-0 gap-3">
+          <FilterSearchBar
+            activeFilters={activeFilters}
+            onAddFilter={handleAddFilter}
+            onRemoveFilter={handleRemoveFilter}
+          />
+          <div className="flex-1 flex flex-col min-h-0 bg-[#1a1a1a] border border-[#3a3a3a] rounded-lg overflow-hidden">
+          <OutreachTable
+            trackers={trackers}
+            onUpdate={handleUpdate}
+            onDelete={handleDelete}
+            onToggleStar={handleToggleStar}
+            onToggleResponse={handleToggleResponse}
+            onRowClick={setSelectedTracker}
+            visibleColumns={columnSettings.visibleColumns}
+            columnWidths={columnSettings.widths}
+            onStartResize={columnSettings.startResize}
+            onAutoFitColumn={columnSettings.autoFitColumn}
+            hasMore={hasMore}
+            isLoadingMore={isLoadingMore}
+            onLoadMore={handleLoadMore}
+            getColumnLabel={columnSettings.getColumnLabel}
+            getCustomCellValue={columnSettings.getCustomCellValue}
+            onCustomCellChange={columnSettings.setCustomCellValue}
+            tableRef={tableRef}
+          />
+        </div>
+        </div>
       )}
 
-      {/* Thread Panel */}
+      {/* Expanded History Review */}
       {selectedTracker && (
-        <ThreadPanel
-          tracker={selectedTracker}
-          isOpen={!!selectedTracker}
-          onClose={() => setSelectedTracker(null)}
-        />
+        <EmailChatProvider>
+          <ExpandedHistoryReview
+            tracker={selectedTracker}
+            onClose={() => setSelectedTracker(null)}
+          />
+        </EmailChatProvider>
       )}
       </div>
       </div>

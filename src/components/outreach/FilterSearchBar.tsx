@@ -90,10 +90,10 @@ export function FilterSearchBar({ activeFilters, onAddFilter, onRemoveFilter }: 
   };
 
   return (
-    <div className="mb-3 flex flex-col gap-1.5">
+    <div className="flex flex-col gap-2">
       {/* Search input */}
       <div className="relative" ref={containerRef}>
-        <div className="flex items-center gap-2 bg-[#1a1a1a] border border-[#3a3a3a] rounded-lg px-4 py-2.5 focus-within:border-[#3a3a3a]">
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-[#1a1a1a] border border-[#3a3a3a] rounded-lg">
           <svg className="w-4 h-4 text-[#505050] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
@@ -135,7 +135,7 @@ export function FilterSearchBar({ activeFilters, onAddFilter, onRemoveFilter }: 
       </div>
 
       {/* Active filters */}
-      <div className="flex items-center gap-1.5 flex-wrap min-h-[24px]">
+      <div className="flex items-center gap-1.5 flex-wrap px-1">
         <span className="text-[13px] text-[#888]">Filters:</span>
         {activeFilters.length === 0 ? (
           <span className="text-[13px] text-[#555]">None</span>
@@ -145,16 +145,16 @@ export function FilterSearchBar({ activeFilters, onAddFilter, onRemoveFilter }: 
               key={`${filter.field}-${filter.value}-${i}`}
               className="flex items-center gap-1 bg-[#6364FF]/20 border border-[#6364FF]/30 text-white text-[12px] rounded-md px-2 py-0.5"
             >
+              <span className="text-[#888]">{filter.field}:</span>
+              <span>{filter.value}</span>
               <button
                 onClick={() => onRemoveFilter(i)}
-                className="text-[#888] hover:text-white transition-colors"
+                className="ml-0.5 text-[#888] hover:text-white transition-colors"
               >
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
-              <span className="text-[#888]">{filter.field}:</span>
-              <span>{filter.value}</span>
             </span>
           ))
         )}

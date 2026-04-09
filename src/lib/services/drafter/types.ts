@@ -40,7 +40,7 @@ export interface PresetTemplate {
   id: string;
   name: string;
   description: string;
-  icon: 'briefcase' | 'users' | 'coffee';
+  icon: 'briefcase' | 'users' | 'coffee' | 'heart';
   template: string;
 }
 
