@@ -271,11 +271,8 @@ export function MainSearchView({
           limit: 25,
         },
         {
-          isAdvancedQuery: result.searchMeta.isAdvancedQuery,
           linkedInFilters: effectiveLiFilters,
           dbFilters: effectiveDbFilters,
-          linkedInPage: result.searchMeta.linkedInPage,
-          totalLinkedInPages: result.searchMeta.totalLinkedInPages,
         }
       );
     } else {

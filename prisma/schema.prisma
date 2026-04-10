@@ -135,14 +135,11 @@ model Person {
   updatedAt               DateTime                     @updatedAt
   sourceLinks             SourceLink[]
   userCandidates          UserCandidate[]
-  searchPeople            SearchPerson[]
   insights                PersonInsight[]
 
   @@unique([fullName, company])
-  @@index([fullName, company])
   @@index([emailStatus])
-  @@index([apolloEnrichedAt]) // For TTL queries (legacy)
-  @@index([apolloStatus]) // For filtering by enrichment status (legacy)
+  @@index([apolloEnrichedAt]) // For TTL queries
   @@index([scrapedAt]) // For TTL queries - check if data is stale
   @@index([linkedinUrl]) // For cache lookup by LinkedIn URL
 }
@@ -160,13 +157,10 @@ model Search {
   // Scrape progress tracking
   lastCsePageScraped    Int            @default(0) // Now stores Serper page number (1,2,3...) not CSE start offset
   cseExhausted          Boolean        @default(false) // true when exhaustion detected
-  // API usage stats (analytics — legacy Serper flow)
+  // API usage stats (analytics)
   apolloCallsMade       Int            @default(0)
   apolloCacheHits       Int            @default(0)
   cseCallsMade          Int            @default(0)
-  linkedinScraperCalls  Int            @default(0)
-  profilesAdded         Int            @default(0) // New Person records created
-  profilesMatchedSearch Int            @default(0) // Of those added, how many matched role/uni/location filters
   // New cost tracking (Short Profile Discovery flow)
   haikuCalls            Int            @default(0)
   shortModePages        Int            @default(0)
@@ -179,25 +173,10 @@ model Search {
   completedAt           DateTime?
   createdAt             DateTime       @default(now())
   updatedAt             DateTime       @default(now()) @updatedAt
-  searchPeople          SearchPerson[] // Kept for production compatibility — no longer used by new code
 
   @@index([createdAt])
   @@index([completedAt])
   @@index([queryHash])
-  @@index([company, name, role, university, location]) // Composite for param lookup
-}
-
-model SearchPerson {
-  id        String   @id @default(cuid())
-  searchId  String
-  personId  String
-  createdAt DateTime @default(now())
-  search    Search   @relation(fields: [searchId], references: [id], onDelete: Cascade)
-  person    Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
-
-  @@unique([searchId, personId])
-  @@index([searchId])
-  @@index([personId])
 }
 
 model UserCandidate {
@@ -207,7 +186,6 @@ model UserCandidate {
   email                String?
   emailStatus          EmailStatus      @default(MISSING)
   emailConfidence      Float?
-  manualEmailConfirmed Boolean          @default(false)
   doNotShow            Boolean          @default(false)
   savedForLater        Boolean          @default(false)
   university           String?
@@ -294,9 +272,6 @@ model EmailDraft {
   subject         String
   body            String
   status          EmailDraftStatus @default(PENDING)
-  userEdited      Boolean          @default(false)
-  editedSubject   String?
-  editedBody      String?
   attachResume    Boolean          @default(false)
   resumeId        String?
   createdAt       DateTime         @default(now())
@@ -338,7 +313,6 @@ model SendLog {
   @@index([userCandidateId])
   @@index([status])
   @@index([sentAt])
-  @@index([gmailMessageId])
   @@index([gmailThreadId])
   @@index([outreachTrackerId])
 }
@@ -548,17 +522,14 @@ model CompanyEmailPattern {
   domain            String // email domain (e.g., "zs.com")
   pattern           String // pattern type: "first.last", "firstlast", "flast", "f.last", "first_last", "first"
   confidence        Float // 0-1 based on consistency
-  sampleSize        Int // number of emails used to determine pattern
   acceptAll         Boolean? // true = catch-all domain (can't verify individual emails), false = can verify, null = unchecked
   unverifiable      Boolean  @default(false) // true = SMTP blocks verification (unavailable_smtp), trust pattern
-  searchable        Boolean  @default(false) // true = users can search this company
   useApolloFallback Boolean  @default(false) // true = inconsistent patterns, call Apollo per-person
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
   @@unique([company, domain])
   @@index([company])
-  @@index([searchable])
 }
 
 model SearchLog {
@@ -569,7 +540,6 @@ model SearchLog {
   university   String?
   location     String?
   resultsCount Int      @default(0) // How many results were returned
-  fromCache    Boolean  @default(false)
   searchedAt   DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)

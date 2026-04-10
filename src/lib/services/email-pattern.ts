@@ -305,41 +305,12 @@ export async function getCompanyPattern(
  * Save a learned pattern to the database
  */
 export async function saveCompanyPattern(
-  company: string,
-  domain: string,
-  pattern: PatternType,
-  confidence: number,
-  sampleSize: number
+  _company: string,
+  _domain: string,
+  _pattern: PatternType,
+  _confidence: number,
 ): Promise<void> {
   // Pattern generation disabled — existing patterns are read-only
-  console.log(`[EmailPattern] Skipping save for ${company} (pattern generation disabled)`);
-  return;
-
-  const normalized = normalizeCompanyName(company);
-
-  await prisma.companyEmailPattern.upsert({
-    where: {
-      company_domain: {
-        company: normalized,
-        domain: domain,
-      },
-    },
-    create: {
-      company: normalized,
-      domain,
-      pattern,
-      confidence,
-      sampleSize,
-    },
-    update: {
-      pattern,
-      confidence,
-      sampleSize,
-      updatedAt: new Date(),
-    },
-  });
-
-  console.log(`[EmailPattern] Saved pattern for ${company}: ${pattern}@${domain} (${Math.round(confidence * 100)}% confidence, ${sampleSize} samples)`);
 }
 
 /**
@@ -394,8 +365,7 @@ export async function learnPatternFromDatabase(company: string): Promise<{
       company,
       learned.domain,
       learned.pattern,
-      learned.confidence,
-      emails.length
+      learned.confidence
     );
   }
 
@@ -583,8 +553,7 @@ export async function bootstrapCompanyPattern(
           company,
           earlyPattern.domain,
           earlyPattern.pattern,
-          earlyPattern.confidence,
-          apolloEmails.length
+          earlyPattern.confidence
         );
 
         // Generate emails for remaining people using the learned pattern
@@ -652,8 +621,7 @@ export async function bootstrapCompanyPattern(
         company,
         learned.domain,
         learned.pattern,
-        learned.confidence,
-        apolloEmails.length
+        learned.confidence
       );
 
       return {

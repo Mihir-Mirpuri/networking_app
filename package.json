@@ -16,9 +16,12 @@
     "test:groq": "tsx src/lib/services/groq/test-groq.ts",
     "test:meeting-suggestions": "tsx src/app/actions/test-meetingSuggestions.ts",
     "test:prescrape": "tsx tests/test-one-page-prescrape.ts",
+    "test:load-more": "tsx tests/test-load-more-cursor.ts",
     "backfill:emails": "tsx scripts/backfill-missing-emails.ts",
     "backfill:embeddings": "tsx scripts/backfill-role-embeddings.ts",
-    "test:batch-embeddings": "tsx tests/test-batch-embeddings.ts"
+    "test:batch-embeddings": "tsx tests/test-batch-embeddings.ts",
+    "test:discovery-flow": "tsx tests/discovery-flow/run.ts",
+    "test:discovery-flow:extract": "tsx tests/discovery-flow/run.ts --extract-only"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",

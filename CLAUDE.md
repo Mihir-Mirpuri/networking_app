@@ -64,7 +64,6 @@ Google OAuth via NextAuth 4. Scopes: openid, email, profile, gmail.send, calenda
 
 ## Database rules
 
-- **Prod and dev share the same database** — migrations must be additive-only (never drop columns/tables)
 - Use `prisma db push` (not `prisma migrate dev` — shadow DB issues with Supabase)
 - When adding `@updatedAt` to tables with existing rows, add `@default(now())` first
 - Connection uses pgbouncer pooling (`?pgbouncer=true&connection_limit=1`)

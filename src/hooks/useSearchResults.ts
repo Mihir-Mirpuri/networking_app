@@ -61,14 +61,16 @@ export function useSearchResults({ initialRemainingDaily }: UseSearchResultsOpti
   const retryCountRef = useRef(0);
   const MAX_RETRIES = 5;
 
-  // V2 advanced query client-side pagination state
+  // V2 unified pagination state:
+  //   allBatchResults = every profile fetched so far (initial search + all
+  //     subsequent Load More pages). The visible slice is results[0..visibleCount].
+  //   serverHasMore   = does the server still have more pages for this filter set?
+  //                     Updated from the initial search and every Load More response.
   const [allBatchResults, setAllBatchResults] = useState<SearchResultWithDraft[]>([]);
   const [visibleCount, setVisibleCount] = useState(0);
-  const [isAdvancedQuery, setIsAdvancedQuery] = useState(false);
+  const [serverHasMore, setServerHasMore] = useState(false);
   const [linkedInFilters, setLinkedInFilters] = useState<LinkedInFilters | null>(null);
   const [dbFilters, setDbFilters] = useState<DBFilters | null>(null);
-  const [linkedInPage, setLinkedInPage] = useState(1);
-  const [totalLinkedInPages, setTotalLinkedInPages] = useState(0);
   const PAGE_SIZE = 6;
 
   // Cleanup retry timer on unmount
@@ -129,57 +131,45 @@ export function useSearchResults({ initialRemainingDaily }: UseSearchResultsOpti
     setTotalLoaded(0);
     setHasMore(true);
     setHiddenCount(0);
-    // Reset V2 advanced pagination state
+    // Reset V2 unified pagination state
     setAllBatchResults([]);
     setVisibleCount(0);
-    setIsAdvancedQuery(false);
+    setServerHasMore(false);
     setLinkedInFilters(null);
     setDbFilters(null);
-    setLinkedInPage(1);
-    setTotalLinkedInPages(0);
   }, []);
 
-  // Apply search results after a search completes
+  // Apply search results after a search completes.
+  //
+  // Unified pagination: every search (simple or advanced) caches the full
+  // returned batch in allBatchResults and reveals PAGE_SIZE at a time.
+  // hasMore is true if the cache still has unshown items OR the server has
+  // more pages for this filter set.
   const applySearchResults = useCallback((
     newResults: SearchResultWithDraft[],
     meta: SearchResultsMeta,
     newHiddenCount: number,
     params: SearchParams,
     v2Meta?: {
-      isAdvancedQuery: boolean;
       linkedInFilters: LinkedInFilters;
       dbFilters: DBFilters;
-      linkedInPage?: number;
-      totalLinkedInPages?: number;
     }
   ) => {
     setHiddenCount(newHiddenCount);
     setSearchParams(params);
 
-    // Always store LinkedIn filters/pagination when provided (both paths may trigger LinkedIn)
     if (v2Meta) {
       setLinkedInFilters(v2Meta.linkedInFilters);
       setDbFilters(v2Meta.dbFilters);
-      setLinkedInPage(v2Meta.linkedInPage || 1);
-      setTotalLinkedInPages(v2Meta.totalLinkedInPages || 0);
     }
 
-    if (v2Meta?.isAdvancedQuery) {
-      // Advanced query: store full batch, show first PAGE_SIZE
-      setAllBatchResults(newResults);
-      setIsAdvancedQuery(true);
-      const initialVisible = Math.min(PAGE_SIZE, newResults.length);
-      setVisibleCount(initialVisible);
-      setResults(newResults.slice(0, initialVisible));
-      setTotalLoaded(initialVisible);
-      setHasMore(initialVisible < newResults.length || (v2Meta.totalLinkedInPages || 0) > 1);
-    } else {
-      // Simple query: existing behavior
-      setResults(newResults);
-      setTotalLoaded(newResults.length);
-      setHasMore(meta.hasMore);
-      setIsAdvancedQuery(false);
-    }
+    setAllBatchResults(newResults);
+    const initialVisible = Math.min(PAGE_SIZE, newResults.length);
+    setVisibleCount(initialVisible);
+    setResults(newResults.slice(0, initialVisible));
+    setTotalLoaded(initialVisible);
+    setServerHasMore(meta.hasMore);
+    setHasMore(initialVisible < newResults.length || meta.hasMore);
   }, []);
 
   const handleSendFromReview = async (index: number, subject: string, body: string, resumeIdOverride?: string | null): Promise<boolean> => {
@@ -365,83 +355,52 @@ export function useSearchResults({ initialRemainingDaily }: UseSearchResultsOpti
     setIsRegenerating(false);
   };
 
+  // Unified Load More — works for both simple and advanced queries.
+  //
+  //   Tier 1: reveal the next PAGE_SIZE from the local cache (no API call)
+  //   Tier 2: if the cache is drained and the server still has more, fetch
+  //           the next Apify page, append to cache, reveal next slice.
   const handleLoadMore = useCallback(async () => {
     if (isLoadingMore || !hasMore) return;
 
-    if (isAdvancedQuery) {
-      // === ADVANCED QUERY: client-side pagination first, then fetch next LinkedIn page ===
-      const nextVisible = visibleCount + PAGE_SIZE;
-
-      if (nextVisible <= allBatchResults.length) {
-        // More results in local batch — instant client-side pagination
-        const newVisible = Math.min(nextVisible, allBatchResults.length);
-        setVisibleCount(newVisible);
-        setResults(allBatchResults.slice(0, newVisible));
-        setTotalLoaded(newVisible);
-        setHasMore(newVisible < allBatchResults.length || linkedInPage < totalLinkedInPages);
-        return;
-      }
-
-      // Local batch exhausted — fetch next page from LinkedIn
-      if (linkedInPage >= totalLinkedInPages) {
-        setHasMore(false);
-        return;
-      }
-
-      if (!linkedInFilters || !dbFilters) return;
-
-      setIsLoadingMore(true);
-      try {
-        const nextPage = linkedInPage + 1;
-        const result = await loadMoreV2Action({
-          linkedInFilters,
-          dbFilters,
-          linkedInPage: nextPage,
-          excludePersonIds: allBatchResults.map(r => r.id),
-        });
-
-        if (result.success) {
-          const newBatch = [...allBatchResults, ...result.results];
-          setAllBatchResults(newBatch);
-          setLinkedInPage(nextPage);
-          setTotalLinkedInPages(result.totalLinkedInPages);
-          const newVisible = Math.min(visibleCount + PAGE_SIZE, newBatch.length);
-          setVisibleCount(newVisible);
-          setResults(newBatch.slice(0, newVisible));
-          setTotalLoaded(newVisible);
-          setHasMore(newVisible < newBatch.length || nextPage < result.totalLinkedInPages);
-        } else if (result.error !== 'Not authenticated') {
-          setToast({ message: result.error || 'Failed to load more profiles', type: 'error' });
-        }
-      } catch (err) {
-        console.error('[LoadMoreV2] Error:', err);
-        setToast({ message: 'Failed to load more profiles', type: 'error' });
-      }
-      setIsLoadingMore(false);
+    // ── Tier 1: reveal from cache ─────────────────────────────────────
+    const nextVisible = visibleCount + PAGE_SIZE;
+    if (nextVisible <= allBatchResults.length) {
+      const newVisible = Math.min(nextVisible, allBatchResults.length);
+      setVisibleCount(newVisible);
+      setResults(allBatchResults.slice(0, newVisible));
+      setTotalLoaded(newVisible);
+      setHasMore(newVisible < allBatchResults.length || serverHasMore);
       return;
     }
 
-    // === SIMPLE QUERY: use V2 loadMore with LinkedIn Short ===
-    if (!linkedInFilters || !dbFilters) return;
+    // ── Tier 2: fetch next Apify page from the server ─────────────────
+    if (!serverHasMore || !linkedInFilters || !dbFilters) {
+      setHasMore(false);
+      return;
+    }
 
     setIsLoadingMore(true);
     try {
-      const nextPage = linkedInPage + 1;
       const result = await loadMoreV2Action({
         linkedInFilters,
         dbFilters,
-        linkedInPage: nextPage,
-        excludePersonIds: results.map(r => r.id),
+        excludePersonIds: allBatchResults.map(r => r.id),
       });
 
       if (result.success) {
         if (result.results.length > 0) {
-          setResults(prev => [...prev, ...result.results]);
-          setTotalLoaded(prev => prev + result.results.length);
-          setLinkedInPage(nextPage);
-          setTotalLinkedInPages(result.totalLinkedInPages);
-          setHasMore(nextPage < result.totalLinkedInPages);
+          const newBatch = [...allBatchResults, ...result.results];
+          setAllBatchResults(newBatch);
+          const newVisible = Math.min(visibleCount + PAGE_SIZE, newBatch.length);
+          setVisibleCount(newVisible);
+          setResults(newBatch.slice(0, newVisible));
+          setTotalLoaded(newVisible);
+          setServerHasMore(result.hasMore);
+          setHasMore(newVisible < newBatch.length || result.hasMore);
         } else {
+          // Server says nothing new (exhausted or all dedup'd) — stop.
+          setServerHasMore(false);
           setHasMore(false);
         }
       } else if (result.error !== 'Not authenticated') {
@@ -453,7 +412,7 @@ export function useSearchResults({ initialRemainingDaily }: UseSearchResultsOpti
     }
 
     setIsLoadingMore(false);
-  }, [searchParams, isLoadingMore, hasMore, results, isAdvancedQuery, visibleCount, allBatchResults, linkedInPage, totalLinkedInPages, linkedInFilters, dbFilters]);
+  }, [isLoadingMore, hasMore, visibleCount, allBatchResults, serverHasMore, linkedInFilters, dbFilters]);
 
   return {
     // State

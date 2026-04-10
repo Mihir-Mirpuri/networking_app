@@ -138,7 +138,6 @@ async function runSearchPipeline(query: string, limit: number = 25): Promise<Tes
         fullScrape: 0,
       },
       totalLinkedInMatches: totalMatchesOnLinkedIn > 0 ? totalMatchesOnLinkedIn : null,
-      profilesAdded: newProfilesSaved,
       completedAt: new Date(),
     },
   });

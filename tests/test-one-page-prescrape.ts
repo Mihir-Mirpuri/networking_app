@@ -26,9 +26,6 @@ function assert(condition: boolean, message: string) {
 }
 
 async function cleanup() {
-  await prisma.searchPerson.deleteMany({
-    where: { search: { company: TEST_COMPANY_NORM } },
-  });
   await prisma.search.deleteMany({
     where: { company: TEST_COMPANY_NORM },
   });

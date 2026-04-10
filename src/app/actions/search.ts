@@ -25,8 +25,10 @@ import {
   generateEmailFromPattern,
 } from '@/lib/services/email-pattern';
 import { resolveCompanyAliases } from '@/lib/services/company-alias';
+import { resolveCompanyUrl } from '@/lib/services/company-resolver';
 import { generateEmailWithLLM, getUserResumeSummary, getRecentSentEmails, refineEmailWithLLM } from '@/lib/services/personalization';
 import { searchLinkedInShort } from '@/lib/services/linkedin-search';
+import { computeNextApifyPage, hasMoreApifyPages } from '@/lib/services/apify-pagination';
 import { createHash } from 'crypto';
 import { isUserBlocked } from '@/lib/services/credits';
 import {
@@ -468,10 +470,36 @@ export async function searchPeopleV2Action(
 
     // ===== STEP 1: Use pre-parsed filters =====
     const dbFilters = input.dbFilters;
-    const linkedInFilters = input.linkedInFilters;
+    const linkedInFilters = { ...input.linkedInFilters };
     const parseCost = { haikuCalls: 0, serperCalls: 0, costCents: 0 };
     console.log(`[SearchV2] ── New search ──────────────────────────────────`);
     console.log(`[SearchV2] Filters — db=${JSON.stringify(dbFilters)}, linkedin=${JSON.stringify(linkedInFilters)}`);
+
+    // Resolve LinkedIn company URL if not already provided. Required for
+    // accurate Apify filtering — without it, the scraper falls back to
+    // text-matching the company name in profile bios.
+    if (dbFilters.company && (!linkedInFilters.currentCompanies || linkedInFilters.currentCompanies.length === 0)) {
+      try {
+        const resolved = await resolveCompanyUrl(dbFilters.company, dbFilters.role || undefined);
+        if (resolved.url) {
+          linkedInFilters.currentCompanies = [resolved.url];
+          log.info('search-v2', 'Company URL resolved', {
+            company: dbFilters.company,
+            url: resolved.url,
+          });
+        } else {
+          linkedInFilters.currentCompanies = [dbFilters.company];
+          log.warn('search-v2', 'Company URL not found, using name', {
+            company: dbFilters.company,
+          });
+        }
+      } catch (err) {
+        log.error('search-v2', 'Company URL resolution threw', {
+          company: dbFilters.company,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
 
     // ===== STEP 2: Determine if advanced query =====
     const hasAdvancedFilters = !!(
@@ -486,6 +514,24 @@ export async function searchPeopleV2Action(
 
     console.log(`[SearchV2] Query: "${input.query}" | advanced=${hasAdvancedFilters} | limit=${input.limit} | excluded=${allExcludedIds.length}`);
 
+    // Look up existing scrape cursor for this search (keyed off the
+    // composite unique index). Used to resume Load More from wherever the
+    // last fetch left off, rather than always starting at Apify page 1.
+    const existingRow = await prisma.$queryRaw<
+      Array<{ lastCsePageScraped: number; totalLinkedInMatches: number | null }>
+    >`
+      SELECT "lastCsePageScraped", "totalLinkedInMatches"
+      FROM "Search"
+      WHERE COALESCE(company, '') = ${dbFilters.company || ''}
+        AND COALESCE(role, '') = ${dbFilters.role || ''}
+        AND COALESCE(university, '') = ${dbFilters.university || ''}
+        AND COALESCE(location, '') = ${dbFilters.location || ''}
+      ORDER BY "updatedAt" DESC
+      LIMIT 1
+    `;
+    const existingCursor = existingRow[0]?.lastCsePageScraped ?? 0;
+    const existingTotalMatches = existingRow[0]?.totalLinkedInMatches ?? null;
+
     let shortModePages = 0;
     let apiResultCount = 0;
     let totalMatchesOnLinkedIn = 0;
@@ -493,6 +539,9 @@ export async function searchPeopleV2Action(
     let linkedInPage = 0;
     let dbResultCount = 0;
     let results: SearchResultWithDraft[];
+    // Cursor to write back to Search row. Initialized to existing; only
+    // advanced if we actually fetch an Apify page in this request.
+    let newCursor = existingCursor;
 
     if (hasAdvancedFilters) {
       // ===== ADVANCED PATH: Skip DB, call LinkedIn Short directly =====
@@ -516,12 +565,17 @@ export async function searchPeopleV2Action(
       });
       const apiStart = Date.now();
 
+      // Initial search always starts fresh at page 1 so the user sees the
+      // top LinkedIn relevance order. Load More picks up from `newCursor`
+      // afterward via loadMoreV2Action.
       const apiResult = await searchLinkedInShort({
         ...linkedInFilters,
+        startPage: 1,
         takePages: 1,
       });
       shortModePages = 1;
       linkedInPage = 1;
+      newCursor = 1;
       totalMatchesOnLinkedIn = apiResult.pagination.totalElements;
       totalLinkedInPages = apiResult.pagination.totalPages;
       apiResultCount = apiResult.profiles.length;
@@ -640,11 +694,16 @@ export async function searchPeopleV2Action(
         });
         const apiStart = Date.now();
 
+        // Simple path LinkedIn fallback: always start at page 1 on initial
+        // search. Load More will resume from cursor+1 via loadMoreV2Action.
         const apiResult = await searchLinkedInShort({
           ...linkedInFilters,
+          startPage: 1,
           takePages: 1,
         });
         shortModePages = 1;
+        linkedInPage = 1;
+        newCursor = 1;
         totalMatchesOnLinkedIn = apiResult.pagination.totalElements;
         totalLinkedInPages = apiResult.pagination.totalPages;
 
@@ -770,6 +829,12 @@ export async function searchPeopleV2Action(
       .update(JSON.stringify(linkedInFilters))
       .digest('hex');
 
+    // Resolved `totalLinkedInMatches` — prefer the live value from this
+    // request, fall back to the previously-stored value so Path C (DB-only,
+    // no Apify call) doesn't wipe out existing knowledge.
+    const resolvedTotalMatches =
+      totalMatchesOnLinkedIn > 0 ? totalMatchesOnLinkedIn : existingTotalMatches;
+
     // Save Search record. The DB has a COALESCE-based unique constraint on
     // (company, role, university, location) that Prisma doesn't know about.
     // On duplicate, update the existing row instead.
@@ -790,37 +855,35 @@ export async function searchPeopleV2Action(
         serper: parseCost.serperCalls * 0.1,
         fullScrape: 0,
       },
-      totalLinkedInMatches: totalMatchesOnLinkedIn > 0 ? totalMatchesOnLinkedIn : null,
-      profilesAdded: apiResultCount,
+      totalLinkedInMatches: resolvedTotalMatches,
+      lastCsePageScraped: newCursor,
       completedAt: new Date(),
     };
 
-    try {
+    // Try UPDATE first; if no row matched, INSERT. This avoids triggering
+    // Prisma's P2002 error log on the COALESCE-based unique constraint
+    // (which Prisma doesn't know about and would log as an error otherwise).
+    const updatedRows = await prisma.$executeRaw`
+      UPDATE "Search"
+      SET "queryHash" = ${searchCreateData.queryHash},
+          "rawQuery" = ${searchCreateData.rawQuery},
+          "parsedFilters" = ${JSON.stringify(searchCreateData.parsedFilters)}::jsonb,
+          "haikuCalls" = ${searchCreateData.haikuCalls},
+          "shortModePages" = ${searchCreateData.shortModePages},
+          "totalCostCents" = ${searchCreateData.totalCostCents},
+          "costBreakdown" = ${JSON.stringify(searchCreateData.costBreakdown)}::jsonb,
+          "totalLinkedInMatches" = ${searchCreateData.totalLinkedInMatches},
+          "lastCsePageScraped" = ${searchCreateData.lastCsePageScraped},
+          "completedAt" = NOW(),
+          "updatedAt" = NOW()
+      WHERE COALESCE(company, '') = ${dbFilters.company || ''}
+        AND COALESCE(role, '') = ${dbFilters.role || ''}
+        AND COALESCE(university, '') = ${dbFilters.university || ''}
+        AND COALESCE(location, '') = ${dbFilters.location || ''}
+    `;
+
+    if (updatedRows === 0) {
       await prisma.search.create({ data: searchCreateData });
-    } catch (searchErr: any) {
-      if (searchErr.code === 'P2002') {
-        // Duplicate — update existing Search row for these filters
-        await prisma.$executeRaw`
-          UPDATE "Search"
-          SET "queryHash" = ${searchCreateData.queryHash},
-              "rawQuery" = ${searchCreateData.rawQuery},
-              "parsedFilters" = ${JSON.stringify(searchCreateData.parsedFilters)}::jsonb,
-              "haikuCalls" = ${searchCreateData.haikuCalls},
-              "shortModePages" = ${searchCreateData.shortModePages},
-              "totalCostCents" = ${searchCreateData.totalCostCents},
-              "costBreakdown" = ${JSON.stringify(searchCreateData.costBreakdown)}::jsonb,
-              "totalLinkedInMatches" = ${searchCreateData.totalLinkedInMatches},
-              "profilesAdded" = ${searchCreateData.profilesAdded},
-              "completedAt" = NOW(),
-              "updatedAt" = NOW()
-          WHERE COALESCE(company, '') = ${dbFilters.company || ''}
-            AND COALESCE(role, '') = ${dbFilters.role || ''}
-            AND COALESCE(university, '') = ${dbFilters.university || ''}
-            AND COALESCE(location, '') = ${dbFilters.location || ''}
-        `;
-      } else {
-        throw searchErr;
-      }
     }
 
     if (userId) {
@@ -832,16 +895,18 @@ export async function searchPeopleV2Action(
           university: dbFilters.university || null,
           location: dbFilters.location || null,
           resultsCount: results.length,
-          fromCache: shortModePages === 0,
         },
       });
     }
 
-    // hasMore: if LinkedIn was called (either path), use LinkedIn pagination; otherwise DB count
+    // hasMore: if LinkedIn was called (either path), use LinkedIn pagination;
+    // otherwise DB-only path — stay optimistic so Load More is clickable. The
+    // server (loadMoreV2Action) drains remaining DB rows first and then falls
+    // through to Apify, so hasMore=false is computed there when truly exhausted.
     const calledLinkedIn = shortModePages > 0;
     const hasMore = calledLinkedIn
       ? totalMatchesOnLinkedIn > apiResultCount
-      : dbResultCount >= input.limit;
+      : dbResultCount > 0;
 
     const elapsed = Date.now() - searchStart;
     console.log(
@@ -904,13 +969,18 @@ export async function searchPeopleV2Action(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// V2 Load More: Fetch next page of LinkedIn results for advanced queries
+// V2 Load More: Fetch next page of LinkedIn results
+//
+// Page state is persisted on the `Search` row (keyed off the same composite
+// used by the upsert in searchPeopleV2Action). The server is the single
+// source of truth — the client just says "give me more for this filter set"
+// and the server decides which Apify page to fetch based on the stored
+// cursor and `totalLinkedInMatches`.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export interface LoadMoreV2Input {
   linkedInFilters: import('@/lib/types/linkedin-filters').LinkedInFilters;
   dbFilters: import('@/lib/types/linkedin-filters').DBFilters;
-  linkedInPage: number;              // Next page to fetch (2, 3, ...)
   excludePersonIds: string[];
   templateId?: string;
 }
@@ -919,9 +989,6 @@ export type LoadMoreV2Result = {
   success: true;
   results: SearchResultWithDraft[];
   hasMore: boolean;
-  linkedInPage: number;
-  totalLinkedInPages: number;
-  totalMatchesOnLinkedIn: number;
 } | {
   success: false;
   error: string;
@@ -941,79 +1008,276 @@ export async function loadMoreV2Action(
     }
   }
 
-  try {
-    const loadStart = Date.now();
-    console.log(`[LoadMoreV2] ── Fetching page ${input.linkedInPage} ──`);
+  // Build a human-readable slug for the discovery log filename.
+  const slugParts = [
+    input.dbFilters.company || 'anycompany',
+    input.dbFilters.role || 'anyrole',
+    input.dbFilters.university,
+    input.dbFilters.location,
+  ].filter(Boolean) as string[];
+  const logger = createLoggerForQuery(`loadmore:${slugParts.join(' ')}`);
 
-    const apiResult = await searchLinkedInShort({
-      ...input.linkedInFilters,
-      startPage: input.linkedInPage,
-      takePages: 1,
+  const run = async (): Promise<LoadMoreV2Result> => {
+    const loadStart = Date.now();
+    const { dbFilters, linkedInFilters, excludePersonIds } = input;
+
+    log.info('loadmore-v2', 'Received load-more request', {
+      dbFilters,
+      linkedInFilterKeys: Object.keys(linkedInFilters),
+      excludeCount: excludePersonIds.length,
     });
 
-    const totalMatchesOnLinkedIn = apiResult.pagination.totalElements;
-    const totalLinkedInPages = apiResult.pagination.totalPages;
+    try {
+      // ── Tier 1: drain remaining DB rows before hitting Apify ──
+      // Covers: (a) initial search took DB-only path, client cache exhausted;
+      // (b) popular searches where DB had >limit rows and the first batch
+      // didn't fetch them all. We probe DB with excludePersonIds so we only
+      // return rows the client hasn't seen yet.
+      if (dbFilters.company) {
+        log.decision('loadmore-v2', 'DB-first probe taken', {});
 
-    console.log(`[LoadMoreV2] Got ${apiResult.profiles.length} profiles (page ${input.linkedInPage}/${totalLinkedInPages})`);
+        const resolved = await resolveCompanyAliases(dbFilters.company);
+        const companyAliases = resolved.aliases;
+        log.info('loadmore-v2', 'Company aliases resolved', {
+          company: dbFilters.company,
+          aliases: companyAliases,
+        });
 
-    // Save profiles to DB in batch
-    const schoolTag = input.linkedInFilters.schools?.[0] || null;
-    await saveShortProfilesBatch(apiResult.profiles, schoolTag);
+        const dbFilterInput: PersonFilters = {
+          company: dbFilters.company,
+          companyAliases: companyAliases.length > 0 ? companyAliases : undefined,
+          location: dbFilters.location || undefined,
+          role: dbFilters.role || undefined,
+          university: dbFilters.university || undefined,
+          requireEmail: false,
+          excludePersonIds,
+          limit: 25,
+        };
 
-    // Look up saved profiles by LinkedIn URL
-    const linkedinUrls = apiResult.profiles
-      .map(p => p.linkedinUrl)
-      .filter((url): url is string => !!url);
-    const personMap = await findPeopleByLinkedInUrls(linkedinUrls);
+        const dbStart = Date.now();
+        const dbPeople = await findPeopleByFilters(dbFilterInput);
+        const dbProbeMs = Date.now() - dbStart;
+        console.log(`[LoadMoreV2] DB-first probe returned ${dbPeople.length} results in ${dbProbeMs}ms`);
+        log.info('loadmore-v2', 'DB-first probe complete', {
+          resultCount: dbPeople.length,
+          durationMs: dbProbeMs,
+          aliasesUsed: companyAliases.length,
+          excludeCount: excludePersonIds.length,
+        });
 
-    // Build results in LinkedIn's order
-    const excludeSet = new Set(input.excludePersonIds);
-    const orderedPeople: Array<{ candidate: PersonWithSource; score: number; breakdown: ScoreBreakdown }> = [];
-    for (const profile of apiResult.profiles) {
-      const person = profile.linkedinUrl ? personMap.get(profile.linkedinUrl) : null;
-      if (!person) continue;
-      if (excludeSet.has(person.id)) continue;
-      orderedPeople.push({
-        candidate: { ...person, emailDeliverable: null, emailVerifiedAt: null, emailVerificationReason: null } as PersonWithSource,
-        score: 0,
-        breakdown: {} as ScoreBreakdown,
+        if (dbPeople.length > 0) {
+          log.decision('loadmore-v2', 'DB hit — returning without Apify', {
+            resultCount: dbPeople.length,
+          });
+
+          // Build user + template for draft generation (same as Apify branch below)
+          let user = null;
+          if (userId) {
+            user = await prisma.user.findUnique({
+              where: { id: userId },
+              select: { name: true, university: true, classification: true, major: true, career: true, dailySendCount: true, lastSendDate: true },
+            });
+          }
+
+          let template: ResolvedTemplate;
+          if (userId) {
+            template = await resolveTemplateForUser(userId, input.templateId);
+          } else {
+            const defaultTemplate = EMAIL_TEMPLATES[0];
+            template = { id: defaultTemplate.id, subject: defaultTemplate.subject, body: defaultTemplate.body, attachResume: false, resumeId: null };
+          }
+
+          const rankedPeople = dbPeople.map((person) => ({
+            candidate: person as PersonWithSource,
+            score: person.roleDistance != null ? Math.round((1 - person.roleDistance) * 100) : 0,
+            breakdown: {} as ScoreBreakdown,
+          }));
+
+          const results = await buildResultsWithDrafts(rankedPeople, userId, template, user);
+
+          // hasMore=true: stay optimistic. Next Load More click will either
+          // return more DB rows or drop through to Apify.
+          const elapsed = Date.now() - loadStart;
+          console.log(`[LoadMoreV2] ✓ Done in ${elapsed}ms — ${results.length} DB results, hasMore=true (db-first)`);
+          log.info('loadmore-v2', 'Returning results', {
+            path: 'db-first',
+            resultCount: results.length,
+            hasMore: true,
+            elapsedMs: elapsed,
+            totalCostCents: 0,
+          });
+          return { success: true, results, hasMore: true };
+        }
+
+        console.log(`[LoadMoreV2] DB drained — falling through to Apify`);
+        log.decision('loadmore-v2', 'DB drained — falling through to Apify', {});
+      }
+
+      // ── Tier 2: Apify Short mode ──
+      // Look up the cursor and totalMatches for this search.
+      const existingRow = await prisma.$queryRaw<
+        Array<{ id: string; lastCsePageScraped: number; totalLinkedInMatches: number | null }>
+      >`
+        SELECT "id", "lastCsePageScraped", "totalLinkedInMatches"
+        FROM "Search"
+        WHERE COALESCE(company, '') = ${dbFilters.company || ''}
+          AND COALESCE(role, '') = ${dbFilters.role || ''}
+          AND COALESCE(university, '') = ${dbFilters.university || ''}
+          AND COALESCE(location, '') = ${dbFilters.location || ''}
+        ORDER BY "updatedAt" DESC
+        LIMIT 1
+      `;
+
+      const currentCursor = existingRow[0]?.lastCsePageScraped ?? 0;
+      const totalMatches = existingRow[0]?.totalLinkedInMatches ?? null;
+
+      const { shouldFetch, nextPage } = computeNextApifyPage(currentCursor, totalMatches);
+
+      log.info('loadmore-v2', 'Cursor lookup complete', {
+        currentCursor,
+        totalMatches,
+        nextPage,
+        shouldFetch,
       });
-    }
 
-    // Get user info for draft generation
-    let user = null;
-    if (userId) {
-      user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { name: true, university: true, classification: true, major: true, career: true, dailySendCount: true, lastSendDate: true },
+      if (!shouldFetch) {
+        console.log(`[LoadMoreV2] Exhausted — cursor=${currentCursor}, totalMatches=${totalMatches}. No more to fetch.`);
+        log.decision('loadmore-v2', 'Apify cursor exhausted — no more pages', {
+          cursor: currentCursor,
+          totalMatches,
+        });
+        const elapsed = Date.now() - loadStart;
+        log.info('loadmore-v2', 'Returning results', {
+          path: 'exhausted',
+          resultCount: 0,
+          hasMore: false,
+          elapsedMs: elapsed,
+          totalCostCents: 0,
+        });
+        return { success: true, results: [], hasMore: false };
+      }
+
+      console.log(`[LoadMoreV2] ── Fetching page ${nextPage} (cursor was ${currentCursor}, totalMatches=${totalMatches ?? 'unknown'}) ──`);
+
+      const apifyStart = Date.now();
+      const apiResult = await searchLinkedInShort({
+        ...linkedInFilters,
+        startPage: nextPage,
+        takePages: 1,
       });
+      const apifyMs = Date.now() - apifyStart;
+
+      const freshTotalMatches = apiResult.pagination.totalElements;
+      const effectiveTotalMatches = freshTotalMatches > 0 ? freshTotalMatches : totalMatches;
+
+      console.log(`[LoadMoreV2] Got ${apiResult.profiles.length} profiles (page ${nextPage}, totalMatches=${effectiveTotalMatches ?? 'unknown'})`);
+      log.info('loadmore-v2', 'Apify page fetched', {
+        page: nextPage,
+        profileCount: apiResult.profiles.length,
+        totalMatchesOnLinkedIn: effectiveTotalMatches,
+        durationMs: apifyMs,
+        costUsd: APIFY_SHORT_COST_PER_PAGE,
+      });
+
+      // Save profiles to DB in batch
+      const schoolTag = linkedInFilters.schools?.[0] || null;
+      const saveStart = Date.now();
+      await saveShortProfilesBatch(apiResult.profiles, schoolTag);
+      log.info('loadmore-v2', 'Profiles saved', {
+        total: apiResult.profiles.length,
+        durationMs: Date.now() - saveStart,
+      });
+
+      // Persist the advanced cursor + fresh totalMatches immediately, so
+      // concurrent Load More clicks don't double-fetch the same page.
+      if (existingRow[0]) {
+        await prisma.search.update({
+          where: { id: existingRow[0].id },
+          data: {
+            lastCsePageScraped: nextPage,
+            totalLinkedInMatches: effectiveTotalMatches,
+            updatedAt: new Date(),
+          },
+        });
+      }
+
+      // Look up saved profiles by LinkedIn URL
+      const linkedinUrls = apiResult.profiles
+        .map(p => p.linkedinUrl)
+        .filter((url): url is string => !!url);
+      const personMap = await findPeopleByLinkedInUrls(linkedinUrls);
+
+      // Build results in LinkedIn's order
+      const excludeSet = new Set(input.excludePersonIds);
+      const orderedPeople: Array<{ candidate: PersonWithSource; score: number; breakdown: ScoreBreakdown }> = [];
+      for (const profile of apiResult.profiles) {
+        const person = profile.linkedinUrl ? personMap.get(profile.linkedinUrl) : null;
+        if (!person) continue;
+        if (excludeSet.has(person.id)) continue;
+        orderedPeople.push({
+          candidate: { ...person, emailDeliverable: null, emailVerifiedAt: null, emailVerificationReason: null } as PersonWithSource,
+          score: 0,
+          breakdown: {} as ScoreBreakdown,
+        });
+      }
+
+      // Get user info for draft generation
+      let user = null;
+      if (userId) {
+        user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { name: true, university: true, classification: true, major: true, career: true, dailySendCount: true, lastSendDate: true },
+        });
+      }
+
+      let template: ResolvedTemplate;
+      if (userId) {
+        template = await resolveTemplateForUser(userId, input.templateId);
+      } else {
+        const defaultTemplate = EMAIL_TEMPLATES[0];
+        template = { id: defaultTemplate.id, subject: defaultTemplate.subject, body: defaultTemplate.body, attachResume: false, resumeId: null };
+      }
+
+      const results = await buildResultsWithDrafts(orderedPeople, userId, template, user);
+      const hasMore = hasMoreApifyPages(nextPage, effectiveTotalMatches);
+
+      const elapsed = Date.now() - loadStart;
+      console.log(`[LoadMoreV2] ✓ Done in ${elapsed}ms — ${results.length} results from page ${nextPage}, hasMore=${hasMore}`);
+      log.info('loadmore-v2', 'Returning results', {
+        path: 'apify',
+        resultCount: results.length,
+        hasMore,
+        nextPage,
+        elapsedMs: elapsed,
+        totalCostCents: Math.round(APIFY_SHORT_COST_PER_PAGE * 100),
+      });
+
+      return { success: true, results, hasMore };
+    } catch (error) {
+      const elapsed = Date.now() - loadStart;
+      console.error(`[LoadMoreV2] ✗ FAILED:`, error);
+      log.error('loadmore-v2', 'Load more threw', {
+        error: String(error),
+        elapsedMs: elapsed,
+      });
+      return { success: false, error: 'Failed to load more profiles. Please try again.' };
     }
+  };
 
-    let template: ResolvedTemplate;
-    if (userId) {
-      template = await resolveTemplateForUser(userId, input.templateId);
-    } else {
-      const defaultTemplate = EMAIL_TEMPLATES[0];
-      template = { id: defaultTemplate.id, subject: defaultTemplate.subject, body: defaultTemplate.body, attachResume: false, resumeId: null };
+  if (logger) {
+    try {
+      const result = await withLogger(logger, run);
+      await logger.finalize(
+        result.success ? 'success' : 'error',
+        result.success ? undefined : result.error
+      );
+      return result;
+    } catch (err) {
+      await logger.finalize('error', String(err));
+      throw err;
     }
-
-    const results = await buildResultsWithDrafts(orderedPeople, userId, template, user);
-    const hasMore = input.linkedInPage < totalLinkedInPages;
-
-    console.log(`[LoadMoreV2] ✓ Done in ${Date.now() - loadStart}ms — ${results.length} results from page ${input.linkedInPage}/${totalLinkedInPages}, hasMore=${hasMore}`);
-
-    return {
-      success: true,
-      results,
-      hasMore,
-      linkedInPage: input.linkedInPage,
-      totalLinkedInPages,
-      totalMatchesOnLinkedIn,
-    };
-  } catch (error) {
-    console.error(`[LoadMoreV2] ✗ FAILED on page ${input.linkedInPage}:`, error);
-    return { success: false, error: 'Failed to load more profiles. Please try again.' };
   }
+  return run();
 }
 
 /**
@@ -1382,8 +1646,10 @@ export async function lookupPersonAction(
     );
 
     // ===== STEP 2: CSE lookup (unless DB already has plenty) =====
+    // Gate on person count, not email count — the goal of a lookup is finding
+    // the person. Emails are filled in later via pattern gen / Apollo at send time.
     let csePeople: PersonResult[] = [];
-    const dbHasEnough = dbPeople.filter((p) => p.email).length >= 3;
+    const dbHasEnough = dbPeople.length >= 3;
 
     if (!dbHasEnough) {
       console.log('[Lookup] DB results insufficient, querying CSE');

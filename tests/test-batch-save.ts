@@ -250,6 +250,89 @@ async function test9_duplicatesInBatch() {
   assert(results[0].personId === results[1].personId, 'Both point to same person');
 }
 
+async function test11_nameCollisionNotMerged() {
+  console.log('\n--- Test 11: Name collision does not silently merge distinct humans ---');
+  // Pre-insert Person A with URL #1
+  const personA = await prisma.person.create({
+    data: {
+      fullName: `${PREFIX} Person 1100`,
+      firstName: 'First1100',
+      lastName: 'Last1100',
+      company: `${PREFIX} Corp 1100`,
+      role: 'Original Role A',
+      linkedinUrl: `https://linkedin.com/in/${PREFIX}-1100-A`,
+      scrapeDepth: 'short',
+    },
+  });
+
+  // Incoming batch with same name+company but a DIFFERENT URL (different human)
+  const profiles = [
+    makeProfile(1100, {
+      linkedinUrl: `https://linkedin.com/in/${PREFIX}-1100-B`,
+      role: 'Attempted Override Role B',
+    }),
+  ];
+  const results = await saveShortProfilesBatch(profiles);
+
+  assert(results.length === 1, 'Returns 1 result');
+  assert(results[0].personId === '', `Colliding profile has empty personId (got "${results[0].personId}")`);
+
+  // Person A's URL must be unchanged
+  const dbPersonA = await prisma.person.findUnique({ where: { id: personA.id } });
+  assert(
+    dbPersonA?.linkedinUrl === `https://linkedin.com/in/${PREFIX}-1100-A`,
+    `Person A's linkedinUrl unchanged (got "${dbPersonA?.linkedinUrl}")`
+  );
+  assert(dbPersonA?.role === 'Original Role A', `Person A's role unchanged (got "${dbPersonA?.role}")`);
+
+  // No second row should have been created for the colliding URL
+  const collidingRow = await prisma.person.findFirst({
+    where: { linkedinUrl: `https://linkedin.com/in/${PREFIX}-1100-B` },
+  });
+  assert(collidingRow === null, 'No row created for colliding URL');
+}
+
+async function test12_missingLinkedinUrl() {
+  console.log('\n--- Test 12: Missing linkedinUrl is dropped ---');
+  const profiles = [
+    makeProfile(1200, { linkedinUrl: '' }),
+    makeProfile(1201),
+  ];
+  const results = await saveShortProfilesBatch(profiles);
+
+  assert(results.length === 2, 'Returns 2 results');
+  assert(results[0].personId === '', `Missing-URL profile has empty personId (got "${results[0].personId}")`);
+  assert(results[1].personId !== '', 'Valid profile has personId');
+
+  // No row should exist for the dropped profile
+  const droppedRow = await prisma.person.findFirst({
+    where: { fullName: `${PREFIX} Person 1200` },
+  });
+  assert(droppedRow === null, 'No row created for missing-URL profile');
+}
+
+async function test13_intraBatchCollision() {
+  console.log('\n--- Test 13: Intra-batch name collision with different URLs ---');
+  // Two profiles sharing name+company but with different URLs
+  const p1 = makeProfile(1300, { linkedinUrl: `https://linkedin.com/in/${PREFIX}-1300-A` });
+  const p2 = makeProfile(1300, { linkedinUrl: `https://linkedin.com/in/${PREFIX}-1300-B` });
+  const results = await saveShortProfilesBatch([p1, p2]);
+
+  assert(results.length === 2, 'Returns 2 results');
+  assert(results[0].personId !== '', `First has personId (got "${results[0].personId}")`);
+  assert(results[1].personId === '', `Second is skipped (got "${results[1].personId}")`);
+
+  // Only one DB row should exist
+  const rows = await prisma.person.findMany({
+    where: { fullName: `${PREFIX} Person 1300`, company: `${PREFIX} Corp 1300` },
+  });
+  assert(rows.length === 1, `Exactly one DB row exists (got ${rows.length})`);
+  assert(
+    rows[0].linkedinUrl === `https://linkedin.com/in/${PREFIX}-1300-A`,
+    `DB row has first profile's URL (got "${rows[0].linkedinUrl}")`
+  );
+}
+
 async function test10_parityWithSingle() {
   console.log('\n--- Test 10: Parity with saveShortProfile ---');
   // Run single-profile saves
@@ -286,6 +369,9 @@ async function main() {
     await test8_profilesWithoutNames();
     await test9_duplicatesInBatch();
     await test10_parityWithSingle();
+    await test11_nameCollisionNotMerged();
+    await test12_missingLinkedinUrl();
+    await test13_intraBatchCollision();
   } finally {
     console.log('\n--- Cleanup ---');
     await cleanup();

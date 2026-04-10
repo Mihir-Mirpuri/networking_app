@@ -129,7 +129,6 @@ async function main() {
       email: 'rwilson@gmail.com',
       emailStatus: 'MANUAL' as const,
       emailConfidence: null,
-      manualEmailConfirmed: true,
       university: university,
     },
     {
@@ -267,14 +266,12 @@ async function main() {
         email: personData.email,
         emailStatus: personData.emailStatus,
         emailConfidence: personData.emailConfidence,
-        manualEmailConfirmed: personData.manualEmailConfirmed || false,
         university: personData.university,
       },
       update: {
         email: personData.email,
         emailStatus: personData.emailStatus,
         emailConfidence: personData.emailConfidence,
-        manualEmailConfirmed: personData.manualEmailConfirmed || false,
       },
     });
 
