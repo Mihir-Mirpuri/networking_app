@@ -26,56 +26,6 @@ function SignalLogo({ className }: { className?: string }) {
   );
 }
 
-const PLACEHOLDER_MESSAGES = [
-  "Find me software engineers at Google who went to UT Austin",
-  "Find bankers at Goldman Sachs in New York who went to the University of Michigan",
-  "Show me consultants at McKinsey in Chicago",
-  "Find product managers at Meta who went to Stanford",
-  "Find analysts at JPMorgan in Houston who went to Rice University",
-];
-
-function useTypewriterPlaceholder(messages: string[], stopped = false, typingSpeed = 60, deleteSpeed = 30, pauseDuration = 2000) {
-  const [displayText, setDisplayText] = useState('');
-  const [messageIndex, setMessageIndex] = useState(0);
-  const [isTyping, setIsTyping] = useState(true);
-  const [isPaused, setIsPaused] = useState(false);
-
-  useEffect(() => {
-    if (stopped) return;
-    const currentMessage = messages[messageIndex];
-
-    if (isPaused) {
-      const pauseTimer = setTimeout(() => {
-        setIsPaused(false);
-        setIsTyping(false);
-      }, pauseDuration);
-      return () => clearTimeout(pauseTimer);
-    }
-
-    if (isTyping) {
-      if (displayText.length < currentMessage.length) {
-        const timer = setTimeout(() => {
-          setDisplayText(currentMessage.slice(0, displayText.length + 1));
-        }, typingSpeed);
-        return () => clearTimeout(timer);
-      } else {
-        setIsPaused(true);
-      }
-    } else {
-      if (displayText.length > 0) {
-        const timer = setTimeout(() => {
-          setDisplayText(displayText.slice(0, -1));
-        }, deleteSpeed);
-        return () => clearTimeout(timer);
-      } else {
-        setMessageIndex((prev) => (prev + 1) % messages.length);
-        setIsTyping(true);
-      }
-    }
-  }, [displayText, isTyping, isPaused, messageIndex, messages, stopped, typingSpeed, deleteSpeed, pauseDuration]);
-
-  return displayText;
-}
 
 interface SearchSidebarProps {
   onSearchSubmit: (query: string) => void;
@@ -111,7 +61,6 @@ export function SearchSidebar({
 }: SearchSidebarProps) {
   const { data: session } = useSession();
   const [inputValue, setInputValue] = useState('');
-  const [isFocused, setIsFocused] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState<boolean | null>(null);
   const { isEmailReviewOpen } = useEmailChat();
 
@@ -123,15 +72,11 @@ export function SearchSidebar({
   }, []);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const typewriterPlaceholder = useTypewriterPlaceholder(PLACEHOLDER_MESSAGES, isFocused);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
-  // The display value: show typewriter when not focused, no input, and no messages
-  const displayValue = isFocused || inputValue || messages.length > 0 ? inputValue : typewriterPlaceholder;
 
   // Auto-resize textarea based on content
   useEffect(() => {
@@ -139,7 +84,7 @@ export function SearchSidebar({
     if (!ta) return;
     ta.style.height = 'auto';
     ta.style.height = Math.min(ta.scrollHeight, 80) + 'px';
-  }, [displayValue]);
+  }, [inputValue]);
 
   // Filter state
   const [company, setCompany] = useState('');
@@ -243,84 +188,108 @@ export function SearchSidebar({
             <div className={`flex-1 overflow-y-auto flex flex-col ${aiMode ? '' : 'justify-center'}`}>
               {aiMode ? (
                 /* AI mode: chat messages */
-                <div className="flex-1 flex flex-col p-3">
-                  {messages.length > 0 ? (
-                    <div className="flex-1 overflow-y-auto">
-                      <div className="space-y-3">
-                        {messages.map((msg) => (
-                          <div
-                            key={msg.id}
-                            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                <div className="flex-1 flex flex-col p-3 overflow-y-auto">
+                  <div className="space-y-3">
+                    {/* Initial greeting - always shown */}
+                    <div className="flex gap-2 max-w-[85%]">
+                      <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#252525] flex items-center justify-center mt-1">
+                        <SignalLogo className="w-3 h-3 text-white" />
+                      </div>
+                      <div className={`rounded-2xl px-3 py-2 text-sm text-white rounded-bl-md ${isSubscribed === null ? 'bg-[#2a2a2a]' : isSubscribed ? 'bg-[#2563EB]' : 'bg-[#22C55E]'}`}>
+                        <p>Hi{session?.user?.name ? ` ${session.user.name.split(' ')[0]}` : ''}! I&apos;m Signl. Who would you like to find today? Try:</p>
+                        <div className="mt-2 space-y-1">
+                          <button
+                            onClick={() => onSearchSubmit('Harvard alumni who work at Google')}
+                            className="block w-full text-left text-white/90 hover:text-white hover:underline transition-colors"
                           >
-                            {msg.role === 'user' ? (
-                              // User message - right-aligned with bubble and profile image
-                              <div className="flex gap-2 max-w-[85%]">
-                                <div className="rounded-2xl px-3 py-2 text-sm bg-[#2a2a2a] text-white rounded-br-md">
-                                  {msg.content}
-                                </div>
-                                <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#252525] flex items-center justify-center mt-1 overflow-hidden">
-                                  {session?.user?.image ? (
-                                    <img src={session.user.image} alt="" className="w-full h-full object-cover" />
-                                  ) : (
-                                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
-                                    </svg>
-                                  )}
-                                </div>
-                              </div>
-                            ) : (
-                              // AI message - left-aligned with bubble and Signal logo
-                              // Blue for premium (like iMessage), green for free (like SMS), neutral while loading
-                              <div className="flex gap-2 max-w-[85%]">
-                                <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#252525] flex items-center justify-center mt-1">
-                                  <SignalLogo className="w-3 h-3 text-white" />
-                                </div>
-                                <div className={`rounded-2xl px-3 py-2 text-sm text-white rounded-bl-md ${isSubscribed === null ? 'bg-[#2a2a2a]' : isSubscribed ? 'bg-[#2563EB]' : 'bg-[#22C55E]'}`}>
-                                  {msg.isLoading ? (
-                                    <div className="flex items-center gap-1.5 py-1">
-                                      <div className="w-1.5 h-1.5 rounded-full bg-[#505050] animate-bounce" style={{ animationDelay: '0ms' }} />
-                                      <div className="w-1.5 h-1.5 rounded-full bg-[#505050] animate-bounce" style={{ animationDelay: '150ms' }} />
-                                      <div className="w-1.5 h-1.5 rounded-full bg-[#505050] animate-bounce" style={{ animationDelay: '300ms' }} />
-                                    </div>
-                                  ) : (
-                                    <>
-                                      {msg.content}
-                                      {msg.selectables && msg.selectables.length > 0 && (
-                                        <div className="flex flex-wrap gap-1.5 mt-2">
-                                          {msg.selectables.map((s) => (
-                                            <button
-                                              key={s.filterValue}
-                                              onClick={() => onSelectableClick(s)}
-                                              disabled={isExtracting || isSearching}
-                                              className="px-2.5 py-1 text-xs font-medium text-white bg-[#252525] border border-[#383838] rounded-full hover:bg-[#333333] hover:border-[#484848] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                            >
-                                              {s.label}
-                                            </button>
-                                          ))}
-                                          {msg.allSelectables && msg.allSelectables.length > ((msg.selectablesPage || 0) + 1) * 5 && (
-                                            <button
-                                              onClick={() => onShowMoreSelectables(msg.id)}
-                                              disabled={isExtracting || isSearching}
-                                              className="px-2.5 py-1 text-xs font-medium text-white bg-[#1a1a1a] border border-[#333333] rounded-full hover:bg-[#252525] hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                            >
-                                              Show more...
-                                            </button>
-                                          )}
-                                        </div>
-                                      )}
-                                    </>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                        <div ref={chatEndRef} />
+                            → Harvard alumni who work at Google
+                          </button>
+                          <button
+                            onClick={() => onSearchSubmit('VCs in San Francisco investing in AI')}
+                            className="block w-full text-left text-white/90 hover:text-white hover:underline transition-colors"
+                          >
+                            → VCs in San Francisco investing in AI
+                          </button>
+                          <button
+                            onClick={() => onSearchSubmit('Product managers at Stripe')}
+                            className="block w-full text-left text-white/90 hover:text-white hover:underline transition-colors"
+                          >
+                            → Product managers at Stripe
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  ) : (
-                    <div className="flex-1" />
-                  )}
+                    {/* User messages */}
+                    {messages.map((msg) => (
+                      <div
+                        key={msg.id}
+                        className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                      >
+                        {msg.role === 'user' ? (
+                          // User message - right-aligned with bubble and profile image
+                          <div className="flex gap-2 max-w-[85%]">
+                            <div className="rounded-2xl px-3 py-2 text-sm bg-[#2a2a2a] text-white rounded-br-md">
+                              {msg.content}
+                            </div>
+                            <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#252525] flex items-center justify-center mt-1 overflow-hidden">
+                              {session?.user?.image ? (
+                                <img src={session.user.image} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+                                </svg>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          // AI message - left-aligned with bubble and Signal logo
+                          // Blue for premium (like iMessage), green for free (like SMS), neutral while loading
+                          <div className="flex gap-2 max-w-[85%]">
+                            <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#252525] flex items-center justify-center mt-1">
+                              <SignalLogo className="w-3 h-3 text-white" />
+                            </div>
+                            <div className={`rounded-2xl px-3 py-2 text-sm text-white rounded-bl-md ${isSubscribed === null ? 'bg-[#2a2a2a]' : isSubscribed ? 'bg-[#2563EB]' : 'bg-[#22C55E]'}`}>
+                              {msg.isLoading ? (
+                                <div className="flex items-center gap-1.5 py-1">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-[#505050] animate-bounce" style={{ animationDelay: '0ms' }} />
+                                  <div className="w-1.5 h-1.5 rounded-full bg-[#505050] animate-bounce" style={{ animationDelay: '150ms' }} />
+                                  <div className="w-1.5 h-1.5 rounded-full bg-[#505050] animate-bounce" style={{ animationDelay: '300ms' }} />
+                                </div>
+                              ) : (
+                                <>
+                                  {msg.content}
+                                  {msg.selectables && msg.selectables.length > 0 && (
+                                    <div className="flex flex-wrap gap-1.5 mt-2">
+                                      {msg.selectables.map((s) => (
+                                        <button
+                                          key={s.filterValue}
+                                          onClick={() => onSelectableClick(s)}
+                                          disabled={isExtracting || isSearching}
+                                          className="px-2.5 py-1 text-xs font-medium text-white bg-[#252525] border border-[#383838] rounded-full hover:bg-[#333333] hover:border-[#484848] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                          {s.label}
+                                        </button>
+                                      ))}
+                                      {msg.allSelectables && msg.allSelectables.length > ((msg.selectablesPage || 0) + 1) * 5 && (
+                                        <button
+                                          onClick={() => onShowMoreSelectables(msg.id)}
+                                          disabled={isExtracting || isSearching}
+                                          className="px-2.5 py-1 text-xs font-medium text-white bg-[#1a1a1a] border border-[#333333] rounded-full hover:bg-[#252525] hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                          Show more...
+                                        </button>
+                                      )}
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    <div ref={chatEndRef} />
+                  </div>
                 </div>
               ) : (
                 /* Filter mode: dropdowns with sentence context */
@@ -412,7 +381,7 @@ export function SearchSidebar({
                 >
                   <textarea
                     ref={textareaRef}
-                    value={displayValue}
+                    value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
@@ -420,11 +389,10 @@ export function SearchSidebar({
                         handleAiSubmit();
                       }
                     }}
-                    onFocus={() => setIsFocused(true)}
-                    onBlur={() => setIsFocused(false)}
+                    placeholder="Describe who you're looking for..."
                     disabled={isSearching}
                     rows={1}
-                    className="w-full px-3 pr-10 py-2.5 text-sm bg-transparent border-none text-white focus:outline-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 disabled:opacity-60 disabled:cursor-not-allowed resize-none"
+                    className="w-full px-3 pr-10 py-2.5 text-sm bg-transparent border-none text-white placeholder-[#505050] focus:outline-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 disabled:opacity-60 disabled:cursor-not-allowed resize-none"
                     style={{ maxHeight: '80px' }}
                   />
                   <button

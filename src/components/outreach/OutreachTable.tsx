@@ -1,26 +1,29 @@
 'use client';
 
-import { useRef, useCallback } from 'react';
+import { useCallback } from 'react';
 import { OutreachTrackerEntry } from '@/app/actions/outreach';
 import { OutreachRow } from './OutreachRow';
 import { ColumnKey } from './OutreachFilters';
 import { LoadingSpinner } from '@/components/search/LoadingSpinner';
-import { COLUMN_LABELS } from './useColumnSettings';
-import Link from 'next/link';
 
 interface OutreachTableProps {
   trackers: OutreachTrackerEntry[];
   onUpdate: (tracker: OutreachTrackerEntry) => void;
   onDelete: (id: string) => void;
   onToggleStar: (id: string) => void;
+  onToggleResponse: (id: string) => void;
   onRowClick: (tracker: OutreachTrackerEntry) => void;
   visibleColumns: ColumnKey[];
-  columnWidths: Record<ColumnKey, number>;
+  columnWidths: Record<string, number>;
   onStartResize: (column: ColumnKey, startX: number) => void;
   onAutoFitColumn: (column: ColumnKey, contentWidths: number[]) => void;
   hasMore: boolean;
   isLoadingMore: boolean;
   onLoadMore: () => void;
+  getColumnLabel: (column: ColumnKey) => string;
+  getCustomCellValue: (trackerId: string, columnKey: string) => string;
+  onCustomCellChange: (trackerId: string, columnKey: string, value: string) => void;
+  tableRef: React.RefObject<HTMLDivElement>;
 }
 
 export function OutreachTable({
@@ -28,6 +31,7 @@ export function OutreachTable({
   onUpdate,
   onDelete,
   onToggleStar,
+  onToggleResponse,
   onRowClick,
   visibleColumns,
   columnWidths,
@@ -36,8 +40,11 @@ export function OutreachTable({
   hasMore,
   isLoadingMore,
   onLoadMore,
+  getColumnLabel,
+  getCustomCellValue,
+  onCustomCellChange,
+  tableRef,
 }: OutreachTableProps) {
-  const tableRef = useRef<HTMLDivElement>(null);
 
   const handleResizeStart = useCallback((column: ColumnKey, e: React.MouseEvent) => {
     e.preventDefault();
@@ -59,41 +66,10 @@ export function OutreachTable({
     });
 
     onAutoFitColumn(column, contentWidths);
-  }, [onAutoFitColumn]);
-
-  if (trackers.length === 0) {
-    return (
-      <div className="flex-1 bg-[#1a1a1a] border border-[#3a3a3a] rounded-lg flex flex-col items-center justify-center py-20 gap-5">
-        <div className="w-20 h-20 rounded-full bg-[#6364FF]/10 flex items-center justify-center">
-          <svg className="w-9 h-9 text-[#6364FF]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-          </svg>
-        </div>
-
-        <div className="flex flex-col items-center gap-2 max-w-[400px]">
-          <h3 className="text-xl font-semibold text-white font-['Inter'] text-center">
-            No emails sent yet
-          </h3>
-          <p className="text-sm text-white font-['Inter'] text-center max-w-[380px]">
-            Once you send your first outreach email, it will appear here. Start by searching for people to connect with.
-          </p>
-        </div>
-
-        <Link
-          href="/"
-          className="flex items-center gap-2 bg-[#6364FF] rounded-lg px-6 py-3 hover:bg-[#5354EE] transition-colors"
-        >
-          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <span className="text-sm font-medium text-white font-['Inter']">Find People</span>
-        </Link>
-      </div>
-    );
-  }
+  }, [onAutoFitColumn, tableRef]);
 
   return (
-    <div ref={tableRef} className="flex-1 flex flex-col min-h-0 bg-[#1a1a1a] border border-[#3a3a3a] rounded-lg overflow-hidden">
+    <div ref={tableRef} className="flex-1 flex flex-col min-h-0 overflow-hidden">
       {/* Header Row - Fixed */}
       <div className="flex-shrink-0 flex items-center px-4 py-2.5 bg-[#2a2a2a] border-b border-[#3a3a3a]">
         {/* Star column header */}
@@ -102,23 +78,26 @@ export function OutreachTable({
             <div
               key={col}
               className="relative flex items-center shrink-0"
-              style={{ width: columnWidths[col] }}
+              style={{ width: columnWidths[col] || 100 }}
               data-column={col}
             >
-              <div className="flex-1 px-2 overflow-hidden">
+              <div
+                className="flex-1 px-2 overflow-hidden cursor-pointer"
+                onDoubleClick={() => handleDoubleClick(col)}
+              >
                 <span className="text-[13px] font-semibold text-white font-['Inter'] truncate">
-                  {COLUMN_LABELS[col]}
+                  {getColumnLabel(col)}
                 </span>
               </div>
 
-              {/* Resize handle */}
+              {/* Resize handle - always visible divider with wide grab zone */}
               {index < visibleColumns.length - 1 && (
                 <div
-                  className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-[#6364FF] transition-colors z-10 group"
+                  className="absolute -right-[3px] -top-2.5 -bottom-2.5 w-[7px] cursor-col-resize z-10 group flex items-center justify-center"
                   onMouseDown={(e) => handleResizeStart(col, e)}
                   onDoubleClick={() => handleDoubleClick(col)}
                 >
-                  <div className="absolute right-0 top-1/2 -translate-y-1/2 w-[3px] h-4 bg-[#505050] rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="w-[2px] h-full bg-[#404040] group-hover:bg-[#6364FF] group-hover:w-[3px] transition-all" />
                 </div>
               )}
             </div>
@@ -129,18 +108,28 @@ export function OutreachTable({
 
       {/* Data Rows - Scrollable */}
       <div className="flex-1 overflow-y-auto">
-        {trackers.map((tracker) => (
-          <OutreachRow
-            key={tracker.id}
-            tracker={tracker}
-            onUpdate={onUpdate}
-            onDelete={onDelete}
-            onToggleStar={onToggleStar}
-            onRowClick={onRowClick}
-            visibleColumns={visibleColumns}
-            columnWidths={columnWidths}
-          />
-        ))}
+        {trackers.length === 0 ? (
+          <div className="flex items-center justify-center py-16 text-[#666] text-sm">
+            No results found
+          </div>
+        ) : (
+          trackers.map((tracker) => (
+            <OutreachRow
+              key={tracker.id}
+              tracker={tracker}
+              onUpdate={onUpdate}
+              onDelete={onDelete}
+              onToggleStar={onToggleStar}
+              onToggleResponse={onToggleResponse}
+              onRowClick={onRowClick}
+              visibleColumns={visibleColumns}
+              columnWidths={columnWidths}
+              getColumnLabel={getColumnLabel}
+              getCustomCellValue={getCustomCellValue}
+              onCustomCellChange={onCustomCellChange}
+            />
+          ))
+        )}
 
         {/* Load More Button */}
         {hasMore && (

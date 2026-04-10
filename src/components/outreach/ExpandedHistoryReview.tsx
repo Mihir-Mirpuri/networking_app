@@ -1,15 +1,15 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { SearchResultWithDraft, generateLLMDraftAction, regenerateDraftAction } from '@/app/actions/search';
-import { scheduleEmailAction } from '@/app/actions/send';
+import { OutreachTrackerEntry, ThreadMessage, getThreadMessages } from '@/app/actions/outreach';
+import { generateFollowUpFromThreadAction } from '@/app/actions/personalize';
+import { sendFollowUpAction } from '@/app/actions/send';
 import { getResumesAction, ResumeData } from '@/app/actions/resume';
-import { LoadingDots } from './LoadingSpinner';
-import { TemplateData } from '@/app/actions/profile';
+import { LoadingSpinner } from '@/components/search/LoadingSpinner';
 import { useEmailChat } from '@/contexts/EmailChatContext';
 import type { PersonInsightResponse } from '@/app/actions/person-insights';
 import { getSubscriptionStatus } from '@/app/actions/subscription';
-// SearchableCombobox removed — no longer used in this layout
+import { LimitReachedModal, dispatchCreditsChanged } from '@/components/credits';
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
 
@@ -27,14 +27,6 @@ function SignalLogoSmall({ className }: { className?: string }) {
   );
 }
 
-function SparkleIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" />
-    </svg>
-  );
-}
-
 // ─── Typing Indicator ────────────────────────────────────────────────────────
 
 function TypingIndicator() {
@@ -47,33 +39,6 @@ function TypingIndicator() {
   );
 }
 
-// ─── Send Animations ─────────────────────────────────────────────────────────
-
-function SendSuccessAnimation() {
-  return (
-    <div className="flex flex-col items-center justify-center py-6 animate-fade-in">
-      <svg className="w-16 h-16" viewBox="0 0 52 52">
-        <circle className="draw-check-circle" cx="26" cy="26" r="25" fill="none" stroke="#10b981" strokeWidth="2" />
-        <path className="draw-check-mark" fill="none" stroke="#10b981" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" d="M14.1 27.2l7.1 7.2 16.7-16.8" />
-      </svg>
-      <p className="mt-3 text-sm font-medium text-emerald-400">Email sent!</p>
-    </div>
-  );
-}
-
-function SendFailureAnimation({ message }: { message: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-6 animate-fade-in">
-      <svg className="w-16 h-16" viewBox="0 0 52 52">
-        <circle className="draw-check-circle" cx="26" cy="26" r="25" fill="none" stroke="#ef4444" strokeWidth="2" />
-        <path className="draw-check-mark" fill="none" stroke="#ef4444" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" d="M17 17l18 18" />
-        <path className="draw-check-mark" fill="none" stroke="#ef4444" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" d="M35 17l-18 18" />
-      </svg>
-      <p className="mt-3 text-sm font-medium text-red-700">{message}</p>
-    </div>
-  );
-}
-
 // ─── Toolbar Helpers ─────────────────────────────────────────────────────────
 
 function ToolbarButton({ children, title, onClick, active }: { children: React.ReactNode; title: string; onClick: () => void; active?: boolean }) {
@@ -81,7 +46,7 @@ function ToolbarButton({ children, title, onClick, active }: { children: React.R
     <button
       type="button"
       title={title}
-      onMouseDown={(e) => e.preventDefault()} // prevent stealing focus from editor
+      onMouseDown={(e) => e.preventDefault()}
       onClick={onClick}
       className={`w-7 h-7 rounded flex items-center justify-center transition-colors ${
         active ? 'text-white bg-[#333]' : 'text-[#888] hover:text-white hover:bg-[#333]'
@@ -90,10 +55,6 @@ function ToolbarButton({ children, title, onClick, active }: { children: React.R
       {children}
     </button>
   );
-}
-
-function ToolbarDivider() {
-  return <div className="w-px h-4 bg-[#333] mx-0.5" />;
 }
 
 // ─── Insights as Chat Message ────────────────────────────────────────────────
@@ -230,7 +191,7 @@ function InsightsChatMessage({ insights, personName, isSubscribed, selectedInsig
           </div>
         )}
 
-        <p className="text-sm text-white leading-relaxed">How would you like to edit the email?</p>
+        <p className="text-sm text-white leading-relaxed">How would you like to edit the follow-up?</p>
       </div>
     </div>
   );
@@ -297,7 +258,6 @@ function ChatSidebar() {
     const message = inputValue.trim();
     if (!message || isProcessing) return;
 
-    // Build message with selected insights context
     let fullMessage = message;
     if (selectedInsights.length > 0) {
       const insightLabels = selectedInsights.map(i => i.label).join(', ');
@@ -429,7 +389,7 @@ function ChatSidebar() {
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask me to edit this email..."
+            placeholder="Ask me to edit this follow-up..."
             disabled={isProcessing}
             rows={1}
             className="w-full px-3 pr-10 py-2.5 text-sm bg-transparent border-none text-white placeholder-[#505050] focus:outline-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 disabled:opacity-60 disabled:cursor-not-allowed resize-none"
@@ -450,84 +410,186 @@ function ChatSidebar() {
   );
 }
 
-// ─── Main Component ──────────────────────────────────────────────────────────
+// ─── Thread Message Component ────────────────────────────────────────────────
 
-interface ExpandedReviewProps {
-  results: SearchResultWithDraft[];
-  currentIndex: number;
-  onClose: () => void;
-  onSend: (index: number, subject: string, body: string, resumeIdOverride?: string | null) => Promise<boolean>;
-  sendStatuses: Map<string, 'success' | 'failed' | 'pending'>;
-  sendErrors?: Map<string, string>;
-  templates?: TemplateData[];
-  defaultTemplateId?: string;
-  onTemplateChange?: (templateId: string, personIndex: number) => void;
-  isRegenerating?: boolean;
-  autoPersonalize?: boolean;
-  limitReached?: boolean;
-  onLimitReached?: () => void;
-  onDraftGenerated?: (personIndex: number, subject: string, body: string) => void;
+function getInitials(name: string | null, email: string): string {
+  if (name) {
+    const parts = name.trim().split(' ');
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+    return name[0].toUpperCase();
+  }
+  return email[0].toUpperCase();
 }
 
-export function ExpandedReview({
-  results,
-  currentIndex,
+interface ThreadMessageItemProps {
+  message: ThreadMessage;
+  isExpanded: boolean;
+  onToggle: () => void;
+  contactName: string | null;
+  contactEmail: string;
+}
+
+function ThreadMessageItem({ message, isExpanded, onToggle, contactName, contactEmail }: ThreadMessageItemProps) {
+  const formatDate = (date: Date) => {
+    const d = new Date(date);
+    const now = new Date();
+    const diffDays = Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) {
+      return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    } else if (diffDays < 7) {
+      return d.toLocaleDateString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' });
+    } else {
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+  };
+
+  const formatSender = (sender: string) => {
+    const match = sender.match(/^(.+?)\s*<(.+)>$/);
+    if (match) {
+      return { name: match[1].trim(), email: match[2].trim() };
+    }
+    return { name: sender, email: sender };
+  };
+
+  const sender = formatSender(message.sender);
+  const isYou = message.direction === 'SENT';
+  const initials = isYou ? 'Y' : getInitials(sender.name, sender.email);
+
+  return (
+    <div className="border-b border-[#2a2a2a] last:border-b-0">
+      {/* Collapsed header */}
+      <div
+        className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-[#1a1a1a] transition-colors"
+        onClick={onToggle}
+      >
+        {/* Avatar */}
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-medium ${
+          isYou ? 'bg-[#2563EB] text-white' : 'bg-[#505050] text-white'
+        }`}>
+          {initials}
+        </div>
+
+        {/* Sender info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-white">
+              {isYou ? 'me' : sender.name}
+            </span>
+            {!isExpanded && (
+              <span className="text-xs text-[#888] truncate flex-1">
+                — {(message.bodyText || '').slice(0, 60)}...
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Date */}
+        <span className="text-xs text-[#888] flex-shrink-0">
+          {formatDate(message.receivedAt)}
+        </span>
+
+        {/* Expand/collapse */}
+        <svg
+          className={`w-4 h-4 text-[#505050] flex-shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </div>
+
+      {/* Expanded body */}
+      {isExpanded && (
+        <div className="px-4 pb-3 pl-[60px]">
+          <p className="text-xs text-[#888] mb-2">
+            to {isYou ? contactName || contactEmail : 'me'}
+          </p>
+          {message.bodyHtml ? (
+            <div
+              className="text-sm text-white prose prose-sm prose-invert max-w-none leading-relaxed"
+              dangerouslySetInnerHTML={{ __html: message.bodyHtml }}
+            />
+          ) : (
+            <p className="text-sm text-white whitespace-pre-wrap leading-relaxed">
+              {message.bodyText || '(No content)'}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main Component ──────────────────────────────────────────────────────────
+
+interface ExpandedHistoryReviewProps {
+  tracker: OutreachTrackerEntry;
+  onClose: () => void;
+}
+
+export function ExpandedHistoryReview({
+  tracker,
   onClose,
-  onSend,
-  sendStatuses,
-  sendErrors,
-  templates,
-  defaultTemplateId,
-  onTemplateChange,
-  isRegenerating,
-  autoPersonalize = false,
-  limitReached,
-  onLimitReached,
-  onDraftGenerated,
-}: ExpandedReviewProps) {
-  console.log('[ExpandedReview] Component rendered, currentIndex:', currentIndex);
-  const person = results[currentIndex];
-  const [subject, setSubject] = useState(person?.draftSubject || '');
-  const [body, setBody] = useState(person?.draftBody || '');
+}: ExpandedHistoryReviewProps) {
+  // Thread state
+  const [threadMessages, setThreadMessages] = useState<ThreadMessage[]>([]);
+  const [isLoadingThread, setIsLoadingThread] = useState(false);
+  const [threadError, setThreadError] = useState<string | null>(null);
+  const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set());
+
+  // Follow-up compose state
+  const [followUpSubject, setFollowUpSubject] = useState('');
+  const [followUpBody, setFollowUpBody] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
   const [isSending, setIsSending] = useState(false);
-  const [internalIndex, setInternalIndex] = useState(currentIndex);
-  const [showScheduleModal, setShowScheduleModal] = useState(false);
-  const [scheduledDateTime, setScheduledDateTime] = useState('');
-  const [scheduleError, setScheduleError] = useState<string | null>(null);
-  const [isScheduling, setIsScheduling] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [showFailure, setShowFailure] = useState(false);
-  const [isGeneratingDraft, setIsGeneratingDraft] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [showLimitModal, setShowLimitModal] = useState(false);
+  const [sendSuccess, setSendSuccess] = useState(false);
+
+  // Other state
+  const [isSubscribed, setIsSubscribed] = useState<boolean | null>(null);
   const [resumes, setResumes] = useState<ResumeData[]>([]);
   const [selectedResumeId, setSelectedResumeId] = useState<string | null>(null);
   const [showResumeDropdown, setShowResumeDropdown] = useState(false);
   const [showLinkModal, setShowLinkModal] = useState(false);
-  const [isSubscribed, setIsSubscribed] = useState<boolean | null>(null);
   const [linkUrl, setLinkUrl] = useState('');
   const [linkText, setLinkText] = useState('');
   const resumeDropdownRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const savedSelectionRef = useRef<Range | null>(null);
 
-  const currentPerson = results[internalIndex];
-  const status = currentPerson ? sendStatuses.get(currentPerson.id) : undefined;
-
-  const [selectedTemplateId, setSelectedTemplateId] = useState(defaultTemplateId || '');
   const userEditedRef = useRef(false);
-
-  const { openEmailChat, closeEmailChat, currentEmail, updateEmail, fetchInsights } = useEmailChat();
+  const { openEmailChat, closeEmailChat, currentEmail, updateEmail } = useEmailChat();
   const isPushingToContextRef = useRef(false);
 
-  // Synchronous state reset when person changes
-  const [prevIndex, setPrevIndex] = useState(internalIndex);
-  if (internalIndex !== prevIndex) {
-    setPrevIndex(internalIndex);
-    const nextPerson = results[internalIndex];
-    setSubject(nextPerson?.draftSubject || '');
-    setBody(nextPerson?.draftBody || '');
-    userEditedRef.current = false;
-    setSelectedResumeId(nextPerson?.resumeId || null);
-  }
+  // Fetch thread messages
+  useEffect(() => {
+    if (tracker.gmailThreadId) {
+      setIsLoadingThread(true);
+      setThreadError(null);
+      getThreadMessages(tracker.gmailThreadId).then((result) => {
+        if (result.success) {
+          setThreadMessages(result.messages);
+          // Collapse all messages by default
+          setExpandedMessages(new Set());
+        } else {
+          setThreadError(result.error);
+        }
+        setIsLoadingThread(false);
+      });
+    }
+  }, [tracker.gmailThreadId]);
+
+  // Auto-generate follow-up when thread loads
+  useEffect(() => {
+    if (tracker.gmailThreadId && threadMessages.length > 0 && !followUpBody && !isGenerating) {
+      handleGenerateFollowUp();
+    }
+  }, [tracker.gmailThreadId, threadMessages.length]);
 
   // Fetch subscription status
   useEffect(() => {
@@ -544,10 +606,6 @@ export function ExpandedReview({
   }, []);
 
   useEffect(() => {
-    setSelectedResumeId(currentPerson?.resumeId || null);
-  }, [currentPerson?.id]);
-
-  useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (resumeDropdownRef.current && !resumeDropdownRef.current.contains(e.target as Node)) {
         setShowResumeDropdown(false);
@@ -557,85 +615,29 @@ export function ExpandedReview({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showResumeDropdown]);
 
-  // Auto-personalize
+  // Open email chat when component mounts
   useEffect(() => {
-    if (!autoPersonalize) return;
-    if (currentPerson && !currentPerson.llmDraftGenerated && currentPerson.userCandidateId) {
-      setIsGeneratingDraft(true);
-      const personId = currentPerson.id;
-      const idx = internalIndex;
-      generateLLMDraftAction({
-        personId: currentPerson.id,
-        userCandidateId: currentPerson.userCandidateId,
-      }).then((result) => {
-        if (result.success && !userEditedRef.current && personId === results[idx]?.id) {
-          setSubject(result.subject);
-          setBody(result.body);
-          onDraftGenerated?.(idx, result.subject, result.body);
-        }
-      }).catch((err) => {
-        console.warn('[Draft] LLM generation failed, using template:', err);
-      }).finally(() => {
-        setIsGeneratingDraft(false);
-      });
+    if (tracker) {
+      openEmailChat(tracker.id, tracker.contactName || tracker.contactEmail, followUpSubject, followUpBody);
     }
-  }, [internalIndex, autoPersonalize]);
-
-  // Regenerate draft if body is empty (fixes stale/empty drafts in DB)
-  useEffect(() => {
-    const templateId = selectedTemplateId || defaultTemplateId || templates?.[0]?.id;
-    console.log('[Draft] Checking if regeneration needed:', { body: body?.substring(0, 50), templateId, userCandidateId: currentPerson?.userCandidateId, isGeneratingDraft });
-    if (!body.trim() && currentPerson?.userCandidateId && templateId && !isGeneratingDraft) {
-      console.log('[Draft] Regenerating draft with templateId:', templateId);
-      setIsGeneratingDraft(true);
-      const personId = currentPerson.id;
-      const idx = internalIndex;
-      regenerateDraftAction({
-        userCandidateId: currentPerson.userCandidateId,
-        templateId: templateId,
-        useLLM: false, // Fast template-based generation
-      }).then((result) => {
-        console.log('[Draft] Regeneration result:', result);
-        if (result.success && !userEditedRef.current && personId === results[idx]?.id) {
-          setSubject(result.subject);
-          setBody(result.body);
-        }
-      }).catch((err) => {
-        console.warn('[Draft] Template regeneration failed:', err);
-      }).finally(() => {
-        setIsGeneratingDraft(false);
-      });
-    }
-  }, [currentPerson?.id, selectedTemplateId, defaultTemplateId, templates]);
-
-  // Open email chat when person changes
-  useEffect(() => {
-    if (currentPerson && subject && body) {
-      openEmailChat(currentPerson.id, currentPerson.fullName, subject, body);
-    }
-  }, [currentPerson?.id, openEmailChat]);
-
-  // Fetch insights when person changes
-  useEffect(() => {
-    if (currentPerson?.id) fetchInsights(currentPerson.id);
-  }, [currentPerson?.id, fetchInsights]);
+  }, [tracker.id, openEmailChat]);
 
   // Sync local edits → context
   useEffect(() => {
-    if (currentPerson && subject && body) {
+    if (tracker && followUpSubject && followUpBody) {
       isPushingToContextRef.current = true;
-      updateEmail(subject, body);
+      updateEmail(followUpSubject, followUpBody);
       requestAnimationFrame(() => { isPushingToContextRef.current = false; });
     }
-  }, [subject, body]);
+  }, [followUpSubject, followUpBody]);
 
   // Sync context → local (when AI refines)
   useEffect(() => {
     if (isPushingToContextRef.current) return;
-    if (currentEmail && currentPerson) {
-      if (currentEmail.subject !== subject || currentEmail.body !== body) {
-        setSubject(currentEmail.subject);
-        setBody(currentEmail.body);
+    if (currentEmail && tracker) {
+      if (currentEmail.subject !== followUpSubject || currentEmail.body !== followUpBody) {
+        setFollowUpSubject(currentEmail.subject);
+        setFollowUpBody(currentEmail.body);
         userEditedRef.current = true;
       }
     }
@@ -645,17 +647,16 @@ export function ExpandedReview({
     return () => { closeEmailChat(); };
   }, [closeEmailChat]);
 
-  // Sync body state into the contentEditable editor.
-  // We track what the editor last wrote to avoid overwriting during typing.
-  const editorBodyRef = useRef(body);
+  // Sync body state into the contentEditable editor
+  const editorBodyRef = useRef(followUpBody);
   useEffect(() => {
-    if (editorRef.current && body !== editorBodyRef.current) {
-      editorRef.current.innerHTML = body.replace(/\n/g, '<br>');
-      editorBodyRef.current = body;
+    if (editorRef.current && followUpBody !== editorBodyRef.current) {
+      editorRef.current.innerHTML = followUpBody.replace(/\n/g, '<br>');
+      editorBodyRef.current = followUpBody;
     }
-  }, [body]);
+  }, [followUpBody]);
 
-  // Also keep editorBodyRef in sync when the user types
+  // Keep editorBodyRef in sync when the user types
   useEffect(() => {
     const editor = editorRef.current;
     if (!editor) return;
@@ -670,30 +671,100 @@ export function ExpandedReview({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (showScheduleModal) {
-          setShowScheduleModal(false);
-          setScheduledDateTime('');
-          setScheduleError(null);
-        } else {
-          onClose();
-        }
+        onClose();
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
         e.preventDefault();
-        if (limitReached) onLimitReached?.();
-        else if (currentPerson && !status && !isSending && !showSuccess) handleSend();
+        if (!isSending && followUpBody.trim()) {
+          handleSendFollowUp();
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showScheduleModal, currentPerson, status, isSending, showSuccess, onClose]);
+  }, [onClose, isSending, followUpBody]);
+
+  const handleGenerateFollowUp = async () => {
+    if (!tracker.gmailThreadId) return;
+
+    setIsGenerating(true);
+    setSendError(null);
+
+    try {
+      const result = await generateFollowUpFromThreadAction(tracker.gmailThreadId);
+      if (result.success && result.subject && result.body) {
+        setFollowUpSubject(result.subject);
+        setFollowUpBody(result.body);
+      } else {
+        setSendError(result.error || 'Failed to generate follow-up');
+      }
+    } catch (err) {
+      setSendError(err instanceof Error ? err.message : 'Failed to generate follow-up');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleSendFollowUp = async () => {
+    if (!tracker.gmailThreadId || !followUpBody.trim()) return;
+
+    setIsSending(true);
+    setSendError(null);
+
+    try {
+      const result = await sendFollowUpAction({
+        toEmail: tracker.contactEmail,
+        subject: followUpSubject,
+        body: followUpBody,
+        threadId: tracker.gmailThreadId,
+        userCandidateId: tracker.userCandidateId || '',
+        resumeId: selectedResumeId || undefined,
+      });
+
+      if (result.success) {
+        dispatchCreditsChanged();
+        setSendSuccess(true);
+        // Refresh thread messages
+        const threadResult = await getThreadMessages(tracker.gmailThreadId);
+        if (threadResult.success) {
+          setThreadMessages(threadResult.messages);
+        }
+        // Clear compose area
+        setFollowUpSubject('');
+        setFollowUpBody('');
+        // Auto-close after a delay
+        setTimeout(() => {
+          onClose();
+        }, 1500);
+      } else if (result.error === 'LIMIT_REACHED') {
+        setShowLimitModal(true);
+      } else {
+        setSendError(result.error || 'Failed to send follow-up');
+      }
+    } catch (err) {
+      setSendError(err instanceof Error ? err.message : 'Failed to send follow-up');
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const toggleMessage = (messageId: string) => {
+    setExpandedMessages(prev => {
+      const next = new Set(prev);
+      if (next.has(messageId)) {
+        next.delete(messageId);
+      } else {
+        next.add(messageId);
+      }
+      return next;
+    });
+  };
 
   const insertLink = () => {
     if (!linkUrl) return;
     const editor = editorRef.current;
     if (!editor) return;
     editor.focus();
-    // Restore saved selection
     if (savedSelectionRef.current) {
       const sel = window.getSelection();
       if (sel) {
@@ -705,89 +776,13 @@ export function ExpandedReview({
     const anchor = `<a href="${linkUrl}" target="_blank" rel="noopener noreferrer">${displayText}</a>`;
     document.execCommand('insertHTML', false, anchor);
     userEditedRef.current = true;
-    if (editor) setBody(editor.innerText);
+    if (editor) setFollowUpBody(editor.innerText);
     setShowLinkModal(false);
     setLinkUrl('');
     setLinkText('');
     savedSelectionRef.current = null;
   };
 
-  const handleSend = async () => {
-    if (!currentPerson) return;
-    setIsSending(true);
-    const success = await onSend(internalIndex, subject, body, selectedResumeId);
-    setIsSending(false);
-    if (!success) {
-      setShowFailure(true);
-      setTimeout(() => setShowFailure(false), 2000);
-      return;
-    }
-    setShowSuccess(true);
-    setTimeout(() => {
-      setShowSuccess(false);
-      const nextIndex = findNextUnsent(internalIndex + 1);
-      if (nextIndex !== -1) setInternalIndex(nextIndex);
-      else onClose();
-    }, 1200);
-  };
-
-  const findNextUnsent = (startIndex: number): number => {
-    for (let i = startIndex; i < results.length; i++) {
-      if (!sendStatuses.has(results[i].id)) return i;
-    }
-    return -1;
-  };
-
-  const handleSchedule = async () => {
-    if (!currentPerson?.userCandidateId) return;
-    if (!scheduledDateTime) { setScheduleError('Please select a date and time'); return; }
-    const selectedDate = new Date(scheduledDateTime);
-    const now = new Date();
-    if (selectedDate < new Date(now.getTime() + 5 * 60 * 1000)) {
-      setScheduleError('Scheduled time must be at least 5 minutes in the future');
-      return;
-    }
-    setIsScheduling(true);
-    setScheduleError(null);
-    try {
-      const result = await scheduleEmailAction({
-        email: currentPerson.email || undefined,
-        subject, body,
-        userCandidateId: currentPerson.userCandidateId,
-        resumeId: selectedResumeId ?? undefined,
-        scheduledFor: selectedDate,
-      });
-      if (result.success) {
-        setShowScheduleModal(false);
-        setScheduledDateTime('');
-        const nextIndex = findNextUnsent(internalIndex + 1);
-        if (nextIndex !== -1) setInternalIndex(nextIndex);
-        else onClose();
-      } else {
-        setScheduleError(result.error || 'Failed to schedule email');
-      }
-    } catch (error) {
-      setScheduleError(error instanceof Error ? error.message : 'Failed to schedule email');
-    } finally {
-      setIsScheduling(false);
-    }
-  };
-
-  useEffect(() => {
-    if (showScheduleModal && !scheduledDateTime) {
-      const defaultTime = new Date();
-      defaultTime.setHours(defaultTime.getHours() + 1);
-      defaultTime.setMinutes(0);
-      defaultTime.setSeconds(0);
-      const localDateTime = new Date(defaultTime.getTime() - defaultTime.getTimezoneOffset() * 60000)
-        .toISOString().slice(0, 16);
-      setScheduledDateTime(localDateTime);
-    }
-  }, [showScheduleModal, scheduledDateTime]);
-
-  if (!currentPerson) return null;
-
-  const canSend = !status && !showSuccess && !limitReached;
   const accentColor = isSubscribed === null ? 'bg-[#2a2a2a]' : isSubscribed ? 'bg-[#2563EB]' : 'bg-[#22C55E]';
   const accentHover = isSubscribed === null ? 'hover:bg-[#333]' : isSubscribed ? 'hover:bg-[#1d4ed8]' : 'hover:bg-[#16a34a]';
 
@@ -802,41 +797,28 @@ export function ExpandedReview({
       <div className="flex-1 flex items-center justify-center bg-[#212121] relative" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
         {/* Compose modal card */}
         <div className="w-full max-w-[680px] max-h-[720px] h-[85vh] bg-[#141414] rounded-xl border border-[#2a2a2a] shadow-2xl flex flex-col overflow-hidden">
-          {/* Success/Failure overlays */}
-          {showSuccess && (
+
+          {/* Success overlay */}
+          {sendSuccess && (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#141414]/90 rounded-xl">
-              <SendSuccessAnimation />
-            </div>
-          )}
-          {showFailure && (
-            <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#141414]/90 rounded-xl">
-              <SendFailureAnimation message={sendErrors?.get(currentPerson.id) || 'Failed to send email'} />
+              <div className="flex flex-col items-center justify-center py-6 animate-fade-in">
+                <svg className="w-16 h-16" viewBox="0 0 52 52">
+                  <circle className="draw-check-circle" cx="26" cy="26" r="25" fill="none" stroke="#10b981" strokeWidth="2" />
+                  <path className="draw-check-mark" fill="none" stroke="#10b981" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" d="M14.1 27.2l7.1 7.2 16.7-16.8" />
+                </svg>
+                <p className="mt-3 text-sm font-medium text-emerald-400">Follow-up sent!</p>
+              </div>
             </div>
           )}
 
-          {/* ── Folder Tabs ── */}
+          {/* ── Header ── */}
           <div className="flex items-center px-5 bg-[#1a1a1a] flex-shrink-0">
-            {templates && templates.length > 0 && onTemplateChange ? (
-              templates.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => {
-                    setSelectedTemplateId(t.id);
-                    onTemplateChange(t.id, internalIndex);
-                  }}
-                  disabled={!canSend || isRegenerating}
-                  className={`px-4 py-2.5 text-xs font-medium transition-colors disabled:opacity-50 rounded-t-lg ${
-                    selectedTemplateId === t.id
-                      ? `${accentColor} text-white`
-                      : 'bg-[#252525] text-[#888] hover:text-white hover:bg-[#303030]'
-                  }`}
-                >
-                  {t.name}
-                </button>
-              ))
-            ) : (
-              <span className={`px-4 py-2.5 text-xs font-semibold text-white ${accentColor} rounded-t-lg`}>Default Template</span>
-            )}
+            <span className={`px-4 py-2.5 text-xs font-semibold text-white ${accentColor} rounded-t-lg`}>
+              Follow Up
+            </span>
+            <span className="px-3 py-2.5 text-xs text-[#888]">
+              {threadMessages.length} {threadMessages.length === 1 ? 'message' : 'messages'} in thread
+            </span>
 
             <div className="flex-1" />
 
@@ -851,33 +833,58 @@ export function ExpandedReview({
           <div className="flex items-center px-5 py-2.5 border-b border-[#2a2a2a] flex-shrink-0">
             <span className="text-[13px] text-[#888] w-14 flex-shrink-0">To</span>
             <span className="text-[13px] font-semibold text-white">
-              {currentPerson.fullName}
+              {tracker.contactName || tracker.contactEmail}
             </span>
-            {(currentPerson.role || currentPerson.company) && (
+            {(tracker.role || tracker.company) && (
               <span className="text-xs text-[#888] ml-2">
-                {currentPerson.role ? `${currentPerson.role} at ` : ''}{currentPerson.company}
+                {tracker.role ? `${tracker.role} at ` : ''}{tracker.company}
               </span>
             )}
           </div>
+
+          {/* ── Thread Messages (collapsed) ── */}
+          {isLoadingThread ? (
+            <div className="flex items-center justify-center py-6 border-b border-[#2a2a2a]">
+              <LoadingSpinner size="sm" />
+              <span className="ml-2 text-sm text-[#888]">Loading conversation...</span>
+            </div>
+          ) : threadError ? (
+            <div className="px-5 py-4 border-b border-[#2a2a2a]">
+              <p className="text-sm text-red-400">{threadError}</p>
+            </div>
+          ) : threadMessages.length > 0 ? (
+            <div className="border-b border-[#2a2a2a] max-h-[200px] overflow-y-auto bg-[#0f0f0f]">
+              {threadMessages.map((message) => (
+                <ThreadMessageItem
+                  key={message.messageId}
+                  message={message}
+                  isExpanded={expandedMessages.has(message.messageId)}
+                  onToggle={() => toggleMessage(message.messageId)}
+                  contactName={tracker.contactName}
+                  contactEmail={tracker.contactEmail}
+                />
+              ))}
+            </div>
+          ) : null}
 
           {/* ── Subject field ── */}
           <div className="flex items-center px-5 py-2.5 border-b border-[#2a2a2a] flex-shrink-0">
             <span className="text-[13px] text-[#888] w-14 flex-shrink-0">Subject</span>
             <input
               type="text"
-              value={subject}
-              onChange={(e) => { userEditedRef.current = true; setSubject(e.target.value); }}
-              placeholder="Enter subject..."
-              className={`flex-1 text-[13px] text-white bg-transparent outline-none placeholder-[#3a3a3a] focus:ring-0 ${isRegenerating || isGeneratingDraft ? 'opacity-50' : ''}`}
+              value={followUpSubject}
+              onChange={(e) => { userEditedRef.current = true; setFollowUpSubject(e.target.value); }}
+              placeholder="Re: ..."
+              className={`flex-1 text-[13px] text-white bg-transparent outline-none placeholder-[#3a3a3a] focus:ring-0 ${isGenerating ? 'opacity-50' : ''}`}
             />
-            {isGeneratingDraft && (
+            {isGenerating && (
               <span className="text-[11px] text-[#888] flex items-center gap-1 flex-shrink-0">
-                <LoadingDots className="text-[#888]" /> Personalizing
+                <LoadingSpinner size="sm" /> Generating...
               </span>
             )}
           </div>
 
-          {/* ── Email body (contentEditable) ── */}
+          {/* ── Follow-up body (contentEditable) ── */}
           <div className="flex-1 overflow-y-auto px-5 py-5">
             <div
               ref={editorRef}
@@ -885,22 +892,28 @@ export function ExpandedReview({
               suppressContentEditableWarning
               onInput={() => {
                 userEditedRef.current = true;
-                if (editorRef.current) setBody(editorRef.current.innerText);
+                if (editorRef.current) setFollowUpBody(editorRef.current.innerText);
               }}
               onPaste={(e) => {
                 e.preventDefault();
                 const text = e.clipboardData.getData('text/plain');
                 document.execCommand('insertText', false, text);
               }}
-              className={`w-full min-h-[300px] text-sm text-white bg-transparent outline-none leading-[1.7] focus:ring-0 [&_a]:text-[#6364FF] [&_a]:underline ${isRegenerating || isGeneratingDraft ? 'opacity-50' : ''}`}
+              className={`w-full min-h-[150px] text-sm text-white bg-transparent outline-none leading-[1.7] focus:ring-0 [&_a]:text-[#6364FF] [&_a]:underline ${isGenerating ? 'opacity-50' : ''}`}
               style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
             />
           </div>
 
+          {/* Error message */}
+          {sendError && (
+            <div className="px-5 py-2 bg-red-900/20 border-t border-red-900/30">
+              <p className="text-sm text-red-400">{sendError}</p>
+            </div>
+          )}
 
           {/* ── Attachment (Gmail style) ── */}
           {selectedResumeId && (
-            <div className="px-5 py-2 flex-shrink-0">
+            <div className="px-5 py-2 flex-shrink-0 border-t border-[#2a2a2a]">
               <div className="flex items-center gap-1">
                 <span className="text-[13px] text-[#6364FF]">
                   {resumes.find(r => r.id === selectedResumeId)?.filename || 'Resume attached'}
@@ -917,6 +930,13 @@ export function ExpandedReview({
 
           {/* ── Bottom bar ── */}
           <div className="flex items-center gap-1.5 px-5 py-2.5 bg-[#1a1a1a] border-t border-[#2a2a2a] flex-shrink-0">
+            {/* Regenerate */}
+            <ToolbarButton title="Regenerate follow-up" onClick={handleGenerateFollowUp}>
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+              </svg>
+            </ToolbarButton>
+
             {/* Attach file / resume */}
             <div className="relative" ref={resumeDropdownRef}>
               <ToolbarButton
@@ -951,7 +971,7 @@ export function ExpandedReview({
               )}
             </div>
 
-            {/* Formatting tools inline */}
+            {/* Formatting tools */}
             <ToolbarButton title="Bold (Ctrl+B)" onClick={() => document.execCommand('bold')}>
               <span className="text-xs font-bold">B</span>
             </ToolbarButton>
@@ -960,9 +980,6 @@ export function ExpandedReview({
             </ToolbarButton>
             <ToolbarButton title="Underline (Ctrl+U)" onClick={() => document.execCommand('underline')}>
               <span className="text-xs underline">U</span>
-            </ToolbarButton>
-            <ToolbarButton title="Bulleted list" onClick={() => document.execCommand('insertUnorderedList')}>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0ZM3.75 12h.007v.008H3.75V12Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm-.375 5.25h.007v.008H3.75v-.008Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" /></svg>
             </ToolbarButton>
             <ToolbarButton title="Insert link (Ctrl+K)" onClick={() => {
               const sel = window.getSelection();
@@ -977,61 +994,24 @@ export function ExpandedReview({
 
             <div className="flex-1" />
 
-            {/* Schedule send */}
-            <ToolbarButton title="Schedule send" onClick={limitReached ? () => onLimitReached?.() : () => setShowScheduleModal(true)}>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
-            </ToolbarButton>
-
-            {/* Send button */}
+            {/* Send Follow-Up button */}
             <button
-              onClick={limitReached ? () => onLimitReached?.() : handleSend}
-              disabled={limitReached ? false : (!canSend || isSending)}
-              className={`px-5 py-2 rounded-full ${accentColor} ${accentHover} text-white text-xs font-semibold disabled:opacity-50 transition-colors`}
+              onClick={handleSendFollowUp}
+              disabled={isSending || isGenerating || !followUpBody.trim()}
+              className={`px-5 py-2 rounded-full ${accentColor} ${accentHover} text-white text-xs font-semibold disabled:opacity-50 transition-colors flex items-center gap-2`}
             >
-              {isSending ? 'Sending...' : limitReached ? 'Limit reached' : 'Send'}
+              {isSending ? (
+                <>
+                  <LoadingSpinner size="sm" />
+                  Sending...
+                </>
+              ) : (
+                'Send Follow-Up'
+              )}
             </button>
           </div>
         </div>
       </div>
-
-      {/* ── Schedule Modal ── */}
-      {showScheduleModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] p-4">
-          <div className="bg-[#1A1A1A] rounded-xl shadow-2xl border border-[#252525] max-w-sm w-full p-6">
-            <h3 className="text-base font-semibold text-white mb-4">Schedule send</h3>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-white mb-2">Date & Time</label>
-              <input
-                type="datetime-local"
-                value={scheduledDateTime}
-                onChange={(e) => { setScheduledDateTime(e.target.value); setScheduleError(null); }}
-                min={new Date(new Date().getTime() + 5 * 60 * 1000).toISOString().slice(0, 16)}
-                className="w-full px-3 py-2 text-sm bg-[#141414] border border-[#252525] rounded-lg text-white outline-none focus:ring-0"
-              />
-              <p className="mt-1 text-xs text-[#888]">Minimum: 5 minutes from now</p>
-            </div>
-            {scheduleError && (
-              <div className="mb-4 p-3 bg-red-900/30 text-red-400 rounded-lg text-sm">{scheduleError}</div>
-            )}
-            <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => { setShowScheduleModal(false); setScheduledDateTime(''); setScheduleError(null); }}
-                disabled={isScheduling}
-                className="px-4 py-2 text-sm text-[#aaa] border border-[#252525] rounded-lg hover:bg-[#252525] transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSchedule}
-                disabled={isScheduling || !scheduledDateTime}
-                className="px-4 py-2 text-sm text-white bg-[#6364FF] rounded-lg hover:bg-[#5354EE] disabled:opacity-50 transition-colors"
-              >
-                {isScheduling ? 'Scheduling...' : 'Schedule'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ── Insert Link Modal ── */}
       {showLinkModal && (
@@ -1085,6 +1065,16 @@ export function ExpandedReview({
           </div>
         </div>
       )}
+
+      {/* Limit Reached Modal */}
+      <LimitReachedModal
+        isOpen={showLimitModal}
+        onClose={() => setShowLimitModal(false)}
+        onCreditsAwarded={() => {
+          setShowLimitModal(false);
+          dispatchCreditsChanged();
+        }}
+      />
     </div>
   );
 }

@@ -100,18 +100,28 @@ export function useSearchResults({ initialRemainingDaily }: UseSearchResultsOpti
     const loadTemplatesAndPrefs = async () => {
       // Load templates
       const result = await getTemplatesAction();
-      const hardcoded = EMAIL_TEMPLATES[0];
+      // Convert all hardcoded templates to TemplateData format
+      const hardcodedTemplates: TemplateData[] = EMAIL_TEMPLATES.map((t) => ({
+        id: t.id,
+        name: t.name,
+        subject: t.subject,
+        body: t.body,
+        isDefault: false,
+        attachResume: false,
+        resumeId: null,
+        createdAt: new Date(),
+      }));
       if (result.success) {
         const combined: TemplateData[] = [
           ...result.templates,
-          { id: hardcoded.id, name: hardcoded.name, subject: hardcoded.subject, body: hardcoded.body, isDefault: false, attachResume: false, resumeId: null, createdAt: new Date() },
+          ...hardcodedTemplates,
         ];
         setTemplates(combined);
         const defaultT = result.templates.find((t) => t.isDefault);
-        setDefaultTemplateId(defaultT?.id || result.templates[0]?.id || hardcoded.id);
+        setDefaultTemplateId(defaultT?.id || result.templates[0]?.id || EMAIL_TEMPLATES[0].id);
       } else {
-        setTemplates([{ id: hardcoded.id, name: hardcoded.name, subject: hardcoded.subject, body: hardcoded.body, isDefault: false, attachResume: false, resumeId: null, createdAt: new Date() }]);
-        setDefaultTemplateId(hardcoded.id);
+        setTemplates(hardcodedTemplates);
+        setDefaultTemplateId(EMAIL_TEMPLATES[0].id);
       }
       // Load autoPersonalize preference
       const autoPersonalizePref = await getAutoPersonalizeAction();

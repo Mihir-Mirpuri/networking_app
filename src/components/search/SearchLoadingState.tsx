@@ -1,5 +1,41 @@
 'use client';
 
+import { useState, useEffect } from 'react';
+
+const STATUS_MESSAGES = [
+  "Scanning the airwaves...",
+  "Tuning frequencies...",
+  "Picking up signals...",
+  "Locking onto targets...",
+  "Sweeping the spectrum...",
+  "Decoding transmissions...",
+  "Triangulating positions...",
+  "Filtering static...",
+  "Amplifying signals...",
+  "Calibrating receivers...",
+  "Boosting reception...",
+  "Analyzing waveforms...",
+  "Establishing uplink...",
+  "Intercepting data...",
+  "Mapping the network...",
+  "Locating profiles...",
+  "Tracking down leads...",
+  "Identifying targets...",
+  "Cross-referencing sources...",
+  "Matching signatures...",
+  "Detecting candidates...",
+  "Zeroing in on matches...",
+  "Running facial recognition...",
+  "Extracting contact data...",
+  "Decrypting inboxes...",
+  "Tracing email routes...",
+  "Pinging mail servers...",
+  "Verifying addresses...",
+  "Resolving endpoints...",
+  "Querying directories...",
+  "Unlocking channels...",
+];
+
 function SignalIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 200 160" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -23,11 +59,25 @@ interface SearchLoadingStateProps {
 }
 
 export function SearchLoadingState({ onCancel }: SearchLoadingStateProps) {
+  const [messageIndex, setMessageIndex] = useState(() =>
+    Math.floor(Math.random() * STATUS_MESSAGES.length)
+  );
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setMessageIndex((prev) => (prev + 1) % STATUS_MESSAGES.length);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <div className="flex flex-col items-center justify-center min-h-[70vh]">
       <div>
         <SignalIcon className="w-96 h-96" />
       </div>
+      <p className="text-lg text-[#999] font-medium tracking-wide animate-pulse">
+        {STATUS_MESSAGES[messageIndex]}
+      </p>
       {onCancel && (
         <button
           onClick={() => {

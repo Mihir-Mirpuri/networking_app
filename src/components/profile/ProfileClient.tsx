@@ -25,9 +25,9 @@ import {
   getSubscriptionStatus,
 } from '@/app/actions/subscription';
 import { SearchableCombobox } from '@/components/search/SearchableCombobox';
-import { UNIVERSITIES, CLASSIFICATIONS, EMAIL_LIMITS } from '@/lib/constants';
+import { UNIVERSITIES } from '@/lib/constants';
 
-type ProfileTab = 'profile' | 'resumes' | 'templates' | 'billing' | 'settings' | 'feedback';
+type ProfileTab = 'account' | 'resumes' | 'templates';
 
 interface ProfileClientProps {
   userEmail: string;
@@ -36,10 +36,12 @@ interface ProfileClientProps {
   activeTab?: ProfileTab;
 }
 
-const DEFAULT_TEMPLATE = {
-  name: 'Default Template',
-  subject: '{university} {classification} interested in {industry} at {company}',
-  body: `Hi {first_name},
+const DEFAULT_TEMPLATES = [
+  {
+    id: '__coffee_chat__',
+    name: 'Coffee Chat Request',
+    subject: '{university} {classification} interested in {industry} at {company}',
+    body: `Hi {first_name},
 
 I hope you are doing well. My name is {user_name} and I am a {classification} pursuing my {major} at {university}. I am interested in {career} and would love to grab 10-15 minutes on the phone with you to hear about your experiences at {company}.
 
@@ -47,7 +49,23 @@ In case it's helpful to provide more context on my background, I have attached m
 
 Warm regards,
 {user_name}`,
-};
+  },
+  {
+    id: '__interview_thank_you__',
+    name: 'Interview Thank You Note',
+    subject: 'Thank you for the interview - {role} at {company}',
+    body: `Hi {first_name},
+
+Thank you for taking the time to tell me about the {role} position at {company} and for the opportunity to interview {interview_date}.
+
+I especially enjoyed learning about {topics_discussed}. It was great getting a clearer picture of what the role actually looks like day-to-day.
+
+Please let me know if there's anything else I can provide. Hope you have a great rest of your week!
+
+Best,
+{user_name}`,
+  },
+];
 
 const DEFAULT_PLACEHOLDERS = [
   '{first_name}',
@@ -59,6 +77,8 @@ const DEFAULT_PLACEHOLDERS = [
   '{career}',
   '{role}',
   '{industry}',
+  '{interview_date}',
+  '{topics_discussed}',
 ];
 
 export function ProfileClient({ userEmail, userName, userImage, activeTab }: ProfileClientProps) {
@@ -83,19 +103,8 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
   const [templates, setTemplates] = useState<TemplateData[]>([]);
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(true);
   const [editingTemplate, setEditingTemplate] = useState<TemplateData | null>(null);
-  const [selectedTemplate, setSelectedTemplate] = useState<TemplateData | null>(null);
-  const [showDefaultTemplate, setShowDefaultTemplate] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
-  const [newTemplate, setNewTemplate] = useState({
-    name: '',
-    subject: '',
-    body: '',
-    attachResume: false,
-    resumeId: null as string | null
-  });
   const [templateError, setTemplateError] = useState<string | null>(null);
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
-  const [carouselIndex, setCarouselIndex] = useState(0);
 
   // Resume state
   const [resumes, setResumes] = useState<ResumeData[]>([]);
@@ -114,10 +123,6 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
   const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
   const [isPortalLoading, setIsPortalLoading] = useState(false);
 
-  // Feedback state
-  const [feedback, setFeedback] = useState('');
-  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
-  const [feedbackSent, setFeedbackSent] = useState(false);
 
   useEffect(() => {
     if (status === 'authenticated') {
@@ -178,32 +183,6 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
       setProfileError(result.error);
     }
     setIsSavingProfile(false);
-  };
-
-  const handleCreateTemplate = async () => {
-    if (!newTemplate.name.trim() || !newTemplate.body.trim()) {
-      setTemplateError('Template name and body are required');
-      return;
-    }
-
-    setIsSavingTemplate(true);
-    setTemplateError(null);
-
-    const result = await createTemplateAction({
-      name: newTemplate.name,
-      subject: newTemplate.subject,
-      body: newTemplate.body,
-      attachResume: newTemplate.attachResume,
-      resumeId: newTemplate.resumeId,
-    });
-    if (result.success) {
-      setTemplates([...templates, result.template]);
-      setNewTemplate({ name: '', subject: '', body: '', attachResume: false, resumeId: null });
-      setIsCreating(false);
-    } else {
-      setTemplateError(result.error);
-    }
-    setIsSavingTemplate(false);
   };
 
   const handleUpdateTemplate = async () => {
@@ -354,16 +333,13 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
     .toUpperCase();
 
   const TAB_TITLES: Record<string, { title: string; subtitle: string }> = {
-    profile: { title: 'Profile', subtitle: 'Manage your personal information and preferences' },
+    account: { title: 'Account', subtitle: 'Manage your profile, plan, and account' },
     resumes: { title: 'Attachments', subtitle: 'Upload and manage files to personalize your outreach' },
     templates: { title: 'Templates', subtitle: 'Browse and manage your email templates' },
-    billing: { title: 'Billing & Plans', subtitle: 'Manage your subscription, plan, and payment details' },
-    settings: { title: 'Settings', subtitle: 'Customize your application preferences' },
-    feedback: { title: 'Send Feedback', subtitle: 'Help us improve by sharing your thoughts' },
   };
 
-  const currentTab = activeTab || 'profile';
-  const tabInfo = TAB_TITLES[currentTab] || TAB_TITLES.profile;
+  const currentTab = activeTab || 'account';
+  const tabInfo = TAB_TITLES[currentTab] || TAB_TITLES.account;
 
   return (
     <div className="text-white px-8 sm:px-10 pt-4 pb-10">
@@ -373,7 +349,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
           <h1 className="text-[22px] font-bold tracking-tight">{tabInfo.title}</h1>
           <p className="text-white text-[13px] mt-1">{tabInfo.subtitle}</p>
         </div>
-        {currentTab === 'profile' && (
+        {currentTab === 'account' && (
           <button
             onClick={handleSaveProfile}
             disabled={isSavingProfile}
@@ -391,22 +367,13 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
             <input type="file" accept=".pdf,.doc,.docx" onChange={handleUploadResume} disabled={isUploadingResume} className="hidden" />
           </label>
         )}
-        {currentTab === 'templates' && !isCreating && (
+        {currentTab === 'templates' && (
           <button
-            onClick={() => setIsCreating(true)}
-            className="bg-[#6364FF] text-white text-[13px] font-semibold px-5 py-2.5 rounded-full hover:bg-[#5354EE] transition-colors flex items-center gap-2"
+            onClick={() => setEditingTemplate({ id: '__new__', name: '', subject: '', body: '', isDefault: false, attachResume: false, resumeId: null, createdAt: new Date() })}
+            className="bg-[#A855F7] text-white text-[13px] font-semibold px-5 py-2.5 rounded-full hover:bg-[#9333EA] transition-colors flex items-center gap-2"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
             Create Template
-          </button>
-        )}
-        {currentTab === 'settings' && (
-          <button
-            onClick={handleSaveProfile}
-            disabled={isSavingProfile}
-            className="bg-[#6364FF] text-white text-[13px] font-semibold px-6 py-2.5 rounded-full hover:bg-[#5354EE] transition-colors disabled:opacity-50"
-          >
-            {isSavingProfile ? 'Saving...' : 'Save Changes'}
           </button>
         )}
       </header>
@@ -428,162 +395,132 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
 
       <div className="space-y-6">
 
-        {/* Profile Section */}
-        {currentTab === 'profile' && (
-        <div>
-          {isLoadingProfile ? (
-            <div className="animate-pulse space-y-3">
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="flex gap-3">
-                  <div className="flex-1 space-y-1">
-                    <div className="h-3 w-20 bg-[#2a2a2a] rounded" />
-                    <div className="h-11 bg-[#111111] rounded-lg" />
-                  </div>
-                  <div className="flex-1 space-y-1">
-                    <div className="h-3 w-20 bg-[#2a2a2a] rounded" />
-                    <div className="h-11 bg-[#111111] rounded-lg" />
-                  </div>
+        {/* Account Section — Bento Layout */}
+        {currentTab === 'account' && (
+        <div className="flex flex-col gap-4">
+          {isLoadingProfile || isLoadingSubscription ? (
+            <div className="animate-pulse space-y-4">
+              <div className="flex gap-4">
+                <div className="flex-1 h-64 bg-[#252525] rounded-xl" />
+                <div className="flex-1 flex flex-col gap-4">
+                  <div className="flex-1 h-28 bg-[#252525] rounded-xl" />
+                  <div className="flex-1 h-28 bg-[#252525] rounded-xl" />
                 </div>
-              ))}
+              </div>
+              <div className="h-16 bg-[#252525] rounded-xl" />
             </div>
           ) : (
-            <div className="space-y-5">
-              {/* Row 1: Name + Email */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-white">Full Name</label>
-                  <input
-                    type="text"
-                    value={profile.name || ''}
-                    onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-                    className="w-full h-11 bg-[#212121] border border-[#2a2a2a] rounded-lg text-[13px] text-white px-4 focus:outline-none focus:ring-1 focus:ring-[#404040] transition-colors"
-                    placeholder="Your full name"
-                  />
+            <>
+              {/* Bento grid — top */}
+              <div className="flex gap-4" style={{ minHeight: 280 }}>
+                {/* Profile card — left */}
+                <div className="flex-1 bg-[#252525] border border-[#3a3a3a] rounded-xl p-8 flex flex-col items-center justify-center gap-4">
+                  {userImage ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={userImage} alt={userName} className="w-24 h-24 rounded-full ring-2 ring-[#303030]" />
+                  ) : (
+                    <div className="w-24 h-24 rounded-full bg-[#6364FF] flex items-center justify-center text-2xl font-bold text-white">
+                      {(profile.name || userName || '?').split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()}
+                    </div>
+                  )}
+                  <span className="text-2xl font-bold text-white">{profile.name || userName}</span>
+                  <span className="text-sm text-[#707070]">{userEmail}</span>
+                  {/* University chip */}
+                  <div className="relative">
+                    <SearchableCombobox
+                      options={UNIVERSITIES}
+                      value={profile.university || ''}
+                      onChange={(value) => setProfile({ ...profile, university: value })}
+                      label=""
+                      placeholder="Select university..."
+                      id="university-bento"
+                    />
+                  </div>
+                  {/* Plan badge */}
+                  <span className={`px-3.5 py-1.5 rounded-full text-xs font-semibold ${
+                    subscription.isSubscribed
+                      ? 'bg-[#6364FF]/15 text-[#6364FF]'
+                      : 'bg-[#303030] text-white'
+                  }`}>
+                    {subscription.isSubscribed ? 'PRO Plan' : 'Free Plan'}
+                  </span>
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-white">Email</label>
-                  <div className="flex items-center gap-2 h-11 bg-[#212121] border border-[#2a2a2a] rounded-lg px-4">
-                    <svg className="w-3 h-3 text-[#404040] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+
+                {/* Right stack */}
+                <div className="flex-1 flex flex-col gap-4">
+                  {/* Subscription tile */}
+                  <div className="flex-1 bg-[#252525] border border-[#3a3a3a] rounded-xl p-6 flex flex-col gap-4">
+                    <svg className="w-6 h-6 text-[#6364FF]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" />
                     </svg>
-                    <span className="text-[13px] text-white">{userEmail}</span>
+                    <div>
+                      <h3 className="text-[15px] font-semibold text-white">Subscription</h3>
+                      <p className="text-xs text-[#707070] mt-1">
+                        {subscription.isSubscribed
+                          ? `$20/month · Renews ${subscription.currentPeriodEnd ? new Date(subscription.currentPeriodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'soon'}`
+                          : '10 emails/day · Free forever'}
+                      </p>
+                    </div>
+                    <div className="flex-1" />
+                    {subscription.isSubscribed ? (
+                      <button
+                        onClick={async () => { setIsPortalLoading(true); try { await createCustomerPortalSession(); } catch { setIsPortalLoading(false); } }}
+                        disabled={isPortalLoading}
+                        className="w-full py-2.5 bg-[#6364FF] text-white text-xs font-semibold rounded-lg hover:bg-[#5354EE] transition-colors disabled:opacity-50"
+                      >
+                        {isPortalLoading ? 'Loading...' : 'Manage Plan'}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={async () => { setIsCheckoutLoading(true); try { await createCheckoutSession(); } catch { setIsCheckoutLoading(false); } }}
+                        disabled={isCheckoutLoading}
+                        className="w-full py-2.5 bg-[#6364FF] text-white text-xs font-semibold rounded-lg hover:bg-[#5354EE] transition-colors disabled:opacity-50"
+                      >
+                        {isCheckoutLoading ? 'Loading...' : 'Upgrade to Pro'}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Feedback tile */}
+                  <div className="flex-1 bg-[#252525] border border-[#3a3a3a] rounded-xl p-6 flex flex-col gap-4">
+                    <svg className="w-6 h-6 text-[#22C55E]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 0 1-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8Z" />
+                    </svg>
+                    <div>
+                      <h3 className="text-[15px] font-semibold text-white">Feedback</h3>
+                      <p className="text-xs text-[#707070] mt-1">Share your thoughts with us</p>
+                    </div>
+                    <div className="flex-1" />
+                    <a
+                      href="mailto:feedback@signl.to"
+                      className="w-full py-2.5 border border-[#3a3a3a] text-white text-xs font-semibold rounded-lg hover:bg-[#303030] transition-colors text-center block"
+                    >
+                      Send Email
+                    </a>
                   </div>
                 </div>
               </div>
 
-              {/* Row 2: University + Classification */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-white">University</label>
-                  <SearchableCombobox
-                    options={UNIVERSITIES}
-                    value={profile.university || ''}
-                    onChange={(value) => setProfile({ ...profile, university: value })}
-                    label=""
-                    placeholder="Search universities..."
-                    id="university"
-                  />
+              {/* Delete row — bottom */}
+              <div className="bg-[#252525] border border-[#ef4444]/25 rounded-xl px-6 py-5 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <svg className="w-5 h-5 text-[#ef4444]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                  </svg>
+                  <div>
+                    <h3 className="text-sm font-semibold text-white">Delete Account</h3>
+                    <p className="text-xs text-[#707070]">Permanently remove your account and all data</p>
+                  </div>
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-white">Classification</label>
-                  <select
-                    value={profile.classification || ''}
-                    onChange={(e) => setProfile({ ...profile, classification: e.target.value })}
-                    className="w-full h-11 bg-[#212121] border border-[#2a2a2a] rounded-lg text-[13px] text-white px-4 focus:outline-none focus:ring-1 focus:ring-[#404040] transition-colors appearance-none"
-                  >
-                    <option value="">Select classification</option>
-                    {CLASSIFICATIONS.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                </div>
+                <button className="text-xs font-semibold text-[#ef4444] border border-[#ef4444]/40 rounded-lg px-5 py-2.5 hover:bg-[#ef4444]/10 transition-colors">
+                  Delete
+                </button>
               </div>
-
-              {/* Row 3: Major + Career */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-white">Major</label>
-                  <input
-                    type="text"
-                    value={profile.major || ''}
-                    onChange={(e) => setProfile({ ...profile, major: e.target.value })}
-                    className="w-full h-11 bg-[#212121] border border-[#2a2a2a] rounded-lg text-[13px] text-white px-4 focus:outline-none focus:ring-1 focus:ring-[#404040] transition-colors"
-                    placeholder="e.g., Computer Science"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-white">Career Interest</label>
-                  <input
-                    type="text"
-                    value={profile.career || ''}
-                    onChange={(e) => setProfile({ ...profile, career: e.target.value })}
-                    className="w-full h-11 bg-[#212121] border border-[#2a2a2a] rounded-lg text-[13px] text-white px-4 focus:outline-none focus:ring-1 focus:ring-[#404040] transition-colors"
-                    placeholder="e.g., Investment Banking, Consulting"
-                  />
-                </div>
-              </div>
-            </div>
+            </>
           )}
         </div>
         )}
 
-        {/* Settings Section */}
-        {currentTab === 'settings' && (
-        <div className="space-y-6">
-          {/* Email Preferences */}
-          <div className="bg-[#252525] border border-[#3a3a3a] rounded-lg p-6 space-y-5">
-            <div>
-              <h3 className="text-base font-semibold text-white">Email Preferences</h3>
-              <p className="text-[12px] text-white mt-1">Configure your default email settings for outreach</p>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-medium text-white">Email Style Instructions</label>
-              <textarea
-                value={profile.emailInstructions || ''}
-                onChange={(e) => setProfile({ ...profile, emailInstructions: e.target.value || null })}
-                rows={3}
-                className="w-full bg-[#1a1a1a] border border-[#3a3a3a] rounded-lg text-[13px] text-white p-4 focus:outline-none focus:ring-1 focus:ring-[#6364FF] transition-colors resize-none leading-relaxed"
-                placeholder="e.g. Keep emails under 3 sentences. Always mention I'm looking for a summer internship."
-              />
-              <p className="text-[10px] text-white">These instructions will be applied to every AI-generated email.</p>
-            </div>
-
-            {/* Auto-Personalize Toggle */}
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <span className="text-[13px] font-medium text-white">Auto-Personalize Emails</span>
-                <p className="text-[11px] text-white">Automatically personalize emails with AI when opening review</p>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={profile.autoPersonalize}
-                onClick={() => setProfile({ ...profile, autoPersonalize: !profile.autoPersonalize })}
-                className={`relative inline-flex h-[22px] w-10 items-center rounded-full transition-colors shrink-0 ${
-                  profile.autoPersonalize ? 'bg-[#6364FF]' : 'bg-[#3a3a3a]'
-                }`}
-              >
-                <span className={`inline-block h-[18px] w-[18px] transform rounded-full transition-transform ${profile.autoPersonalize ? 'translate-x-[20px] bg-white' : 'translate-x-[2px] bg-[#707070]'}`} />
-              </button>
-            </div>
-          </div>
-
-          {/* Danger Zone */}
-          <div className="bg-[#252525] border border-[#ef4444]/25 rounded-lg p-6 space-y-3">
-            <h3 className="text-base font-semibold text-[#ef4444]">Danger Zone</h3>
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <span className="text-[13px] font-medium text-white">Delete Account</span>
-                <p className="text-[11px] text-white">Permanently delete your account and all associated data</p>
-              </div>
-              <button className="text-[12px] font-semibold text-[#ef4444] border border-[#ef4444] rounded-lg px-4 py-2 hover:bg-[#ef4444]/10 transition-colors">
-                Delete Account
-              </button>
-            </div>
-          </div>
-        </div>
-        )}
 
         {/* Attachments Grid */}
         {currentTab === 'resumes' && (
@@ -686,7 +623,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
         </div>
         )}
 
-        {/* Templates Carousel */}
+        {/* Templates Table */}
         {currentTab === 'templates' && (
         <div>
           {templateError && (
@@ -695,565 +632,259 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
 
           {isLoadingTemplates ? (
             <div className="text-center py-12 text-white text-sm">Loading templates...</div>
-          ) : isCreating ? (
-            /* Create Template Form */
-            <div className="max-w-2xl mx-auto p-6 bg-[#252525] border border-[#3a3a3a] rounded-xl">
-              <h4 className="font-semibold text-white text-lg mb-5">New Template</h4>
-              <div className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-white">Name</label>
-                  <input type="text" value={newTemplate.name} onChange={(e) => setNewTemplate({ ...newTemplate, name: e.target.value })} className="w-full h-11 bg-[#1a1a1a] border border-[#3a3a3a] rounded-lg text-[13px] text-white px-4 focus:outline-none focus:ring-1 focus:ring-[#6364FF]" placeholder="Template name" />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-white">Subject</label>
-                  <input type="text" value={newTemplate.subject} onChange={(e) => setNewTemplate({ ...newTemplate, subject: e.target.value })} className="w-full h-11 bg-[#1a1a1a] border border-[#3a3a3a] rounded-lg text-[13px] text-white px-4 focus:outline-none focus:ring-1 focus:ring-[#6364FF]" placeholder="Email subject" />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-white">Body</label>
-                  <textarea value={newTemplate.body} onChange={(e) => setNewTemplate({ ...newTemplate, body: e.target.value })} rows={8} className="w-full bg-[#1a1a1a] border border-[#3a3a3a] rounded-lg text-[13px] text-white p-4 focus:outline-none focus:ring-1 focus:ring-[#6364FF] resize-none" placeholder="Email body" />
-                </div>
-                <div className="p-3 bg-[#1a1a1a] rounded-lg">
-                  <p className="text-[10px] font-medium text-white mb-2">Placeholders:</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {DEFAULT_PLACEHOLDERS.map((p) => (
-                      <button key={p} type="button" onClick={() => setNewTemplate({ ...newTemplate, body: newTemplate.body + p })} className="text-[10px] px-2 py-1 bg-[#252525] text-white rounded-full hover:bg-[#303030] transition-colors">{p}</button>
-                    ))}
-                  </div>
-                </div>
-                {resumes.length > 0 && (
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={newTemplate.attachResume} onChange={(e) => { const checked = e.target.checked; const active = resumes.find(r => r.isActive); setNewTemplate({ ...newTemplate, attachResume: checked, resumeId: checked ? (active?.id || resumes[0]?.id || null) : null }); }} className="w-4 h-4 rounded border-[#3a3a3a]" />
-                    <span className="text-sm text-white">Attach resume</span>
-                  </label>
-                )}
-                <div className="flex gap-3 pt-2">
-                  <button onClick={handleCreateTemplate} disabled={isSavingTemplate} className="bg-[#6364FF] text-white px-6 py-2.5 rounded-lg font-semibold text-sm hover:bg-[#5354EE] transition-colors disabled:opacity-50">{isSavingTemplate ? 'Creating...' : 'Create Template'}</button>
-                  <button onClick={() => { setIsCreating(false); setNewTemplate({ name: '', subject: '', body: '', attachResume: false, resumeId: null }); }} className="px-6 py-2.5 rounded-lg text-sm text-white hover:text-white transition-colors">Cancel</button>
-                </div>
-              </div>
-            </div>
           ) : (() => {
-            /* Grid view */
+            const defaultTemplateItems = DEFAULT_TEMPLATES.map((dt, index) => ({
+              id: dt.id,
+              name: dt.name,
+              subject: dt.subject,
+              body: dt.body,
+              isDefault: index === 0 && !templates.some(t => t.isDefault),
+              attachResume: false,
+              resumeId: null,
+              createdAt: new Date(),
+            } as TemplateData & { id: string }));
             const allTemplates = [
-              { id: '__default__', name: 'Default Template', subject: DEFAULT_TEMPLATE.subject, body: DEFAULT_TEMPLATE.body, isDefault: !templates.some(t => t.isDefault), attachResume: false, resumeId: null },
+              ...defaultTemplateItems,
               ...templates,
             ];
 
             return (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              <div className="border border-[#2a2a2a] rounded-lg overflow-hidden">
+                {/* Table header */}
+                <div className="flex items-center px-5 py-3 border-b border-[#2a2a2a] bg-[#1a1a1a]">
+                  <span className="flex-1 text-xs font-semibold text-[#707070]">Template Name</span>
+                  <span className="w-[120px] text-xs font-semibold text-[#707070]">Type</span>
+                  <span className="w-[120px] text-xs font-semibold text-[#707070] text-right">Last Modified</span>
+                  <span className="w-4 ml-3" />
+                </div>
+
+                {/* Template rows */}
                 {allTemplates.map((template) => (
-                  <div key={template.id} className="group flex flex-col">
-                    {/* Mini email preview card */}
-                    <button
-                      onClick={() => template.id === '__default__' ? setShowDefaultTemplate(true) : setSelectedTemplate(template as TemplateData)}
-                      className={`relative w-full bg-white rounded-lg overflow-hidden cursor-pointer transition-all hover:shadow-lg text-left ${
-                        template.isDefault
-                          ? 'ring-2 ring-[#6364FF] shadow-[0_2px_12px_rgba(99,100,255,0.15)]'
-                          : 'hover:ring-1 hover:ring-[#505050]'
-                      }`}
-                      style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}
-                    >
-                      {/* Mini subject bar */}
-                      <div className="px-3 py-2 border-b border-gray-200 bg-gray-50">
-                        <p className="text-[11px] font-medium text-gray-900 truncate">
-                          {template.subject || <span className="text-gray-400 italic">No subject</span>}
-                        </p>
-                      </div>
-
-                      {/* Mini sender row */}
-                      <div className="px-3 py-2 flex items-center gap-2 border-b border-gray-100">
-                        <div className="w-6 h-6 rounded-full bg-[#6364FF] flex items-center justify-center text-white font-semibold text-[8px] shrink-0">
-                          {(profile.name || userName || 'U').split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[10px] font-medium text-gray-900 truncate">{profile.name || userName || 'You'}</p>
-                          <p className="text-[9px] text-gray-500">to recipient</p>
-                        </div>
-                      </div>
-
-                      {/* Mini body preview */}
-                      <div className="px-3 py-3 h-[120px] overflow-hidden">
-                        <p className="text-[10px] text-gray-600 leading-[1.6] line-clamp-6 whitespace-pre-wrap">
-                          {template.body}
-                        </p>
-                      </div>
-
-                      {/* Attachment indicator */}
-                      {template.attachResume && (
-                        <div className="px-3 py-1.5 border-t border-gray-100 bg-gray-50">
-                          <div className="flex items-center gap-1 text-gray-500 text-[9px]">
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
-                            </svg>
-                            <span>Resume</span>
-                          </div>
-                        </div>
+                  <button
+                    key={template.id}
+                    onClick={() => {
+                      const defaultTemplate = DEFAULT_TEMPLATES.find(dt => dt.id === template.id);
+                      if (defaultTemplate) {
+                        setEditingTemplate({ id: defaultTemplate.id, name: defaultTemplate.name, subject: defaultTemplate.subject, body: defaultTemplate.body, isDefault: template.isDefault, attachResume: false, resumeId: null, createdAt: new Date() });
+                      } else {
+                        setEditingTemplate(template as TemplateData);
+                      }
+                    }}
+                    className="flex items-center w-full px-5 py-3.5 gap-3 border-b border-[#2a2a2a] last:border-b-0 hover:bg-[#252525] transition-colors text-left"
+                  >
+                    <svg className={`w-4 h-4 shrink-0 ${template.isDefault ? 'text-[#A855F7]' : 'text-[#606060]'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                    </svg>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-medium text-white truncate">{template.name}</p>
+                      <p className="text-[11px] text-[#606060] truncate">{template.subject}</p>
+                    </div>
+                    <div className="w-[120px] flex justify-center">
+                      {template.isDefault ? (
+                        <span className="text-[11px] font-medium text-[#A855F7] bg-[#A855F7]/10 px-2.5 py-0.5 rounded-full">Default</span>
+                      ) : (
+                        <span className="text-[11px] font-medium text-[#606060] bg-[#1a1a1a] border border-[#2a2a2a] px-2.5 py-0.5 rounded-full">Custom</span>
                       )}
-
-                      {/* Hover overlay with actions */}
-                      {template.id !== '__default__' && (
-                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setSelectedTemplate(template as TemplateData); setEditingTemplate(template as TemplateData); }}
-                            className="p-2 bg-[#6364FF] rounded-lg text-white hover:bg-[#5354EE] transition-colors"
-                            title="Edit"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
-                            </svg>
-                          </button>
-                          {!template.isDefault && (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleSetDefault(template.id); }}
-                              className="p-2 bg-[#404040] rounded-lg text-white hover:bg-[#505050] transition-colors"
-                              title="Set as default"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                              </svg>
-                            </button>
-                          )}
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleDeleteTemplate(template.id); }}
-                            className="p-2 bg-[#ef4444]/80 rounded-lg text-white hover:bg-[#ef4444] transition-colors"
-                            title="Delete"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
-                        </div>
-                      )}
-                    </button>
-
-                    {/* Template name below */}
-                    <p className="text-[11px] text-white font-medium truncate mt-2 text-center">{template.name}</p>
-
-                    {/* Default badge */}
-                    {template.isDefault && (
-                      <span className="text-[9px] font-semibold text-[#6364FF] bg-[#6364FF]/15 px-2.5 py-0.5 rounded-full mt-1 mx-auto">Default</span>
-                    )}
-                  </div>
+                    </div>
+                    <span className="w-[120px] text-[12px] text-[#606060] text-right">
+                      {template.createdAt ? new Date(template.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                    </span>
+                    <svg className="w-4 h-4 text-[#606060] ml-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                    </svg>
+                  </button>
                 ))}
-
-                {/* Create new template card */}
-                <button
-                  onClick={() => setIsCreating(true)}
-                  className="flex flex-col items-center justify-center gap-2 min-h-[220px] rounded-lg border border-dashed border-[#3a3a3a] hover:border-[#606060] transition-colors group"
-                >
-                  <svg className="w-6 h-6 text-white group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                  </svg>
-                  <span className="text-[10px] text-white group-hover:text-white font-medium transition-colors">Create Template</span>
-                </button>
               </div>
             );
           })()}
-        </div>
-        )}
 
-        {/* Billing */}
-        {currentTab === 'billing' && (
-        <div className="space-y-5">
-          {isLoadingSubscription ? (
-            <div className="text-center py-12 text-white text-sm">Loading plan details...</div>
-          ) : (
-            <>
-              {/* Plan card */}
-              <div className="flex items-center justify-between bg-[#252525] border border-[#3a3a3a] rounded-lg p-6">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-3">
-                    <span className="text-lg font-bold text-white">{subscription.isSubscribed ? 'PRO Plan' : 'Free Plan'}</span>
-                    <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full ${subscription.isSubscribed ? 'bg-[#22C55E]/15 text-[#22C55E]' : 'bg-[#303030] text-white'}`}>
-                      {subscription.isSubscribed ? 'Active' : 'Current'}
-                    </span>
-                  </div>
-                  <p className="text-[13px] text-white">
-                    {subscription.isSubscribed
-                      ? `$20/month · Renews ${subscription.currentPeriodEnd ? new Date(subscription.currentPeriodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'soon'}`
-                      : '10 emails/day · Free forever'}
-                  </p>
-                </div>
-                {subscription.isSubscribed ? (
-                  <button
-                    onClick={async () => { setIsPortalLoading(true); try { await createCustomerPortalSession(); } catch { setIsPortalLoading(false); } }}
-                    disabled={isPortalLoading}
-                    className="bg-[#6364FF] text-white text-[13px] font-semibold px-5 py-2.5 rounded-lg hover:bg-[#5354EE] transition-colors disabled:opacity-50"
-                  >
-                    {isPortalLoading ? 'Loading...' : 'Manage Plan'}
-                  </button>
-                ) : (
-                  <button
-                    onClick={async () => { setIsCheckoutLoading(true); try { await createCheckoutSession(); } catch { setIsCheckoutLoading(false); } }}
-                    disabled={isCheckoutLoading}
-                    className="bg-[#6364FF] text-white text-[13px] font-semibold px-5 py-2.5 rounded-lg hover:bg-[#5354EE] transition-colors disabled:opacity-50 flex items-center gap-2"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                    {isCheckoutLoading ? 'Loading...' : 'Upgrade to Pro'}
-                  </button>
-                )}
-              </div>
+          {/* Email Preferences */}
+          <div className="bg-[#252525] border border-[#3a3a3a] rounded-lg p-6 space-y-5 mt-6">
+            <div>
+              <h3 className="text-base font-semibold text-white">Email Preferences</h3>
+              <p className="text-[12px] text-white mt-1">Configure your default email settings for outreach</p>
+            </div>
 
-              {/* Stats row */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-[#252525] border border-[#3a3a3a] rounded-lg p-5 space-y-2">
-                  <p className="text-[12px] text-white">Emails Sent</p>
-                  <p className="text-xl font-bold text-white">{subscription.isSubscribed ? 'Unlimited' : '10/day'}</p>
-                </div>
-                <div className="bg-[#252525] border border-[#3a3a3a] rounded-lg p-5 space-y-2">
-                  <p className="text-[12px] text-white">Templates</p>
-                  <p className="text-xl font-bold text-white">{templates.length}</p>
-                </div>
-                <div className="bg-[#252525] border border-[#3a3a3a] rounded-lg p-5 space-y-2">
-                  <p className="text-[12px] text-white">Attachments</p>
-                  <p className="text-xl font-bold text-white">{resumes.length}</p>
-                </div>
-              </div>
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-medium text-white">Email Style Instructions</label>
+              <textarea
+                value={profile.emailInstructions || ''}
+                onChange={(e) => setProfile({ ...profile, emailInstructions: e.target.value || null })}
+                rows={3}
+                className="w-full bg-[#1a1a1a] border border-[#3a3a3a] rounded-lg text-[13px] text-white p-4 focus:outline-none focus:ring-1 focus:ring-[#6364FF] transition-colors resize-none leading-relaxed"
+                placeholder="e.g. Keep emails under 3 sentences. Always mention I'm looking for a summer internship."
+              />
+              <p className="text-[10px] text-white">These instructions will be applied to every AI-generated email.</p>
+            </div>
 
-              {/* Plans comparison */}
-              <div className="space-y-4 mt-2">
-                <h3 className="text-[15px] font-semibold text-white">Compare Plans</h3>
-                {/* Free Plan */}
-                <div className={`relative rounded-xl border p-5 transition-all ${!subscription.isSubscribed ? 'border-[#404040] bg-[#252525]' : 'border-[#3a3a3a] bg-[#1a1a1a]'}`}>
-                  {!subscription.isSubscribed && (
-                    <span className="absolute -top-2.5 left-4 px-2 py-0.5 bg-[#252525] text-white text-xs font-medium rounded">Current Plan</span>
-                  )}
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h4 className="text-lg font-semibold text-white">Free</h4>
-                      <p className="text-white text-sm mt-1">For getting started with networking</p>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-2xl font-bold text-white">$0</span>
-                      <span className="text-white text-sm">/month</span>
-                    </div>
-                  </div>
-                  <ul className="mt-4 space-y-2">
-                    {[`${EMAIL_LIMITS.FREE_LIFETIME_LIMIT} free emails`, 'AI-powered email personalization', 'Basic contact discovery'].map((feature) => (
-                      <li key={feature} className="flex items-center gap-2 text-sm text-white">
-                        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                {/* Pro Plan */}
-                <div className={`relative rounded-xl border p-5 transition-all ${subscription.isSubscribed ? 'border-[#404040] bg-[#252525]' : 'border-[#3b82f6]/30 bg-gradient-to-br from-[#252525] to-[#0f172a]'}`}>
-                  {subscription.isSubscribed && (
-                    <span className="absolute -top-2.5 left-4 px-2 py-0.5 bg-[#252525] text-[#3b82f6] text-xs font-medium rounded border border-[#3b82f6]/30">Current Plan</span>
-                  )}
-                  {!subscription.isSubscribed && (
-                    <span className="absolute -top-2.5 right-4 px-2 py-0.5 bg-[#3b82f6] text-white text-xs font-medium rounded">Recommended</span>
-                  )}
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h4 className="text-lg font-semibold text-white">Pro</h4>
-                      <p className="text-white text-sm mt-1">For serious networkers</p>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-2xl font-bold text-white">$20</span>
-                      <span className="text-white text-sm">/month</span>
-                    </div>
-                  </div>
-                  <ul className="mt-4 space-y-2">
-                    {[
-                      <><span className="text-white font-medium">Unlimited</span> emails</>,
-                      'AI-powered email personalization',
-                      'Priority contact discovery',
-                      'Email open tracking',
-                    ].map((feature, i) => (
-                      <li key={i} className="flex items-center gap-2 text-sm text-white">
-                        <svg className="w-4 h-4 text-[#3b82f6]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-                  {!subscription.isSubscribed && (
-                    <button
-                      onClick={async () => { setIsCheckoutLoading(true); try { await createCheckoutSession(); } catch { setIsCheckoutLoading(false); } }}
-                      disabled={isCheckoutLoading}
-                      className="w-full mt-5 py-2.5 bg-[#3b82f6] text-white font-medium rounded-lg hover:bg-[#2563eb] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-                    >
-                      {isCheckoutLoading ? 'Loading...' : (
-                        <>
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                          Upgrade to Pro
-                        </>
-                      )}
-                    </button>
-                  )}
-                  {subscription.isSubscribed && (
-                    <button
-                      onClick={async () => { setIsPortalLoading(true); try { await createCustomerPortalSession(); } catch { setIsPortalLoading(false); } }}
-                      disabled={isPortalLoading}
-                      className="w-full mt-5 py-2.5 bg-[#2a2a2a] text-white font-medium rounded-lg hover:bg-[#333333] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      {isPortalLoading ? 'Loading...' : 'Manage Subscription'}
-                    </button>
-                  )}
-                </div>
+            {/* Auto-Personalize Toggle */}
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <span className="text-[13px] font-medium text-white">Auto-Personalize Emails</span>
+                <p className="text-[11px] text-white">Automatically personalize emails with AI when opening review</p>
               </div>
-            </>
-          )}
-        </div>
-        )}
-
-        {/* Feedback */}
-        {currentTab === 'feedback' && (
-        <div className="space-y-5">
-          {feedbackSent ? (
-            <div className="bg-[#252525] border border-[#3a3a3a] rounded-lg p-8 text-center space-y-3">
-              <div className="w-12 h-12 mx-auto rounded-full bg-[#22C55E]/15 flex items-center justify-center">
-                <svg className="w-6 h-6 text-[#22C55E]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <p className="text-white font-semibold">Thanks for your feedback!</p>
-              <p className="text-white text-sm">We appreciate you taking the time to help us improve.</p>
               <button
-                onClick={() => { setFeedbackSent(false); setFeedback(''); }}
-                className="mt-2 px-4 py-2 text-sm font-medium bg-[#2a2a2a] text-white rounded-lg hover:bg-[#333333] transition-colors"
+                type="button"
+                role="switch"
+                aria-checked={profile.autoPersonalize}
+                onClick={() => setProfile({ ...profile, autoPersonalize: !profile.autoPersonalize })}
+                className={`relative inline-flex h-[22px] w-10 items-center rounded-full transition-colors shrink-0 ${
+                  profile.autoPersonalize ? 'bg-[#6364FF]' : 'bg-[#3a3a3a]'
+                }`}
               >
-                Send More Feedback
+                <span className={`inline-block h-[18px] w-[18px] transform rounded-full transition-transform ${profile.autoPersonalize ? 'translate-x-[20px] bg-white' : 'translate-x-[2px] bg-[#707070]'}`} />
               </button>
             </div>
-          ) : (
-            <div className="bg-[#252525] border border-[#3a3a3a] rounded-lg p-6 space-y-4">
-              <p className="text-white text-sm">What&apos;s on your mind? We&apos;d love to hear your thoughts, suggestions, or bug reports.</p>
-              <textarea
-                value={feedback}
-                onChange={(e) => setFeedback(e.target.value)}
-                placeholder="Tell us what you think..."
-                rows={6}
-                className="w-full px-4 py-3 text-sm bg-[#1a1a1a] border border-[#3a3a3a] rounded-lg text-white placeholder:text-[#666] focus:outline-none focus:border-[#505050] resize-none"
-              />
-              <div className="flex justify-end">
-                <button
-                  onClick={async () => {
-                    if (!feedback.trim()) return;
-                    setFeedbackSubmitting(true);
-                    try {
-                      const response = await fetch('/api/feedback', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ feedback: feedback.trim(), page: '/profile' }),
-                      });
-                      if (response.ok) {
-                        setFeedbackSent(true);
-                      }
-                    } catch {
-                      // silently fail
-                    } finally {
-                      setFeedbackSubmitting(false);
-                    }
-                  }}
-                  disabled={!feedback.trim() || feedbackSubmitting}
-                  className="px-5 py-2.5 text-[13px] font-semibold bg-[#6364FF] text-white rounded-lg hover:bg-[#5354EE] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  {feedbackSubmitting ? 'Sending...' : 'Send Feedback'}
-                </button>
-              </div>
+
+            <div className="flex justify-end">
+              <button
+                onClick={handleSaveProfile}
+                disabled={isSavingProfile}
+                className="bg-[#6364FF] text-white text-[13px] font-semibold px-5 py-2 rounded-lg hover:bg-[#5354EE] transition-colors disabled:opacity-50"
+              >
+                {isSavingProfile ? 'Saving...' : 'Save Preferences'}
+              </button>
             </div>
-          )}
+          </div>
         </div>
         )}
 
       </div>
 
-      {/* Template Modal */}
-      {(selectedTemplate || showDefaultTemplate) && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-[#1a1a1a] rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6 pb-4 border-b border-[#252525]">
-                <h3 className="text-lg font-bold text-white">
-                  {showDefaultTemplate ? 'Default Template' : selectedTemplate?.name}
-                </h3>
+      {/* Template Editor Modal */}
+      {editingTemplate && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          onClick={() => { setEditingTemplate(null); }}
+        >
+          <div
+            className="bg-[#111111] rounded-xl border border-[#2a2a2a] w-full max-w-[680px] max-h-[720px] flex flex-col overflow-hidden"
+            style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center gap-3 px-5 py-2.5 bg-[#161616] border-b border-[#2a2a2a]">
+              <span className="text-[14px] font-semibold text-white">Edit Template</span>
+              <span className="flex-1" />
+              <button onClick={() => { setEditingTemplate(null); }} className="text-[#71717A] hover:text-white transition-colors">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            {/* Name row */}
+            <div className="flex items-center gap-2.5 px-5 py-2.5 border-b border-[#2a2a2a]">
+              <span className="text-[13px] text-[#71717A]">Name</span>
+              <input
+                type="text"
+                value={editingTemplate.name}
+                onChange={(e) => setEditingTemplate({ ...editingTemplate, name: e.target.value })}
+                className="flex-1 bg-transparent text-[13px] text-white focus:outline-none"
+                placeholder="Template name"
+              />
+            </div>
+
+            {/* Subject row */}
+            <div className="flex items-center gap-2.5 px-5 py-2.5 border-b border-[#2a2a2a]">
+              <span className="text-[13px] text-[#71717A]">Subject</span>
+              <input
+                type="text"
+                value={editingTemplate.subject}
+                onChange={(e) => setEditingTemplate({ ...editingTemplate, subject: e.target.value })}
+                className="flex-1 bg-transparent text-[13px] text-white focus:outline-none"
+                placeholder="Email subject"
+              />
+            </div>
+
+            {/* Variables bar */}
+            <div className="flex items-center gap-1.5 px-5 py-2 border-b border-[#2a2a2a] bg-[#161616] overflow-x-auto">
+              <span className="text-[11px] font-medium text-[#71717A] shrink-0 mr-1">Insert:</span>
+              {DEFAULT_PLACEHOLDERS.map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setEditingTemplate({ ...editingTemplate, body: editingTemplate.body + p })}
+                  className="shrink-0 text-[10px] font-mono font-medium text-[#A855F7] bg-[#A855F7]/10 border border-[#A855F7]/25 rounded px-2 py-0.5 hover:bg-[#A855F7]/20 transition-colors"
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              <textarea
+                value={editingTemplate.body}
+                onChange={(e) => setEditingTemplate({ ...editingTemplate, body: e.target.value })}
+                className="w-full h-full min-h-[280px] bg-transparent text-[13px] text-[#A1A1AA] p-5 focus:outline-none resize-none leading-[1.6]"
+                placeholder="Write your template body here..."
+              />
+            </div>
+
+            {/* Bottom bar */}
+            <div className="flex items-center gap-2.5 px-5 py-2.5 bg-[#161616] border-t border-[#2a2a2a]">
+              {!DEFAULT_TEMPLATES.some(dt => dt.id === editingTemplate.id) && (
                 <button
                   onClick={() => {
-                    setSelectedTemplate(null);
-                    setShowDefaultTemplate(false);
+                    handleDeleteTemplate(editingTemplate.id);
                     setEditingTemplate(null);
                   }}
-                  className="p-2 text-white hover:text-white hover:bg-[#1a1a1a] rounded-lg transition-colors"
+                  className="p-1.5 rounded-lg hover:bg-[#252525] transition-colors"
+                  title="Delete template"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <svg className="w-4 h-4 text-[#ef4444]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                   </svg>
                 </button>
-              </div>
-
-              {showDefaultTemplate ? (
-                <div className="space-y-5">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-white">Subject</label>
-                    <div className="px-4 py-3 bg-[#111111] rounded-lg text-white text-sm">
-                      {DEFAULT_TEMPLATE.subject}
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-white">Body</label>
-                    <div className="px-4 py-3 bg-[#111111] rounded-lg text-white text-sm whitespace-pre-wrap">
-                      {DEFAULT_TEMPLATE.body}
-                    </div>
-                  </div>
-                  <div className="p-4 bg-[#111111] rounded-xl">
-                    <p className="text-xs font-semibold text-white mb-2">Available Placeholders:</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {DEFAULT_PLACEHOLDERS.map((p) => (
-                        <span key={p} className="text-xs px-2.5 py-1 bg-white/10 text-white rounded-full font-medium">
-                          {p}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ) : selectedTemplate && editingTemplate?.id === selectedTemplate.id ? (
-                <div className="space-y-5">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-white">Name</label>
-                    <input
-                      type="text"
-                      value={editingTemplate.name}
-                      onChange={(e) => setEditingTemplate({ ...editingTemplate, name: e.target.value })}
-                      className="w-full bg-[#111111] border-none rounded-lg focus:ring-2 focus:ring-[#505050] text-sm p-3"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-white">Subject</label>
-                    <input
-                      type="text"
-                      value={editingTemplate.subject}
-                      onChange={(e) => setEditingTemplate({ ...editingTemplate, subject: e.target.value })}
-                      className="w-full bg-[#111111] border-none rounded-lg focus:ring-2 focus:ring-[#505050] text-sm p-3"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-white">Body</label>
-                    <textarea
-                      value={editingTemplate.body}
-                      onChange={(e) => setEditingTemplate({ ...editingTemplate, body: e.target.value })}
-                      rows={8}
-                      className="w-full bg-[#111111] border-none rounded-lg focus:ring-2 focus:ring-[#505050] text-sm p-3 resize-none"
-                    />
-                  </div>
-                  <div className="p-3 bg-[#111111] rounded-xl">
-                    <p className="text-xs font-semibold text-white mb-2">Available Placeholders:</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {DEFAULT_PLACEHOLDERS.map((p) => (
-                        <button
-                          key={p}
-                          type="button"
-                          onClick={() => setEditingTemplate({ ...editingTemplate, body: editingTemplate.body + p })}
-                          className="text-xs px-2.5 py-1 bg-white/10 text-white rounded-full font-medium hover:bg-white/15 transition-colors cursor-pointer"
-                        >
-                          {p}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  {resumes.length > 0 && (
-                    <div className="space-y-2">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={editingTemplate.attachResume}
-                          onChange={(e) => {
-                            const checked = e.target.checked;
-                            const activeResume = resumes.find((r) => r.isActive);
-                            setEditingTemplate({
-                              ...editingTemplate,
-                              attachResume: checked,
-                              resumeId: checked ? (editingTemplate.resumeId || activeResume?.id || resumes[0]?.id || null) : null,
-                            });
-                          }}
-                          className="w-4 h-4 text-white border-[#303030] rounded"
-                        />
-                        <span className="text-sm text-white">Attach resume</span>
-                      </label>
-                      {editingTemplate.attachResume && (
-                        <select
-                          value={editingTemplate.resumeId || ''}
-                          onChange={(e) => setEditingTemplate({ ...editingTemplate, resumeId: e.target.value || null })}
-                          className="w-full bg-[#1a1a1a] border border-[#252525] rounded-lg text-sm p-2"
-                        >
-                          {resumes.map((resume) => (
-                            <option key={resume.id} value={resume.id}>
-                              {resume.filename} {resume.isActive ? '(Active)' : ''}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
-                  )}
-                  <div className="flex gap-3 pt-5 border-t border-[#252525]">
-                    <button
-                      onClick={async () => {
-                        await handleUpdateTemplate();
-                        if (!templateError) setSelectedTemplate({ ...editingTemplate });
-                      }}
-                      disabled={isSavingTemplate}
-                      className="bg-[#505050] text-white px-6 py-2.5 rounded-xl font-semibold hover:bg-[#606060] transition-all disabled:opacity-50"
-                    >
-                      {isSavingTemplate ? 'Saving...' : 'Save Changes'}
-                    </button>
-                    <button
-                      onClick={() => setEditingTemplate(null)}
-                      className="px-6 py-2.5 rounded-xl font-semibold hover:bg-[#1a1a1a] transition-all text-white"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : selectedTemplate ? (
-                <div className="space-y-5">
-                  <div className="flex items-center gap-2">
-                    {selectedTemplate.isDefault && (
-                      <span className="bg-white/10 text-white text-[10px] px-2.5 py-1 rounded-full font-bold uppercase">Default</span>
-                    )}
-                    {selectedTemplate.attachResume && (
-                      <span className="bg-green-900/30 text-green-400 text-[10px] px-2.5 py-1 rounded-full font-bold uppercase">Resume</span>
-                    )}
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-white">Subject</label>
-                    <div className="px-4 py-3 bg-[#111111] rounded-lg text-white text-sm">
-                      {selectedTemplate.subject || '(No subject)'}
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-white">Body</label>
-                    <div className="px-4 py-3 bg-[#111111] rounded-lg text-white text-sm whitespace-pre-wrap max-h-64 overflow-y-auto">
-                      {selectedTemplate.body}
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-3 pt-5 border-t border-[#252525]">
-                    <button
-                      onClick={() => setEditingTemplate(selectedTemplate)}
-                      className="bg-[#505050] text-white px-6 py-2.5 rounded-xl font-semibold hover:bg-[#606060] transition-all"
-                    >
-                      Edit Template
-                    </button>
-                    {!selectedTemplate.isDefault && (
-                      <button
-                        onClick={() => handleSetDefault(selectedTemplate.id)}
-                        className="px-6 py-2.5 rounded-xl font-semibold border border-[#252525] hover:bg-[#111111] transition-all text-white"
-                      >
-                        Set as Default
-                      </button>
-                    )}
-                    <button
-                      onClick={() => {
-                        handleDeleteTemplate(selectedTemplate.id);
-                        setSelectedTemplate(null);
-                      }}
-                      className="px-6 py-2.5 rounded-xl font-semibold border border-red-900/50 hover:bg-red-900/30 transition-all text-red-400"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              ) : null}
+              )}
+              <span className="flex-1" />
+              {!DEFAULT_TEMPLATES.some(dt => dt.id === editingTemplate.id) && !editingTemplate.isDefault && (
+                <button
+                  onClick={() => handleSetDefault(editingTemplate.id)}
+                  className="text-[12px] text-[#71717A] hover:text-white px-3 py-1.5 rounded-lg hover:bg-[#252525] transition-colors"
+                >
+                  Set as Default
+                </button>
+              )}
+              <button
+                onClick={async () => {
+                  if (DEFAULT_TEMPLATES.some(dt => dt.id === editingTemplate.id)) {
+                    setEditingTemplate(null);
+                    return;
+                  }
+                  if (editingTemplate.id === '__new__') {
+                    // Create new template
+                    if (!editingTemplate.name.trim() || !editingTemplate.body.trim()) {
+                      setTemplateError('Template name and body are required');
+                      return;
+                    }
+                    setIsSavingTemplate(true);
+                    setTemplateError(null);
+                    const result = await createTemplateAction({
+                      name: editingTemplate.name,
+                      subject: editingTemplate.subject,
+                      body: editingTemplate.body,
+                      attachResume: editingTemplate.attachResume,
+                      resumeId: editingTemplate.resumeId,
+                    });
+                    if (result.success) {
+                      setTemplates([...templates, result.template]);
+                      setEditingTemplate(null);
+                    } else {
+                      setTemplateError(result.error);
+                    }
+                    setIsSavingTemplate(false);
+                  } else {
+                    await handleUpdateTemplate();
+                    if (!templateError) {
+                      setEditingTemplate(null);
+                    }
+                  }
+                }}
+                disabled={isSavingTemplate || DEFAULT_TEMPLATES.some(dt => dt.id === editingTemplate.id)}
+                className="text-[12px] font-semibold text-white bg-[#A855F7] rounded-full px-5 py-2 hover:bg-[#9333EA] transition-colors disabled:opacity-50"
+              >
+                {isSavingTemplate ? 'Saving...' : editingTemplate.id === '__new__' ? 'Create Template' : DEFAULT_TEMPLATES.some(dt => dt.id === editingTemplate.id) ? 'Close' : 'Save Template'}
+              </button>
             </div>
           </div>
         </div>

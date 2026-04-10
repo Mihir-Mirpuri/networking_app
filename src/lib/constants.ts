@@ -944,8 +944,8 @@ export const LOCATIONS = [
 
 export const EMAIL_TEMPLATES = [
   {
-    id: 'default',
-    name: 'Default Template',
+    id: 'coffee-chat',
+    name: 'Coffee Chat Request',
     subject: '{university} {classification} interested in {industry} at {company}',
     body: `Hello {first_name},
 
@@ -954,6 +954,21 @@ I hope you are doing well. My name is {user_name} and I am a {classification} pu
 In case it's helpful to provide more context on my background, I have attached my resume below for your reference. I look forward to hearing from you.
 
 Warm regards,
+{user_name}`,
+  },
+  {
+    id: 'interview-thank-you',
+    name: 'Interview Thank You Note',
+    subject: 'Thank you for the interview - {role} at {company}',
+    body: `Hi {first_name},
+
+Thank you for taking the time to tell me about the {role} position at {company} and for the opportunity to interview {interview_date}.
+
+I especially enjoyed learning about {topics_discussed}. It was great getting a clearer picture of what the role actually looks like day-to-day.
+
+Please let me know if there's anything else I can provide. Hope you have a great rest of your week!
+
+Best,
 {user_name}`,
   },
 ] as const;

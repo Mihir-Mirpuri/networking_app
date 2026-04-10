@@ -6,6 +6,38 @@ import { PresetTemplate } from './types';
 
 export const PRESET_TEMPLATES: PresetTemplate[] = [
   {
+    id: 'coffee-chat',
+    name: 'Coffee Chat Request',
+    description: 'Request an informational conversation',
+    icon: 'coffee',
+    template: `Hi {{contact_name}},
+
+I'm a {{your_classification}} at {{your_university}} interested in {{their_field_or_role}}, and I came across your profile while researching careers in {{industry}}.
+
+{{specific_interest_or_question}}
+
+Would you have 20 minutes for a quick virtual coffee chat? I'd love to hear about your experience at {{company}}.
+
+Best,
+{{your_name}}`,
+  },
+  {
+    id: 'interview-thank-you',
+    name: 'Interview Thank You Note',
+    description: 'Follow up after an interview',
+    icon: 'heart',
+    template: `Hi {{first_name}},
+
+Thank you for taking the time to tell me about the {{role}} position at {{company}} and for the opportunity to interview {{interview_date}}.
+
+I especially enjoyed learning about {{topics_discussed}}. It was great getting a clearer picture of what the role actually looks like day-to-day.
+
+Please let me know if there's anything else I can provide. Hope you have a great rest of your week!
+
+Best,
+{{your_name}}`,
+  },
+  {
     id: 'cold-recruiter',
     name: 'Cold Recruiter',
     description: 'Reach out to a recruiter at your target company',
@@ -37,22 +69,6 @@ I hope you're doing well! I saw that {{company}} is hiring for {{target_role}}, 
 Would you be open to referring me for the position? I'd be happy to send over my resume and any other materials that would be helpful.
 
 Thanks so much,
-{{your_name}}`,
-  },
-  {
-    id: 'coffee-chat',
-    name: 'Coffee Chat',
-    description: 'Request an informational conversation',
-    icon: 'coffee',
-    template: `Hi {{contact_name}},
-
-I'm a {{your_classification}} at {{your_university}} interested in {{their_field_or_role}}, and I came across your profile while researching careers in {{industry}}.
-
-{{specific_interest_or_question}}
-
-Would you have 20 minutes for a quick virtual coffee chat? I'd love to hear about your experience at {{company}}.
-
-Best,
 {{your_name}}`,
   },
 ];
