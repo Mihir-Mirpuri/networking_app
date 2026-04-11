@@ -489,6 +489,15 @@ export function ExpandedReview({
   const person = results[currentIndex];
   const [subject, setSubject] = useState(person?.draftSubject || '');
   const [body, setBody] = useState(person?.draftBody || '');
+  // Bumped only for EXTERNAL body updates (person switch, AI refine, context sync, etc).
+  // Used to drive a useEffect that resyncs the contentEditable's innerHTML.
+  // User typing updates `body` via onInput but does NOT bump this — that way the
+  // DOM-sync effect never runs during typing and the caret/selection is preserved.
+  const [bodyVersion, setBodyVersion] = useState(0);
+  const setBodyAndSyncDom = (newBody: string) => {
+    setBody(newBody);
+    setBodyVersion((v) => v + 1);
+  };
   const [isSending, setIsSending] = useState(false);
   const [internalIndex, setInternalIndex] = useState(currentIndex);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
@@ -505,9 +514,11 @@ export function ExpandedReview({
   const [isSubscribed, setIsSubscribed] = useState<boolean | null>(null);
   const [linkUrl, setLinkUrl] = useState('');
   const [linkText, setLinkText] = useState('');
+  const [linkPopoverPos, setLinkPopoverPos] = useState<{ top: number; left: number } | null>(null);
   const resumeDropdownRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const savedSelectionRef = useRef<Range | null>(null);
+  const linkPopoverRef = useRef<HTMLDivElement>(null);
 
   const currentPerson = results[internalIndex];
   const status = currentPerson ? sendStatuses.get(currentPerson.id) : undefined;
@@ -524,7 +535,7 @@ export function ExpandedReview({
     setPrevIndex(internalIndex);
     const nextPerson = results[internalIndex];
     setSubject(nextPerson?.draftSubject || '');
-    setBody(nextPerson?.draftBody || '');
+    setBodyAndSyncDom(nextPerson?.draftBody || '');
     userEditedRef.current = false;
     setSelectedResumeId(nextPerson?.resumeId || null);
   }
@@ -557,6 +568,20 @@ export function ExpandedReview({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showResumeDropdown]);
 
+  // Click outside handler for link popover
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (linkPopoverRef.current && !linkPopoverRef.current.contains(e.target as Node)) {
+        setShowLinkModal(false);
+        setLinkPopoverPos(null);
+        setLinkUrl('');
+        setLinkText('');
+      }
+    };
+    if (showLinkModal) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showLinkModal]);
+
   // Auto-personalize
   useEffect(() => {
     if (!autoPersonalize) return;
@@ -570,7 +595,7 @@ export function ExpandedReview({
       }).then((result) => {
         if (result.success && !userEditedRef.current && personId === results[idx]?.id) {
           setSubject(result.subject);
-          setBody(result.body);
+          setBodyAndSyncDom(result.body);
           onDraftGenerated?.(idx, result.subject, result.body);
         }
       }).catch((err) => {
@@ -598,7 +623,7 @@ export function ExpandedReview({
         console.log('[Draft] Regeneration result:', result);
         if (result.success && !userEditedRef.current && personId === results[idx]?.id) {
           setSubject(result.subject);
-          setBody(result.body);
+          setBodyAndSyncDom(result.body);
         }
       }).catch((err) => {
         console.warn('[Draft] Template regeneration failed:', err);
@@ -635,7 +660,7 @@ export function ExpandedReview({
     if (currentEmail && currentPerson) {
       if (currentEmail.subject !== subject || currentEmail.body !== body) {
         setSubject(currentEmail.subject);
-        setBody(currentEmail.body);
+        setBodyAndSyncDom(currentEmail.body);
         userEditedRef.current = true;
       }
     }
@@ -646,31 +671,27 @@ export function ExpandedReview({
   }, [closeEmailChat]);
 
   // Sync body state into the contentEditable editor.
-  // We track what the editor last wrote to avoid overwriting during typing.
-  const editorBodyRef = useRef(body);
+  // This effect ONLY runs when bodyVersion changes (i.e., for external updates
+  // via setBodyAndSyncDom). It does NOT run when the user types — that path
+  // calls plain setBody, which leaves bodyVersion alone, so the DOM is left
+  // untouched and the caret/selection is preserved.
   useEffect(() => {
-    if (editorRef.current && body !== editorBodyRef.current) {
+    if (editorRef.current) {
       editorRef.current.innerHTML = body.replace(/\n/g, '<br>');
-      editorBodyRef.current = body;
     }
-  }, [body]);
-
-  // Also keep editorBodyRef in sync when the user types
-  useEffect(() => {
-    const editor = editorRef.current;
-    if (!editor) return;
-    const handler = () => {
-      editorBodyRef.current = editor.innerText;
-    };
-    editor.addEventListener('input', handler);
-    return () => editor.removeEventListener('input', handler);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bodyVersion]);
 
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (showScheduleModal) {
+        if (showLinkModal) {
+          setShowLinkModal(false);
+          setLinkPopoverPos(null);
+          setLinkUrl('');
+          setLinkText('');
+        } else if (showScheduleModal) {
           setShowScheduleModal(false);
           setScheduledDateTime('');
           setScheduleError(null);
@@ -705,11 +726,108 @@ export function ExpandedReview({
     const anchor = `<a href="${linkUrl}" target="_blank" rel="noopener noreferrer">${displayText}</a>`;
     document.execCommand('insertHTML', false, anchor);
     userEditedRef.current = true;
-    if (editor) setBody(editor.innerText);
+    setBody(editor.innerText);
     setShowLinkModal(false);
+    setLinkPopoverPos(null);
     setLinkUrl('');
     setLinkText('');
     savedSelectionRef.current = null;
+  };
+
+  const toggleBulletList = () => {
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) {
+      editor.focus();
+      document.execCommand('insertHTML', false, '<ul><li>&nbsp;</li></ul>');
+      userEditedRef.current = true;
+      setBody(editor.innerText);
+      return;
+    }
+
+    // Check if cursor is inside a list item - if so, remove the bullet
+    const anchorNode = sel.anchorNode;
+    const li = anchorNode?.parentElement?.closest('li');
+    if (li) {
+      const ul = li.closest('ul');
+      const text = li.textContent || '';
+
+      // Create a text node with the content
+      const textNode = document.createTextNode(text.trim() || '\u00A0');
+
+      // If this is the only item in the list, replace the whole ul
+      if (ul && ul.children.length === 1) {
+        ul.parentNode?.replaceChild(textNode, ul);
+      } else {
+        // Multiple items - just replace this li with text + br
+        const br = document.createElement('br');
+        li.parentNode?.insertBefore(textNode, li);
+        li.parentNode?.insertBefore(br, li);
+        li.remove();
+      }
+
+      // Place cursor at the text
+      const newRange = document.createRange();
+      newRange.setStart(textNode, textNode.length);
+      newRange.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(newRange);
+
+      userEditedRef.current = true;
+      setBody(editor.innerText);
+      return;
+    }
+
+    const range = sel.getRangeAt(0);
+    const selectedText = sel.toString();
+
+    if (selectedText.trim()) {
+      // Has selected text - convert each line to a bullet point
+      const lines = selectedText.split('\n').filter(line => line.trim());
+      const listItems = lines.map(line => `<li>${line.trim()}</li>`).join('');
+      const bulletList = `<ul>${listItems}</ul>`;
+
+      range.deleteContents();
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = bulletList;
+      const frag = document.createDocumentFragment();
+      while (tempDiv.firstChild) {
+        frag.appendChild(tempDiv.firstChild);
+      }
+      range.insertNode(frag);
+      sel.removeAllRanges();
+    } else {
+      // Cursor on a line but no text selected - wrap current line in bullet
+      if (anchorNode && anchorNode.nodeType === Node.TEXT_NODE && anchorNode.textContent?.trim()) {
+        const textNode = anchorNode as Text;
+        const text = textNode.textContent || '';
+
+        // Create the bullet list with this line's content
+        const ul = document.createElement('ul');
+        const li = document.createElement('li');
+        li.textContent = text.trim();
+        ul.appendChild(li);
+
+        // Replace the text node with the list
+        textNode.parentNode?.replaceChild(ul, textNode);
+
+        // Place cursor at end of the list item
+        const newRange = document.createRange();
+        newRange.selectNodeContents(li);
+        newRange.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+      } else {
+        // Empty line or non-text node - insert new bullet
+        editor.focus();
+        document.execCommand('insertHTML', false, '<ul><li>&nbsp;</li></ul>');
+      }
+    }
+
+    userEditedRef.current = true;
+    setBody(editor.innerText);
   };
 
   const handleSend = async () => {
@@ -868,7 +986,7 @@ export function ExpandedReview({
               value={subject}
               onChange={(e) => { userEditedRef.current = true; setSubject(e.target.value); }}
               placeholder="Enter subject..."
-              className={`flex-1 text-[13px] text-white bg-transparent outline-none placeholder-[#3a3a3a] focus:ring-0 ${isRegenerating || isGeneratingDraft ? 'opacity-50' : ''}`}
+              className={`flex-1 text-[13px] text-white bg-transparent outline-none placeholder-[#3a3a3a] focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none ${isRegenerating || isGeneratingDraft ? 'opacity-50' : ''}`}
             />
             {isGeneratingDraft && (
               <span className="text-[11px] text-[#888] flex items-center gap-1 flex-shrink-0">
@@ -884,15 +1002,27 @@ export function ExpandedReview({
               contentEditable
               suppressContentEditableWarning
               onInput={() => {
+                if (!editorRef.current) return;
                 userEditedRef.current = true;
-                if (editorRef.current) setBody(editorRef.current.innerText);
+                setBody(editorRef.current.innerText);
               }}
               onPaste={(e) => {
                 e.preventDefault();
                 const text = e.clipboardData.getData('text/plain');
-                document.execCommand('insertText', false, text);
+                // Convert plain-text newlines to <br> elements so the editor's
+                // DOM uses a single line-break primitive. Mixing raw \n text
+                // chars (rendered via white-space: pre-wrap) with <br>s inserted
+                // by Enter creates invisible cursor positions between adjacent
+                // breaks — first Enter appears to "do nothing".
+                const html = text
+                  .replace(/&/g, '&amp;')
+                  .replace(/</g, '&lt;')
+                  .replace(/>/g, '&gt;')
+                  .replace(/\r\n/g, '\n')
+                  .replace(/\n/g, '<br>');
+                document.execCommand('insertHTML', false, html);
               }}
-              className={`w-full min-h-[300px] text-sm text-white bg-transparent outline-none leading-[1.7] focus:ring-0 [&_a]:text-[#6364FF] [&_a]:underline ${isRegenerating || isGeneratingDraft ? 'opacity-50' : ''}`}
+              className={`w-full min-h-[300px] text-sm text-white bg-transparent outline-none leading-[1.7] focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none [&_a]:text-[#6364FF] [&_a]:underline [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1 [&_li]:pl-1 ${isRegenerating || isGeneratingDraft ? 'opacity-50' : ''}`}
               style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
             />
           </div>
@@ -952,28 +1082,96 @@ export function ExpandedReview({
             </div>
 
             {/* Formatting tools inline */}
-            <ToolbarButton title="Bold (Ctrl+B)" onClick={() => document.execCommand('bold')}>
+            <ToolbarButton title="Bold (Ctrl+B)" onClick={() => { editorRef.current?.focus(); document.execCommand('bold'); }}>
               <span className="text-xs font-bold">B</span>
             </ToolbarButton>
-            <ToolbarButton title="Italic (Ctrl+I)" onClick={() => document.execCommand('italic')}>
+            <ToolbarButton title="Italic (Ctrl+I)" onClick={() => { editorRef.current?.focus(); document.execCommand('italic'); }}>
               <span className="text-xs italic">I</span>
             </ToolbarButton>
-            <ToolbarButton title="Underline (Ctrl+U)" onClick={() => document.execCommand('underline')}>
+            <ToolbarButton title="Underline (Ctrl+U)" onClick={() => { editorRef.current?.focus(); document.execCommand('underline'); }}>
               <span className="text-xs underline">U</span>
             </ToolbarButton>
-            <ToolbarButton title="Bulleted list" onClick={() => document.execCommand('insertUnorderedList')}>
+            <ToolbarButton title="Bulleted list" onClick={toggleBulletList}>
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0ZM3.75 12h.007v.008H3.75V12Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm-.375 5.25h.007v.008H3.75v-.008Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" /></svg>
             </ToolbarButton>
-            <ToolbarButton title="Insert link (Ctrl+K)" onClick={() => {
-              const sel = window.getSelection();
-              if (sel && sel.rangeCount > 0) {
-                savedSelectionRef.current = sel.getRangeAt(0).cloneRange();
-                setLinkText(sel.toString());
-              }
-              setShowLinkModal(true);
-            }}>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" /></svg>
-            </ToolbarButton>
+            <div className="relative">
+              <ToolbarButton title="Insert link (Ctrl+K)" onClick={() => {
+                const sel = window.getSelection();
+                if (sel && sel.rangeCount > 0) {
+                  savedSelectionRef.current = sel.getRangeAt(0).cloneRange();
+                  setLinkText(sel.toString());
+                  // Get position for inline popover
+                  const range = sel.getRangeAt(0);
+                  const rect = range.getBoundingClientRect();
+                  // Position above the selection, centered
+                  setLinkPopoverPos({
+                    top: rect.top - 8,
+                    left: rect.left + rect.width / 2,
+                  });
+                } else {
+                  // No selection, position near the link button
+                  setLinkPopoverPos({ top: 0, left: 0 });
+                }
+                setShowLinkModal(true);
+              }}>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" /></svg>
+              </ToolbarButton>
+
+              {/* Gmail-style inline link popover */}
+              {showLinkModal && linkPopoverPos && (
+                <div
+                  ref={linkPopoverRef}
+                  className="fixed z-[70] bg-[#1a1a1a] rounded-lg shadow-2xl border border-[#333] p-3 w-72"
+                  style={{
+                    top: linkPopoverPos.top,
+                    left: linkPopoverPos.left,
+                    transform: 'translate(-50%, -100%)',
+                  }}
+                >
+                  <div className="space-y-2">
+                    {!linkText && (
+                      <input
+                        type="text"
+                        value={linkText}
+                        onChange={(e) => setLinkText(e.target.value)}
+                        placeholder="Text to display"
+                        className="w-full px-2.5 py-1.5 text-xs bg-[#141414] border border-[#333] rounded text-white outline-none focus:border-[#6364FF] placeholder-[#555]"
+                      />
+                    )}
+                    <div className="flex gap-2">
+                      <input
+                        type="url"
+                        value={linkUrl}
+                        onChange={(e) => setLinkUrl(e.target.value)}
+                        placeholder="Paste or type a link"
+                        autoFocus
+                        className="flex-1 px-2.5 py-1.5 text-xs bg-[#141414] border border-[#333] rounded text-white outline-none focus:border-[#6364FF] placeholder-[#555]"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            insertLink();
+                            setLinkPopoverPos(null);
+                          }
+                          if (e.key === 'Escape') {
+                            setShowLinkModal(false);
+                            setLinkPopoverPos(null);
+                            setLinkUrl('');
+                            setLinkText('');
+                          }
+                        }}
+                      />
+                      <button
+                        onClick={() => { insertLink(); setLinkPopoverPos(null); }}
+                        disabled={!linkUrl}
+                        className="px-3 py-1.5 text-xs text-white bg-[#6364FF] rounded hover:bg-[#5354EE] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Apply
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
 
             <div className="flex-1" />
 
@@ -1033,58 +1231,6 @@ export function ExpandedReview({
         </div>
       )}
 
-      {/* ── Insert Link Modal ── */}
-      {showLinkModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] p-4">
-          <div className="bg-[#1a1a1a] rounded-xl shadow-2xl border border-[#333] max-w-sm w-full p-5">
-            <h3 className="text-sm font-semibold text-white mb-4">Insert link</h3>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs text-[#888] mb-1">Text to display</label>
-                <input
-                  type="text"
-                  value={linkText}
-                  onChange={(e) => setLinkText(e.target.value)}
-                  placeholder="Link text"
-                  className="w-full px-3 py-2 text-sm bg-[#141414] border border-[#333] rounded-lg text-white outline-none focus:ring-0 focus:border-[#6364FF] placeholder-[#555]"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-[#888] mb-1">URL</label>
-                <input
-                  type="url"
-                  value={linkUrl}
-                  onChange={(e) => setLinkUrl(e.target.value)}
-                  placeholder="https://"
-                  autoFocus
-                  className="w-full px-3 py-2 text-sm bg-[#141414] border border-[#333] rounded-lg text-white outline-none focus:ring-0 focus:border-[#6364FF] placeholder-[#555]"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      insertLink();
-                    }
-                  }}
-                />
-              </div>
-            </div>
-            <div className="flex gap-2 justify-end mt-4">
-              <button
-                onClick={() => { setShowLinkModal(false); setLinkUrl(''); setLinkText(''); }}
-                className="px-4 py-2 text-sm text-[#aaa] border border-[#333] rounded-lg hover:bg-[#252525] transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={insertLink}
-                disabled={!linkUrl}
-                className="px-4 py-2 text-sm text-white bg-[#6364FF] rounded-lg hover:bg-[#5354EE] disabled:opacity-50 transition-colors"
-              >
-                Insert
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

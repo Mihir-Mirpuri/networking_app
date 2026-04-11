@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { signOut, useSession } from 'next-auth/react';
 import {
   getProfileAction,
@@ -9,7 +9,6 @@ import {
   createTemplateAction,
   updateTemplateAction,
   deleteTemplateAction,
-  setDefaultTemplateAction,
   UserProfile,
   TemplateData,
 } from '@/app/actions/profile';
@@ -67,19 +66,638 @@ Best,
   },
 ];
 
-const DEFAULT_PLACEHOLDERS = [
-  '{first_name}',
-  '{user_name}',
-  '{company}',
-  '{university}',
-  '{classification}',
-  '{major}',
-  '{career}',
-  '{role}',
-  '{industry}',
-  '{interview_date}',
-  '{topics_discussed}',
+// Comprehensive placeholder list with cohesive naming (category_name format)
+const PLACEHOLDER_CATEGORIES = [
+  {
+    name: 'Recipient',
+    prefix: 'recipient',
+    placeholders: [
+      { key: '{recipient_first_name}', label: 'recipient_first_name', description: 'The recipient\'s first name' },
+      { key: '{recipient_last_name}', label: 'recipient_last_name', description: 'The recipient\'s last name' },
+      { key: '{recipient_full_name}', label: 'recipient_full_name', description: 'The recipient\'s full name' },
+      { key: '{recipient_company}', label: 'recipient_company', description: 'The company where the recipient works' },
+      { key: '{recipient_role}', label: 'recipient_role', description: 'The recipient\'s job title or position' },
+      { key: '{recipient_department}', label: 'recipient_department', description: 'The department where they work' },
+      { key: '{recipient_location}', label: 'recipient_location', description: 'The recipient\'s city or location' },
+    ],
+  },
+  {
+    name: 'Sender',
+    prefix: 'sender',
+    placeholders: [
+      { key: '{sender_name}', label: 'sender_name', description: 'Your full name' },
+      { key: '{sender_university}', label: 'sender_university', description: 'Your university or school name' },
+      { key: '{sender_year}', label: 'sender_year', description: 'Your year (e.g., Junior, Senior)' },
+      { key: '{sender_major}', label: 'sender_major', description: 'Your major or field of study' },
+      { key: '{sender_minor}', label: 'sender_minor', description: 'Your minor if applicable' },
+      { key: '{sender_graduation}', label: 'sender_graduation', description: 'Your expected graduation year' },
+      { key: '{sender_gpa}', label: 'sender_gpa', description: 'Your GPA if you want to include it' },
+      { key: '{sender_phone}', label: 'sender_phone', description: 'Your phone number' },
+      { key: '{sender_linkedin}', label: 'sender_linkedin', description: 'Your LinkedIn profile URL' },
+    ],
+  },
+  {
+    name: 'Career',
+    prefix: 'career',
+    placeholders: [
+      { key: '{career_field}', label: 'career_field', description: 'The career field you\'re interested in' },
+      { key: '{career_industry}', label: 'career_industry', description: 'The target industry' },
+      { key: '{career_role}', label: 'career_role', description: 'The specific role you\'re applying for' },
+      { key: '{career_team}', label: 'career_team', description: 'The specific team you\'re interested in' },
+      { key: '{career_type}', label: 'career_type', description: 'Full-time, internship, co-op, etc.' },
+      { key: '{career_start}', label: 'career_start', description: 'When you can start the position' },
+    ],
+  },
+  {
+    name: 'Interview',
+    prefix: 'interview',
+    placeholders: [
+      { key: '{interview_date}', label: 'interview_date', description: 'The date of the interview' },
+      { key: '{interview_time}', label: 'interview_time', description: 'The time of the interview' },
+      { key: '{interview_interviewer}', label: 'interview_interviewer', description: 'Name of the interviewer' },
+      { key: '{interview_topics}', label: 'interview_topics', description: 'Topics discussed during the interview' },
+      { key: '{interview_next_steps}', label: 'interview_next_steps', description: 'Agreed upon next steps' },
+      { key: '{interview_follow_up}', label: 'interview_follow_up', description: 'When to follow up' },
+    ],
+  },
+  {
+    name: 'Experience',
+    prefix: 'experience',
+    placeholders: [
+      { key: '{experience_relevant}', label: 'experience_relevant', description: 'Your relevant experience for this role' },
+      { key: '{experience_skills}', label: 'experience_skills', description: 'Your key skills' },
+      { key: '{experience_achievements}', label: 'experience_achievements', description: 'Notable achievements' },
+      { key: '{experience_projects}', label: 'experience_projects', description: 'Relevant projects you\'ve worked on' },
+      { key: '{experience_certifications}', label: 'experience_certifications', description: 'Your certifications' },
+    ],
+  },
+  {
+    name: 'Connection',
+    prefix: 'connection',
+    placeholders: [
+      { key: '{connection_mutual}', label: 'connection_mutual', description: 'A mutual connection you share' },
+      { key: '{connection_referral}', label: 'connection_referral', description: 'Person who referred you' },
+      { key: '{connection_event}', label: 'connection_event', description: 'Event where you met or heard of them' },
+      { key: '{connection_interest}', label: 'connection_interest', description: 'A shared interest you have' },
+    ],
+  },
+  {
+    name: 'Scheduling',
+    prefix: 'scheduling',
+    placeholders: [
+      { key: '{scheduling_availability}', label: 'scheduling_availability', description: 'Your available times' },
+      { key: '{scheduling_duration}', label: 'scheduling_duration', description: 'Suggested meeting length' },
+      { key: '{scheduling_timezone}', label: 'scheduling_timezone', description: 'Your timezone' },
+      { key: '{scheduling_deadline}', label: 'scheduling_deadline', description: 'Application or response deadline' },
+    ],
+  },
 ];
+
+// Flatten for backward compatibility
+const DEFAULT_PLACEHOLDERS = PLACEHOLDER_CATEGORIES.flatMap(cat => cat.placeholders.map(p => p.key));
+
+function SignalLogoSmall({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 200 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="100" cy="80" r="12" fill="currentColor" />
+      <path d="M78 56 A30 30 0 0 0 78 104" stroke="currentColor" strokeWidth="10" strokeLinecap="round" fill="none" />
+      <path d="M122 56 A30 30 0 0 1 122 104" stroke="currentColor" strokeWidth="10" strokeLinecap="round" fill="none" />
+      <path d="M58 38 A55 55 0 0 0 58 122" stroke="currentColor" strokeWidth="10" strokeLinecap="round" fill="none" />
+      <path d="M142 38 A55 55 0 0 1 142 122" stroke="currentColor" strokeWidth="10" strokeLinecap="round" fill="none" />
+      <path d="M38 20 A80 80 0 0 0 38 140" stroke="currentColor" strokeWidth="10" strokeLinecap="round" fill="none" />
+      <path d="M162 20 A80 80 0 0 1 162 140" stroke="currentColor" strokeWidth="10" strokeLinecap="round" fill="none" />
+    </svg>
+  );
+}
+
+// ─── Draggable Placeholder Pill ────────────────────────────────────────────────
+
+interface DraggablePillProps {
+  placeholderKey: string;
+  label: string;
+  isSelected: boolean;
+  onToggle: () => void;
+}
+
+function DraggablePill({ placeholderKey, label, isSelected, onToggle }: DraggablePillProps) {
+  const handleDragStart = (e: React.DragEvent) => {
+    e.dataTransfer.setData('text/plain', placeholderKey);
+    e.dataTransfer.setData('application/x-placeholder', placeholderKey);
+    e.dataTransfer.effectAllowed = 'copy';
+  };
+
+  return (
+    <button
+      draggable
+      onDragStart={handleDragStart}
+      onClick={onToggle}
+      className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium transition-all cursor-grab active:cursor-grabbing ${
+        isSelected
+          ? 'bg-[#6364FF] text-white ring-2 ring-[#6364FF]/30'
+          : 'bg-[#6364FF]/90 text-white hover:bg-[#6364FF]'
+      }`}
+      title="Drag to insert or click for details"
+    >
+      {label}
+    </button>
+  );
+}
+
+// ─── Shared pill utilities ─────────────────────────────────────────────────────
+
+const PILL_STYLE = 'display:inline-flex;align-items:center;gap:4px;padding:2px 6px 2px 8px;margin:0 2px;border-radius:9999px;font-size:11px;font-weight:500;background:#6364FF;color:white;white-space:nowrap;vertical-align:baseline;cursor:grab;';
+
+const PILL_X_STYLE = 'display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:rgba(255,255,255,0.2);cursor:pointer;font-size:10px;line-height:1;';
+
+function textToHtml(text: string, multiline: boolean = true): string {
+  if (!text) return '';
+  let result = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  if (multiline) {
+    result = result.replace(/\n/g, '<br>');
+  }
+
+  return result.replace(
+    /\{([^}]+)\}/g,
+    `<span class="pill-placeholder" draggable="true" contenteditable="false" data-placeholder="{$1}" style="${PILL_STYLE}"><span class="pill-text">$1</span><span class="pill-remove" style="${PILL_X_STYLE}">×</span></span>`
+  );
+}
+
+function htmlToText(element: HTMLElement): string {
+  let result = '';
+  const processNode = (node: Node) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      result += node.textContent || '';
+    } else if (node.nodeType === Node.ELEMENT_NODE) {
+      const el = node as HTMLElement;
+      if (el.classList.contains('pill-placeholder')) {
+        result += el.getAttribute('data-placeholder') || '';
+      } else if (el.classList.contains('pill-text') || el.classList.contains('pill-remove')) {
+        // Skip - handled by parent pill-placeholder
+      } else if (el.tagName === 'BR') {
+        result += '\n';
+      } else if (el.tagName === 'DIV' && result.length > 0 && !result.endsWith('\n')) {
+        result += '\n';
+        el.childNodes.forEach(processNode);
+      } else {
+        el.childNodes.forEach(processNode);
+      }
+    }
+  };
+  element.childNodes.forEach(processNode);
+  return result;
+}
+
+function createPillElement(placeholderKey: string): HTMLSpanElement {
+  const pill = document.createElement('span');
+  pill.className = 'pill-placeholder';
+  pill.draggable = true;
+  pill.contentEditable = 'false';
+  pill.setAttribute('data-placeholder', placeholderKey);
+  pill.setAttribute('style', PILL_STYLE);
+
+  const textSpan = document.createElement('span');
+  textSpan.className = 'pill-text';
+  textSpan.textContent = placeholderKey.slice(1, -1); // Remove { and }
+
+  const removeSpan = document.createElement('span');
+  removeSpan.className = 'pill-remove';
+  removeSpan.setAttribute('style', PILL_X_STYLE);
+  removeSpan.textContent = '×';
+
+  pill.appendChild(textSpan);
+  pill.appendChild(removeSpan);
+  return pill;
+}
+
+// ─── Single-line Pill Input (for subject) ──────────────────────────────────────
+
+interface PillInputProps {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}
+
+// Track pill being dragged from within editors
+let draggingPill: HTMLElement | null = null;
+
+function PillInput({ value, onChange, placeholder }: PillInputProps) {
+  const editorRef = useRef<HTMLDivElement>(null);
+  const [isFocused, setIsFocused] = useState(false);
+
+  const syncFromValue = () => {
+    if (editorRef.current) {
+      editorRef.current.innerHTML = textToHtml(value, false);
+    }
+  };
+
+  const handleInput = () => {
+    if (editorRef.current) {
+      const newText = htmlToText(editorRef.current).replace(/\n/g, ' ');
+      onChange(newText);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+    }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const text = e.clipboardData.getData('text/plain').replace(/\n/g, ' ');
+    document.execCommand('insertText', false, text);
+  };
+
+  const handleClick = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.classList.contains('pill-remove')) {
+      e.preventDefault();
+      e.stopPropagation();
+      const pill = target.closest('.pill-placeholder');
+      if (pill) {
+        pill.remove();
+        handleInput();
+      }
+    }
+  };
+
+  const handleDragStart = (e: React.DragEvent) => {
+    const target = e.target as HTMLElement;
+    const pill = target.closest('.pill-placeholder') as HTMLElement;
+    if (pill) {
+      const placeholderKey = pill.getAttribute('data-placeholder') || '';
+      e.dataTransfer.setData('text/plain', placeholderKey);
+      e.dataTransfer.setData('application/x-placeholder', placeholderKey);
+      e.dataTransfer.effectAllowed = 'move';
+      draggingPill = pill;
+    }
+  };
+
+  const handleDragEnd = () => {
+    draggingPill = null;
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const placeholderKey = e.dataTransfer.getData('application/x-placeholder') || e.dataTransfer.getData('text/plain');
+    if (placeholderKey && placeholderKey.startsWith('{') && editorRef.current) {
+      // Remove the original pill if it's a move operation
+      if (draggingPill && editorRef.current.contains(draggingPill)) {
+        draggingPill.remove();
+      }
+      draggingPill = null;
+
+      const range = document.caretRangeFromPoint(e.clientX, e.clientY);
+      if (range && editorRef.current.contains(range.startContainer)) {
+        const selection = window.getSelection();
+        if (selection) {
+          selection.removeAllRanges();
+          selection.addRange(range);
+          const pill = createPillElement(placeholderKey);
+          range.insertNode(pill);
+          range.setStartAfter(pill);
+          range.setEndAfter(pill);
+          selection.removeAllRanges();
+          selection.addRange(range);
+          handleInput();
+        }
+      }
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    // Show caret at drop position
+    if (editorRef.current) {
+      const range = document.caretRangeFromPoint(e.clientX, e.clientY);
+      if (range && editorRef.current.contains(range.startContainer)) {
+        // If hovering over a pill, place caret before it
+        const pill = (e.target as HTMLElement).closest?.('.pill-placeholder');
+        if (pill && pill.parentNode) {
+          const newRange = document.createRange();
+          newRange.setStartBefore(pill);
+          newRange.setEndBefore(pill);
+          const selection = window.getSelection();
+          if (selection) {
+            selection.removeAllRanges();
+            selection.addRange(newRange);
+          }
+        } else {
+          const selection = window.getSelection();
+          if (selection) {
+            selection.removeAllRanges();
+            selection.addRange(range);
+          }
+        }
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (!isFocused) {
+      syncFromValue();
+    }
+  }, [value, isFocused]);
+
+  useEffect(() => {
+    syncFromValue();
+  }, []);
+
+  return (
+    <div className="flex-1 relative">
+      {!value && !isFocused && (
+        <div className="absolute inset-0 text-[13px] text-[#3a3a3a] pointer-events-none select-none">
+          {placeholder}
+        </div>
+      )}
+      <div
+        ref={editorRef}
+        contentEditable
+        suppressContentEditableWarning
+        onInput={handleInput}
+        onKeyDown={handleKeyDown}
+        onClick={handleClick}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => { setIsFocused(false); syncFromValue(); }}
+        onPaste={handlePaste}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+        className="text-[13px] text-white outline-none border-none ring-0 focus:outline-none focus:border-none focus:ring-0 whitespace-nowrap overflow-x-auto"
+        style={{ minHeight: '1.5em', caretColor: '#6364FF', boxShadow: 'none' }}
+      />
+    </div>
+  );
+}
+
+// ─── Multi-line Pill Editor (for body) ─────────────────────────────────────────
+
+interface PillEditorProps {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}
+
+function PillEditor({ value, onChange, placeholder }: PillEditorProps) {
+  const editorRef = useRef<HTMLDivElement>(null);
+  const [isFocused, setIsFocused] = useState(false);
+
+  const syncFromValue = () => {
+    if (editorRef.current) {
+      editorRef.current.innerHTML = textToHtml(value, true);
+    }
+  };
+
+  const handleInput = () => {
+    if (editorRef.current) {
+      const newText = htmlToText(editorRef.current);
+      onChange(newText);
+    }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const text = e.clipboardData.getData('text/plain');
+    document.execCommand('insertText', false, text);
+  };
+
+  const handleClick = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.classList.contains('pill-remove')) {
+      e.preventDefault();
+      e.stopPropagation();
+      const pill = target.closest('.pill-placeholder');
+      if (pill) {
+        pill.remove();
+        handleInput();
+      }
+    }
+  };
+
+  const handleDragStart = (e: React.DragEvent) => {
+    const target = e.target as HTMLElement;
+    const pill = target.closest('.pill-placeholder') as HTMLElement;
+    if (pill) {
+      const placeholderKey = pill.getAttribute('data-placeholder') || '';
+      e.dataTransfer.setData('text/plain', placeholderKey);
+      e.dataTransfer.setData('application/x-placeholder', placeholderKey);
+      e.dataTransfer.effectAllowed = 'move';
+      draggingPill = pill;
+    }
+  };
+
+  const handleDragEnd = () => {
+    draggingPill = null;
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const placeholderKey = e.dataTransfer.getData('application/x-placeholder') || e.dataTransfer.getData('text/plain');
+    if (placeholderKey && placeholderKey.startsWith('{') && editorRef.current) {
+      // Remove the original pill if it's a move operation
+      if (draggingPill && editorRef.current.contains(draggingPill)) {
+        draggingPill.remove();
+      }
+      draggingPill = null;
+
+      const range = document.caretRangeFromPoint(e.clientX, e.clientY);
+      if (range && editorRef.current.contains(range.startContainer)) {
+        const selection = window.getSelection();
+        if (selection) {
+          selection.removeAllRanges();
+          selection.addRange(range);
+          const pill = createPillElement(placeholderKey);
+          range.insertNode(pill);
+          range.setStartAfter(pill);
+          range.setEndAfter(pill);
+          selection.removeAllRanges();
+          selection.addRange(range);
+          handleInput();
+        }
+      }
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    // Show caret at drop position
+    if (editorRef.current) {
+      const range = document.caretRangeFromPoint(e.clientX, e.clientY);
+      if (range && editorRef.current.contains(range.startContainer)) {
+        // If hovering over a pill, place caret before it
+        const pill = (e.target as HTMLElement).closest?.('.pill-placeholder');
+        if (pill && pill.parentNode) {
+          const newRange = document.createRange();
+          newRange.setStartBefore(pill);
+          newRange.setEndBefore(pill);
+          const selection = window.getSelection();
+          if (selection) {
+            selection.removeAllRanges();
+            selection.addRange(newRange);
+          }
+        } else {
+          const selection = window.getSelection();
+          if (selection) {
+            selection.removeAllRanges();
+            selection.addRange(range);
+          }
+        }
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (!isFocused) {
+      syncFromValue();
+    }
+  }, [value, isFocused]);
+
+  useEffect(() => {
+    syncFromValue();
+  }, []);
+
+  return (
+    <div className="relative h-full">
+      {!value && !isFocused && (
+        <div className="absolute inset-0 text-sm text-[#3a3a3a] leading-[1.7] pointer-events-none select-none">
+          {placeholder}
+        </div>
+      )}
+      <div
+        ref={editorRef}
+        contentEditable
+        suppressContentEditableWarning
+        onInput={handleInput}
+        onClick={handleClick}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => { setIsFocused(false); syncFromValue(); }}
+        onPaste={handlePaste}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+        className="w-full h-full min-h-[300px] text-sm text-white leading-[1.7] outline-none border-none ring-0 focus:outline-none focus:border-none focus:ring-0"
+        style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', caretColor: '#6364FF', boxShadow: 'none' }}
+      />
+    </div>
+  );
+}
+
+// ─── Placeholders Sidebar ─────────────────────────────────────────────────────
+
+function PlaceholdersSidebar() {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [expandedPill, setExpandedPill] = useState<string | null>(null);
+
+  // Filter placeholders based on search query
+  const filteredCategories = PLACEHOLDER_CATEGORIES.map(category => ({
+    ...category,
+    placeholders: category.placeholders.filter(p =>
+      searchQuery === '' ||
+      p.key.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.description.toLowerCase().includes(searchQuery.toLowerCase())
+    ),
+  })).filter(category => category.placeholders.length > 0);
+
+  const handlePillToggle = (key: string) => {
+    setExpandedPill(prev => prev === key ? null : key);
+  };
+
+  return (
+    <div className="flex flex-col h-full w-80 bg-[#141414] border-r border-[#1a1a1a]">
+      {/* Header */}
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-[#1a1a1a]">
+        <SignalLogoSmall className="w-7 h-7 text-white" />
+        <span className="text-xl font-bold text-white">Signl</span>
+      </div>
+
+      {/* Search bar */}
+      <div className="px-4 py-3 border-b border-[#1a1a1a]">
+        <div className="relative">
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#505050]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+          </svg>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search placeholders..."
+            className="w-full pl-9 pr-8 py-2 text-xs bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg text-white placeholder-[#505050] outline-none focus:border-[#6364FF] transition-colors"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-[#505050] hover:text-white transition-colors"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Drag instruction */}
+      <div className="px-4 py-2 bg-[#1a1a1a]/50 border-b border-[#1a1a1a]">
+        <p className="text-[10px] text-[#505050] flex items-center gap-1.5">
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+          </svg>
+          Drag pills to email or click for info
+        </p>
+      </div>
+
+      {/* Placeholders content */}
+      <div className="flex-1 overflow-y-auto px-4 py-3">
+        {filteredCategories.map((category) => {
+          // Find the selected placeholder in this category (if any)
+          const selectedInCategory = category.placeholders.find(p => p.key === expandedPill);
+
+          return (
+            <div key={category.name} className="mb-4">
+              <h4 className="text-[10px] font-semibold text-[#505050] uppercase tracking-wider mb-2">
+                {category.name}
+              </h4>
+              <div className="flex flex-wrap gap-1.5">
+                {category.placeholders.map((placeholder) => (
+                  <DraggablePill
+                    key={placeholder.key}
+                    placeholderKey={placeholder.key}
+                    label={placeholder.label}
+                    isSelected={expandedPill === placeholder.key}
+                    onToggle={() => handlePillToggle(placeholder.key)}
+                  />
+                ))}
+              </div>
+              {/* Description appears below the pill row */}
+              {selectedInCategory && (
+                <p className="mt-2 text-[11px] text-white leading-relaxed">
+                  {selectedInCategory.description}
+                </p>
+              )}
+            </div>
+          );
+        })}
+
+        {/* No results */}
+        {filteredCategories.length === 0 && (
+          <div className="text-center py-8">
+            <p className="text-xs text-[#505050]">No placeholders found</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export function ProfileClient({ userEmail, userName, userImage, activeTab }: ProfileClientProps) {
   const { status } = useSession();
@@ -95,9 +713,8 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
     autoPersonalize: false,
   });
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
-  const [isSavingProfile, setIsSavingProfile] = useState(false);
-  const [profileSaved, setProfileSaved] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const profileLoadedRef = useRef(false);
 
   // Templates state
   const [templates, setTemplates] = useState<TemplateData[]>([]);
@@ -113,6 +730,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
   const [resumeError, setResumeError] = useState<string | null>(null);
   const [resumeSuccess, setResumeSuccess] = useState(false);
   const [expandedResume, setExpandedResume] = useState<ResumeData | null>(null);
+  const [showEmailPrefs, setShowEmailPrefs] = useState(false);
 
   // Subscription state
   const [subscription, setSubscription] = useState<{
@@ -138,6 +756,8 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
     const result = await getProfileAction();
     if (result.success) {
       setProfile(result.profile);
+      // Mark loaded so auto-save doesn't fire on initial load
+      setTimeout(() => { profileLoadedRef.current = true; }, 0);
     }
     setIsLoadingProfile(false);
   };
@@ -170,20 +790,18 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
     setIsLoadingSubscription(false);
   };
 
-  const handleSaveProfile = async () => {
-    setIsSavingProfile(true);
+  // Auto-save profile on change (debounced)
+  useEffect(() => {
+    if (!profileLoadedRef.current) return;
     setProfileError(null);
-    setProfileSaved(false);
-
-    const result = await updateProfileAction(profile);
-    if (result.success) {
-      setProfileSaved(true);
-      setTimeout(() => setProfileSaved(false), 3000);
-    } else {
-      setProfileError(result.error);
-    }
-    setIsSavingProfile(false);
-  };
+    const timeout = setTimeout(async () => {
+      const result = await updateProfileAction(profile);
+      if (!result.success) {
+        setProfileError(result.error);
+      }
+    }, 600);
+    return () => clearTimeout(timeout);
+  }, [profile]);
 
   const handleUpdateTemplate = async () => {
     if (!editingTemplate) return;
@@ -216,20 +834,6 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
     const result = await deleteTemplateAction(id);
     if (result.success) {
       setTemplates(templates.filter((t) => t.id !== id));
-    } else {
-      setTemplateError(result.error);
-    }
-  };
-
-  const handleSetDefault = async (id: string) => {
-    const result = await setDefaultTemplateAction(id);
-    if (result.success) {
-      setTemplates(
-        templates.map((t) => ({
-          ...t,
-          isDefault: t.id === id,
-        }))
-      );
     } else {
       setTemplateError(result.error);
     }
@@ -349,15 +953,6 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
           <h1 className="text-[22px] font-bold tracking-tight">{tabInfo.title}</h1>
           <p className="text-white text-[13px] mt-1">{tabInfo.subtitle}</p>
         </div>
-        {currentTab === 'account' && (
-          <button
-            onClick={handleSaveProfile}
-            disabled={isSavingProfile}
-            className="bg-[#6364FF] text-white text-[13px] font-semibold px-6 py-2.5 rounded-full hover:bg-[#5354EE] transition-colors disabled:opacity-50"
-          >
-            {isSavingProfile ? 'Saving...' : 'Save Changes'}
-          </button>
-        )}
         {currentTab === 'resumes' && (
           <label className="bg-[#6364FF] text-white text-[13px] font-semibold px-5 py-2.5 rounded-full hover:bg-[#5354EE] transition-colors cursor-pointer flex items-center gap-2">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -369,23 +964,18 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
         )}
         {currentTab === 'templates' && (
           <button
-            onClick={() => setEditingTemplate({ id: '__new__', name: '', subject: '', body: '', isDefault: false, attachResume: false, resumeId: null, createdAt: new Date() })}
-            className="bg-[#A855F7] text-white text-[13px] font-semibold px-5 py-2.5 rounded-full hover:bg-[#9333EA] transition-colors flex items-center gap-2"
+            onClick={() => setShowEmailPrefs(true)}
+            className="bg-[#6364FF] text-white text-[13px] font-semibold px-5 py-2.5 rounded-full hover:bg-[#5354EE] transition-colors flex items-center gap-2"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-            Create Template
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+            </svg>
+            Email Preferences
           </button>
         )}
       </header>
 
-      {profileSaved && (
-        <div className="mb-6 px-4 py-3 bg-green-900/30 text-green-400 rounded-lg text-sm flex items-center gap-2">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
-          Profile saved successfully!
-        </div>
-      )}
 
       {profileError && (
         <div className="mb-6 px-4 py-3 bg-red-900/30 text-red-400 rounded-lg text-sm">
@@ -627,7 +1217,12 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
         {currentTab === 'templates' && (
         <div>
           {templateError && (
-            <div className="mb-4 px-4 py-3 bg-red-900/30 text-red-400 rounded-lg text-sm">{templateError}</div>
+            <div className="mb-4 px-4 py-3 bg-red-900/30 text-red-400 rounded-lg text-sm flex items-center gap-2">
+              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+              </svg>
+              {templateError}
+            </div>
           )}
 
           {isLoadingTemplates ? (
@@ -649,13 +1244,11 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
             ];
 
             return (
-              <div className="border border-[#2a2a2a] rounded-lg overflow-hidden">
+              <div className="border border-[#3a3a3a] rounded-xl overflow-hidden">
                 {/* Table header */}
-                <div className="flex items-center px-5 py-3 border-b border-[#2a2a2a] bg-[#1a1a1a]">
-                  <span className="flex-1 text-xs font-semibold text-[#707070]">Template Name</span>
-                  <span className="w-[120px] text-xs font-semibold text-[#707070]">Type</span>
-                  <span className="w-[120px] text-xs font-semibold text-[#707070] text-right">Last Modified</span>
-                  <span className="w-4 ml-3" />
+                <div className="flex items-center px-5 py-3 border-b border-[#3a3a3a] bg-[#0f0f0f]">
+                  <span className="flex-1 text-[11px] font-semibold text-white uppercase tracking-wider">Template</span>
+                  <span className="w-8" />
                 </div>
 
                 {/* Template rows */}
@@ -670,220 +1263,280 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                         setEditingTemplate(template as TemplateData);
                       }
                     }}
-                    className="flex items-center w-full px-5 py-3.5 gap-3 border-b border-[#2a2a2a] last:border-b-0 hover:bg-[#252525] transition-colors text-left"
+                    className="group flex items-center w-full px-5 py-4 gap-3 border-b border-[#3a3a3a] last:border-b-0 hover:bg-[#1a1a1a] transition-colors text-left"
                   >
-                    <svg className={`w-4 h-4 shrink-0 ${template.isDefault ? 'text-[#A855F7]' : 'text-[#606060]'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
-                    </svg>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-medium text-white truncate">{template.name}</p>
-                      <p className="text-[11px] text-[#606060] truncate">{template.subject}</p>
+                    <div className="p-2 rounded-lg shrink-0 bg-[#6364FF]">
+                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                      </svg>
                     </div>
-                    <div className="w-[120px] flex justify-center">
-                      {template.isDefault ? (
-                        <span className="text-[11px] font-medium text-[#A855F7] bg-[#A855F7]/10 px-2.5 py-0.5 rounded-full">Default</span>
-                      ) : (
-                        <span className="text-[11px] font-medium text-[#606060] bg-[#1a1a1a] border border-[#2a2a2a] px-2.5 py-0.5 rounded-full">Custom</span>
-                      )}
-                    </div>
-                    <span className="w-[120px] text-[12px] text-[#606060] text-right">
-                      {template.createdAt ? new Date(template.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
-                    </span>
-                    <svg className="w-4 h-4 text-[#606060] ml-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                    <p className="flex-1 text-[13px] font-medium text-white truncate">{template.name}</p>
+                    <svg className="w-4 h-4 text-[#404040] group-hover:text-[#606060] shrink-0 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
                     </svg>
                   </button>
                 ))}
+
+                {/* New Template Row */}
+                <button
+                  onClick={() => setEditingTemplate({ id: '__new__', name: '', subject: '', body: '', isDefault: false, attachResume: false, resumeId: null, createdAt: new Date() })}
+                  className="group flex items-center w-full px-5 py-4 gap-3 hover:bg-[#1a1a1a] transition-colors text-left"
+                >
+                  <div className="p-2 rounded-lg shrink-0 bg-[#6364FF]">
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                    </svg>
+                  </div>
+                  <span className="text-[13px] font-medium text-white">New Template</span>
+                </button>
               </div>
             );
           })()}
 
-          {/* Email Preferences */}
-          <div className="bg-[#252525] border border-[#3a3a3a] rounded-lg p-6 space-y-5 mt-6">
-            <div>
-              <h3 className="text-base font-semibold text-white">Email Preferences</h3>
-              <p className="text-[12px] text-white mt-1">Configure your default email settings for outreach</p>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-medium text-white">Email Style Instructions</label>
-              <textarea
-                value={profile.emailInstructions || ''}
-                onChange={(e) => setProfile({ ...profile, emailInstructions: e.target.value || null })}
-                rows={3}
-                className="w-full bg-[#1a1a1a] border border-[#3a3a3a] rounded-lg text-[13px] text-white p-4 focus:outline-none focus:ring-1 focus:ring-[#6364FF] transition-colors resize-none leading-relaxed"
-                placeholder="e.g. Keep emails under 3 sentences. Always mention I'm looking for a summer internship."
-              />
-              <p className="text-[10px] text-white">These instructions will be applied to every AI-generated email.</p>
-            </div>
-
-            {/* Auto-Personalize Toggle */}
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <span className="text-[13px] font-medium text-white">Auto-Personalize Emails</span>
-                <p className="text-[11px] text-white">Automatically personalize emails with AI when opening review</p>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={profile.autoPersonalize}
-                onClick={() => setProfile({ ...profile, autoPersonalize: !profile.autoPersonalize })}
-                className={`relative inline-flex h-[22px] w-10 items-center rounded-full transition-colors shrink-0 ${
-                  profile.autoPersonalize ? 'bg-[#6364FF]' : 'bg-[#3a3a3a]'
-                }`}
-              >
-                <span className={`inline-block h-[18px] w-[18px] transform rounded-full transition-transform ${profile.autoPersonalize ? 'translate-x-[20px] bg-white' : 'translate-x-[2px] bg-[#707070]'}`} />
-              </button>
-            </div>
-
-            <div className="flex justify-end">
-              <button
-                onClick={handleSaveProfile}
-                disabled={isSavingProfile}
-                className="bg-[#6364FF] text-white text-[13px] font-semibold px-5 py-2 rounded-lg hover:bg-[#5354EE] transition-colors disabled:opacity-50"
-              >
-                {isSavingProfile ? 'Saving...' : 'Save Preferences'}
-              </button>
-            </div>
-          </div>
         </div>
         )}
 
       </div>
 
-      {/* Template Editor Modal */}
+      {/* Full-Screen Template Editor */}
       {editingTemplate && (
-        <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-          onClick={() => { setEditingTemplate(null); }}
-        >
+        <div className="fixed inset-0 z-50 flex bg-[#181818] animate-fade-in">
+          {/* ── Left: Placeholders Sidebar ── */}
+          <div className="hidden lg:block flex-shrink-0">
+            <PlaceholdersSidebar />
+          </div>
+
+          {/* ── Right: Main area with floating compose card ── */}
           <div
-            className="bg-[#111111] rounded-xl border border-[#2a2a2a] w-full max-w-[680px] max-h-[720px] flex flex-col overflow-hidden"
-            style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}
-            onClick={(e) => e.stopPropagation()}
+            className="flex-1 flex items-center justify-center bg-[#212121] relative"
+            onClick={(e) => { if (e.target === e.currentTarget) setEditingTemplate(null); }}
           >
-            {/* Header */}
-            <div className="flex items-center gap-3 px-5 py-2.5 bg-[#161616] border-b border-[#2a2a2a]">
-              <span className="text-[14px] font-semibold text-white">Edit Template</span>
-              <span className="flex-1" />
-              <button onClick={() => { setEditingTemplate(null); }} className="text-[#71717A] hover:text-white transition-colors">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-            </div>
+            {/* Template editor card */}
+            <div className="w-full max-w-[680px] max-h-[720px] h-[85vh] bg-[#141414] rounded-xl border border-[#2a2a2a] shadow-2xl flex flex-col overflow-hidden">
+              {/* ── Fixed Header ── */}
+              <div className="flex-shrink-0">
+                {/* Header bar */}
+                <div className="flex items-center px-5 bg-[#1a1a1a]">
+                  <span className="px-4 py-2.5 text-xs font-semibold text-white bg-[#6364FF] rounded-t-lg">
+                    {editingTemplate.name || 'New Template'}
+                  </span>
 
-            {/* Name row */}
-            <div className="flex items-center gap-2.5 px-5 py-2.5 border-b border-[#2a2a2a]">
-              <span className="text-[13px] text-[#71717A]">Name</span>
-              <input
-                type="text"
-                value={editingTemplate.name}
-                onChange={(e) => setEditingTemplate({ ...editingTemplate, name: e.target.value })}
-                className="flex-1 bg-transparent text-[13px] text-white focus:outline-none"
-                placeholder="Template name"
-              />
-            </div>
+                  <div className="flex-1" />
 
-            {/* Subject row */}
-            <div className="flex items-center gap-2.5 px-5 py-2.5 border-b border-[#2a2a2a]">
-              <span className="text-[13px] text-[#71717A]">Subject</span>
-              <input
-                type="text"
-                value={editingTemplate.subject}
-                onChange={(e) => setEditingTemplate({ ...editingTemplate, subject: e.target.value })}
-                className="flex-1 bg-transparent text-[13px] text-white focus:outline-none"
-                placeholder="Email subject"
-              />
-            </div>
+                  {/* Delete button for custom templates (not for new or default templates) */}
+                  {!DEFAULT_TEMPLATES.some(dt => dt.id === editingTemplate.id) && editingTemplate.id !== '__new__' && (
+                    <button
+                      onClick={() => {
+                        handleDeleteTemplate(editingTemplate.id);
+                        setEditingTemplate(null);
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 mr-2 text-xs text-[#ef4444] hover:bg-[#ef4444]/10 rounded-lg transition-colors"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      <span>Delete</span>
+                    </button>
+                  )}
 
-            {/* Variables bar */}
-            <div className="flex items-center gap-1.5 px-5 py-2 border-b border-[#2a2a2a] bg-[#161616] overflow-x-auto">
-              <span className="text-[11px] font-medium text-[#71717A] shrink-0 mr-1">Insert:</span>
-              {DEFAULT_PLACEHOLDERS.map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => setEditingTemplate({ ...editingTemplate, body: editingTemplate.body + p })}
-                  className="shrink-0 text-[10px] font-mono font-medium text-[#A855F7] bg-[#A855F7]/10 border border-[#A855F7]/25 rounded px-2 py-0.5 hover:bg-[#A855F7]/20 transition-colors"
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
+                  <button
+                    onClick={() => setEditingTemplate(null)}
+                    className="p-1.5 text-[#888] hover:text-white transition-colors"
+                    aria-label="Close"
+                  >
+                    <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
 
-            {/* Body */}
-            <div className="flex-1 min-h-0 overflow-y-auto">
-              <textarea
-                value={editingTemplate.body}
-                onChange={(e) => setEditingTemplate({ ...editingTemplate, body: e.target.value })}
-                className="w-full h-full min-h-[280px] bg-transparent text-[13px] text-[#A1A1AA] p-5 focus:outline-none resize-none leading-[1.6]"
-                placeholder="Write your template body here..."
-              />
-            </div>
+                {/* To field */}
+                <div className="flex items-center px-5 py-2.5 border-b border-[#2a2a2a]">
+                  <span className="text-[13px] text-[#888] w-16 flex-shrink-0">To:</span>
+                  <span className="text-[13px] text-[#3a3a3a]"></span>
+                </div>
 
-            {/* Bottom bar */}
-            <div className="flex items-center gap-2.5 px-5 py-2.5 bg-[#161616] border-t border-[#2a2a2a]">
-              {!DEFAULT_TEMPLATES.some(dt => dt.id === editingTemplate.id) && (
-                <button
-                  onClick={() => {
-                    handleDeleteTemplate(editingTemplate.id);
-                    setEditingTemplate(null);
-                  }}
-                  className="p-1.5 rounded-lg hover:bg-[#252525] transition-colors"
-                  title="Delete template"
-                >
-                  <svg className="w-4 h-4 text-[#ef4444]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                {/* Subject field */}
+                <div className="flex items-center px-5 py-2.5 border-b border-[#2a2a2a]">
+                  <span className="text-[13px] text-[#888] w-16 flex-shrink-0">Subject</span>
+                  <PillInput
+                    value={editingTemplate.subject}
+                    onChange={(newSubject) => setEditingTemplate({ ...editingTemplate, subject: newSubject })}
+                    placeholder="Email subject..."
+                  />
+                </div>
+              </div>
+
+              {/* ── Scrollable Content (Body) ── */}
+              <div className="flex-1 overflow-y-auto px-5 py-5">
+                <PillEditor
+                  value={editingTemplate.body}
+                  onChange={(newBody) => setEditingTemplate({ ...editingTemplate, body: newBody })}
+                  placeholder="Write your email template here. Drag placeholders from the sidebar to personalize..."
+                />
+              </div>
+
+              {/* Error message */}
+              {templateError && (
+                <div className="px-5 py-2 bg-red-900/20 border-t border-red-900/30 flex-shrink-0">
+                  <p className="text-sm text-red-400">{templateError}</p>
+                </div>
+              )}
+
+              {/* ── Bottom bar ── */}
+              <div className="flex items-center gap-1.5 px-5 py-2.5 bg-[#1a1a1a] border-t border-[#2a2a2a] flex-shrink-0">
+                {/* Mobile placeholders indicator */}
+                <div className="lg:hidden flex items-center gap-2 text-xs text-[#606060]">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 6.75 22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3-4.5 16.5" />
                   </svg>
-                </button>
-              )}
-              <span className="flex-1" />
-              {!DEFAULT_TEMPLATES.some(dt => dt.id === editingTemplate.id) && !editingTemplate.isDefault && (
+                  <span>Use sidebar for placeholders</span>
+                </div>
+
+                <div className="flex-1" />
+
+                {/* Save button */}
                 <button
-                  onClick={() => handleSetDefault(editingTemplate.id)}
-                  className="text-[12px] text-[#71717A] hover:text-white px-3 py-1.5 rounded-lg hover:bg-[#252525] transition-colors"
-                >
-                  Set as Default
-                </button>
-              )}
-              <button
-                onClick={async () => {
-                  if (DEFAULT_TEMPLATES.some(dt => dt.id === editingTemplate.id)) {
-                    setEditingTemplate(null);
-                    return;
-                  }
-                  if (editingTemplate.id === '__new__') {
-                    // Create new template
+                  onClick={async () => {
+                    // Validate
                     if (!editingTemplate.name.trim() || !editingTemplate.body.trim()) {
                       setTemplateError('Template name and body are required');
                       return;
                     }
+
                     setIsSavingTemplate(true);
                     setTemplateError(null);
-                    const result = await createTemplateAction({
-                      name: editingTemplate.name,
-                      subject: editingTemplate.subject,
-                      body: editingTemplate.body,
-                      attachResume: editingTemplate.attachResume,
-                      resumeId: editingTemplate.resumeId,
-                    });
-                    if (result.success) {
-                      setTemplates([...templates, result.template]);
-                      setEditingTemplate(null);
+
+                    // If it's a new template OR a default template (save as new), create it
+                    if (editingTemplate.id === '__new__' || DEFAULT_TEMPLATES.some(dt => dt.id === editingTemplate.id)) {
+                      const result = await createTemplateAction({
+                        name: editingTemplate.name,
+                        subject: editingTemplate.subject,
+                        body: editingTemplate.body,
+                        attachResume: editingTemplate.attachResume,
+                        resumeId: editingTemplate.resumeId,
+                      });
+                      if (result.success) {
+                        setTemplates([...templates, result.template]);
+                        setEditingTemplate(null);
+                      } else {
+                        setTemplateError(result.error);
+                      }
                     } else {
-                      setTemplateError(result.error);
+                      // Update existing custom template
+                      await handleUpdateTemplate();
+                      if (!templateError) {
+                        setEditingTemplate(null);
+                      }
                     }
                     setIsSavingTemplate(false);
-                  } else {
-                    await handleUpdateTemplate();
-                    if (!templateError) {
-                      setEditingTemplate(null);
-                    }
-                  }
-                }}
-                disabled={isSavingTemplate || DEFAULT_TEMPLATES.some(dt => dt.id === editingTemplate.id)}
-                className="text-[12px] font-semibold text-white bg-[#A855F7] rounded-full px-5 py-2 hover:bg-[#9333EA] transition-colors disabled:opacity-50"
+                  }}
+                  disabled={isSavingTemplate}
+                  className="px-5 py-2 rounded-full text-xs font-semibold transition-colors disabled:opacity-50 flex items-center gap-2 bg-[#6364FF] text-white hover:bg-[#5354EE]"
+                >
+                  {isSavingTemplate ? (
+                    <>
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Saving...
+                    </>
+                  ) : (
+                    'Save'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Email Preferences Modal */}
+      {showEmailPrefs && (
+        <div
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={() => setShowEmailPrefs(false)}
+        >
+          <div
+            className="bg-[#141414] rounded-2xl border border-[#252525] w-full max-w-[480px] flex flex-col overflow-hidden"
+            style={{ boxShadow: '0 25px 50px -12px rgba(0,0,0,0.6)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center gap-4 px-6 py-4 border-b border-[#252525]">
+              <div className="p-2.5 rounded-xl bg-[#6364FF]/10">
+                <svg className="w-5 h-5 text-[#6364FF]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h2 className="text-[16px] font-semibold text-white">Email Preferences</h2>
+                <p className="text-[11px] text-[#505050]">Configure AI behavior for outreach emails</p>
+              </div>
+              <button onClick={() => setShowEmailPrefs(false)} className="p-2 rounded-lg text-[#505050] hover:text-white hover:bg-[#252525] transition-colors">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-5">
+              {/* Style Instructions */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-[12px] font-medium text-white">Style Instructions</label>
+                  <span className="text-[10px] text-[#505050]">Applied to all AI emails</span>
+                </div>
+                <textarea
+                  value={profile.emailInstructions || ''}
+                  onChange={(e) => setProfile({ ...profile, emailInstructions: e.target.value || null })}
+                  rows={4}
+                  className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg text-[13px] text-white p-4 focus:outline-none focus:border-[#6364FF] transition-colors resize-none leading-relaxed placeholder:text-[#404040]"
+                  placeholder="e.g. Keep emails under 3 sentences. Always mention I'm looking for a summer internship."
+                />
+              </div>
+
+              {/* Auto-Personalize Toggle */}
+              <div className="flex items-center justify-between p-4 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg transition-colors ${profile.autoPersonalize ? 'bg-[#6364FF]/10' : 'bg-[#252525]'}`}>
+                    <svg className={`w-4 h-4 transition-colors ${profile.autoPersonalize ? 'text-[#6364FF]' : 'text-[#505050]'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <span className="text-[13px] font-medium text-white block">Auto-Personalize</span>
+                    <p className="text-[11px] text-[#505050]">Auto-personalize when opening review</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={profile.autoPersonalize}
+                  onClick={() => setProfile({ ...profile, autoPersonalize: !profile.autoPersonalize })}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ${
+                    profile.autoPersonalize ? 'bg-[#6364FF]' : 'bg-[#303030]'
+                  }`}
+                >
+                  <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${profile.autoPersonalize ? 'translate-x-[22px]' : 'translate-x-[2px]'}`} />
+                </button>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#252525]">
+              <button
+                onClick={() => setShowEmailPrefs(false)}
+                className="px-4 py-2 rounded-lg text-[12px] font-medium text-[#606060] hover:text-white hover:bg-[#252525] transition-colors"
               >
-                {isSavingTemplate ? 'Saving...' : editingTemplate.id === '__new__' ? 'Create Template' : DEFAULT_TEMPLATES.some(dt => dt.id === editingTemplate.id) ? 'Close' : 'Save Template'}
+                Cancel
+              </button>
+              <button
+                onClick={() => setShowEmailPrefs(false)}
+                className="bg-[#6364FF] text-white text-[12px] font-semibold px-5 py-2 rounded-lg hover:bg-[#5354EE] transition-colors"
+              >
+                Done
               </button>
             </div>
           </div>

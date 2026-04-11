@@ -533,7 +533,7 @@ model CompanyEmailPattern {
   domain            String // email domain (e.g., "zs.com")
   pattern           String // pattern type: "first.last", "firstlast", "flast", "f.last", "first_last", "first"
   confidence        Float // 0-1 based on consistency
-  sampleSize        Int // number of emails used to determine pattern
+  sampleSize        Int      @default(0) // number of emails used to determine pattern
   acceptAll         Boolean? // true = catch-all domain (can't verify individual emails), false = can verify, null = unchecked
   unverifiable      Boolean  @default(false) // true = SMTP blocks verification (unavailable_smtp), trust pattern
   searchable        Boolean  @default(false) // true = users can search this company
