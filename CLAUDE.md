@@ -33,7 +33,7 @@ npm run test:meeting-suggestions # Test meeting extraction
 - `app/api/` — API routes: NextAuth handler, resume CRUD, prescrape trigger, Stripe/Gmail webhooks, cron jobs
 - `components/` — React components grouped by feature: `search/`, `compose/`, `home/`, `sidebar/`, `onboarding/`, `outreach/`, `calendar/`, `profile/`, `history/`, `credits/`, `ui/`
 - `lib/db/` — Database service layer: `person-service.ts` (Person/UserCandidate queries), `search-cache.ts` (scrape progress tracking)
-- `lib/services/` — External integrations: `discovery.ts` (Google CSE), `enrichment.ts` (Apollo), `gmail.ts`, `personalization.ts` (Groq LLM), `calendar.ts`, `credits.ts`, `ranking.ts`, `email-pattern.ts`, `email-verification.ts` (Emailable)
+- `lib/services/` — External integrations: `discovery.ts` (Serper — LinkedIn profile discovery), `serper.ts` (Serper API client), `enrichment.ts` (Apollo), `gmail.ts`, `personalization.ts` (Groq LLM), `calendar.ts`, `credits.ts`, `ranking.ts`, `email-pattern.ts`, `email-verification.ts` (Emailable)
 - `lib/auth.ts` — NextAuth config (Google OAuth, Prisma adapter, database sessions)
 - `lib/prisma.ts` — Prisma client singleton
 
@@ -41,18 +41,22 @@ npm run test:meeting-suggestions # Test meeting extraction
 
 - **Person** — Shared profile data (name, company, role, LinkedIn URL, email + status). Unique on `[fullName, company]`.
 - **UserCandidate** — Per-user relationship to Person (email context, outreach status).
-- **Search** — Scrape progress tracker (lastCsePageScraped, cseExhausted). Not a results cache.
+- **Search** — Scrape progress tracker (lastSerperPageScraped, serperExhausted). Not a results cache. Note: DB columns still use legacy `cse` naming (lastCsePageScraped, cseExhausted) from when the app used Google CSE — the actual API is Serper.
 - **EmailTemplate / EmailDraft / SendLog** — Template → AI draft → sent email audit trail.
 - **User** — Auth + profile + credits + Stripe subscription fields.
 
 ### Discovery search flow
 
+LinkedIn profile discovery uses **Serper** (Google SERP API) with `site:linkedin.com/in` queries. The code has legacy "CSE" naming (interfaces like `CSEDiscoveryResult`, fields like `cseCompany`) from when it used Google Custom Search Engine — it was migrated to Serper but names were kept for backward compatibility.
+
+**Full pipeline:** Serper (`site:linkedin.com/in` queries) → find LinkedIn URLs → Apify (scrape LinkedIn profiles) → Apollo (enrich with email at send time)
+
 Three-path UX based on result count:
-1. **0 results** → synchronous CSE scrape, then show
+1. **0 results** → synchronous Serper scrape, then show
 2. **1–4 results** → show immediately + background scrape via `POST /api/prescrape`
 3. **5+ results** → instant display
 
-`searchPeopleAction` queries Person table directly with offset pagination (stable sort: emailStatus asc, emailConfidence desc, createdAt asc). `scrapeNextPageAction` scrapes one Google CSE page at a time. CSE exhaustion threshold: < 5 valid profiles returned.
+`searchPeopleAction` queries Person table directly with offset pagination (stable sort: emailStatus asc, emailConfidence desc, createdAt asc). `scrapeNextPageAction` scrapes one Serper page at a time. Exhaustion threshold: < 5 valid profiles returned.
 
 ### Authentication
 
@@ -60,7 +64,6 @@ Google OAuth via NextAuth 4. Scopes: openid, email, profile, gmail.send, calenda
 
 ## Database rules
 
-- **Prod and dev share the same database** — migrations must be additive-only (never drop columns/tables)
 - Use `prisma db push` (not `prisma migrate dev` — shadow DB issues with Supabase)
 - When adding `@updatedAt` to tables with existing rows, add `@default(now())` first
 - Connection uses pgbouncer pooling (`?pgbouncer=true&connection_limit=1`)

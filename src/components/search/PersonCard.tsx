@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { SearchResultWithDraft } from '@/app/actions/search';
 import { EnvelopeIcon, AcademicCapIcon, MapPinIcon, BuildingOfficeIcon, CheckIcon, BookmarkIcon } from '@heroicons/react/24/outline';
 import { BookmarkIcon as BookmarkIconSolid } from '@heroicons/react/24/solid';
@@ -86,13 +87,14 @@ export function PersonCard({
     .join('')
     .toUpperCase();
 
+  const [justToggled, setJustToggled] = useState(false);
   const gradient = nameToGradient(person.fullName);
   const isSent = sendStatus === 'success';
   const isFailed = sendStatus === 'failed';
 
   return (
     <div
-      onClick={onExpand}
+      onClick={limitReached ? () => onLimitReached?.() : onExpand}
       className={`group relative card-hover p-5 flex flex-col items-center text-center hover:-translate-y-0.5 cursor-pointer ${
       (isSent || isFailed) ? 'opacity-60 saturate-50' : ''
     }`}>
@@ -230,7 +232,7 @@ export function PersonCard({
       </div>
 
       {/* Action button */}
-      <div className="w-full mt-auto">
+      <div className="w-full mt-auto" onClick={(e) => e.stopPropagation()}>
         {isSent ? (
           <div
             className="text-sm w-full justify-center btn-secondary text-emerald-600 border-emerald-200 flex items-center"

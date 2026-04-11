@@ -10,6 +10,7 @@
 import { resolveCompanyAliases } from '@/lib/services/company-alias';
 import { searchSerper, SerperResult } from '@/lib/services/serper';
 import { parseSerperTitle, parseSnippetMetadata } from '@/lib/services/snippet-parser';
+import { log, SERPER_COST_PER_REQUEST } from '@/lib/services/discovery-logger';
 
 export interface SearchParams {
   name?: string;
@@ -239,8 +240,16 @@ export async function lookupByName(params: {
     const companyPart = await buildCompanyQueryPart(company);
     const query = `site:linkedin.com/in "${cleanName}" ${companyPart}`;
     console.log(`[Discovery:Lookup] Pass 1 query: ${query}`);
+    const pass1Start = Date.now();
     const results = await searchSerper(query);
     const candidates = processSerperResults(results, LIMIT, seenUrls, new Set(), company);
+    log.api('discovery', {
+      service: 'serper',
+      request: { query, pass: 1, name: cleanName, company },
+      response: { rawResultCount: results.length, candidateCount: candidates.length },
+      durationMs: Date.now() - pass1Start,
+      costUsd: SERPER_COST_PER_REQUEST,
+    }, 'lookup_pass1');
 
     if (candidates.length > 0) {
       console.log(`[Discovery:Lookup] Pass 1 found ${candidates.length} results`);
@@ -252,29 +261,17 @@ export async function lookupByName(params: {
   // Pass 2: name only (fallback or no company provided)
   const query = `site:linkedin.com/in "${cleanName}"`;
   console.log(`[Discovery:Lookup] Pass 2 query: ${query}`);
+  const pass2Start = Date.now();
   const results = await searchSerper(query);
   const candidates = processSerperResults(results, LIMIT, seenUrls, new Set());
+  log.api('discovery', {
+    service: 'serper',
+    request: { query, pass: 2, name: cleanName },
+    response: { rawResultCount: results.length, candidateCount: candidates.length },
+    durationMs: Date.now() - pass2Start,
+    costUsd: SERPER_COST_PER_REQUEST,
+  }, 'lookup_pass2');
   console.log(`[Discovery:Lookup] Pass 2 found ${candidates.length} results`);
   return candidates;
 }
 
-/**
- * Legacy function for backward compatibility
- * Wraps discoverLinkedInProfiles and adds company from search params
- */
-export async function searchPeople(params: SearchParams): Promise<SearchResult[]> {
-  const profiles = await discoverLinkedInProfiles(params);
-
-  // Convert to legacy SearchResult format
-  return profiles.map(profile => ({
-    fullName: profile.fullName,
-    firstName: profile.firstName,
-    lastName: profile.lastName,
-    company: params.company || '', // Use search company - scraper will verify/update
-    role: null, // Scraper will provide this
-    sourceUrl: profile.linkedinUrl,
-    sourceTitle: profile.sourceTitle,
-    sourceSnippet: profile.sourceSnippet,
-    sourceDomain: profile.sourceDomain,
-  }));
-}

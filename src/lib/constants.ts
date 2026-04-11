@@ -1,71 +1,3 @@
-export const INDUSTRIES = ['Banking', 'Consulting', 'PM'] as const;
-
-// Banking companies
-export const BANKING_COMPANIES = [
-  'Goldman Sachs',
-  'Morgan Stanley',
-  'JPMorgan Chase',
-  'Bank of America',
-  'Citigroup',
-  'Barclays',
-  'Deutsche Bank',
-  'UBS',
-  'Credit Suisse',
-  'Wells Fargo',
-  'Lazard',
-  'Evercore',
-  'Centerview Partners',
-  'Moelis & Company',
-  'PJT Partners',
-  'Perella Weinberg Partners',
-  'Guggenheim Partners',
-  'Houlihan Lokey',
-  'Greenhill & Co',
-  'Rothschild & Co',
-  'Jefferies',
-  'RBC Capital Markets',
-  'HSBC',
-  'BNP Paribas',
-] as const;
-
-// Only companies with verified email patterns
-export const CONSULTING_COMPANIES = [
-  'McKinsey & Company',
-  'Boston Consulting Group',
-  'Bain & Company',
-  'Deloitte',
-  'PwC',
-  'EY',
-  'KPMG',
-  'Accenture',
-  'Oliver Wyman',
-  'Kearney',
-  'LEK Consulting',
-  'ZS',
-  'Huron',
-] as const;
-
-// Only companies with verified email patterns
-export const PM_COMPANIES = [
-  'Google',
-  'NVIDIA',
-  'Microsoft',
-  'Stripe',
-  'Meta',
-  'Adobe',
-  'Amazon',
-  'Airbnb',
-  'Slack',
-  'Atlassian',
-  'Shopify',
-] as const;
-
-export const COMPANIES_BY_INDUSTRY: Record<string, readonly string[]> = {
-  Banking: BANKING_COMPANIES,
-  Consulting: CONSULTING_COMPANIES,
-  PM: PM_COMPANIES,
-};
-
 export const COMPANIES = [
   // Bulge Bracket Investment Banks
   'Goldman Sachs',
@@ -973,7 +905,6 @@ Best,
   },
 ] as const;
 
-export type Industry = (typeof INDUSTRIES)[number];
 export type Company = (typeof COMPANIES)[number];
 export type Role = (typeof ROLES)[number];
 export type Classification = (typeof CLASSIFICATIONS)[number];

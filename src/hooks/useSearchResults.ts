@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { SearchResultWithDraft, loadMorePeopleAction, regenerateDraftAction } from '@/app/actions/search';
+import { SearchResultWithDraft, regenerateDraftAction, loadMoreV2Action, SearchMetaV2 } from '@/app/actions/search';
 import { sendSingleEmailAction, sendEmailsAction, PersonToSend } from '@/app/actions/send';
 import { getTemplatesAction, getAutoPersonalizeAction, TemplateData } from '@/app/actions/profile';
 import { hidePersonAction, toggleSavedForLaterAction } from '@/app/actions/search';
 import { EMAIL_TEMPLATES } from '@/lib/constants';
 import { LimitReachedModal, dispatchCreditsChanged } from '@/components/credits';
 import { useSession } from 'next-auth/react';
+import type { LinkedInFilters, DBFilters } from '@/lib/types/linkedin-filters';
 
 export interface SearchParams {
   company?: string;
@@ -59,6 +60,18 @@ export function useSearchResults({ initialRemainingDaily }: UseSearchResultsOpti
   const retryTimerRef = useRef<NodeJS.Timeout | null>(null);
   const retryCountRef = useRef(0);
   const MAX_RETRIES = 5;
+
+  // V2 unified pagination state:
+  //   allBatchResults = every profile fetched so far (initial search + all
+  //     subsequent Load More pages). The visible slice is results[0..visibleCount].
+  //   serverHasMore   = does the server still have more pages for this filter set?
+  //                     Updated from the initial search and every Load More response.
+  const [allBatchResults, setAllBatchResults] = useState<SearchResultWithDraft[]>([]);
+  const [visibleCount, setVisibleCount] = useState(0);
+  const [serverHasMore, setServerHasMore] = useState(false);
+  const [linkedInFilters, setLinkedInFilters] = useState<LinkedInFilters | null>(null);
+  const [dbFilters, setDbFilters] = useState<DBFilters | null>(null);
+  const PAGE_SIZE = 6;
 
   // Cleanup retry timer on unmount
   useEffect(() => {
@@ -128,20 +141,45 @@ export function useSearchResults({ initialRemainingDaily }: UseSearchResultsOpti
     setTotalLoaded(0);
     setHasMore(true);
     setHiddenCount(0);
+    // Reset V2 unified pagination state
+    setAllBatchResults([]);
+    setVisibleCount(0);
+    setServerHasMore(false);
+    setLinkedInFilters(null);
+    setDbFilters(null);
   }, []);
 
-  // Apply search results after a search completes
+  // Apply search results after a search completes.
+  //
+  // Unified pagination: every search (simple or advanced) caches the full
+  // returned batch in allBatchResults and reveals PAGE_SIZE at a time.
+  // hasMore is true if the cache still has unshown items OR the server has
+  // more pages for this filter set.
   const applySearchResults = useCallback((
     newResults: SearchResultWithDraft[],
     meta: SearchResultsMeta,
     newHiddenCount: number,
-    params: SearchParams
+    params: SearchParams,
+    v2Meta?: {
+      linkedInFilters: LinkedInFilters;
+      dbFilters: DBFilters;
+    }
   ) => {
-    setResults(newResults);
-    setTotalLoaded(newResults.length);
-    setHasMore(meta.hasMore);
     setHiddenCount(newHiddenCount);
     setSearchParams(params);
+
+    if (v2Meta) {
+      setLinkedInFilters(v2Meta.linkedInFilters);
+      setDbFilters(v2Meta.dbFilters);
+    }
+
+    setAllBatchResults(newResults);
+    const initialVisible = Math.min(PAGE_SIZE, newResults.length);
+    setVisibleCount(initialVisible);
+    setResults(newResults.slice(0, initialVisible));
+    setTotalLoaded(initialVisible);
+    setServerHasMore(meta.hasMore);
+    setHasMore(initialVisible < newResults.length || meta.hasMore);
   }, []);
 
   const handleSendFromReview = async (index: number, subject: string, body: string, resumeIdOverride?: string | null): Promise<boolean> => {
@@ -273,10 +311,6 @@ export function useSearchResults({ initialRemainingDaily }: UseSearchResultsOpti
           r.userCandidateId === userCandidateId ? { ...r, savedForLater: result.savedForLater } : r
         )
       );
-      setToast({
-        message: result.savedForLater ? 'Saved for later' : 'Removed from saved',
-        type: 'success',
-      });
     } else if (result.error !== 'Not authenticated') {
       setToast({ message: result.error || 'Failed to update', type: 'error' });
     }
@@ -331,43 +365,55 @@ export function useSearchResults({ initialRemainingDaily }: UseSearchResultsOpti
     setIsRegenerating(false);
   };
 
+  // Unified Load More — works for both simple and advanced queries.
+  //
+  //   Tier 1: reveal the next PAGE_SIZE from the local cache (no API call)
+  //   Tier 2: if the cache is drained and the server still has more, fetch
+  //           the next Apify page, append to cache, reveal next slice.
   const handleLoadMore = useCallback(async () => {
-    if (!searchParams?.company || isLoadingMore || !hasMore) return;
+    if (isLoadingMore || !hasMore) return;
+
+    // ── Tier 1: reveal from cache ─────────────────────────────────────
+    const nextVisible = visibleCount + PAGE_SIZE;
+    if (nextVisible <= allBatchResults.length) {
+      const newVisible = Math.min(nextVisible, allBatchResults.length);
+      setVisibleCount(newVisible);
+      setResults(allBatchResults.slice(0, newVisible));
+      setTotalLoaded(newVisible);
+      setHasMore(newVisible < allBatchResults.length || serverHasMore);
+      return;
+    }
+
+    // ── Tier 2: fetch next Apify page from the server ─────────────────
+    if (!serverHasMore || !linkedInFilters || !dbFilters) {
+      setHasMore(false);
+      return;
+    }
 
     setIsLoadingMore(true);
-    setIsRetrying(false);
     try {
-      const result = await loadMorePeopleAction({
-        company: searchParams.company,
-        role: searchParams.role,
-        university: searchParams.university,
-        location: searchParams.location,
-        limit: searchParams.limit,
-        excludePersonIds: results.map(r => r.id),
-        skipLocationInSearch: searchParams.skipLocationInSearch,
-        companyNameAmbiguous: searchParams.companyNameAmbiguous,
+      const result = await loadMoreV2Action({
+        linkedInFilters,
+        dbFilters,
+        excludePersonIds: allBatchResults.map(r => r.id),
       });
 
       if (result.success) {
         if (result.results.length > 0) {
-          setResults(prev => [...prev, ...result.results]);
-          setTotalLoaded(prev => prev + result.results.length);
-          setHasMore(result.loadMoreMeta.hasMore);
-          retryCountRef.current = 0;
-        } else if (result.loadMoreMeta.prescrapeRunning && retryCountRef.current < MAX_RETRIES) {
-          retryCountRef.current++;
-          setIsRetrying(true);
-          setIsLoadingMore(false);
-          retryTimerRef.current = setTimeout(() => {
-            handleLoadMore();
-          }, 3000);
-          return;
+          const newBatch = [...allBatchResults, ...result.results];
+          setAllBatchResults(newBatch);
+          const newVisible = Math.min(visibleCount + PAGE_SIZE, newBatch.length);
+          setVisibleCount(newVisible);
+          setResults(newBatch.slice(0, newVisible));
+          setTotalLoaded(newVisible);
+          setServerHasMore(result.hasMore);
+          setHasMore(newVisible < newBatch.length || result.hasMore);
         } else {
+          // Server says nothing new (exhausted or all dedup'd) — stop.
+          setServerHasMore(false);
           setHasMore(false);
-          retryCountRef.current = 0;
         }
       } else if (result.error !== 'Not authenticated') {
-        // Don't show error for unauthenticated users
         setToast({ message: result.error || 'Failed to load more profiles', type: 'error' });
       }
     } catch (err) {
@@ -375,9 +421,8 @@ export function useSearchResults({ initialRemainingDaily }: UseSearchResultsOpti
       setToast({ message: 'Failed to load more profiles', type: 'error' });
     }
 
-    setIsRetrying(false);
     setIsLoadingMore(false);
-  }, [searchParams, isLoadingMore, hasMore, results]);
+  }, [isLoadingMore, hasMore, visibleCount, allBatchResults, serverHasMore, linkedInFilters, dbFilters]);
 
   return {
     // State

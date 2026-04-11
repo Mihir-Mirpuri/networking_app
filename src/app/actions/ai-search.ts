@@ -2,16 +2,23 @@
 
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { completeJson, GroqJsonParseError } from '@/lib/services/groq';
+import { completeJsonAnthropic } from '@/lib/services/anthropic';
 import { GroqAction } from '@prisma/client';
-import { fetchCompaniesForCategory } from '@/lib/services/perplexity';
+import { fetchCompaniesForCategory, PerplexityCompany } from '@/lib/services/perplexity';
+import prisma from '@/lib/prisma';
+import { LinkedInFilters } from '@/lib/types/linkedin-filters';
+import { resolveCompanyUrl } from '@/lib/services/company-resolver';
 import { isUserBlocked } from '@/lib/services/credits';
+import { sanitizeLinkedInFilters } from '@/lib/services/linkedin-filter-validator';
+import { log, createLoggerForQuery, withLogger } from '@/lib/services/discovery-logger';
+import { SEARCH_EXTRACTION_SYSTEM_PROMPT } from '@/lib/prompts/search-extraction-prompt';
 
 export interface ParsedFilters {
   company?: string;
   role?: string;
   university?: string;
   location?: string;
+  roleSpecificity?: 'narrow' | 'standard' | 'broad';
 }
 
 export interface Selectable {
@@ -48,6 +55,26 @@ interface LLMResponse {
     university: string | null;
     location: string | null;
   };
+  linkedin_filters: {
+    search_query?: string;
+    locations?: string[];
+    current_companies?: string[];
+    past_companies?: string[];
+    schools?: string[];
+    current_job_titles?: string[];
+    past_job_titles?: string[];
+    seniority_level_ids?: string[];
+    function_ids?: string[];
+    company_headcount?: string[];
+    years_of_experience_ids?: string[];
+    years_at_current_company_ids?: string[];
+    recently_changed_jobs?: boolean;
+    exclude_locations?: string[];
+    exclude_current_companies?: string[];
+    exclude_seniority_level_ids?: string[];
+    exclude_function_ids?: string[];
+  };
+  role_specificity?: 'narrow' | 'standard' | 'broad';
   company_name_ambiguous?: boolean;
   person_name?: string;
   person_company?: string;
@@ -57,103 +84,49 @@ interface LLMResponse {
 }
 
 export type ExtractFiltersResult =
-  | { success: true; status: 'ready'; filters: ParsedFilters; assistantMessage: string; suggestedSearches: SuggestedSearch[]; companyNameAmbiguous?: boolean }
+  | { success: true; status: 'ready'; filters: ParsedFilters; linkedInFilters: LinkedInFilters; assistantMessage: string; suggestedSearches: SuggestedSearch[]; companyNameAmbiguous?: boolean }
   | { success: true; status: 'needs_selection'; filters: ParsedFilters; assistantMessage: string; selectables: Selectable[]; allSelectables?: Selectable[] }
   | { success: true; status: 'person_lookup'; assistantMessage: string; personName: string; personCompany?: string }
   | { success: true; status: 'off_topic'; filters: ParsedFilters; assistantMessage: string }
   | { success: true; status: 'blocked'; assistantMessage: string }
   | { success: false; error: string };
 
-const SYSTEM_PROMPT = `You are a search filter extraction assistant for a professional networking tool. Your job is to help users find people by extracting structured search filters from natural language.
 
-A search requires exactly ONE company. Role is optional but recommended. You also extract optional filters: university, location.
-
-You must return JSON with this schema:
-{
-  "status": "ready" | "needs_selection" | "off_topic" | "person_lookup",
-  "confidence": "high" | "low",
-  "filters": { "company": string|null, "role": string|null, "university": string|null, "location": string|null },
-  "company_name_ambiguous": boolean,
-  "person_name": string|null,
-  "person_company": string|null,
-  "selectables": [{ "label": string, "filter_key": "company"|"role", "filter_value": string }],
-  "suggested_searches": [{ "label": string, "company": string, "role": string|null }],
-  "message": string
+/**
+ * Convert snake_case linkedin_filters from LLM to camelCase LinkedInFilters.
+ */
+function convertLinkedInFilters(raw: LLMResponse['linkedin_filters'] | undefined): LinkedInFilters {
+  if (!raw) return {};
+  const result: LinkedInFilters = {};
+  if (raw.search_query) result.searchQuery = raw.search_query;
+  if (raw.locations?.length) result.locations = raw.locations;
+  if (raw.current_companies?.length) result.currentCompanies = raw.current_companies;
+  if (raw.past_companies?.length) result.pastCompanies = raw.past_companies;
+  if (raw.schools?.length) result.schools = raw.schools;
+  if (raw.current_job_titles?.length) result.currentJobTitles = raw.current_job_titles;
+  if (raw.past_job_titles?.length) result.pastJobTitles = raw.past_job_titles;
+  if (raw.seniority_level_ids?.length) result.seniorityLevelIds = raw.seniority_level_ids;
+  if (raw.function_ids?.length) result.functionIds = raw.function_ids;
+  if (raw.company_headcount?.length) result.companyHeadcount = raw.company_headcount;
+  if (raw.years_of_experience_ids?.length) result.yearsOfExperienceIds = raw.years_of_experience_ids;
+  if (raw.years_at_current_company_ids?.length) result.yearsAtCurrentCompanyIds = raw.years_at_current_company_ids;
+  if (raw.recently_changed_jobs) result.recentlyChangedJobs = raw.recently_changed_jobs;
+  if (raw.exclude_locations?.length) result.excludeLocations = raw.exclude_locations;
+  if (raw.exclude_current_companies?.length) result.excludeCurrentCompanies = raw.exclude_current_companies;
+  if (raw.exclude_seniority_level_ids?.length) result.excludeSeniorityLevelIds = raw.exclude_seniority_level_ids;
+  if (raw.exclude_function_ids?.length) result.excludeFunctionIds = raw.exclude_function_ids;
+  // Strip any LLM-hallucinated LinkedIn IDs before they reach Apify
+  return sanitizeLinkedInFilters(result);
 }
 
-STATUS RULES:
-- "person_lookup": The user is searching for a SPECIFIC PERSON by name (e.g., "Find John Smith", "Look up Jane Doe at Google", "Do you have Sarah Connor's info?"). Return the person's name in "person_name" and optional company in "person_company". This takes priority over "ready" when a person's full name (first + last) is clearly provided.
-- "ready": Company is clearly specified but NO specific person name. Role is optional — if the user doesn't mention a role, set role to null and return "ready". Trigger the search.
-- "needs_selection": The user mentioned a category, industry, or ambiguous term that maps to multiple companies. Return up to 5 selectables for the user to choose from.
-- "off_topic": The message is unrelated to finding professional contacts.
-
-PERSON LOOKUP RULES:
-- A person lookup requires at minimum a first AND last name (e.g., "John Smith"). A single name like "John" is NOT enough — ask for a last name.
-- If the user also mentions a company (e.g., "John Smith at Google"), include it in "person_company" to narrow results.
-- Do NOT use "person_lookup" for generic role-based searches like "engineers at Google" — those are "ready" searches.
-- Examples of person lookups: "Find John Smith", "Look up Sarah at Meta" (ask for last name), "John Smith Goldman Sachs", "Do you know Jane Doe?"
-
-FILTER RULES:
-1. If a filter was previously set and the user doesn't mention it, KEEP the previous value.
-2. "try X instead" or "change to X" → replace the relevant filter.
-3. "remove the role filter" or "any role" → set that filter to null.
-4. ROLE NORMALIZATION: Always normalize informal, slang, or abbreviated role terms to the most common LinkedIn job title(s). The role you return must be a real title that people actually use on LinkedIn profiles.
-   - Abbreviations: "PMs" → "Product Manager", "SWEs" → "Software Engineer", "BAs" → "Business Analyst", "IB" → "Investment Banking"
-   - Slang/informal: "Banker" → "Investment Banking Analyst", "Consultant" → "Consultant" (already standard), "Trader" → "Trader" (already standard), "Coder" → "Software Engineer", "Dev" → "Software Engineer", "Designer" → "Product Designer", "Data guy" → "Data Scientist"
-   - Finance titles: "Banker" → "Investment Banking Analyst", "Quant" → "Quantitative Researcher", "PE" → "Private Equity"
-   - If the term is already a standard LinkedIn title (e.g., "Software Engineer", "Product Manager", "Consultant"), keep it as-is.
-5. "at [X]" = company. "from [X]" = university. University abbreviations: "UT" = "UT Austin", "MIT" = "MIT", "Stanford" = "Stanford University".
-6. When the user says "No", "Nah", "that's it" in response to a question, KEEP all previous filters unchanged.
-7. Always extract a company when one is clearly stated. "at Meta" = company: "Meta". Never drop it.
-8. For US locations, ALWAYS normalize to "City, State" format (e.g., "Austin" → "Austin, Texas", "SF" → "San Francisco, California", "NYC" → "New York, New York", "LA" → "Los Angeles, California", "Chi" → "Chicago, Illinois"). For international locations, use "City, Country" (e.g., "London" → "London, United Kingdom"). This prevents city names from matching people's names in search results.
-
-COMPANY NAME AMBIGUITY:
-- Set "company_name_ambiguous" to true when the company name could easily be confused with a person's name or a common English word (e.g., Chase, Block, Bolt, Squire, Square, Plaid, Hinge, Gusto, Toast, Brex, Ramp).
-- Set to false for distinctive, well-known company names that are unlikely to be confused (e.g., McKinsey, Google, Goldman Sachs, Stripe, Anthropic, JPMorgan, Deloitte, Microsoft, Meta, Apple, Figma, Notion).
-- Default to true when unsure.
-
-SELECTABLE RULES:
-- When the user says a category like "top consulting firms", "big tech", "investment banks", "FAANG", return status "needs_selection" with up to 5 company selectables.
-- When the user names multiple companies ("at Google and Meta"), return status "needs_selection" with each as a selectable.
-- When a role is ambiguous for a given company (e.g., "people at McKinsey" — could be Consultant, Analyst, Partner), return "needs_selection" with role selectables.
-- If the user names a role, use it. If no role is mentioned, set role to null and return "ready" — do NOT prompt for role selection unless the user's message is specifically asking what roles exist (e.g., "what roles at McKinsey?").
-- Each selectable has: label (display text), filter_key ("company" or "role"), filter_value (the exact value to use as the filter).
-- IMPORTANT: Selectables must ALWAYS be specific, real company names (e.g., "Anthropic", "Scale AI", "Stripe") — NEVER sub-categories or groupings like "Y Combinator startups", "500 Startups portfolio", "AngelList startups", or "Other seed-stage startups". If you don't know specific companies in a niche category, return your best guesses with confidence: "low".
-- When returning company selectables, also return "confidence": "high" or "low". Return "low" when the category involves startups, accelerator/YC companies, niche or emerging industries, or any companies you are unsure are current or complete. Return "high" for well-known stable categories like FAANG, MBB consulting, bulge bracket banks, Big 4 accounting, etc.
-
-SUGGESTED SEARCH RULES:
-- Only include when status is "ready".
-- Suggest up to 4 alternative searches based on the user's original intent.
-- If the user picked one company from a category, suggest the other companies with the same role.
-- If appropriate, suggest a different role at the same company.
-
-MESSAGE RULES:
-- For "ready": brief confirmation of what you're searching. Don't ask follow-up questions.
-- For "needs_selection": ask the user to pick one. Be brief.
-- For "off_topic": friendly redirect suggesting they search for people.
-
-EXAMPLES:
-
-User: "PMs at Google in Austin"
-→ {"status":"ready","filters":{"company":"Google","role":"Product Manager","university":null,"location":"Austin, Texas"},"selectables":[],"suggested_searches":[{"label":"PMs at Meta","company":"Meta","role":"Product Manager"},{"label":"PMs at Apple","company":"Apple","role":"Product Manager"},{"label":"Software Engineers at Google","company":"Google","role":"Software Engineer"}],"message":"Searching for Product Managers at Google in Austin!"}
-
-User: "consultants at top consulting firms from UT Austin"
-→ {"status":"needs_selection","filters":{"company":null,"role":"Consultant","university":"UT Austin","location":null},"selectables":[{"label":"McKinsey","filter_key":"company","filter_value":"McKinsey"},{"label":"BCG","filter_key":"company","filter_value":"BCG"},{"label":"Bain","filter_key":"company","filter_value":"Bain"},{"label":"Deloitte","filter_key":"company","filter_value":"Deloitte"},{"label":"Accenture","filter_key":"company","filter_value":"Accenture"}],"suggested_searches":[],"message":"Which consulting firm are you interested in?"}
-
-User: "people at McKinsey"
-→ {"status":"ready","filters":{"company":"McKinsey","role":null,"university":null,"location":null},"selectables":[],"suggested_searches":[{"label":"Consultants at McKinsey","company":"McKinsey","role":"Consultant"},{"label":"Business Analysts at McKinsey","company":"McKinsey","role":"Business Analyst"},{"label":"Associates at McKinsey","company":"McKinsey","role":"Associate"}],"message":"Searching for people at McKinsey!"}
-
-User: "engineers at Google and Meta"
-→ {"status":"needs_selection","filters":{"company":null,"role":"Software Engineer","university":null,"location":null},"selectables":[{"label":"Google","filter_key":"company","filter_value":"Google"},{"label":"Meta","filter_key":"company","filter_value":"Meta"}],"suggested_searches":[],"message":"Which company would you like to search first?"}
-
-User: "Find John Smith at Google"
-→ {"status":"person_lookup","filters":{"company":null,"role":null,"university":null,"location":null},"person_name":"John Smith","person_company":"Google","selectables":[],"suggested_searches":[],"message":"Looking up John Smith at Google!"}
-
-User: "Do you have Jane Doe's info?"
-→ {"status":"person_lookup","filters":{"company":null,"role":null,"university":null,"location":null},"person_name":"Jane Doe","person_company":null,"selectables":[],"suggested_searches":[],"message":"Looking up Jane Doe!"}
-
-User: "how is the weather?"
-→ {"status":"off_topic","filters":{"company":null,"role":null,"university":null,"location":null},"selectables":[],"suggested_searches":[],"message":"I'm designed to help you find and reach out to professional contacts! Try something like 'Find software engineers at Google' or 'PMs at McKinsey'."}`;
+/**
+ * Strip company name from search query to avoid double-filtering.
+ * Case-insensitive removal with extra whitespace cleanup.
+ */
+function stripCompanyName(query: string, company: string): string {
+  const regex = new RegExp(company.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+  return query.replace(regex, '').replace(/\s{2,}/g, ' ').trim();
+}
 
 function buildUserPrompt(input: ExtractFiltersInput): string {
   const parts: string[] = [];
@@ -203,22 +176,6 @@ function shouldEscalateToPerplexity(
 }
 
 /**
- * When Groq returns status=ready but the company name is actually a category
- * (e.g., "YC companies", "climate tech startups"), we need to intercept and
- * convert to needs_selection with Perplexity-sourced companies.
- */
-function isCompanyNameACategory(companyName: string | undefined): boolean {
-  if (!companyName) return false;
-  const lower = companyName.toLowerCase();
-  // Check if it contains category-like words
-  const categoryWords = [
-    'companies', 'startups', 'firms', 'banks', 'agencies',
-    'studios', 'labs', 'top ', 'big ', 'best ',
-  ];
-  return categoryWords.some(w => lower.includes(w));
-}
-
-/**
  * Extract a clean category string for Perplexity from the user message and Groq's response context.
  * e.g., "Show me some engineers at seed a startups" → "seed stage startups"
  */
@@ -247,6 +204,30 @@ function extractCategoryFromContext(
   return stripped || userMessage;
 }
 
+/**
+ * Fire-and-forget: pre-cache LinkedIn URLs from Perplexity category results
+ * into CompanyUrl table so resolveCompanyUrl gets a free DB hit later.
+ */
+function preCacheCompanyUrls(companies: PerplexityCompany[]): void {
+  const withUrls = companies.filter(c => c.linkedinUrl);
+  if (withUrls.length === 0) return;
+
+  console.log(`[AI Search] Pre-caching ${withUrls.length} company LinkedIn URLs`);
+
+  // Fire-and-forget — don't await
+  Promise.all(
+    withUrls.map(c =>
+      prisma.companyUrl.upsert({
+        where: { name: c.name.toLowerCase().trim() },
+        create: { name: c.name.toLowerCase().trim(), url: c.linkedinUrl! },
+        update: { url: c.linkedinUrl! },
+      }).catch(err => {
+        console.warn(`[AI Search] Failed to cache URL for "${c.name}":`, err);
+      })
+    )
+  ).catch(() => {});
+}
+
 export async function extractSearchFiltersAction(
   input: ExtractFiltersInput
 ): Promise<ExtractFiltersResult> {
@@ -265,15 +246,20 @@ export async function extractSearchFiltersAction(
     };
   }
 
+  const logger = createLoggerForQuery(`extract:${input.message}`);
+  const run = async (): Promise<ExtractFiltersResult> => {
+    log.info('ai-search', 'Received query', {
+      message: input.message,
+      currentFilters: input.currentFilters,
+      historyLength: input.conversationHistory.length,
+    });
   try {
-    const response = await completeJson<LLMResponse>({
-      systemPrompt: SYSTEM_PROMPT,
+    const response = await completeJsonAnthropic<LLMResponse>({
+      systemPrompt: SEARCH_EXTRACTION_SYSTEM_PROMPT,
       userPrompt: buildUserPrompt(input),
-      options: {
-        model: 'llama-3.3-70b-versatile',
-        temperature: 0.1,
-        maxTokens: 512,
-      },
+      model: 'claude-haiku-4-5-20251001',
+      temperature: 0.1,
+      maxTokens: 512,
       metadata: {
         userId: session.user.id,
         action: 'SEARCH_FILTER_EXTRACTION' as GroqAction,
@@ -288,10 +274,19 @@ export async function extractSearchFiltersAction(
     if (filters.role) parsedFilters.role = filters.role;
     if (filters.university) parsedFilters.university = filters.university;
     if (filters.location) parsedFilters.location = filters.location;
+    parsedFilters.roleSpecificity = response.content.role_specificity || 'standard';
 
     console.log(`[AI Search] Status: ${status}, Confidence: ${confidence || 'n/a'}, Filters: ${JSON.stringify(parsedFilters)}`);
+    log.info('ai-search', 'LLM response parsed', {
+      status,
+      confidence,
+      parsedFilters,
+      personName: response.content.person_name,
+      selectablesCount: (selectables || []).length,
+    });
 
     if (status === 'off_topic') {
+      log.decision('ai-search', 'off_topic branch', { message });
       return {
         success: true,
         status: 'off_topic',
@@ -311,6 +306,10 @@ export async function extractSearchFiltersAction(
         };
       }
       console.log(`[AI Search] Person lookup: name="${personName}", company="${response.content.person_company || '(none)'}"`);
+      log.decision('ai-search', 'person_lookup branch', {
+        personName,
+        personCompany: response.content.person_company,
+      });
       return {
         success: true,
         status: 'person_lookup',
@@ -330,6 +329,12 @@ export async function extractSearchFiltersAction(
 
       let allSelectables: Selectable[] | undefined;
 
+      log.decision('ai-search', 'needs_selection branch', {
+        selectablesCount: parsedSelectables.length,
+        confidence,
+        companyNameAmbiguous: company_name_ambiguous,
+      });
+
       // Escalate to Perplexity for niche/startup categories
       if (shouldEscalateToPerplexity(input.message, confidence, selectables || [])) {
         // Build a clean category string from Groq's understanding rather than raw user message
@@ -337,6 +342,12 @@ export async function extractSearchFiltersAction(
           ? extractCategoryFromContext(input.message, message, parsedSelectables)
           : input.message;
         console.log(`[AI Search] Escalating to Perplexity (confidence: ${confidence}, category: "${cleanCategory}")`);
+        log.decision('ai-search', 'Escalating to Perplexity', {
+          confidence,
+          userMessage: input.message,
+          cleanCategory,
+          role: filters.role,
+        });
         try {
           const perplexityCompanies = await fetchCompaniesForCategory(
             cleanCategory,
@@ -345,6 +356,9 @@ export async function extractSearchFiltersAction(
           );
 
           if (perplexityCompanies.length > 0) {
+            // Pre-cache LinkedIn URLs for instant resolution when user selects a company
+            preCacheCompanyUrls(perplexityCompanies);
+
             const perplexitySelectables: Selectable[] = perplexityCompanies.map(c => ({
               label: c.name,
               filterKey: 'company' as const,
@@ -364,9 +378,15 @@ export async function extractSearchFiltersAction(
             parsedSelectables = combined.slice(0, 5);
 
             console.log(`[AI Search] Perplexity returned ${perplexityCompanies.length} companies, showing first 5 of ${combined.length} total`);
+            log.info('ai-search', 'Perplexity escalation result', {
+              perplexityCount: perplexityCompanies.length,
+              combinedCount: combined.length,
+              shown: parsedSelectables.length,
+            });
           }
         } catch (err) {
           console.warn('[AI Search] Perplexity escalation failed, using Groq suggestions:', err);
+          log.error('ai-search', 'Perplexity escalation failed', { error: String(err) });
           // Fall through — keep Groq's original selectables
         }
       }
@@ -383,39 +403,8 @@ export async function extractSearchFiltersAction(
       };
     }
 
-    // status === 'ready' — but check if the company is actually a category that needs Perplexity
-    if (isCompanyNameACategory(filters.company ?? undefined) && shouldEscalateToPerplexity(input.message, confidence, [])) {
-      const cleanCategory2 = extractCategoryFromContext(input.message, message, []);
-      console.log(`[AI Search] Groq returned "ready" but company "${filters.company}" looks like a category — escalating to Perplexity (category: "${cleanCategory2}")`);
-      try {
-        const perplexityCompanies = await fetchCompaniesForCategory(
-          cleanCategory2,
-          filters.role,
-          12
-        );
-
-        if (perplexityCompanies.length > 0) {
-          const allPerplexitySelectables: Selectable[] = perplexityCompanies.map(c => ({
-            label: c.name,
-            filterKey: 'company' as const,
-            filterValue: c.name,
-            skipLocationInSearch: true,
-          }));
-
-          return {
-            success: true,
-            status: 'needs_selection',
-            filters: parsedFilters,
-            assistantMessage: `I found some companies matching that. Which one are you interested in?`,
-            selectables: allPerplexitySelectables.slice(0, 5),
-            allSelectables: allPerplexitySelectables.length > 5 ? allPerplexitySelectables : undefined,
-          };
-        }
-      } catch (err) {
-        console.warn('[AI Search] Perplexity escalation failed for category company:', err);
-        // Fall through to normal ready flow
-      }
-    }
+    // status === 'ready' — the new prompt's ANTI-CATEGORY RULE handles category
+    // names directly, so no post-hoc category-to-Perplexity override is needed.
 
     const parsedSuggestions: SuggestedSearch[] = (suggested_searches || []).map(s => ({
       label: s.label,
@@ -428,27 +417,96 @@ export async function extractSearchFiltersAction(
       },
     }));
 
+    // Convert linkedin_filters from LLM snake_case to camelCase
+    const linkedInFilters = convertLinkedInFilters(response.content.linkedin_filters);
+    console.log(`[AI Search] LinkedIn filters: ${JSON.stringify(linkedInFilters)}`);
+    log.info('ai-search', 'LinkedIn filters built', { linkedInFilters });
+
+    // Always resolve company URL and use currentCompanies
+    if (parsedFilters.company) {
+      try {
+        const resolved = await resolveCompanyUrl(parsedFilters.company, parsedFilters.role || undefined);
+        if (resolved.url) {
+          linkedInFilters.currentCompanies = [resolved.url];
+          console.log(`[AI Search] Resolved company URL: ${parsedFilters.company} → ${resolved.url}`);
+          log.info('ai-search', 'Company URL resolved', {
+            company: parsedFilters.company,
+            url: resolved.url,
+            method: 'resolveCompanyUrl',
+          });
+        } else {
+          linkedInFilters.currentCompanies = [parsedFilters.company];
+          console.log(`[AI Search] No URL found, using company name: ${parsedFilters.company}`);
+          log.warn('ai-search', 'Company URL not found, using name', {
+            company: parsedFilters.company,
+          });
+        }
+        // Strip company name from searchQuery to avoid double-filtering
+        if (linkedInFilters.searchQuery) {
+          linkedInFilters.searchQuery = stripCompanyName(linkedInFilters.searchQuery, parsedFilters.company);
+          if (!linkedInFilters.searchQuery) {
+            delete linkedInFilters.searchQuery;
+          }
+        }
+      } catch (err) {
+        console.warn(`[AI Search] Company URL resolution failed for "${parsedFilters.company}":`, err);
+        log.error('ai-search', 'Company URL resolution threw', {
+          company: parsedFilters.company,
+          error: String(err),
+        });
+        // Fallback: use company name in currentCompanies
+        linkedInFilters.currentCompanies = [parsedFilters.company];
+      }
+    }
+
     console.log(`[AI Search] Ready with ${parsedSuggestions.length} suggested searches`);
+    log.info('ai-search', 'Returning ready', {
+      filters: parsedFilters,
+      linkedInFilters,
+      suggestionsCount: parsedSuggestions.length,
+    });
 
     return {
       success: true,
       status: 'ready',
       filters: parsedFilters,
+      linkedInFilters,
       assistantMessage: message,
       suggestedSearches: parsedSuggestions,
       companyNameAmbiguous: company_name_ambiguous,
     };
   } catch (error) {
-    if (error instanceof GroqJsonParseError) {
+    if (error instanceof SyntaxError) {
+      log.error('ai-search', 'Filter extraction threw', {
+        error: String(error),
+        isSyntaxError: true,
+      });
       return {
         success: false,
         error: "I couldn't understand that. Could you rephrase your search?",
       };
     }
     console.error('[AI Search] Filter extraction error:', error);
+    log.error('ai-search', 'Filter extraction threw', {
+      error: String(error),
+      isSyntaxError: false,
+    });
     return {
       success: false,
       error: 'Something went wrong. Please try again.',
     };
   }
+  };
+
+  if (logger) {
+    try {
+      const result = await withLogger(logger, run);
+      await logger.finalize(result.success ? 'success' : 'error', result.success ? undefined : result.error);
+      return result;
+    } catch (err) {
+      await logger.finalize('error', String(err));
+      throw err;
+    }
+  }
+  return run();
 }

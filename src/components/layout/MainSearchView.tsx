@@ -19,9 +19,14 @@ import { SearchLoadingState } from '@/components/search/SearchLoadingState';
 import { Toast } from '@/components/ui/Toast';
 import { LimitReachedModal, dispatchCreditsChanged } from '@/components/credits';
 import { HiddenPeopleBar } from '@/components/search/HiddenPeopleBar';
-import { searchPeopleAction, lookupPersonAction, SearchResultWithDraft } from '@/app/actions/search';
+import { searchPeopleV2Action, lookupPersonAction, SearchResultWithDraft } from '@/app/actions/search';
 import { extractSearchFiltersAction, ParsedFilters, ChatMessage, Selectable } from '@/app/actions/ai-search';
 import { useSearchResults } from '@/hooks/useSearchResults';
+import { LoginPromptModal } from '@/components/auth/LoginPromptModal';
+import type { LinkedInFilters } from '@/lib/types/linkedin-filters';
+
+const GUEST_QUERY_LIMIT = 5;
+const GUEST_QUERY_KEY = 'signl_guest_queries';
 
 export interface DisplayMessage {
   id: string;
@@ -40,6 +45,7 @@ interface MainSearchViewProps {
   pendingFilters: ParsedFilters | null;
   onQueryProcessed: () => void;
   aiMode?: boolean;
+  isAuthenticated?: boolean;
   // Lifted state from AppShell
   messages: DisplayMessage[];
   setMessages: React.Dispatch<React.SetStateAction<DisplayMessage[]>>;
@@ -76,6 +82,7 @@ export function MainSearchView({
   pendingFilters,
   onQueryProcessed,
   aiMode,
+  isAuthenticated = true,
   messages,
   setMessages,
   currentFilters,
@@ -87,9 +94,46 @@ export function MainSearchView({
 }: MainSearchViewProps) {
   const hook = useSearchResults({ initialRemainingDaily });
 
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const [loginPromptReason, setLoginPromptReason] = useState<'query_limit' | 'send_email'>('query_limit');
+  const [isHydrated, setIsHydrated] = useState(false);
+
   const lastProcessedQueryRef = useRef<string | null>(null);
   const lastProcessedFiltersRef = useRef<string | null>(null);
   const searchIdRef = useRef(0);
+
+  // Guest query counter
+  const getGuestQueryCount = useCallback(() => {
+    if (isAuthenticated) return 0;
+    try {
+      return parseInt(sessionStorage.getItem(GUEST_QUERY_KEY) || '0', 10);
+    } catch {
+      return 0;
+    }
+  }, [isAuthenticated]);
+
+  const incrementGuestQueryCount = useCallback(() => {
+    if (isAuthenticated) return 0;
+    try {
+      const current = parseInt(sessionStorage.getItem(GUEST_QUERY_KEY) || '0', 10);
+      const newCount = current + 1;
+      sessionStorage.setItem(GUEST_QUERY_KEY, String(newCount));
+      return newCount;
+    } catch {
+      return 0;
+    }
+  }, [isAuthenticated]);
+
+  const checkGuestQueryLimit = useCallback(() => {
+    if (isAuthenticated) return false;
+    const count = getGuestQueryCount();
+    if (count >= GUEST_QUERY_LIMIT) {
+      setLoginPromptReason('query_limit');
+      setShowLoginPrompt(true);
+      return true;
+    }
+    return false;
+  }, [isAuthenticated, getGuestQueryCount]);
 
   // Restore state from sessionStorage on mount
   useEffect(() => {
@@ -119,6 +163,7 @@ export function MainSearchView({
     } catch {
       try { sessionStorage.removeItem(STORAGE_KEY); } catch {}
     }
+    setIsHydrated(true);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -172,56 +217,67 @@ export function MainSearchView({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hook]);
 
-  const runSearch = useCallback(async (filters: ParsedFilters) => {
-    if (!filters.company) return;
+  const runSearch = useCallback(async (filters: ParsedFilters, liFilters?: LinkedInFilters, originalQuery?: string) => {
+    // Check guest query limit before searching
+    if (checkGuestQueryLimit()) {
+      setIsSearching(false);
+      return;
+    }
 
     const thisSearchId = searchIdRef.current;
-    console.log(`[Search] Starting search #${thisSearchId} for company="${filters.company}" role="${filters.role || '(any)'}"`);
 
+    // Build query string and LinkedIn filters for V2
+    const query = originalQuery || [filters.role, filters.company, filters.university, filters.location].filter(Boolean).join(' at ');
+    const effectiveLiFilters: LinkedInFilters = liFilters || {
+      searchQuery: [filters.role, filters.company].filter(Boolean).join(' '),
+      locations: filters.location ? [filters.location] : undefined,
+    };
+    const effectiveDbFilters = {
+      company: filters.company,
+      role: filters.role,
+      location: filters.location,
+      university: filters.university,
+      roleSpecificity: filters.roleSpecificity,
+    };
+
+    console.log(`[Search] Starting V2 search #${thisSearchId} query="${query}"`);
     setIsSearching(true);
     hook.resetResults();
 
-    const result = await searchPeopleAction({
-      company: filters.company,
-      role: filters.role,
-      university: filters.university,
-      location: filters.location,
-      limit: 6,
+    const result = await searchPeopleV2Action({
+      query,
+      linkedInFilters: effectiveLiFilters,
+      dbFilters: effectiveDbFilters,
+      limit: 25,
     });
 
-    // Stale check: discard if search was cancelled or a new search started
     if (searchIdRef.current !== thisSearchId) {
-      console.log(`[Search] Discarding stale result from search #${thisSearchId} (current is #${searchIdRef.current})`);
+      console.log(`[Search] Discarding stale V2 result from search #${thisSearchId}`);
       return;
     }
 
     if (result.success) {
-      console.log(`[Search] Search #${thisSearchId} returned ${result.results.length} results`);
+      console.log(`[Search] V2 search #${thisSearchId} returned ${result.results.length} results, advanced=${result.searchMeta.isAdvancedQuery}`);
+      incrementGuestQueryCount();
 
-      hook.applySearchResults(result.results, result.searchMeta, result.hiddenCount, {
-        company: filters.company,
-        role: filters.role,
-        university: filters.university,
-        location: filters.location,
-        limit: 6,
-      });
-
-      // Fire-and-forget prescrape
-      if (result.results.length > 0) {
-        console.log(`[Search] Firing prescrape for search #${thisSearchId}`);
-        fetch('/api/prescrape', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            company: filters.company,
-            role: filters.role,
-            university: filters.university,
-            location: filters.location,
-          }),
-        }).catch(err => console.error('[Prescrape] Error:', err));
-      }
+      hook.applySearchResults(
+        result.results,
+        result.searchMeta,
+        result.hiddenCount,
+        {
+          company: filters.company,
+          role: filters.role,
+          university: filters.university,
+          location: filters.location,
+          limit: 25,
+        },
+        {
+          linkedInFilters: effectiveLiFilters,
+          dbFilters: effectiveDbFilters,
+        }
+      );
     } else {
-      console.log(`[Search] Search #${thisSearchId} failed:`, result.error);
+      console.log(`[Search] V2 search #${thisSearchId} failed:`, result.error);
     }
 
     setIsSearching(false);
@@ -357,7 +413,8 @@ export function MainSearchView({
       return;
     }
 
-    // status === 'ready'
+    // status === 'ready' — set isSearching in the same batch as the message
+    // so the main UI loading state stays in sync with the chat message
     setMessages(prev =>
       prev.map(m =>
         m.id === assistantMsgId
@@ -366,8 +423,10 @@ export function MainSearchView({
       )
     );
     setIsExtracting(false);
+    setIsSearching(true);
+    hook.resetResults();
 
-    await runSearch(filters);
+    await runSearch(filters, extractResult.linkedInFilters, text);
   }, [isExtracting, isSearching, messages, currentFilters, runSearch]);
 
 
@@ -395,6 +454,8 @@ export function MainSearchView({
           role: 'assistant',
           content: `Searching for ${label}...`,
         }]);
+        setIsSearching(true);
+        hook.resetResults();
 
         runSearch(pendingFilters);
         onQueryProcessed();
@@ -418,6 +479,8 @@ export function MainSearchView({
         ...prev,
         { id: `assistant-${Date.now()}`, role: 'assistant', content: `Removed ${key} filter. Updating results...` },
       ]);
+      setIsSearching(true);
+      hook.resetResults();
       await runSearch(updated);
     }
   };
@@ -436,7 +499,7 @@ export function MainSearchView({
           </div>
         )}
 
-        {showChat && messages.length === 0 && !hasResults && activeFilterEntries.length === 0 && (
+        {showChat && messages.length === 0 && !hasResults && activeFilterEntries.length === 0 && isHydrated && (
           <IdleAnimation />
         )}
 
@@ -552,6 +615,18 @@ export function MainSearchView({
             hook.setToast({ message: `+${credits} email credits added!`, type: 'success' });
             dispatchCreditsChanged();
           }}
+        />
+
+        {/* Login prompt for guests */}
+        <LoginPromptModal
+          isOpen={showLoginPrompt}
+          onClose={() => setShowLoginPrompt(false)}
+          title={loginPromptReason === 'query_limit' ? 'Sign in to continue' : 'Sign in to send emails'}
+          message={
+            loginPromptReason === 'query_limit'
+              ? "You've used your 5 free searches. Sign in to unlock unlimited searches and start sending emails."
+              : 'Sign in with Google to send personalized emails directly from your Gmail account.'
+          }
         />
       </div>
     </div>

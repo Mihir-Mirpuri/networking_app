@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { AppWrapper } from '@/components/layout/AppWrapper';
+import { AppShell } from '@/components/layout/AppShell';
 import prisma from '@/lib/prisma';
 
 const DAILY_LIMIT = 30;
@@ -49,7 +49,7 @@ export default async function AppPage() {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { onboardingCompleted: true },
+    select: { onboardingCompleted: true, subscriptionStatus: true },
   });
 
   if (!user?.onboardingCompleted) {
@@ -57,6 +57,7 @@ export default async function AppPage() {
   }
 
   const remainingDaily = await getRemainingDailyLimit(session.user.id);
+  const isSubscribed = user?.subscriptionStatus === 'active' || user?.subscriptionStatus === 'trialing';
 
-  return <AppWrapper initialRemainingDaily={remainingDaily} />;
+  return <AppShell initialRemainingDaily={remainingDaily} isSubscribed={isSubscribed} />;
 }

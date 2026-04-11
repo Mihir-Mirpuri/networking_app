@@ -307,8 +307,7 @@ async function scrapeOnePage(
   // Update scrape progress
   await updateScrapeProgress(searchId, pageStart, cseResults.length, {
     cseCallsMade: 1,
-    linkedinScraperCalls: urlsToScrape.length > 0 ? 1 : 0,
-    profilesAdded: newPeople,
+    newProfileCount: newPeople,
   });
 
   return {

@@ -47,6 +47,7 @@ model User {
   career                     String?
   onboardingCompleted        Boolean                      @default(false)
   dailySendCount             Int                          @default(0)
+  totalSendCount             Int                          @default(0)
   lastSendDate               DateTime?
   calendarConnected          Boolean                      @default(false)
   // Credit system fields
@@ -124,19 +125,21 @@ model Person {
   schools                 Json? // Array of all schools (normalized)
   experienceHistory       Json? // Full work history from LinkedIn [{ position, companyName, location }]
   educationHistory        Json? // Full education from LinkedIn [{ schoolName, degree, fieldOfStudy }]
+  scrapeDepth             String                       @default("full") // "short" or "full"
+  pictureUrl              String?
+  tenureMonths            Int?
+  openProfile             Boolean?
+  premium                 Boolean?
   role_embedding          Unsupported("vector(1536)")? // pgvector embedding for semantic role matching
   createdAt               DateTime                     @default(now())
   updatedAt               DateTime                     @updatedAt
   sourceLinks             SourceLink[]
   userCandidates          UserCandidate[]
-  searchPeople            SearchPerson[]
   insights                PersonInsight[]
 
   @@unique([fullName, company])
-  @@index([fullName, company])
   @@index([emailStatus])
-  @@index([apolloEnrichedAt]) // For TTL queries (legacy)
-  @@index([apolloStatus]) // For filtering by enrichment status (legacy)
+  @@index([apolloEnrichedAt]) // For TTL queries
   @@index([scrapedAt]) // For TTL queries - check if data is stale
   @@index([linkedinUrl]) // For cache lookup by LinkedIn URL
 }
@@ -149,6 +152,8 @@ model Search {
   university            String?
   location              String?
   queryHash             String? // SHA-256 hash of exact Serper query string for dedup
+  rawQuery              String? // Original natural language query (v2 flow)
+  parsedFilters         Json?   // Full Haiku output: { dbFilters, linkedInFilters } (v2 flow)
   // Scrape progress tracking
   lastCsePageScraped    Int            @default(0) // Now stores Serper page number (1,2,3...) not CSE start offset
   cseExhausted          Boolean        @default(false) // true when exhaustion detected
@@ -156,33 +161,22 @@ model Search {
   apolloCallsMade       Int            @default(0)
   apolloCacheHits       Int            @default(0)
   cseCallsMade          Int            @default(0)
-  linkedinScraperCalls  Int            @default(0)
-  profilesAdded         Int            @default(0) // New Person records created
-  profilesMatchedSearch Int            @default(0) // Of those added, how many matched role/uni/location filters
+  // New cost tracking (Short Profile Discovery flow)
+  haikuCalls            Int            @default(0)
+  shortModePages        Int            @default(0)
+  fullScrapeCalls       Int            @default(0)
+  totalCostCents        Float          @default(0)
+  costBreakdown         Json?          // { haiku, shortMode, fullScrape, serper }
+  totalLinkedInMatches  Int?           // totalElements from Short mode pagination — null if API not called
   prescrapeStatus       String? // null=not started, 'RUNNING'=in progress, 'DONE'=completed
   lastPrescrapeNewCount Int            @default(0) // New profiles added by the most recent prescrape page
   completedAt           DateTime?
   createdAt             DateTime       @default(now())
   updatedAt             DateTime       @default(now()) @updatedAt
-  searchPeople          SearchPerson[] // Kept for production compatibility — no longer used by new code
 
   @@index([createdAt])
   @@index([completedAt])
   @@index([queryHash])
-  @@index([company, name, role, university, location]) // Composite for param lookup
-}
-
-model SearchPerson {
-  id        String   @id @default(cuid())
-  searchId  String
-  personId  String
-  createdAt DateTime @default(now())
-  search    Search   @relation(fields: [searchId], references: [id], onDelete: Cascade)
-  person    Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
-
-  @@unique([searchId, personId])
-  @@index([searchId])
-  @@index([personId])
 }
 
 model UserCandidate {
@@ -192,7 +186,6 @@ model UserCandidate {
   email                String?
   emailStatus          EmailStatus      @default(MISSING)
   emailConfidence      Float?
-  manualEmailConfirmed Boolean          @default(false)
   doNotShow            Boolean          @default(false)
   savedForLater        Boolean          @default(false)
   university           String?
@@ -279,9 +272,6 @@ model EmailDraft {
   subject         String
   body            String
   status          EmailDraftStatus @default(PENDING)
-  userEdited      Boolean          @default(false)
-  editedSubject   String?
-  editedBody      String?
   attachResume    Boolean          @default(false)
   resumeId        String?
   createdAt       DateTime         @default(now())
@@ -323,7 +313,6 @@ model SendLog {
   @@index([userCandidateId])
   @@index([status])
   @@index([sentAt])
-  @@index([gmailMessageId])
   @@index([gmailThreadId])
   @@index([outreachTrackerId])
 }
@@ -536,14 +525,12 @@ model CompanyEmailPattern {
   sampleSize        Int      @default(0) // number of emails used to determine pattern
   acceptAll         Boolean? // true = catch-all domain (can't verify individual emails), false = can verify, null = unchecked
   unverifiable      Boolean  @default(false) // true = SMTP blocks verification (unavailable_smtp), trust pattern
-  searchable        Boolean  @default(false) // true = users can search this company
   useApolloFallback Boolean  @default(false) // true = inconsistent patterns, call Apollo per-person
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
   @@unique([company, domain])
   @@index([company])
-  @@index([searchable])
 }
 
 model SearchLog {
@@ -554,7 +541,6 @@ model SearchLog {
   university   String?
   location     String?
   resultsCount Int      @default(0) // How many results were returned
-  fromCache    Boolean  @default(false)
   searchedAt   DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -716,4 +702,18 @@ model PersonInsight {
   person      Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
 
   @@index([personId])
+}
+
+model CompanyUrl {
+  id        String   @id @default(cuid())
+  name      String   @unique // normalized company name (lowercase, trimmed)
+  url       String   // LinkedIn company URL
+  createdAt DateTime @default(now())
+}
+
+model RoleEmbedding {
+  id        String                          @id @default(cuid())
+  role      String                          @unique // normalized: lowercase, trimmed
+  embedding Unsupported("vector(1536)")
+  createdAt DateTime                        @default(now())
 }

@@ -73,6 +73,7 @@ const config: Config = {
         'pulse-soft': 'pulse-soft 2s infinite',
         'bounce-dot': 'bounce-dot 1.4s ease-in-out infinite',
         'ripple': 'ripple 2s cubic-bezier(0, 0.2, 0.8, 1) infinite',
+        'bookmark-pop': 'bookmark-pop 0.35s cubic-bezier(0.68, -0.55, 0.265, 1.55)',
       },
       keyframes: {
         'fade-in': {
@@ -110,6 +111,11 @@ const config: Config = {
         'ripple': {
           '0%': { transform: 'scale(1)', opacity: '0.6' },
           '100%': { transform: 'scale(2.5)', opacity: '0' },
+        },
+        'bookmark-pop': {
+          '0%': { transform: 'scale(1)' },
+          '50%': { transform: 'scale(1.35)' },
+          '100%': { transform: 'scale(1)' },
         },
       },
       transitionTimingFunction: {

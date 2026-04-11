@@ -86,8 +86,11 @@ export async function getOrExtractInsights(
   });
 
   if (!person) {
+    console.warn(`[PersonInsights] Person ${personId} not found in DB`);
     return { insights: [], fromCache: false };
   }
+
+  console.log(`[PersonInsights] Extracting insights for "${person.fullName}" at "${person.company}"`);
 
   // 3. Google search via Serper — two parallel queries for better coverage:
   //    - Name only: catches personal pages for unique names
@@ -95,6 +98,7 @@ export async function getOrExtractInsights(
   let serperSnippets = '';
   let serperResults: Array<{ title: string; link: string; snippet: string }> = [];
   try {
+    const serperStart = Date.now();
     const [nameResults, nameCompanyResults] = await Promise.all([
       searchSerper(`"${person.fullName}"`),
       searchSerper(`"${person.fullName}" "${person.company}"`),
@@ -113,8 +117,9 @@ export async function getOrExtractInsights(
     serperSnippets = serperResults
       .map((r) => `- [${r.link}] ${r.title}: ${r.snippet}`)
       .join('\n');
+    console.log(`[PersonInsights] Serper returned ${nameResults.length} + ${nameCompanyResults.length} results (${serperResults.length} unique) in ${Date.now() - serperStart}ms`);
   } catch (err) {
-    console.error('[person-insights] Serper search failed:', err);
+    console.error(`[PersonInsights] Serper search failed for "${person.fullName}":`, err);
   }
 
   // 4. Build context from DB fields
@@ -125,6 +130,7 @@ export async function getOrExtractInsights(
     .join('\n');
 
   // 5. LLM extraction
+  const llmStart = Date.now();
   try {
     const systemPrompt = `You are a research assistant helping craft personalized cold emails.
 
@@ -181,7 +187,7 @@ ${serperSnippets || '(none)'}`;
       userPrompt,
       model: 'claude-haiku-4-5-20251001',
       temperature: 0.3,
-      maxTokens: 1500,
+      maxTokens: 4096,
       metadata: {
         userId,
         action: GroqAction.PERSON_INSIGHT_EXTRACTION,
@@ -189,6 +195,7 @@ ${serperSnippets || '(none)'}`;
     });
 
     const extractedInsights = response.content.insights || [];
+    console.log(`[PersonInsights] LLM extracted ${extractedInsights.length} insights for "${person.fullName}" in ${Date.now() - llmStart}ms`);
 
     // 6. Persist to DB
     if (extractedInsights.length > 0) {
@@ -227,9 +234,10 @@ ${serperSnippets || '(none)'}`;
       };
     }
 
+    console.log(`[PersonInsights] No insights found for "${person.fullName}"`);
     return { insights: [], fromCache: false };
   } catch (err) {
-    console.error('[person-insights] LLM extraction failed:', err);
+    console.error(`[PersonInsights] LLM extraction failed for "${person.fullName}" after ${Date.now() - llmStart}ms:`, err);
     return { insights: [], fromCache: false };
   }
 }

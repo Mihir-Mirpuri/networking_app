@@ -3,7 +3,7 @@ import { SearchResult } from '@/lib/services/discovery';
 import { EmailResult, EducationInfo, EmploymentInfo } from '@/lib/services/enrichment';
 import { EmailStatus } from '@prisma/client';
 import { ScrapedProfile } from '@/lib/services/linkedin-scraper';
-import { getSearchRoleEmbedding } from '@/lib/services/embeddings';
+import { getSearchRoleEmbedding, stampPersonRoleEmbedding } from '@/lib/services/embeddings';
 import { Prisma } from '@prisma/client';
 
 /**
@@ -456,7 +456,6 @@ export async function saveSearchResult(
 ): Promise<{
   personId: string;
   userCandidateId: string;
-  emailDraftId: string;
   linkedinUrl: string | null;
 }> {
   // Extract LinkedIn URL
@@ -563,13 +562,9 @@ export async function saveSearchResult(
     university,
   });
 
-  // 5. Create/update EmailDraft
-  const emailDraft = await createOrUpdateEmailDraft(userCandidate.id, draftData);
-
   return {
     personId: person.id,
     userCandidateId: userCandidate.id,
-    emailDraftId: emailDraft.id,
     linkedinUrl: finalLinkedInUrl,
   };
 }
@@ -735,6 +730,7 @@ export interface PersonFilters {
   location?: string;         // Optional - city ILIKE match
   role?: string;             // Optional - role ILIKE match
   university?: string;       // Optional - educationSchool ILIKE match
+  roleSpecificity?: 'narrow' | 'standard' | 'broad'; // Controls vector similarity threshold
   requireEmail?: boolean;    // Default true - only return people with emails
   excludePersonIds?: string[]; // Person IDs to exclude (already displayed + sent/hidden)
   limit: number;
@@ -877,7 +873,7 @@ async function getSchoolMatchIds(university: string): Promise<string[]> {
  * Apply post-query filtering: company fuzzy match.
  * Person exclusions (sent/hidden) are handled at the DB level via excludePersonIds.
  */
-export function applyPostQueryFilters<T extends { company: string }>(
+function applyPostQueryFilters<T extends { company: string }>(
   people: T[],
   searchCompany: string | string[] | undefined
 ): T[] {
@@ -917,6 +913,7 @@ export type PersonResult = {
   educationDegree: string | null;
   educationField: string | null;
   educationYear: string | null;
+  scrapeDepth?: string;
   roleDistance?: number;
   sourceLinks: Array<{
     url: string;
@@ -983,6 +980,7 @@ export async function findPeopleByFilters(filters: PersonFilters): Promise<Perso
       educationDegree: true,
       educationField: true,
       educationYear: true,
+      scrapeDepth: true,
       sourceLinks: {
         where: { kind: 'DISCOVERY' },
         orderBy: { createdAt: 'asc' },
@@ -1087,17 +1085,19 @@ async function findPeopleByFiltersVector(
   // Exclude people whose role indicates they haven't started yet (e.g., "Incoming Analyst")
   conditions.push(Prisma.sql`p.role !~* '^(incoming|future)\s+'`);
 
-  // Vector similarity threshold: only include people with embeddings that are close enough.
-  // Null embeddings are excluded — they'll get backfilled by the next prescrape/scrape cycle.
+  // Vector similarity threshold: dynamic based on role specificity bucket.
+  // Narrow (niche titles) = tight match, Standard = moderate, Broad (generic disciplines) = loose.
+  const SPECIFICITY_THRESHOLDS = { narrow: 0.28, standard: 0.38, broad: 0.48 } as const;
+  const threshold = SPECIFICITY_THRESHOLDS[filters.roleSpecificity || 'standard'];
   conditions.push(Prisma.sql`
     p.role_embedding IS NOT NULL
-    AND (p.role_embedding <=> ${vectorString}::vector) <= 0.55
+    AND (p.role_embedding <=> ${vectorString}::vector) <= ${threshold}
   `);
 
   const whereClause = Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}`;
   const fetchLimit = limit * 2; // Overfetch for post-query company filtering
 
-  console.log(`[VectorQuery] Filters: company=${company}, aliases=${filters.companyAliases?.length ?? 0}, location=${location}, university=${university}, requireEmail=${requireEmail}, excludeIds=${excludePersonIds?.length ?? 0}, threshold=0.55, fetchLimit=${fetchLimit}`);
+  console.log(`[VectorQuery] Filters: company=${company}, aliases=${filters.companyAliases?.length ?? 0}, location=${location}, university=${university}, requireEmail=${requireEmail}, excludeIds=${excludePersonIds?.length ?? 0}, bucket=${filters.roleSpecificity || 'standard'}, threshold=${threshold}, fetchLimit=${fetchLimit}`);
 
   const rows = await prisma.$queryRaw<Array<{
     id: string;
@@ -1120,6 +1120,7 @@ async function findPeopleByFiltersVector(
     educationDegree: string | null;
     educationField: string | null;
     educationYear: string | null;
+    scrapeDepth: string;
     role_distance: number;
   }>>(Prisma.sql`
     SELECT
@@ -1143,6 +1144,7 @@ async function findPeopleByFiltersVector(
       p."educationDegree",
       p."educationField",
       p."educationYear",
+      p."scrapeDepth",
       (p.role_embedding <=> ${vectorString}::vector) as role_distance
     FROM "Person" p
     ${whereClause}
@@ -1252,6 +1254,7 @@ export async function findPeopleByName(params: {
       educationDegree: true,
       educationField: true,
       educationYear: true,
+      scrapeDepth: true,
       sourceLinks: {
         where: { kind: 'DISCOVERY' },
         orderBy: { createdAt: 'asc' as const },
@@ -1543,6 +1546,12 @@ export async function saveScrapedProfile(
   searchCompany: string, // Fallback if scraper didn't find company
   searchUniversity?: string | null // Fallback if scraper didn't find school
 ): Promise<{ personId: string; isNew: boolean; role: string | null }> {
+  // Drop profiles missing linkedinUrl — should never happen, but guard against silent merge
+  if (!profile.linkedinUrl) {
+    console.warn(`[saveScrapedProfile] Skipping "${profile.fullName}" at "${searchCompany}" — missing linkedinUrl`);
+    return { personId: '', isNew: false, role: profile.role };
+  }
+
   // Use scraped company or fall back to search company, then normalize
   const rawCompany = profile.company || searchCompany;
   const company = normalizeCompanyForStorage(rawCompany);
@@ -1585,6 +1594,8 @@ export async function saveScrapedProfile(
       },
     });
 
+    // Fire-and-forget: stamp role embedding from cache
+    if (profile.role) stampPersonRoleEmbedding(existingByUrl.id, profile.role).catch(() => {});
     return { personId: existingByUrl.id, isNew: false, role: profile.role };
   }
 
@@ -1596,11 +1607,21 @@ export async function saveScrapedProfile(
         company,
       },
     },
-    select: { id: true },
+    select: { id: true, linkedinUrl: true },
   });
 
   if (existingByName) {
-    // Update with LinkedIn URL and fresh data
+    // Only backfill when existing row has no linkedinUrl (legacy Apollo/Serper rows).
+    // If it has a different URL, we're looking at two distinct humans with the same
+    // name+company — skip rather than silently merging them.
+    if (existingByName.linkedinUrl !== null) {
+      console.warn(
+        `[saveScrapedProfile] Name collision: skipping save. existingPersonId=${existingByName.id} existingLinkedinUrl=${existingByName.linkedinUrl} incomingLinkedinUrl=${profile.linkedinUrl} fullName="${profile.fullName}" company="${company}"`
+      );
+      return { personId: '', isNew: false, role: profile.role };
+    }
+
+    // Backfill legacy null-URL row with LinkedIn URL and fresh data
     await prisma.person.update({
       where: { id: existingByName.id },
       data: {
@@ -1620,6 +1641,8 @@ export async function saveScrapedProfile(
       },
     });
 
+    // Fire-and-forget: stamp role embedding from cache
+    if (profile.role) stampPersonRoleEmbedding(existingByName.id, profile.role).catch(() => {});
     return { personId: existingByName.id, isNew: false, role: profile.role };
   }
 
@@ -1660,6 +1683,8 @@ export async function saveScrapedProfile(
       },
     });
 
+    // Fire-and-forget: stamp role embedding from cache
+    if (profile.role) stampPersonRoleEmbedding(person.id, profile.role).catch(() => {});
     return { personId: person.id, isNew: true, role: profile.role };
   } catch (error: any) {
     // P2002 = Prisma unique constraint violation (concurrent scrape created this person)
@@ -1667,9 +1692,17 @@ export async function saveScrapedProfile(
       console.log(`[saveScrapedProfile] Duplicate detected for "${profile.fullName}" at "${company}", falling back to update`);
       const existing = await prisma.person.findUnique({
         where: { fullName_company: { fullName: profile.fullName, company } },
-        select: { id: true },
+        select: { id: true, linkedinUrl: true },
       });
       if (existing) {
+        // Only update if the existing row is safe to merge into: either has no
+        // URL yet (backfill) or already has the same URL (idempotent update).
+        if (existing.linkedinUrl !== null && existing.linkedinUrl !== profile.linkedinUrl) {
+          console.warn(
+            `[saveScrapedProfile] P2002 collision: skipping update. existingPersonId=${existing.id} existingLinkedinUrl=${existing.linkedinUrl} incomingLinkedinUrl=${profile.linkedinUrl} fullName="${profile.fullName}" company="${company}"`
+          );
+          return { personId: '', isNew: false, role: profile.role };
+        }
         await prisma.person.update({
           where: { id: existing.id },
           data: {
@@ -1688,9 +1721,548 @@ export async function saveScrapedProfile(
             scrapedAt: new Date(),
           },
         });
+        // Fire-and-forget: stamp role embedding from cache
+        if (profile.role) stampPersonRoleEmbedding(existing.id, profile.role).catch(() => {});
         return { personId: existing.id, isNew: false, role: profile.role };
       }
     }
     throw error;
   }
+}
+
+// ─── Full Profile Upgrade (Phase 3 Step 2) ─────────────────────────────────
+
+/**
+ * Upgrade a short profile to full by applying scraped LinkedIn data.
+ *
+ * - Only overwrites fields where scraped value is non-null (preserves pictureUrl, tenureMonths)
+ * - Does NOT update company (short profile already has correct company)
+ * - Sets scrapeDepth = "full" and scrapedAt = now
+ */
+export async function upgradeToFullProfile(
+  personId: string,
+  profile: ScrapedProfile
+): Promise<void> {
+  const data: Record<string, unknown> = {
+    scrapeDepth: 'full',
+    scrapedAt: new Date(),
+  };
+
+  if (profile.role) data.role = profile.role;
+  if (profile.email) {
+    data.email = profile.email;
+    data.emailStatus = getEmailStatus(profile.email);
+    data.emailConfidence = 50;
+  }
+  if (profile.city) data.city = profile.city;
+  if (profile.state) data.state = profile.state;
+  if (profile.country) data.country = profile.country;
+  if (profile.schools.length > 0) data.schools = profile.schools;
+  if (profile.educationSchool) data.educationSchool = profile.educationSchool;
+  if (profile.experienceHistory?.length) data.experienceHistory = profile.experienceHistory;
+  if (profile.educationHistory?.length) data.educationHistory = profile.educationHistory;
+  if (profile.linkedinUrl) data.linkedinUrl = profile.linkedinUrl;
+
+  await prisma.person.update({
+    where: { id: personId },
+    data,
+  });
+
+  // Fire-and-forget: stamp role embedding from cache
+  if (profile.role) stampPersonRoleEmbedding(personId, profile.role).catch(() => {});
+}
+
+// ─── Short Profile Save (Phase 3: LinkedIn Short Profile Discovery) ────────
+
+import type { ShortProfileResult } from '@/lib/services/linkedin-search';
+
+/**
+ * Save a short profile from LinkedIn Short mode search to the Person table.
+ *
+ * - Deduplicates on linkedinUrl first, then fullName+company
+ * - Does NOT overwrite full profiles with short data (preserves richer data)
+ * - Optionally tags with school when search used schools filter
+ * - Sets scrapeDepth = "short" for new profiles
+ *
+ * @returns personId and whether a new Person was created
+ */
+export async function saveShortProfile(
+  profile: ShortProfileResult,
+  schoolTag?: string | null
+): Promise<{ personId: string; isNew: boolean }> {
+  const company = normalizeCompanyForStorage(profile.company || 'Unknown');
+  const fullName = profile.fullName || `${profile.firstName} ${profile.lastName}`.trim();
+
+  if (!fullName) {
+    console.warn(`[saveShortProfile] Skipping profile with no name`);
+    throw new Error('Cannot save profile without a name');
+  }
+
+  // Drop profiles missing linkedinUrl — LinkedIn Short API always returns one;
+  // falling through the name+company branch would risk silently merging humans.
+  if (!profile.linkedinUrl) {
+    console.warn(`[saveShortProfile] Skipping "${fullName}" at "${company}" — missing linkedinUrl`);
+    return { personId: '', isNew: false };
+  }
+
+  // 1. Check by linkedinUrl first (most reliable dedup)
+  const existingByUrl = await prisma.person.findFirst({
+    where: { linkedinUrl: profile.linkedinUrl },
+    select: { id: true, scrapeDepth: true },
+  });
+
+  if (existingByUrl) {
+    // Don't overwrite full profiles with short data
+    if (existingByUrl.scrapeDepth === 'full') {
+      // Still tag with school if missing
+      if (schoolTag) {
+        await prisma.person.update({
+          where: { id: existingByUrl.id },
+          data: {
+            educationSchool: schoolTag,
+            schools: [schoolTag],
+          },
+        });
+      }
+      return { personId: existingByUrl.id, isNew: false };
+    }
+
+    // Update existing short profile with fresh data
+    await prisma.person.update({
+      where: { id: existingByUrl.id },
+      data: {
+        fullName,
+        firstName: profile.firstName || undefined,
+        lastName: profile.lastName || undefined,
+        company,
+        role: profile.role || undefined,
+        city: profile.city || undefined,
+        state: profile.state || undefined,
+        country: profile.country || undefined,
+        pictureUrl: profile.pictureUrl || undefined,
+        tenureMonths: profile.tenureMonths ?? undefined,
+        openProfile: profile.openProfile,
+        premium: profile.premium,
+        ...(schoolTag && {
+          educationSchool: schoolTag,
+          schools: [schoolTag],
+        }),
+      },
+    });
+    // Fire-and-forget: stamp role embedding from cache
+    if (profile.role) stampPersonRoleEmbedding(existingByUrl.id, profile.role).catch(() => {});
+    return { personId: existingByUrl.id, isNew: false };
+  }
+
+  // 2. Check by fullName + company (legacy backfill only)
+  const existingByName = await prisma.person.findUnique({
+    where: { fullName_company: { fullName, company } },
+    select: { id: true, linkedinUrl: true, scrapeDepth: true },
+  });
+
+  if (existingByName) {
+    // Collision: same name+company but a DIFFERENT non-null URL = different human.
+    // Skip rather than silently merging.
+    if (existingByName.linkedinUrl !== null && existingByName.linkedinUrl !== profile.linkedinUrl) {
+      console.warn(
+        `[saveShortProfile] Name collision: skipping save. existingPersonId=${existingByName.id} existingLinkedinUrl=${existingByName.linkedinUrl} incomingLinkedinUrl=${profile.linkedinUrl} fullName="${fullName}" company="${company}"`
+      );
+      return { personId: '', isNew: false };
+    }
+
+    // If existing row is full-depth, only backfill URL + school tag — preserve richer data
+    if (existingByName.scrapeDepth === 'full') {
+      await prisma.person.update({
+        where: { id: existingByName.id },
+        data: {
+          linkedinUrl: profile.linkedinUrl,
+          ...(schoolTag && {
+            educationSchool: schoolTag,
+            schools: [schoolTag],
+          }),
+        },
+      });
+      return { personId: existingByName.id, isNew: false };
+    }
+
+    // Short-depth row with null URL — full update + URL backfill
+    await prisma.person.update({
+      where: { id: existingByName.id },
+      data: {
+        linkedinUrl: profile.linkedinUrl,
+        role: profile.role || undefined,
+        city: profile.city || undefined,
+        state: profile.state || undefined,
+        country: profile.country || undefined,
+        pictureUrl: profile.pictureUrl || undefined,
+        tenureMonths: profile.tenureMonths ?? undefined,
+        openProfile: profile.openProfile,
+        premium: profile.premium,
+        ...(schoolTag && {
+          educationSchool: schoolTag,
+          schools: [schoolTag],
+        }),
+      },
+    });
+    // Fire-and-forget: stamp role embedding from cache
+    if (profile.role) stampPersonRoleEmbedding(existingByName.id, profile.role).catch(() => {});
+    return { personId: existingByName.id, isNew: false };
+  }
+
+  // 3. Create new short profile
+  try {
+    const person = await prisma.person.create({
+      data: {
+        fullName,
+        firstName: profile.firstName || null,
+        lastName: profile.lastName || null,
+        company,
+        role: profile.role || null,
+        linkedinUrl: profile.linkedinUrl || null,
+        city: profile.city || null,
+        state: profile.state || null,
+        country: profile.country || null,
+        pictureUrl: profile.pictureUrl || null,
+        tenureMonths: profile.tenureMonths ?? null,
+        openProfile: profile.openProfile,
+        premium: profile.premium,
+        scrapeDepth: 'short',
+        ...(schoolTag && {
+          educationSchool: schoolTag,
+          schools: [schoolTag],
+        }),
+      },
+    });
+
+    console.log(`[saveShortProfile] Created short profile: "${fullName}" at "${company}" (${person.id})`);
+    // Fire-and-forget: stamp role embedding from cache
+    if (profile.role) stampPersonRoleEmbedding(person.id, profile.role).catch(() => {});
+    return { personId: person.id, isNew: true };
+  } catch (error: any) {
+    // Handle race condition (concurrent save)
+    if (error.code === 'P2002') {
+      console.log(`[saveShortProfile] Duplicate for "${fullName}" at "${company}" — fetching existing`);
+      const existing = await prisma.person.findUnique({
+        where: { fullName_company: { fullName, company } },
+        select: { id: true, linkedinUrl: true },
+      });
+      if (existing) {
+        if (existing.linkedinUrl !== null && existing.linkedinUrl !== profile.linkedinUrl) {
+          console.warn(
+            `[saveShortProfile] P2002 collision: skipping update. existingPersonId=${existing.id} existingLinkedinUrl=${existing.linkedinUrl} incomingLinkedinUrl=${profile.linkedinUrl} fullName="${fullName}" company="${company}"`
+          );
+          return { personId: '', isNew: false };
+        }
+        return { personId: existing.id, isNew: false };
+      }
+    }
+    throw error;
+  }
+}
+
+/**
+ * Batch version of saveShortProfile — saves multiple profiles with far fewer DB round-trips.
+ * Instead of 2-3 queries per profile, uses batch lookups and createMany.
+ */
+export async function saveShortProfilesBatch(
+  profiles: ShortProfileResult[],
+  schoolTag?: string | null
+): Promise<{ personId: string; isNew: boolean }[]> {
+  if (profiles.length === 0) return [];
+
+  const startTime = Date.now();
+
+  // ── 1. Normalize + filter ──
+  type NormalizedProfile = ShortProfileResult & { _fullName: string; _company: string; _index: number };
+  const normalized: NormalizedProfile[] = [];
+  const results: { personId: string; isNew: boolean }[] = profiles.map(() => ({ personId: '', isNew: false }));
+
+  for (let i = 0; i < profiles.length; i++) {
+    const p = profiles[i];
+    const company = normalizeCompanyForStorage(p.company || 'Unknown');
+    const fullName = p.fullName || `${p.firstName} ${p.lastName}`.trim();
+    if (!fullName) {
+      console.warn(`[saveShortProfilesBatch] Skipping profile at index ${i} with no name`);
+      continue;
+    }
+    // Drop profiles missing linkedinUrl — LinkedIn Short API always returns one;
+    // falling through the name+company branch would risk silently merging humans.
+    if (!p.linkedinUrl) {
+      console.warn(`[saveShortProfilesBatch] Skipping "${fullName}" at "${company}" at index ${i} — missing linkedinUrl`);
+      continue;
+    }
+    normalized.push({ ...p, _fullName: fullName, _company: company, _index: i });
+  }
+
+  if (normalized.length === 0) return results;
+
+  // ── 2. Batch lookup by LinkedIn URL ──
+  const urlsToLookup = normalized
+    .filter(p => !!p.linkedinUrl)
+    .map(p => p.linkedinUrl);
+  const uniqueUrls = Array.from(new Set(urlsToLookup));
+
+  const existingByUrl = uniqueUrls.length > 0
+    ? await prisma.person.findMany({
+        where: { linkedinUrl: { in: uniqueUrls } },
+        select: { id: true, linkedinUrl: true, scrapeDepth: true },
+      })
+    : [];
+
+  const urlToExisting = new Map(existingByUrl.map(p => [p.linkedinUrl!, p]));
+
+  // ── 3. Batch lookup by name+company (for profiles not matched by URL) ──
+  const unmatchedByUrl: NormalizedProfile[] = [];
+  const matchedByUrl: { profile: NormalizedProfile; existing: { id: string; scrapeDepth: string | null } }[] = [];
+
+  for (const p of normalized) {
+    const existing = p.linkedinUrl ? urlToExisting.get(p.linkedinUrl) : undefined;
+    if (existing) {
+      matchedByUrl.push({ profile: p, existing });
+    } else {
+      unmatchedByUrl.push(p);
+    }
+  }
+
+  // Deduplicate name+company pairs for the OR query
+  const nameCompanyPairs = unmatchedByUrl.map(p => ({ fullName: p._fullName, company: p._company }));
+  const uniquePairsMap = new Map<string, { fullName: string; company: string }>();
+  for (const pair of nameCompanyPairs) {
+    const key = `${pair.fullName}|||${pair.company}`;
+    if (!uniquePairsMap.has(key)) uniquePairsMap.set(key, pair);
+  }
+  const uniquePairs = Array.from(uniquePairsMap.values());
+
+  const existingByName = uniquePairs.length > 0
+    ? await prisma.person.findMany({
+        where: {
+          OR: uniquePairs.map(pair => ({
+            fullName: pair.fullName,
+            company: pair.company,
+          })),
+        },
+        select: { id: true, fullName: true, company: true, linkedinUrl: true, scrapeDepth: true },
+      })
+    : [];
+
+  const nameToExisting = new Map(
+    existingByName.map(p => [`${p.fullName}|||${p.company}`, p])
+  );
+
+  // ── 4. Categorize all profiles ──
+  type CategorizedProfile = NormalizedProfile & {
+    _existingId?: string;
+    _category: 'full' | 'update-url' | 'backfill-name' | 'collision' | 'new';
+  };
+  const categorized: CategorizedProfile[] = [];
+
+  for (const { profile, existing } of matchedByUrl) {
+    if (existing.scrapeDepth === 'full') {
+      categorized.push({ ...profile, _existingId: existing.id, _category: 'full' });
+    } else {
+      categorized.push({ ...profile, _existingId: existing.id, _category: 'update-url' });
+    }
+  }
+
+  for (const p of unmatchedByUrl) {
+    const key = `${p._fullName}|||${p._company}`;
+    const existing = nameToExisting.get(key);
+    if (existing) {
+      // Only backfill when the existing row has no URL. A different non-null URL
+      // means this is a different human with the same name+company — skip.
+      if (existing.linkedinUrl === null) {
+        if (existing.scrapeDepth === 'full') {
+          // Preserve richer data; the backfill-name loop below only touches URL + school
+          categorized.push({ ...p, _existingId: existing.id, _category: 'full' });
+        } else {
+          categorized.push({ ...p, _existingId: existing.id, _category: 'backfill-name' });
+        }
+      } else if (existing.linkedinUrl === p.linkedinUrl) {
+        // Defensive: primary URL match should have caught this, but if the batch URL
+        // lookup missed (e.g., casing), treat as a normal URL update.
+        if (existing.scrapeDepth === 'full') {
+          categorized.push({ ...p, _existingId: existing.id, _category: 'full' });
+        } else {
+          categorized.push({ ...p, _existingId: existing.id, _category: 'update-url' });
+        }
+      } else {
+        categorized.push({ ...p, _existingId: existing.id, _category: 'collision' });
+      }
+    } else {
+      categorized.push({ ...p, _category: 'new' });
+    }
+  }
+
+  // ── 4b. Log collisions and leave results empty ──
+  for (const p of categorized.filter(c => c._category === 'collision')) {
+    const existing = nameToExisting.get(`${p._fullName}|||${p._company}`);
+    console.warn(
+      `[saveShortProfilesBatch] Name collision: skipping save. existingPersonId=${p._existingId} existingLinkedinUrl=${existing?.linkedinUrl} incomingLinkedinUrl=${p.linkedinUrl} fullName="${p._fullName}" company="${p._company}"`
+    );
+    // results[p._index] already set to default empty entry
+  }
+
+  // ── 5. School-tag full-depth profiles ──
+  const fullDepthIds = categorized
+    .filter(p => p._category === 'full')
+    .map(p => p._existingId!)
+    .filter(Boolean);
+
+  if (fullDepthIds.length > 0 && schoolTag) {
+    await prisma.person.updateMany({
+      where: { id: { in: fullDepthIds } },
+      data: {
+        educationSchool: schoolTag,
+        schools: [schoolTag],
+      },
+    });
+  }
+
+  // Write results for full-depth profiles
+  for (const p of categorized.filter(c => c._category === 'full')) {
+    results[p._index] = { personId: p._existingId!, isNew: false };
+  }
+
+  // ── 6. Update existing short profiles (matched by URL) ──
+  for (const p of categorized.filter(c => c._category === 'update-url')) {
+    await prisma.person.update({
+      where: { id: p._existingId! },
+      data: {
+        fullName: p._fullName,
+        firstName: p.firstName || undefined,
+        lastName: p.lastName || undefined,
+        company: p._company,
+        role: p.role || undefined,
+        city: p.city || undefined,
+        state: p.state || undefined,
+        country: p.country || undefined,
+        pictureUrl: p.pictureUrl || undefined,
+        tenureMonths: p.tenureMonths ?? undefined,
+        openProfile: p.openProfile,
+        premium: p.premium,
+        ...(schoolTag && { educationSchool: schoolTag, schools: [schoolTag] }),
+      },
+    });
+    results[p._index] = { personId: p._existingId!, isNew: false };
+    if (p.role) stampPersonRoleEmbedding(p._existingId!, p.role).catch(() => {});
+  }
+
+  // ── 7. Backfill legacy null-URL rows (matched by name+company) ──
+  for (const p of categorized.filter(c => c._category === 'backfill-name')) {
+    await prisma.person.update({
+      where: { id: p._existingId! },
+      data: {
+        linkedinUrl: p.linkedinUrl,
+        role: p.role || undefined,
+        city: p.city || undefined,
+        state: p.state || undefined,
+        country: p.country || undefined,
+        pictureUrl: p.pictureUrl || undefined,
+        tenureMonths: p.tenureMonths ?? undefined,
+        openProfile: p.openProfile,
+        premium: p.premium,
+        ...(schoolTag && { educationSchool: schoolTag, schools: [schoolTag] }),
+      },
+    });
+    results[p._index] = { personId: p._existingId!, isNew: false };
+    if (p.role) stampPersonRoleEmbedding(p._existingId!, p.role).catch(() => {});
+  }
+
+  // ── 8. Create new profiles ──
+  const newProfiles = categorized.filter(c => c._category === 'new');
+
+  if (newProfiles.length > 0) {
+    // Intra-batch dedup by name+company. If two profiles share name+company but
+    // have DIFFERENT URLs, they're different humans — keep the first and treat
+    // the rest as collisions (leave results empty). Same URL = exact duplicate,
+    // safely merged (preserves test 9 behavior).
+    const firstByKey = new Map<string, CategorizedProfile>();
+    const deduplicatedNew: CategorizedProfile[] = [];
+    const intraBatchCollisions: CategorizedProfile[] = [];
+    for (const p of newProfiles) {
+      const key = `${p._fullName}|||${p._company}`;
+      const first = firstByKey.get(key);
+      if (!first) {
+        firstByKey.set(key, p);
+        deduplicatedNew.push(p);
+      } else if (first.linkedinUrl === p.linkedinUrl) {
+        // Exact duplicate in batch — safe to merge; resolved via createdMap below
+      } else {
+        intraBatchCollisions.push(p);
+      }
+    }
+
+    for (const p of intraBatchCollisions) {
+      const first = firstByKey.get(`${p._fullName}|||${p._company}`);
+      console.warn(
+        `[saveShortProfilesBatch] Intra-batch collision: skipping save. firstLinkedinUrl=${first?.linkedinUrl} incomingLinkedinUrl=${p.linkedinUrl} fullName="${p._fullName}" company="${p._company}"`
+      );
+      // results[p._index] stays as default empty entry
+    }
+
+    await prisma.person.createMany({
+      data: deduplicatedNew.map(p => ({
+        fullName: p._fullName,
+        firstName: p.firstName || null,
+        lastName: p.lastName || null,
+        company: p._company,
+        role: p.role || null,
+        linkedinUrl: p.linkedinUrl || null,
+        city: p.city || null,
+        state: p.state || null,
+        country: p.country || null,
+        pictureUrl: p.pictureUrl || null,
+        tenureMonths: p.tenureMonths ?? null,
+        openProfile: p.openProfile,
+        premium: p.premium,
+        scrapeDepth: 'short',
+        ...(schoolTag && { educationSchool: schoolTag, schools: [schoolTag] }),
+      })),
+      skipDuplicates: true,
+    });
+
+    // Fetch back IDs for the newly created profiles. Include linkedinUrl so we
+    // can defend against a late race where another writer already claimed the
+    // (name, company) slot with a different URL.
+    const newNameCompanyPairs = deduplicatedNew.map(p => ({ fullName: p._fullName, company: p._company }));
+    const createdPersons = await prisma.person.findMany({
+      where: {
+        OR: newNameCompanyPairs.map(pair => ({
+          fullName: pair.fullName,
+          company: pair.company,
+        })),
+      },
+      select: { id: true, fullName: true, company: true, linkedinUrl: true },
+    });
+
+    const createdMap = new Map(
+      createdPersons.map(p => [`${p.fullName}|||${p.company}`, p])
+    );
+
+    // Only resolve the deduplicated "first wins" entries AND any exact-duplicate
+    // siblings (same URL). Intra-batch collisions stay empty.
+    const collisionIndices = new Set(intraBatchCollisions.map(p => p._index));
+    for (const p of newProfiles) {
+      if (collisionIndices.has(p._index)) continue;
+      const key = `${p._fullName}|||${p._company}`;
+      const created = createdMap.get(key);
+      if (!created) continue;
+      // Defend against late race: only claim this row if the URL still matches
+      // (or was null at create time — shouldn't happen for new profiles, but safe).
+      if (created.linkedinUrl !== null && created.linkedinUrl !== p.linkedinUrl) {
+        console.warn(
+          `[saveShortProfilesBatch] Late race: skipping save. existingPersonId=${created.id} existingLinkedinUrl=${created.linkedinUrl} incomingLinkedinUrl=${p.linkedinUrl} fullName="${p._fullName}" company="${p._company}"`
+        );
+        continue;
+      }
+      results[p._index] = { personId: created.id, isNew: true };
+      if (p.role) stampPersonRoleEmbedding(created.id, p.role).catch(() => {});
+    }
+  }
+
+  const newCount = results.filter(r => r.isNew).length;
+  const existingCount = results.filter(r => r.personId && !r.isNew).length;
+  console.log(`[saveShortProfilesBatch] Saved ${profiles.length} profiles (${newCount} new, ${existingCount} existing) in ${Date.now() - startTime}ms`);
+
+  return results;
 }

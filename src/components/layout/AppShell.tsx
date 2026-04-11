@@ -9,9 +9,10 @@ import { EmailChatProvider } from '@/contexts/EmailChatContext';
 
 interface AppShellProps {
   initialRemainingDaily: number;
+  isSubscribed: boolean;
 }
 
-export function AppShell({ initialRemainingDaily }: AppShellProps) {
+export function AppShell({ initialRemainingDaily, isSubscribed }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pendingQuery, setPendingQuery] = useState<string | null>(null);
   const [pendingFilters, setPendingFilters] = useState<ParsedFilters | null>(null);
@@ -37,11 +38,6 @@ export function AppShell({ initialRemainingDaily }: AppShellProps) {
 
     // If company is set, trigger search via pending filters
     if (updated.company) {
-      const confirmMsgId = `assistant-${Date.now()}`;
-      setMessages(prev => [
-        ...prev,
-        { id: confirmMsgId, role: 'assistant', content: `Searching for ${updated.role ? `${updated.role}s` : 'people'} at ${updated.company}${updated.location ? ` in ${updated.location}` : ''}${updated.university ? ` from ${updated.university}` : ''}!` },
-      ]);
       setPendingFilters(updated);
     } else {
       // Still missing company — send as query
@@ -96,6 +92,7 @@ export function AppShell({ initialRemainingDaily }: AppShellProps) {
           onSelectableClick={handleSelectableClick}
           onShowMoreSelectables={handleShowMoreSelectables}
           onClearChat={handleClearChat}
+          isSubscribed={isSubscribed}
         />
         <div className="flex-1 flex flex-col overflow-hidden">
           <NewHeader

@@ -69,7 +69,9 @@ export async function isUserBlocked(userId: string): Promise<boolean> {
 }
 
 /**
- * Check if user can send an email and get full credit status
+ * Check if user can send an email and get full credit status.
+ * Free users get a hard lifetime limit of 3 sends total.
+ * Subscribers get unlimited.
  */
 export async function checkEmailCredits(userId: string): Promise<CreditStatus> {
   const user = await prisma.user.findUnique({

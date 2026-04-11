@@ -16,6 +16,9 @@ interface OutreachFiltersProps {
   onStarredFilterChange: (starred: boolean | undefined) => void;
   scheduledFilter: boolean | undefined;
   onScheduledFilterChange: (scheduled: boolean | undefined) => void;
+  draftsFilter: boolean | undefined;
+  onDraftsFilterChange: (drafts: boolean | undefined) => void;
+  draftsCount: number;
   // Column settings
   columnOrder: ColumnKey[];
   isColumnVisible: (column: ColumnKey) => boolean;
@@ -46,6 +49,9 @@ export function OutreachFilters({
   onStarredFilterChange,
   scheduledFilter,
   onScheduledFilterChange,
+  draftsFilter,
+  onDraftsFilterChange,
+  draftsCount,
   columnOrder,
   isColumnVisible,
   onToggleColumn,
@@ -101,6 +107,7 @@ export function OutreachFilters({
 
   const starredActive = starredFilter === true;
   const scheduledActive = scheduledFilter === true;
+  const draftsActive = draftsFilter === true;
 
   // Count visible columns for numbering
   const getVisibleIndex = (column: ColumnKey): number | null => {
@@ -207,6 +214,28 @@ export function OutreachFilters({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <span>Scheduled</span>
+        </button>
+
+        {/* Drafts filter */}
+        <button
+          onClick={() => onDraftsFilterChange(draftsActive ? undefined : true)}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-['Inter'] transition-colors ${
+            draftsActive
+              ? 'bg-[#6364FF]/20 border-[#6364FF] text-[#E0E0E0]'
+              : 'bg-[#1a1a1a] border-[#3a3a3a] text-[#E0E0E0] hover:border-[#505050]'
+          }`}
+        >
+          <svg className="w-3 h-3 text-[#f59e0b]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          </svg>
+          <span>Drafts</span>
+          {draftsCount > 0 && (
+            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
+              draftsActive ? 'bg-[#6364FF]/30 text-[#a5a6ff]' : 'bg-[#3a3a3a] text-[#909090]'
+            }`}>
+              {draftsCount}
+            </span>
+          )}
         </button>
 
         {/* Multi-select filter dropdowns */}
