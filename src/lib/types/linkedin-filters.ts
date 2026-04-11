@@ -4,6 +4,7 @@ export interface DBFilters {
   location?: string;
   university?: string;
   minYearsExperience?: number;
+  roleSpecificity?: 'narrow' | 'standard' | 'broad';
 }
 
 export interface LinkedInFilters {

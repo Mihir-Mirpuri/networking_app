@@ -101,6 +101,7 @@ function parseArgs(): CliOptions {
 interface LLMResponse {
   status: 'ready' | 'needs_selection' | 'off_topic' | 'person_lookup';
   confidence?: 'high' | 'low';
+  role_specificity?: 'narrow' | 'standard' | 'broad';
   filters: {
     company: string | null;
     role: string | null;
@@ -189,6 +190,7 @@ interface ExtractionOutcome {
   personName?: string;
   personCompany?: string;
   companyNameAmbiguous?: boolean;
+  roleSpecificity?: 'narrow' | 'standard' | 'broad';
   rawResponse: LLMResponse;
   escalatedToPerplexity: boolean;
 }
@@ -216,6 +218,7 @@ async function runExtraction(query: string): Promise<ExtractionOutcome> {
   if (filters.role) dbFilters.role = filters.role;
   if (filters.university) dbFilters.university = filters.university;
   if (filters.location) dbFilters.location = filters.location;
+  dbFilters.roleSpecificity = parsed.role_specificity || 'standard';
 
   log.info('ai-search', 'LLM response parsed', {
     status,
@@ -350,6 +353,7 @@ async function runExtraction(query: string): Promise<ExtractionOutcome> {
     linkedInFilters,
     selectables: [],
     companyNameAmbiguous: parsed.company_name_ambiguous,
+    roleSpecificity: parsed.role_specificity || 'standard',
     rawResponse: parsed,
     escalatedToPerplexity: false,
   };
@@ -497,6 +501,7 @@ async function runSearch(
     location: dbFilters.location || undefined,
     role: dbFilters.role || undefined,
     university: dbFilters.university || undefined,
+    roleSpecificity: dbFilters.roleSpecificity,
     requireEmail: false,
     limit: 25,
   };
@@ -701,6 +706,15 @@ function validateExtraction(
     if (expected.personCompany && outcome.personCompany?.toLowerCase() !== expected.personCompany.toLowerCase()) {
       failures.push(
         `personCompany mismatch: expected="${expected.personCompany}", actual="${outcome.personCompany ?? '(unset)'}"`
+      );
+    }
+  }
+
+  // 8. Role specificity check
+  if (expected.roleSpecificity && outcome.status === 'ready') {
+    if (outcome.roleSpecificity !== expected.roleSpecificity) {
+      failures.push(
+        `roleSpecificity mismatch: expected="${expected.roleSpecificity}", actual="${outcome.roleSpecificity ?? '(unset)'}"`
       );
     }
   }

@@ -113,6 +113,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
   const [resumeError, setResumeError] = useState<string | null>(null);
   const [resumeSuccess, setResumeSuccess] = useState(false);
   const [expandedResume, setExpandedResume] = useState<ResumeData | null>(null);
+  const [loadedPdfs, setLoadedPdfs] = useState<Set<string>>(new Set());
 
   // Subscription state
   const [subscription, setSubscription] = useState<{
@@ -522,9 +523,8 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
         )}
 
 
-        {/* Attachments Grid */}
-        {currentTab === 'resumes' && (
-        <div>
+        {/* Attachments Grid — kept mounted so PDF objects don't re-fetch */}
+        <div className={currentTab === 'resumes' ? '' : 'hidden'}>
           {resumeSuccess && (
             <div className="mb-4 px-4 py-3 bg-green-900/30 text-green-400 rounded-lg text-sm flex items-center gap-2">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
@@ -560,37 +560,31 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                     }`}
                     onClick={() => setExpandedResume(resume)}
                   >
-                    {/* Document preview with fallback */}
+                    {/* PDF thumbnail with spinner until loaded */}
                     {resume.mimeType === 'application/pdf' ? (
-                      <object
-                        data={`/api/resume/view?id=${resume.id}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
-                        type="application/pdf"
-                        className="w-full h-full pointer-events-none"
-                        title={resume.filename}
-                      >
-                        {/* Fallback if PDF fails to load */}
-                        <div className="w-full h-full flex flex-col items-center justify-center bg-[#F5F5F5] p-3">
-                          <svg className="w-10 h-10 text-[#6364FF] mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-                          </svg>
-                          <span className="text-[10px] text-[#1a1a1a] font-medium text-center truncate max-w-full px-2">
-                            {resume.filename}
-                          </span>
-                          <span className="text-[9px] text-[#666] mt-1">PDF</span>
-                        </div>
-                      </object>
+                      <>
+                        {!loadedPdfs.has(resume.id) && (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#F5F5F5] z-[1]">
+                            <div className="w-5 h-5 border-2 border-[#6364FF]/30 border-t-[#6364FF] rounded-full animate-spin" />
+                          </div>
+                        )}
+                        <object
+                          data={`/api/resume/view?id=${resume.id}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
+                          type="application/pdf"
+                          className={`w-full h-full pointer-events-none transition-opacity duration-500 ${loadedPdfs.has(resume.id) ? 'opacity-100' : 'opacity-0'}`}
+                          title={resume.filename}
+                          onLoad={() => setLoadedPdfs(prev => new Set(prev).add(resume.id))}
+                        >
+                          <div className="w-full h-full" />
+                        </object>
+                      </>
                     ) : (
-                      /* Fallback for non-PDF files (DOC, DOCX) */
                       <div className="w-full h-full flex flex-col items-center justify-center bg-[#F5F5F5] p-3">
                         <svg className="w-10 h-10 text-[#6364FF] mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
                         </svg>
-                        <span className="text-[10px] text-[#1a1a1a] font-medium text-center truncate max-w-full px-2">
-                          {resume.filename}
-                        </span>
-                        <span className="text-[9px] text-[#666] mt-1">
-                          {resume.filename.split('.').pop()?.toUpperCase()}
-                        </span>
+                        <span className="text-[10px] text-[#1a1a1a] font-medium text-center truncate max-w-full px-2">{resume.filename}</span>
+                        <span className="text-[9px] text-[#666] mt-1">{resume.filename.split('.').pop()?.toUpperCase()}</span>
                       </div>
                     )}
 
@@ -621,7 +615,6 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
             </div>
           )}
         </div>
-        )}
 
         {/* Templates Table */}
         {currentTab === 'templates' && (

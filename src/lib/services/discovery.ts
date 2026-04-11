@@ -275,23 +275,3 @@ export async function lookupByName(params: {
   return candidates;
 }
 
-/**
- * Legacy function for backward compatibility
- * Wraps discoverLinkedInProfiles and adds company from search params
- */
-export async function searchPeople(params: SearchParams): Promise<SearchResult[]> {
-  const profiles = await discoverLinkedInProfiles(params);
-
-  // Convert to legacy SearchResult format
-  return profiles.map(profile => ({
-    fullName: profile.fullName,
-    firstName: profile.firstName,
-    lastName: profile.lastName,
-    company: params.company || '', // Use search company - scraper will verify/update
-    role: null, // Scraper will provide this
-    sourceUrl: profile.linkedinUrl,
-    sourceTitle: profile.sourceTitle,
-    sourceSnippet: profile.sourceSnippet,
-    sourceDomain: profile.sourceDomain,
-  }));
-}

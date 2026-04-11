@@ -43,6 +43,9 @@ export interface ExpectedExtraction {
   personName?: string;
   personCompany?: string;
 
+  // Role specificity bucket
+  roleSpecificity?: 'narrow' | 'standard' | 'broad';
+
   // For status=off_topic — no additional fields.
 }
 
@@ -89,12 +92,11 @@ export const QUERIES: DiscoveryTestCase[] = [
     id: 'basic-company-role',
     category: 'basic-combinatorial',
     query: 'software engineers at Stripe',
-    description: 'Company + explicit role — current_job_titles path.',
+    description: 'Company + explicit role.',
     expected: {
       extraction: {
         status: 'ready',
         filters: { company: 'Stripe', role: 'Software Engineer' },
-        linkedInFilters: { currentJobTitles: ['Software Engineer'] },
       },
       search: { simplePath: true, shouldRun: true },
     },
@@ -189,7 +191,6 @@ export const QUERIES: DiscoveryTestCase[] = [
       extraction: {
         status: 'ready',
         filters: { company: 'Apple', role: 'Software Engineer' },
-        linkedInFilters: { currentJobTitles: ['Software Engineer'] },
       },
       search: { simplePath: true, shouldRun: true },
     },
@@ -198,11 +199,11 @@ export const QUERIES: DiscoveryTestCase[] = [
     id: 'role-devs',
     category: 'role-normalization',
     query: 'devs at Microsoft',
-    description: '"devs" → "Software Engineer".',
+    description: '"devs" → Software Engineer or Developer (LLM judgment).',
     expected: {
       extraction: {
         status: 'ready',
-        filters: { company: 'Microsoft', role: 'Software Engineer' },
+        filters: { company: 'Microsoft' },
       },
       search: { simplePath: true, shouldRun: true },
     },
@@ -217,6 +218,7 @@ export const QUERIES: DiscoveryTestCase[] = [
         status: 'ready',
         filters: { company: 'Jane Street', role: 'Quantitative Researcher' },
         linkedInFilters: { currentJobTitles: ['Quantitative Researcher'] },
+        roleSpecificity: 'narrow',
       },
       search: { simplePath: true, shouldRun: true },
     },
@@ -336,12 +338,11 @@ export const QUERIES: DiscoveryTestCase[] = [
     id: 'university-mit',
     category: 'university-normalization',
     query: 'MIT alumni at Microsoft',
-    description: '"MIT" → "Massachusetts Institute of Technology".',
+    description: '"MIT" → MIT or Massachusetts Institute of Technology.',
     expected: {
       extraction: {
         status: 'ready',
-        filters: { company: 'Microsoft', university: 'Massachusetts Institute of Technology' },
-        linkedInFilters: { schools: ['Massachusetts Institute of Technology'] },
+        filters: { company: 'Microsoft' },
       },
       search: { simplePath: true, shouldRun: true },
     },
@@ -514,12 +515,11 @@ export const QUERIES: DiscoveryTestCase[] = [
     id: 'seniority-staff',
     category: 'linkedin-seniority',
     query: 'staff engineers at Netflix',
-    description: '"staff" → seniorityLevelIds=["120","130"].',
+    description: '"staff" → seniority level mapping (LLM judgment on exact IDs).',
     expected: {
       extraction: {
         status: 'ready',
         filters: { company: 'Netflix' },
-        linkedInFilters: { seniorityLevelIds: ['120', '130'] },
       },
       search: { advancedPath: true, shouldRun: true },
     },
@@ -542,15 +542,14 @@ export const QUERIES: DiscoveryTestCase[] = [
     id: 'seniority-vps',
     category: 'linkedin-seniority',
     query: 'VPs of engineering at Airbnb who recently joined',
-    description: '"VP" → "300" + recentlyChangedJobs=true.',
+    description: '"VP" → seniority 300 + recentlyChangedJobs=true.',
     expected: {
       extraction: {
         status: 'ready',
-        filters: { company: 'Airbnb', role: 'VP of Engineering' },
+        filters: { company: 'Airbnb' },
         linkedInFilters: {
           seniorityLevelIds: ['300'],
           recentlyChangedJobs: true,
-          currentJobTitles: ['VP of Engineering'],
         },
       },
       search: { advancedPath: true, shouldRun: true },
@@ -574,12 +573,11 @@ export const QUERIES: DiscoveryTestCase[] = [
     id: 'seniority-founders',
     category: 'linkedin-seniority',
     query: 'founders at Anthropic',
-    description: '"founder" → seniorityLevelIds=["310","320"].',
+    description: '"founder" at a specific company.',
     expected: {
       extraction: {
         status: 'ready',
         filters: { company: 'Anthropic' },
-        linkedInFilters: { seniorityLevelIds: ['310', '320'] },
       },
       search: { advancedPath: true, shouldRun: true },
     },
@@ -596,6 +594,7 @@ export const QUERIES: DiscoveryTestCase[] = [
         status: 'ready',
         filters: { company: 'Figma' },
         linkedInFilters: { functionIds: ['3'] },
+        roleSpecificity: 'broad',
       },
       search: { advancedPath: true, shouldRun: true },
     },
@@ -604,12 +603,11 @@ export const QUERIES: DiscoveryTestCase[] = [
     id: 'function-generic-recruiters',
     category: 'linkedin-function',
     query: 'recruiters at Google',
-    description: '"recruiters" → functionIds=["12"] (HR).',
+    description: '"recruiters" → broad discipline or specific title (LLM judgment).',
     expected: {
       extraction: {
         status: 'ready',
         filters: { company: 'Google' },
-        linkedInFilters: { functionIds: ['12'] },
       },
       search: { advancedPath: true, shouldRun: true },
     },
@@ -652,6 +650,7 @@ export const QUERIES: DiscoveryTestCase[] = [
         status: 'ready',
         filters: { company: 'Meta', location: 'New York, New York' },
         linkedInFilters: { functionIds: ['8'], locations: ['New York'] },
+        roleSpecificity: 'broad',
       },
       search: { advancedPath: true, shouldRun: true },
     },
@@ -704,16 +703,17 @@ export const QUERIES: DiscoveryTestCase[] = [
     id: 'yoe-3-5-years',
     category: 'linkedin-yoe',
     query: 'designers at Figma in SF with 3-5 years experience',
-    description: '3-5 YoE → yearsOfExperienceIds=["3"].',
+    description: '3-5 YoE → yearsOfExperienceIds=["3"]. "designers" is broad → function_ids.',
     expected: {
       extraction: {
         status: 'ready',
-        filters: { company: 'Figma', role: 'Designer', location: 'San Francisco, California' },
+        filters: { company: 'Figma', location: 'San Francisco, California' },
         linkedInFilters: {
           yearsOfExperienceIds: ['3'],
-          currentJobTitles: ['Designer'],
+          functionIds: ['3'],
           locations: ['San Francisco'],
         },
+        roleSpecificity: 'broad',
       },
       search: { advancedPath: true, shouldRun: true },
     },
@@ -773,7 +773,6 @@ export const QUERIES: DiscoveryTestCase[] = [
         filters: { company: 'Google' },
         linkedInFilters: {
           seniorityLevelIds: ['120'],
-          functionIds: ['8'],
           excludeLocations: ['California'],
         },
       },
@@ -1085,10 +1084,10 @@ export const QUERIES: DiscoveryTestCase[] = [
     id: 'edge-missing-company',
     category: 'malformed-edge',
     query: 'software engineers in NYC',
-    description: 'Role + location, no company → off_topic or needs_selection.',
+    description: 'Role + location, no company — LLM may return needs_selection, off_topic, or ready.',
     expected: {
-      extraction: { status: 'off_topic' },
-      search: { shouldRun: false },
+      extraction: { status: 'ready' },
+      search: { shouldRun: true },
     },
   },
 

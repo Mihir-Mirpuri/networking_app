@@ -9,9 +9,10 @@ import { EmailChatProvider } from '@/contexts/EmailChatContext';
 
 interface AppShellProps {
   initialRemainingDaily: number;
+  isSubscribed: boolean;
 }
 
-export function AppShell({ initialRemainingDaily }: AppShellProps) {
+export function AppShell({ initialRemainingDaily, isSubscribed }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pendingQuery, setPendingQuery] = useState<string | null>(null);
   const [pendingFilters, setPendingFilters] = useState<ParsedFilters | null>(null);
@@ -91,6 +92,7 @@ export function AppShell({ initialRemainingDaily }: AppShellProps) {
           onSelectableClick={handleSelectableClick}
           onShowMoreSelectables={handleShowMoreSelectables}
           onClearChat={handleClearChat}
+          isSubscribed={isSubscribed}
         />
         <div className="flex-1 flex flex-col overflow-hidden">
           <NewHeader

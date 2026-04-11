@@ -237,6 +237,7 @@ export function MainSearchView({
       role: filters.role,
       location: filters.location,
       university: filters.university,
+      roleSpecificity: filters.roleSpecificity,
     };
 
     console.log(`[Search] Starting V2 search #${thisSearchId} query="${query}"`);

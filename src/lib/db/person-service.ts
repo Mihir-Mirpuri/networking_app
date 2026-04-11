@@ -730,6 +730,7 @@ export interface PersonFilters {
   location?: string;         // Optional - city ILIKE match
   role?: string;             // Optional - role ILIKE match
   university?: string;       // Optional - educationSchool ILIKE match
+  roleSpecificity?: 'narrow' | 'standard' | 'broad'; // Controls vector similarity threshold
   requireEmail?: boolean;    // Default true - only return people with emails
   excludePersonIds?: string[]; // Person IDs to exclude (already displayed + sent/hidden)
   limit: number;
@@ -872,7 +873,7 @@ async function getSchoolMatchIds(university: string): Promise<string[]> {
  * Apply post-query filtering: company fuzzy match.
  * Person exclusions (sent/hidden) are handled at the DB level via excludePersonIds.
  */
-export function applyPostQueryFilters<T extends { company: string }>(
+function applyPostQueryFilters<T extends { company: string }>(
   people: T[],
   searchCompany: string | string[] | undefined
 ): T[] {
@@ -1084,17 +1085,19 @@ async function findPeopleByFiltersVector(
   // Exclude people whose role indicates they haven't started yet (e.g., "Incoming Analyst")
   conditions.push(Prisma.sql`p.role !~* '^(incoming|future)\s+'`);
 
-  // Vector similarity threshold: only include people with embeddings that are close enough.
-  // Null embeddings are excluded — they'll get backfilled by the next prescrape/scrape cycle.
+  // Vector similarity threshold: dynamic based on role specificity bucket.
+  // Narrow (niche titles) = tight match, Standard = moderate, Broad (generic disciplines) = loose.
+  const SPECIFICITY_THRESHOLDS = { narrow: 0.28, standard: 0.38, broad: 0.48 } as const;
+  const threshold = SPECIFICITY_THRESHOLDS[filters.roleSpecificity || 'standard'];
   conditions.push(Prisma.sql`
     p.role_embedding IS NOT NULL
-    AND (p.role_embedding <=> ${vectorString}::vector) <= 0.35
+    AND (p.role_embedding <=> ${vectorString}::vector) <= ${threshold}
   `);
 
   const whereClause = Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}`;
   const fetchLimit = limit * 2; // Overfetch for post-query company filtering
 
-  console.log(`[VectorQuery] Filters: company=${company}, aliases=${filters.companyAliases?.length ?? 0}, location=${location}, university=${university}, requireEmail=${requireEmail}, excludeIds=${excludePersonIds?.length ?? 0}, threshold=0.35, fetchLimit=${fetchLimit}`);
+  console.log(`[VectorQuery] Filters: company=${company}, aliases=${filters.companyAliases?.length ?? 0}, location=${location}, university=${university}, requireEmail=${requireEmail}, excludeIds=${excludePersonIds?.length ?? 0}, bucket=${filters.roleSpecificity || 'standard'}, threshold=${threshold}, fetchLimit=${fetchLimit}`);
 
   const rows = await prisma.$queryRaw<Array<{
     id: string;

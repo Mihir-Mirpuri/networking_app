@@ -18,6 +18,7 @@ export interface ParsedFilters {
   role?: string;
   university?: string;
   location?: string;
+  roleSpecificity?: 'narrow' | 'standard' | 'broad';
 }
 
 export interface Selectable {
@@ -73,6 +74,7 @@ interface LLMResponse {
     exclude_seniority_level_ids?: string[];
     exclude_function_ids?: string[];
   };
+  role_specificity?: 'narrow' | 'standard' | 'broad';
   company_name_ambiguous?: boolean;
   person_name?: string;
   person_company?: string;
@@ -272,6 +274,7 @@ export async function extractSearchFiltersAction(
     if (filters.role) parsedFilters.role = filters.role;
     if (filters.university) parsedFilters.university = filters.university;
     if (filters.location) parsedFilters.location = filters.location;
+    parsedFilters.roleSpecificity = response.content.role_specificity || 'standard';
 
     console.log(`[AI Search] Status: ${status}, Confidence: ${confidence || 'n/a'}, Filters: ${JSON.stringify(parsedFilters)}`);
     log.info('ai-search', 'LLM response parsed', {
