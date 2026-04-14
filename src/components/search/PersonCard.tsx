@@ -261,6 +261,7 @@ export function PersonCard({
           </div>
         ) : (
           <div
+            onClick={onExpand}
             className="text-sm w-full justify-center btn-primary flex items-center"
           >
             <EnvelopeIcon className="w-4 h-4 mr-1.5" />

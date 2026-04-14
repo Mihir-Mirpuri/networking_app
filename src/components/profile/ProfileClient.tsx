@@ -157,20 +157,6 @@ const PLACEHOLDER_CATEGORIES = [
 // Flatten for backward compatibility
 const DEFAULT_PLACEHOLDERS = PLACEHOLDER_CATEGORIES.flatMap(cat => cat.placeholders.map(p => p.key));
 
-function SignalLogoSmall({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 200 160" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="100" cy="80" r="12" fill="currentColor" />
-      <path d="M78 56 A30 30 0 0 0 78 104" stroke="currentColor" strokeWidth="10" strokeLinecap="round" fill="none" />
-      <path d="M122 56 A30 30 0 0 1 122 104" stroke="currentColor" strokeWidth="10" strokeLinecap="round" fill="none" />
-      <path d="M58 38 A55 55 0 0 0 58 122" stroke="currentColor" strokeWidth="10" strokeLinecap="round" fill="none" />
-      <path d="M142 38 A55 55 0 0 1 142 122" stroke="currentColor" strokeWidth="10" strokeLinecap="round" fill="none" />
-      <path d="M38 20 A80 80 0 0 0 38 140" stroke="currentColor" strokeWidth="10" strokeLinecap="round" fill="none" />
-      <path d="M162 20 A80 80 0 0 1 162 140" stroke="currentColor" strokeWidth="10" strokeLinecap="round" fill="none" />
-    </svg>
-  );
-}
-
 // ─── Draggable Placeholder Pill ────────────────────────────────────────────────
 
 interface DraggablePillProps {
@@ -187,28 +173,59 @@ function DraggablePill({ placeholderKey, label, isSelected, onToggle }: Draggabl
     e.dataTransfer.effectAllowed = 'copy';
   };
 
+  const handleInsert = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (activePlaceholderInsert) {
+      activePlaceholderInsert(placeholderKey);
+    }
+  };
+
+  const handleInfo = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onToggle();
+  };
+
   return (
-    <button
+    <span
       draggable
       onDragStart={handleDragStart}
-      onClick={onToggle}
-      className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium transition-all cursor-grab active:cursor-grabbing ${
+      className={`group inline-flex items-stretch rounded-md text-[11px] font-medium transition-all cursor-grab active:cursor-grabbing select-none border ${
         isSelected
-          ? 'bg-[#6364FF] text-white ring-2 ring-[#6364FF]/30'
-          : 'bg-[#6364FF]/90 text-white hover:bg-[#6364FF]'
+          ? 'bg-[#6364FF]/20 border-[#6364FF]/60 text-white'
+          : 'bg-[#6364FF]/10 border-[#6364FF]/30 text-[#a5a6ff] hover:bg-[#6364FF]/20 hover:border-[#6364FF]/55 hover:text-white'
       }`}
-      title="Drag to insert or click for details"
+      title="Click to insert · drag to position · ⓘ for details"
     >
-      {label}
-    </button>
+      <button
+        type="button"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={handleInsert}
+        className="pl-2.5 pr-1.5 py-[3px] rounded-l-md"
+      >
+        {label}
+      </button>
+      <button
+        type="button"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={handleInfo}
+        aria-label={`About ${label}`}
+        className="pr-2 pl-1 py-[3px] opacity-60 hover:opacity-100 rounded-r-md border-l border-[#6364FF]/25 flex items-center"
+      >
+        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+          <circle cx="12" cy="12" r="9" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 11v5M12 8h.01" />
+        </svg>
+      </button>
+    </span>
   );
 }
 
 // ─── Shared pill utilities ─────────────────────────────────────────────────────
 
-const PILL_STYLE = 'display:inline-flex;align-items:center;gap:4px;padding:2px 6px 2px 8px;margin:0 2px;border-radius:9999px;font-size:11px;font-weight:500;background:#6364FF;color:white;white-space:nowrap;vertical-align:baseline;cursor:grab;';
+const PILL_STYLE = 'display:inline-flex;align-items:center;gap:4px;padding:1px 5px 1px 8px;margin:0 2px;border-radius:6px;font-size:12px;font-weight:500;background:rgba(99,100,255,0.12);border:1px solid rgba(99,100,255,0.35);color:#a5a6ff;white-space:nowrap;vertical-align:baseline;cursor:grab;';
 
-const PILL_X_STYLE = 'display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:rgba(255,255,255,0.2);cursor:pointer;font-size:10px;line-height:1;';
+const PILL_X_STYLE = 'display:inline-flex;align-items:center;justify-content:center;width:13px;height:13px;border-radius:50%;background:rgba(99,100,255,0.2);color:#a5a6ff;cursor:pointer;font-size:10px;line-height:1;margin-left:2px;';
 
 function textToHtml(text: string, multiline: boolean = true): string {
   if (!text) return '';
@@ -284,6 +301,46 @@ interface PillInputProps {
 
 // Track pill being dragged from within editors
 let draggingPill: HTMLElement | null = null;
+
+// Track the last-focused editor so sidebar clicks can insert into it.
+// Set when a PillInput/PillEditor focuses; intentionally not cleared on blur
+// (clicking the sidebar blurs the editor, but we still want that click to target it).
+let activePlaceholderInsert: ((placeholderKey: string) => void) | null = null;
+
+function insertPillAtCursor(
+  editorRef: React.RefObject<HTMLDivElement>,
+  placeholderKey: string,
+  onAfterInsert: () => void,
+) {
+  const el = editorRef.current;
+  if (!el) return;
+  el.focus();
+  const selection = window.getSelection();
+  let range: Range;
+  if (
+    selection &&
+    selection.rangeCount > 0 &&
+    selection.anchorNode &&
+    el.contains(selection.anchorNode)
+  ) {
+    range = selection.getRangeAt(0).cloneRange();
+    range.deleteContents();
+  } else {
+    range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(false);
+  }
+  const pill = createPillElement(placeholderKey);
+  range.insertNode(pill);
+  const newRange = document.createRange();
+  newRange.setStartAfter(pill);
+  newRange.setEndAfter(pill);
+  if (selection) {
+    selection.removeAllRanges();
+    selection.addRange(newRange);
+  }
+  onAfterInsert();
+}
 
 function PillInput({ value, onChange, placeholder }: PillInputProps) {
   const editorRef = useRef<HTMLDivElement>(null);
@@ -424,7 +481,10 @@ function PillInput({ value, onChange, placeholder }: PillInputProps) {
         onInput={handleInput}
         onKeyDown={handleKeyDown}
         onClick={handleClick}
-        onFocus={() => setIsFocused(true)}
+        onFocus={() => {
+          setIsFocused(true);
+          activePlaceholderInsert = (key) => insertPillAtCursor(editorRef, key, handleInput);
+        }}
         onBlur={() => { setIsFocused(false); syncFromValue(); }}
         onPaste={handlePaste}
         onDragStart={handleDragStart}
@@ -578,7 +638,10 @@ function PillEditor({ value, onChange, placeholder }: PillEditorProps) {
         suppressContentEditableWarning
         onInput={handleInput}
         onClick={handleClick}
-        onFocus={() => setIsFocused(true)}
+        onFocus={() => {
+          setIsFocused(true);
+          activePlaceholderInsert = (key) => insertPillAtCursor(editorRef, key, handleInput);
+        }}
         onBlur={() => { setIsFocused(false); syncFromValue(); }}
         onPaste={handlePaste}
         onDragStart={handleDragStart}
@@ -613,31 +676,54 @@ function PlaceholdersSidebar() {
     setExpandedPill(prev => prev === key ? null : key);
   };
 
+  const totalCount = filteredCategories.reduce((n, c) => n + c.placeholders.length, 0);
+
   return (
-    <div className="flex flex-col h-full w-80 bg-[#141414] border-r border-[#1a1a1a]">
-      {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-[#1a1a1a]">
-        <SignalLogoSmall className="w-7 h-7 text-white" />
-        <span className="text-xl font-bold text-white">Signl</span>
+    <div className="flex flex-col h-full w-80 bg-[#141414] border-r border-[#2a2a2a] relative">
+      {/* subtle ambient accent */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{ background: 'radial-gradient(400px 200px at 50% -10%, rgba(99,100,255,0.05), transparent 70%)' }}
+      />
+
+      {/* Header — eyebrow style, matching main editor */}
+      <div className="relative px-5 pt-6 pb-4">
+        <div className="flex items-center gap-2.5 mb-4">
+          <span className="relative flex h-1.5 w-1.5">
+            <span className="absolute inset-0 rounded-full bg-[#6364FF] animate-ping opacity-60" />
+            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#6364FF]" />
+          </span>
+          <span className="text-[11px] uppercase tracking-[0.1em] text-[#606060]">Placeholders</span>
+          <span className="ml-auto text-[10px] text-[#505050] tabular-nums">{totalCount}</span>
+        </div>
+
+        {/* Title */}
+        <h3 className="text-[20px] leading-tight tracking-[-0.01em] text-white font-[family-name:var(--font-outfit)] font-normal">
+          Drag to insert
+        </h3>
+        <p className="mt-1 text-[12px] text-[#606060] leading-relaxed">
+          Tap a pill for its definition, or drag it into the subject or body.
+        </p>
       </div>
 
       {/* Search bar */}
-      <div className="px-4 py-3 border-b border-[#1a1a1a]">
+      <div className="relative px-5 pb-4">
         <div className="relative">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#505050]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#505050]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
           </svg>
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search placeholders..."
-            className="w-full pl-9 pr-8 py-2 text-xs bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg text-white placeholder-[#505050] outline-none focus:border-[#6364FF] transition-colors"
+            placeholder="Search placeholders"
+            className="w-full pl-9 pr-8 py-2 text-[12px] bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg text-white placeholder-[#505050] outline-none focus:border-[#6364FF] focus:ring-2 focus:ring-[#6364FF]/15 transition-all"
           />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
               className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-[#505050] hover:text-white transition-colors"
+              aria-label="Clear search"
             >
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
@@ -647,27 +733,26 @@ function PlaceholdersSidebar() {
         </div>
       </div>
 
-      {/* Drag instruction */}
-      <div className="px-4 py-2 bg-[#1a1a1a]/50 border-b border-[#1a1a1a]">
-        <p className="text-[10px] text-[#505050] flex items-center gap-1.5">
-          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
-          </svg>
-          Drag pills to email or click for info
-        </p>
-      </div>
+      {/* Accent rule matching the main editor */}
+      <div
+        className="relative h-px mx-5"
+        style={{ background: 'linear-gradient(90deg, #6364FF 0%, #6364FF 36px, #2a2a2a 36px, #2a2a2a 100%)' }}
+      />
 
       {/* Placeholders content */}
-      <div className="flex-1 overflow-y-auto px-4 py-3">
+      <div className="relative flex-1 overflow-y-auto px-5 pt-5 pb-6">
         {filteredCategories.map((category) => {
-          // Find the selected placeholder in this category (if any)
           const selectedInCategory = category.placeholders.find(p => p.key === expandedPill);
 
           return (
-            <div key={category.name} className="mb-4">
-              <h4 className="text-[10px] font-semibold text-[#505050] uppercase tracking-wider mb-2">
-                {category.name}
-              </h4>
+            <div key={category.name} className="mb-5 last:mb-0">
+              <div className="flex items-center gap-2.5 mb-2.5">
+                <h4 className="text-[10px] font-medium text-[#606060] uppercase tracking-[0.18em]">
+                  {category.name}
+                </h4>
+                <div className="flex-1 h-px bg-gradient-to-r from-[#2a2a2a] to-transparent" />
+                <span className="text-[10px] text-[#404040] tabular-nums">{category.placeholders.length}</span>
+              </div>
               <div className="flex flex-wrap gap-1.5">
                 {category.placeholders.map((placeholder) => (
                   <DraggablePill
@@ -679,20 +764,26 @@ function PlaceholdersSidebar() {
                   />
                 ))}
               </div>
-              {/* Description appears below the pill row */}
               {selectedInCategory && (
-                <p className="mt-2 text-[11px] text-white leading-relaxed">
-                  {selectedInCategory.description}
-                </p>
+                <div className="mt-3 px-3 py-2.5 rounded-lg bg-[#1a1a1a] border border-[#2a2a2a]">
+                  <p className="text-[11px] text-[#d0d0d0] leading-relaxed">
+                    {selectedInCategory.description}
+                  </p>
+                </div>
               )}
             </div>
           );
         })}
 
-        {/* No results */}
         {filteredCategories.length === 0 && (
-          <div className="text-center py-8">
-            <p className="text-xs text-[#505050]">No placeholders found</p>
+          <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+            <div className="w-10 h-10 rounded-full border border-dashed border-[#2a2a2a] flex items-center justify-center mb-3">
+              <svg className="w-4 h-4 text-[#404040]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+              </svg>
+            </div>
+            <p className="text-[12px] text-[#606060]">No placeholders match</p>
+            <p className="text-[11px] text-[#404040] mt-0.5">&ldquo;{searchQuery}&rdquo;</p>
           </div>
         )}
       </div>
@@ -1385,159 +1476,197 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
 
       </div>
 
-      {/* Full-Screen Template Editor */}
-      {editingTemplate && (
-        <div className="fixed inset-0 z-50 flex bg-[#181818] animate-fade-in">
-          {/* ── Left: Placeholders Sidebar ── */}
-          <div className="hidden lg:block flex-shrink-0">
-            <PlaceholdersSidebar />
-          </div>
+      {/* Full-Screen Template Editor — Letterpress */}
+      {editingTemplate && (() => {
+        const isDefault = DEFAULT_TEMPLATES.some(dt => dt.id === editingTemplate.id);
+        const isNew = editingTemplate.id === '__new__';
+        const canDelete = !isDefault && !isNew;
+        const charCount = editingTemplate.body.length;
+        const readSec = Math.max(1, Math.round(charCount / 17));
+        const placeholderCount = (editingTemplate.body.match(/\{\{[^}]+\}\}/g) || []).length
+          + (editingTemplate.subject.match(/\{\{[^}]+\}\}/g) || []).length;
 
-          {/* ── Right: Main area with floating compose card ── */}
+        const handleSave = async () => {
+          if (!editingTemplate.name.trim() || !editingTemplate.body.trim()) {
+            setTemplateError('Template name and body are required');
+            return;
+          }
+          setIsSavingTemplate(true);
+          setTemplateError(null);
+          if (isNew || isDefault) {
+            const result = await createTemplateAction({
+              name: editingTemplate.name,
+              subject: editingTemplate.subject,
+              body: editingTemplate.body,
+              attachResume: editingTemplate.attachResume,
+              resumeId: editingTemplate.resumeId,
+            });
+            if (result.success) {
+              setTemplates([...templates, result.template]);
+              setEditingTemplate(null);
+            } else {
+              setTemplateError(result.error);
+            }
+          } else {
+            await handleUpdateTemplate();
+            if (!templateError) setEditingTemplate(null);
+          }
+          setIsSavingTemplate(false);
+        };
+
+        return (
           <div
-            className="flex-1 flex items-center justify-center bg-[#212121] relative"
-            onMouseDown={(e) => { if (e.target === e.currentTarget) setEditingTemplate(null); }}
+            className="fixed inset-0 z-50 flex bg-[#111111] animate-fade-in"
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setEditingTemplate(null);
+              if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); handleSave(); }
+            }}
+            tabIndex={-1}
           >
-            {/* Template editor card */}
-            <div className="w-full max-w-[680px] max-h-[720px] h-[85vh] bg-[#141414] rounded-xl border border-[#2a2a2a] shadow-2xl flex flex-col overflow-hidden">
-              {/* ── Fixed Header ── */}
-              <div className="flex-shrink-0">
-                {/* Header bar */}
-                <div className="flex items-center px-5 bg-[#1a1a1a]">
-                  <span className="px-4 py-2.5 text-xs font-semibold text-white bg-[#6364FF] rounded-t-lg">
-                    {editingTemplate.name || 'New Template'}
-                  </span>
+            {/* ── Left: Placeholders Sidebar ── */}
+            <div className="hidden lg:block flex-shrink-0">
+              <PlaceholdersSidebar />
+            </div>
 
-                  <div className="flex-1" />
+            {/* ── Right: Main composition surface ── */}
+            <div
+              className="flex-1 flex items-center justify-center bg-[#111111] relative overflow-hidden"
+              onMouseDown={(e) => { if (e.target === e.currentTarget) setEditingTemplate(null); }}
+            >
+              {/* ambient accent glow */}
+              <div
+                className="absolute inset-0 pointer-events-none opacity-60"
+                style={{ background: 'radial-gradient(900px 420px at 22% -8%, rgba(99,100,255,0.07), transparent 60%)' }}
+              />
 
-                  {/* Delete button for custom templates (not for new or default templates) */}
-                  {!DEFAULT_TEMPLATES.some(dt => dt.id === editingTemplate.id) && editingTemplate.id !== '__new__' && (
-                    <button
-                      onClick={() => {
-                        handleDeleteTemplate(editingTemplate.id);
-                        setEditingTemplate(null);
-                      }}
-                      className="flex items-center gap-1.5 px-3 py-1.5 mr-2 text-xs text-[#ef4444] hover:bg-[#ef4444]/10 rounded-lg transition-colors"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                      <span>Delete</span>
-                    </button>
-                  )}
+              <div
+                className="relative w-full max-w-[760px] h-[88vh] max-h-[820px] bg-[#1a1a1a] rounded-2xl border border-[#2a2a2a] flex flex-col overflow-hidden"
+                style={{ boxShadow: '0 0 1px rgba(0,0,0,0.4), 0 30px 80px rgba(0,0,0,0.55)' }}
+              >
+                {/* ── Header region ── */}
+                <div className="flex-shrink-0 px-10 pt-7">
+                  {/* Eyebrow + actions */}
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2.5 text-[11px] uppercase tracking-[0.1em] text-[#606060]">
+                      <span>Template</span>
+                      <span className="text-[#404040]">·</span>
+                      <span className="inline-flex items-center gap-2 text-[#6364FF]">
+                        <span className="relative flex h-1.5 w-1.5">
+                          <span className="absolute inset-0 rounded-full bg-[#6364FF] animate-ping opacity-60" />
+                          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#6364FF]" />
+                        </span>
+                        {isNew ? 'New draft' : isDefault ? 'From preset' : 'Editing'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {canDelete && (
+                        <button
+                          onClick={() => { handleDeleteTemplate(editingTemplate.id); setEditingTemplate(null); }}
+                          aria-label="Delete template"
+                          className="w-8 h-8 rounded-lg border border-transparent text-[#606060] hover:text-[#ff6b6b] hover:bg-[#ff6b6b]/10 hover:border-[#ff6b6b]/25 transition-colors flex items-center justify-center"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setEditingTemplate(null)}
+                        aria-label="Close"
+                        className="w-8 h-8 rounded-lg border border-transparent text-[#606060] hover:text-white hover:bg-[#252525] hover:border-[#404040] transition-colors flex items-center justify-center"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
 
-                  <button
-                    onClick={() => setEditingTemplate(null)}
-                    className="p-1.5 text-[#888] hover:text-white transition-colors"
-                    aria-label="Close"
-                  >
-                    <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                    </svg>
-                  </button>
+                  {/* Editable title */}
+                  <input
+                    type="text"
+                    value={editingTemplate.name}
+                    onChange={(e) => setEditingTemplate({ ...editingTemplate, name: e.target.value })}
+                    placeholder="Untitled template"
+                    className="w-full bg-transparent border-none outline-none text-[36px] leading-[1.1] tracking-[-0.02em] text-white placeholder:text-[#404040] font-[family-name:var(--font-outfit)] font-normal"
+                    style={{ caretColor: '#6364FF' }}
+                    autoFocus={isNew}
+                  />
+
+                  {/* Accent rule */}
+                  <div
+                    className="h-px mt-4 mb-2"
+                    style={{ background: 'linear-gradient(90deg, #6364FF 0%, #6364FF 48px, #2a2a2a 48px, #2a2a2a 100%)' }}
+                  />
+
+                  {/* Subject field */}
+                  <div className="flex items-baseline gap-5 py-3 border-b border-dashed border-[#2a2a2a]">
+                    <span className="text-[11px] uppercase tracking-[0.08em] text-[#606060] w-16 flex-shrink-0">Subject</span>
+                    <div className="flex-1">
+                      <PillInput
+                        value={editingTemplate.subject}
+                        onChange={(newSubject) => setEditingTemplate({ ...editingTemplate, subject: newSubject })}
+                        placeholder="Email subject..."
+                      />
+                    </div>
+                  </div>
                 </div>
 
-                {/* To field */}
-                <div className="flex items-center px-5 py-2.5 border-b border-[#2a2a2a]">
-                  <span className="text-[13px] text-[#888] w-16 flex-shrink-0">To:</span>
-                  <span className="text-[13px] text-[#3a3a3a]"></span>
-                </div>
-
-                {/* Subject field */}
-                <div className="flex items-center px-5 py-2.5 border-b border-[#2a2a2a]">
-                  <span className="text-[13px] text-[#888] w-16 flex-shrink-0">Subject</span>
-                  <PillInput
-                    value={editingTemplate.subject}
-                    onChange={(newSubject) => setEditingTemplate({ ...editingTemplate, subject: newSubject })}
-                    placeholder="Email subject..."
+                {/* ── Body ── */}
+                <div className="flex-1 overflow-y-auto px-10 py-6">
+                  <PillEditor
+                    value={editingTemplate.body}
+                    onChange={(newBody) => setEditingTemplate({ ...editingTemplate, body: newBody })}
+                    placeholder="Write your email template here. Drag placeholders from the sidebar to personalize..."
                   />
                 </div>
-              </div>
 
-              {/* ── Scrollable Content (Body) ── */}
-              <div className="flex-1 overflow-y-auto px-5 py-5">
-                <PillEditor
-                  value={editingTemplate.body}
-                  onChange={(newBody) => setEditingTemplate({ ...editingTemplate, body: newBody })}
-                  placeholder="Write your email template here. Drag placeholders from the sidebar to personalize..."
-                />
-              </div>
+                {/* Error */}
+                {templateError && (
+                  <div className="px-10 py-2.5 bg-red-900/15 border-t border-red-900/25 flex-shrink-0">
+                    <p className="text-[12px] text-red-400">{templateError}</p>
+                  </div>
+                )}
 
-              {/* Error message */}
-              {templateError && (
-                <div className="px-5 py-2 bg-red-900/20 border-t border-red-900/30 flex-shrink-0">
-                  <p className="text-sm text-red-400">{templateError}</p>
+                {/* ── Footer ── */}
+                <div className="flex-shrink-0 flex items-center justify-between px-10 py-4 border-t border-[#2a2a2a] bg-[#141414]">
+                  <div className="flex items-center gap-5 text-[11px] text-[#606060]">
+                    <span><span className="text-[#b0b0b0] font-medium">{placeholderCount}</span> placeholders</span>
+                    <span className="text-[#303030]">·</span>
+                    <span><span className="text-[#b0b0b0] font-medium">{charCount}</span> chars</span>
+                    <span className="text-[#303030]">·</span>
+                    <span>~<span className="text-[#b0b0b0] font-medium">{readSec}s</span> read</span>
+                    <span className="lg:hidden text-[#404040]">·</span>
+                    <span className="lg:hidden">Use sidebar for placeholders</span>
+                  </div>
+
+                  <button
+                    onClick={handleSave}
+                    disabled={isSavingTemplate}
+                    className="inline-flex items-center gap-2.5 px-5 py-2.5 rounded-full text-[13px] font-semibold text-white bg-[#6364FF] hover:bg-[#7879ff] transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:-translate-y-px"
+                    style={{ boxShadow: '0 0 0 1px rgba(99,100,255,0.3), 0 8px 24px rgba(99,100,255,0.25)' }}
+                  >
+                    {isSavingTemplate ? (
+                      <>
+                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        Saving
+                      </>
+                    ) : (
+                      <>
+                        Save template
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/15 font-medium tracking-wider">⌘↵</span>
+                      </>
+                    )}
+                  </button>
                 </div>
-              )}
-
-              {/* ── Bottom bar ── */}
-              <div className="flex items-center gap-1.5 px-5 py-2.5 bg-[#1a1a1a] border-t border-[#2a2a2a] flex-shrink-0">
-                {/* Mobile placeholders indicator */}
-                <div className="lg:hidden flex items-center gap-2 text-xs text-[#606060]">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 6.75 22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3-4.5 16.5" />
-                  </svg>
-                  <span>Use sidebar for placeholders</span>
-                </div>
-
-                <div className="flex-1" />
-
-                {/* Save button */}
-                <button
-                  onClick={async () => {
-                    // Validate
-                    if (!editingTemplate.name.trim() || !editingTemplate.body.trim()) {
-                      setTemplateError('Template name and body are required');
-                      return;
-                    }
-
-                    setIsSavingTemplate(true);
-                    setTemplateError(null);
-
-                    // If it's a new template OR a default template (save as new), create it
-                    if (editingTemplate.id === '__new__' || DEFAULT_TEMPLATES.some(dt => dt.id === editingTemplate.id)) {
-                      const result = await createTemplateAction({
-                        name: editingTemplate.name,
-                        subject: editingTemplate.subject,
-                        body: editingTemplate.body,
-                        attachResume: editingTemplate.attachResume,
-                        resumeId: editingTemplate.resumeId,
-                      });
-                      if (result.success) {
-                        setTemplates([...templates, result.template]);
-                        setEditingTemplate(null);
-                      } else {
-                        setTemplateError(result.error);
-                      }
-                    } else {
-                      // Update existing custom template
-                      await handleUpdateTemplate();
-                      if (!templateError) {
-                        setEditingTemplate(null);
-                      }
-                    }
-                    setIsSavingTemplate(false);
-                  }}
-                  disabled={isSavingTemplate}
-                  className="px-5 py-2 rounded-full text-xs font-semibold transition-colors disabled:opacity-50 flex items-center gap-2 bg-[#6364FF] text-white hover:bg-[#5354EE]"
-                >
-                  {isSavingTemplate ? (
-                    <>
-                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                      </svg>
-                      Saving...
-                    </>
-                  ) : (
-                    'Save'
-                  )}
-                </button>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Email Preferences Modal */}
       {showEmailPrefs && (
