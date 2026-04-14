@@ -818,6 +818,92 @@ function validateExtraction(
     }
   }
 
+  // 9. Unsupported criteria subset match
+  if (expected.unsupportedCriteria && expected.unsupportedCriteria.length > 0) {
+    for (const criterion of expected.unsupportedCriteria) {
+      const found = outcome.unsupportedCriteria.some(
+        actual => actual.toLowerCase().includes(criterion.toLowerCase())
+      );
+      if (!found) {
+        failures.push(
+          `unsupportedCriteria missing "${criterion}". Got: [${outcome.unsupportedCriteria.join(', ')}]`
+        );
+      }
+    }
+  }
+
+  // 10. Suggested alternative filters
+  if (expected.suggestedAlternativeFilters && outcome.suggestedAlternative) {
+    for (const [k, v] of Object.entries(expected.suggestedAlternativeFilters)) {
+      const actual = (outcome.suggestedAlternative.filters as Record<string, unknown>)[k];
+      if (actual !== v) {
+        failures.push(
+          `suggestedAlternative.filters.${k} mismatch: expected="${v}", actual="${actual ?? '(unset)'}"`
+        );
+      }
+    }
+  } else if (expected.suggestedAlternativeFilters && !outcome.suggestedAlternative) {
+    failures.push('expected suggestedAlternative but it was null');
+  }
+
+  // 11. Suggested alternative LinkedIn filters
+  if (expected.suggestedAlternativeLinkedInFilters && outcome.suggestedAlternative) {
+    for (const [k, v] of Object.entries(expected.suggestedAlternativeLinkedInFilters)) {
+      const actual = (outcome.suggestedAlternative.linkedInFilters as Record<string, unknown>)[k];
+      if (Array.isArray(v)) {
+        if (!matchArraySubset(actual as unknown[], v)) {
+          failures.push(
+            `suggestedAlternative.linkedInFilters.${k} missing values: expected subset=${JSON.stringify(v)}, actual=${JSON.stringify(actual ?? null)}`
+          );
+        }
+      } else if (typeof v === 'boolean') {
+        if (actual !== v) {
+          failures.push(
+            `suggestedAlternative.linkedInFilters.${k} mismatch: expected=${v}, actual=${actual ?? '(unset)'}`
+          );
+        }
+      }
+    }
+  }
+
+  // 12. Suggested alternative label
+  if (expected.suggestedAlternativeLabel && outcome.suggestedAlternative) {
+    if (!outcome.suggestedAlternative.label.toLowerCase().includes(expected.suggestedAlternativeLabel.toLowerCase())) {
+      failures.push(
+        `suggestedAlternative.label missing "${expected.suggestedAlternativeLabel}". Got: "${outcome.suggestedAlternative.label}"`
+      );
+    }
+  }
+
+  // 13. Suggested searches count
+  if (expected.suggestedSearchesMin != null) {
+    if (outcome.suggestedSearches.length < expected.suggestedSearchesMin) {
+      failures.push(
+        `suggestedSearches count too low: expected>=${expected.suggestedSearchesMin}, actual=${outcome.suggestedSearches.length}`
+      );
+    }
+  }
+
+  // 14. Message contains
+  if (expected.messageContains) {
+    for (const substring of expected.messageContains) {
+      if (!outcome.message.toLowerCase().includes(substring.toLowerCase())) {
+        failures.push(
+          `message missing "${substring}". Got: "${outcome.message}"`
+        );
+      }
+    }
+  }
+
+  // 15. Company name ambiguous flag
+  if (expected.companyNameAmbiguous != null) {
+    if (outcome.companyNameAmbiguous !== expected.companyNameAmbiguous) {
+      failures.push(
+        `companyNameAmbiguous mismatch: expected=${expected.companyNameAmbiguous}, actual=${outcome.companyNameAmbiguous ?? '(unset)'}`
+      );
+    }
+  }
+
   return { passed: failures.length === 0, failures, observations };
 }
 
