@@ -154,7 +154,7 @@ function InsightsChatMessage({ insights, personName, isSubscribed, selectedInsig
       <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#252525] flex items-center justify-center mt-1">
         <SignalLogoSmall className="w-3 h-3 text-white" />
       </div>
-      <div className={`min-w-0 rounded-2xl px-3 py-2 rounded-bl-md space-y-2.5 text-sm text-white ${isSubscribed === null ? 'bg-[#2a2a2a]' : isSubscribed ? 'bg-[#3b66f5]' : 'bg-[#22C55E]'}`}>
+      <div className={`min-w-0 rounded-2xl px-3 py-2 rounded-bl-md space-y-2.5 text-sm text-white ${isSubscribed === false ? 'bg-[#22C55E]' : 'bg-[#3b66f5]'}`}>
         <p className="text-sm text-white leading-relaxed">Here&apos;s what I found on {firstName}:</p>
 
         {linkedinInsights.length > 0 && (
@@ -345,7 +345,7 @@ function ChatSidebar() {
             <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#252525] flex items-center justify-center mt-1">
               <SignalLogoSmall className="w-3 h-3 text-white" />
             </div>
-            <div className={`flex-1 rounded-2xl px-3 py-2 rounded-bl-md ${isSubscribed === null ? 'bg-[#2a2a2a]' : isSubscribed ? 'bg-[#3b66f5]' : 'bg-[#22C55E]'}`}>
+            <div className={`flex-1 rounded-2xl px-3 py-2 rounded-bl-md ${isSubscribed === false ? 'bg-[#22C55E]' : 'bg-[#3b66f5]'}`}>
               <TypingIndicator />
             </div>
           </div>
@@ -373,7 +373,7 @@ function ChatSidebar() {
                 <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#252525] flex items-center justify-center mt-1">
                   <SignalLogoSmall className="w-3 h-3 text-white" />
                 </div>
-                <div className={`rounded-2xl px-3 py-2 text-sm text-white rounded-bl-md ${isSubscribed === null ? 'bg-[#2a2a2a]' : isSubscribed ? 'bg-[#3b66f5]' : 'bg-[#22C55E]'}`}>
+                <div className={`rounded-2xl px-3 py-2 text-sm text-white rounded-bl-md ${isSubscribed === false ? 'bg-[#22C55E]' : 'bg-[#3b66f5]'}`}>
                   <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
                 </div>
               </div>
@@ -388,7 +388,7 @@ function ChatSidebar() {
               <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#252525] flex items-center justify-center mt-1">
                 <SignalLogoSmall className="w-3 h-3 text-white" />
               </div>
-              <div className={`rounded-2xl px-3 py-2 rounded-bl-md ${isSubscribed === null ? 'bg-[#2a2a2a]' : isSubscribed ? 'bg-[#3b66f5]' : 'bg-[#22C55E]'}`}>
+              <div className={`rounded-2xl px-3 py-2 rounded-bl-md ${isSubscribed === false ? 'bg-[#22C55E]' : 'bg-[#3b66f5]'}`}>
                 <TypingIndicator />
               </div>
             </div>
@@ -991,8 +991,8 @@ export function ExpandedReview({
   if (!currentPerson) return null;
 
   const canSend = !status && !showSuccess && !limitReached;
-  const accentColor = isSubscribed === null ? 'bg-[#2a2a2a]' : isSubscribed ? 'bg-[#2563EB]' : 'bg-[#22C55E]';
-  const accentHover = isSubscribed === null ? 'hover:bg-[#333]' : isSubscribed ? 'hover:bg-[#1d4ed8]' : 'hover:bg-[#16a34a]';
+  const accentColor = isSubscribed === false ? 'bg-[#22C55E]' : 'bg-[#2563EB]';
+  const accentHover = isSubscribed === false ? 'hover:bg-[#16a34a]' : 'hover:bg-[#1d4ed8]';
 
   return (
     <div className="fixed inset-0 z-50 flex bg-[#181818] animate-fade-in">
