@@ -295,11 +295,11 @@ function ChatSidebar() {
       <div className="flex-1 overflow-y-auto px-3 py-4 space-y-3">
         {/* Person insights as AI first message */}
         {insightsLoading && insights.length === 0 ? (
-          <div className="flex gap-2 w-full">
+          <div className="flex gap-2">
             <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#252525] flex items-center justify-center mt-1">
               <SignalLogoSmall className="w-3 h-3 text-white" />
             </div>
-            <div className={`flex-1 rounded-2xl px-3 py-2 rounded-bl-md ${isSubscribed === null ? 'bg-[#2a2a2a]' : isSubscribed ? 'bg-[#3b66f5]' : 'bg-[#22C55E]'}`}>
+            <div className={`rounded-2xl px-3 py-2 rounded-bl-md ${isSubscribed === null ? 'bg-[#2a2a2a]' : isSubscribed ? 'bg-[#3b66f5]' : 'bg-[#22C55E]'}`}>
               <TypingIndicator />
             </div>
           </div>
