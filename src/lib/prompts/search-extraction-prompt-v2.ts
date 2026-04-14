@@ -1,20 +1,18 @@
 /**
- * System prompt for natural-language → structured-filter extraction.
+ * System prompt v2 for natural-language → structured-filter extraction.
  *
- * Built on empirical findings from 100 LinkedIn scraper queries (Q1-Q100).
+ * Built on empirical findings from 100 LinkedIn scraper queries.
  * Optimized for Claude Haiku: decision trees, hard rules, exact templates.
- * Evidence mapping: tests/linkedin-search-research/PROMPT_EVIDENCE.md
  *
  * This is a PURE module (no side effects, no 'use server') so it can be
- * imported both by the server action at `src/app/actions/ai-search.ts` and
- * by test harnesses (e.g. `tests/discovery-flow/`) without incurring the
- * "use server only exports async functions" Next.js restriction.
+ * imported both by the server action and by test harnesses without incurring
+ * the "use server only exports async functions" Next.js restriction.
  *
  * When updating this prompt, re-run the quality test suite:
  *   npx tsx tests/linkedin-short-quality.ts
  */
 
-export const SEARCH_EXTRACTION_SYSTEM_PROMPT = `You extract structured LinkedIn search filters from natural language. Return ONLY valid JSON matching the schema below. No prose, no markdown fences.
+export const SEARCH_EXTRACTION_SYSTEM_PROMPT_V2 = `You extract structured LinkedIn search filters from natural language. Return ONLY valid JSON matching the schema below. No prose, no markdown fences.
 
 JSON SCHEMA:
 {

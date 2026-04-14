@@ -8,7 +8,7 @@ import { SearchableCombobox } from '@/components/search/SearchableCombobox';
 import { useEmailChat } from '@/contexts/EmailChatContext';
 import { EmailChatPanel } from '@/components/sidebar/EmailChatPanel';
 import { DisplayMessage } from './MainSearchView';
-import { Selectable } from '@/app/actions/ai-search';
+import { Selectable, SuggestedAlternative } from '@/app/actions/ai-search';
 
 
 // Signal logo component
@@ -41,6 +41,7 @@ interface SearchSidebarProps {
   isExtracting: boolean;
   onSelectableClick: (selectable: Selectable) => void;
   onShowMoreSelectables: (messageId: string) => void;
+  onSuggestedAlternativeClick: (alt: SuggestedAlternative) => void;
   onClearChat: () => void;
   isSubscribed: boolean;
 }
@@ -58,6 +59,7 @@ export function SearchSidebar({
   isExtracting,
   onSelectableClick,
   onShowMoreSelectables,
+  onSuggestedAlternativeClick,
   onClearChat,
   isSubscribed,
 }: SearchSidebarProps) {
@@ -273,6 +275,24 @@ export function SearchSidebar({
                                           Show more...
                                         </button>
                                       )}
+                                    </div>
+                                  )}
+                                  {msg.suggestedAlternative && (
+                                    <div className="mt-3">
+                                      <p className="text-xs text-white/60 mb-1.5">Try instead:</p>
+                                      <button
+                                        onClick={() => onSuggestedAlternativeClick(msg.suggestedAlternative!)}
+                                        disabled={isExtracting || isSearching}
+                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-[#1a2a1a] border border-[#2a4a2a] rounded-xl hover:bg-[#1e341e] hover:border-[#3a5e3a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-left"
+                                      >
+                                        <svg className="w-3.5 h-3.5 flex-shrink-0 text-white/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                                        </svg>
+                                        <span className="truncate">{msg.suggestedAlternative.label}</span>
+                                        <svg className="w-3 h-3 flex-shrink-0 text-white/50 ml-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                                        </svg>
+                                      </button>
                                     </div>
                                   )}
                                 </>

@@ -79,9 +79,11 @@ export function ChatMessages({
 
       {/* Processing indicator */}
       {isProcessing && (
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-start w-fit">
           <AIIcon />
-          <TypingIndicator />
+          <div className="bg-[#252525] rounded-lg px-3 py-2">
+            <TypingIndicator />
+          </div>
         </div>
       )}
 

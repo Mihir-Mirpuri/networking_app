@@ -931,282 +931,22 @@ export function isVectorRoleMatchingEnabled(): boolean {
   return process.env.USE_VECTOR_ROLE_MATCHING !== 'false' && !!process.env.OPENAI_API_KEY;
 }
 
-export async function findPeopleByFilters(filters: PersonFilters): Promise<PersonResult[]> {
-  const { company, role, limit } = filters;
-
-  // Dispatch to vector path if role provided and vector matching is enabled
-  if (role && role.trim() && isVectorRoleMatchingEnabled()) {
-    const searchEmbedding = await getSearchRoleEmbedding(role);
-    if (searchEmbedding) {
-      console.log(`[PersonService] Using VECTOR path for role="${role}" | company="${company}" | aliases=${filters.companyAliases?.length ?? 0} | limit=${limit}`);
-      return findPeopleByFiltersVector(filters, searchEmbedding);
-    }
-    console.warn(`[PersonService] Embedding FAILED for role="${role}" — falling back to ILIKE path`);
-  } else if (role && role.trim()) {
-    console.log(`[PersonService] Vector matching disabled (OPENAI_API_KEY=${!!process.env.OPENAI_API_KEY}, USE_VECTOR_ROLE_MATCHING=${process.env.USE_VECTOR_ROLE_MATCHING}) — using ILIKE path`);
-  } else {
-    console.log(`[PersonService] No role filter — using ILIKE path`);
-  }
-
-  // Fallback: existing Prisma path
-  const roleTerms = role ? getRoleSearchTerms(role) : [];
-  console.log(`[PersonService] ILIKE path: role="${role}" → terms=${JSON.stringify(roleTerms)} | company="${company}" | aliases=${filters.companyAliases?.length ?? 0} | limit=${limit}`);
-
-  const schoolMatchIds = filters.university?.trim() ? await getSchoolMatchIds(filters.university) : undefined;
-  const where = buildPersonWhereClause(filters, schoolMatchIds);
-
-  // excludePersonIds (NOT IN) handles pagination at the DB level,
-  // so no OFFSET needed — always fetch the top-ranked unseen people.
-  const people = await prisma.person.findMany({
-    where,
-    select: {
-      id: true,
-      fullName: true,
-      firstName: true,
-      lastName: true,
-      company: true,
-      role: true,
-      linkedinUrl: true,
-      email: true,
-      emailStatus: true,
-      emailConfidence: true,
-      emailDeliverable: true,
-      emailVerifiedAt: true,
-      emailVerificationReason: true,
-      city: true,
-      state: true,
-      country: true,
-      educationSchool: true,
-      educationDegree: true,
-      educationField: true,
-      educationYear: true,
-      scrapeDepth: true,
-      sourceLinks: {
-        where: { kind: 'DISCOVERY' },
-        orderBy: { createdAt: 'asc' },
-        take: 1,
-        select: {
-          url: true,
-          title: true,
-          snippet: true,
-          domain: true,
-        },
-      },
-    },
-    orderBy: [
-      { emailStatus: 'asc' },       // VERIFIED first
-      { emailConfidence: 'desc' },
-      { createdAt: 'asc' },          // Stable sort — new people go to end
-    ],
-    take: limit * 2, // Overfetch to compensate for post-query filtering
-  });
-
-  console.log(`[ILIKEQuery] Raw rows returned: ${people.length}${people.length > 0 ? ` | top roles: ${people.slice(0, 3).map(p => p.role).join(', ')}` : ''}`);
-
-  // If pre-resolved aliases were used, exact-match DB query is sufficient — skip post-filter
-  if (filters.companyAliases && filters.companyAliases.length > 0) {
-    return people.slice(0, limit);
-  }
-  const filtered = applyPostQueryFilters(people, filters.companies || company);
-  return filtered.slice(0, limit);
-}
-
 /**
- * Vector-based role matching: uses pgvector cosine distance for semantic role similarity.
- * Hard filters (company, location, university, email, excludes) remain as SQL WHERE clauses.
- * Role matching is done via ORDER BY embedding distance + threshold filter.
- * Records with null embeddings are included with a penalty distance of 1.0 (appear at end).
+ * Find people matching filters. Delegates to V2 hybrid vector + pg_trgm implementation.
+ * V1 backup: src/lib/db/person-service-v1-backup.ts
  */
-async function findPeopleByFiltersVector(
-  filters: PersonFilters,
-  searchEmbedding: number[]
-): Promise<PersonResult[]> {
-  const { company, location, university, requireEmail = true, excludePersonIds, limit } = filters;
-  const vectorString = `[${searchEmbedding.join(',')}]`;
-
-  // Build WHERE conditions as Prisma.sql fragments
-  const conditions: Prisma.Sql[] = [Prisma.sql`1=1`];
-
-  // Company filter — use pre-resolved aliases or fall back to alias mapping
-  if (filters.companyAliases && filters.companyAliases.length > 0) {
-    // Short aliases (<=3 chars like "gs") use exact match to avoid false positives.
-    // Longer aliases use substring match so "anara" matches "Anara Health".
-    const companyConditions = filters.companyAliases.map(alias =>
-      alias.length <= 3
-        ? Prisma.sql`p.company ILIKE ${alias}`
-        : Prisma.sql`p.company ILIKE ${'%' + alias + '%'}`
-    );
-    conditions.push(Prisma.sql`(${Prisma.join(companyConditions, ' OR ')})`);
-  } else if (company && company.trim()) {
-    // Simple contains fallback — all real search paths use companyAliases
-    conditions.push(Prisma.sql`p.company ILIKE ${'%' + company.trim() + '%'}`);
-  }
-
-  // Location filter — split "City, State" and check city OR state for each part
-  if (location && location.trim()) {
-    const locationParts = location.split(',').map(p => p.trim()).filter(Boolean);
-    const locConditions = locationParts.map(part => {
-      const term = '%' + part + '%';
-      return Prisma.sql`(p.city ILIKE ${term} OR p.state ILIKE ${term})`;
-    });
-    // ANY part matching is sufficient (e.g., "New York" OR "New York" from "New York, New York")
-    conditions.push(Prisma.sql`(${Prisma.join(locConditions, ' OR ')})`);
-  }
-
-  // University filter — keyword-split matching to handle abbreviations
-  if (university && university.trim()) {
-    const keywords = getUniversityKeywords(university);
-    const kwConditions = keywords.map(kw => {
-      const term = '%' + kw + '%';
-      return Prisma.sql`(p."educationSchool" ILIKE ${term} OR p.schools::text ILIKE ${term})`;
-    });
-    conditions.push(Prisma.sql`(${Prisma.join(kwConditions, ' AND ')})`);
-  }
-
-  // Email filter
-  if (requireEmail) {
-    conditions.push(Prisma.sql`p.email IS NOT NULL`);
-    conditions.push(Prisma.sql`(p."emailDeliverable" = true OR p."emailDeliverable" IS NULL)`);
-  } else {
-    // Exclude people Apollo already tried and couldn't find an email for
-    conditions.push(Prisma.sql`NOT (p.email IS NULL AND p."apolloEnrichedAt" IS NOT NULL)`);
-    // Also exclude bounced/undeliverable people
-    conditions.push(Prisma.sql`(p."emailDeliverable" = true OR p."emailDeliverable" IS NULL)`);
-  }
-
-  // Exclude filter
-  if (excludePersonIds && excludePersonIds.length > 0) {
-    conditions.push(Prisma.sql`p.id NOT IN (${Prisma.join(excludePersonIds)})`);
-  }
-
-  // Never show people without a role
-  conditions.push(Prisma.sql`p.role IS NOT NULL`);
-
-  // Exclude people whose role indicates they haven't started yet (e.g., "Incoming Analyst")
-  conditions.push(Prisma.sql`p.role !~* '^(incoming|future)\s+'`);
-
-  // Vector similarity threshold: dynamic based on role specificity bucket.
-  // Narrow (niche titles) = tight match, Standard = moderate, Broad (generic disciplines) = loose.
-  const SPECIFICITY_THRESHOLDS = { narrow: 0.28, standard: 0.38, broad: 0.48 } as const;
-  const threshold = SPECIFICITY_THRESHOLDS[filters.roleSpecificity || 'standard'];
-  conditions.push(Prisma.sql`
-    p.role_embedding IS NOT NULL
-    AND (p.role_embedding <=> ${vectorString}::vector) <= ${threshold}
-  `);
-
-  const whereClause = Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}`;
-  const fetchLimit = limit * 2; // Overfetch for post-query company filtering
-
-  console.log(`[VectorQuery] Filters: company=${company}, aliases=${filters.companyAliases?.length ?? 0}, location=${location}, university=${university}, requireEmail=${requireEmail}, excludeIds=${excludePersonIds?.length ?? 0}, bucket=${filters.roleSpecificity || 'standard'}, threshold=${threshold}, fetchLimit=${fetchLimit}`);
-
-  const rows = await prisma.$queryRaw<Array<{
-    id: string;
-    fullName: string;
-    firstName: string | null;
-    lastName: string | null;
-    company: string;
-    role: string | null;
-    linkedinUrl: string | null;
-    email: string | null;
-    emailStatus: string | null;
-    emailConfidence: number | null;
-    emailDeliverable: boolean | null;
-    emailVerifiedAt: Date | null;
-    emailVerificationReason: string | null;
-    city: string | null;
-    state: string | null;
-    country: string | null;
-    educationSchool: string | null;
-    educationDegree: string | null;
-    educationField: string | null;
-    educationYear: string | null;
-    scrapeDepth: string;
-    role_distance: number;
-  }>>(Prisma.sql`
-    SELECT
-      p.id,
-      p."fullName",
-      p."firstName",
-      p."lastName",
-      p.company,
-      p.role,
-      p."linkedinUrl",
-      p.email,
-      p."emailStatus"::text,
-      p."emailConfidence",
-      p."emailDeliverable",
-      p."emailVerifiedAt",
-      p."emailVerificationReason",
-      p.city,
-      p.state,
-      p.country,
-      p."educationSchool",
-      p."educationDegree",
-      p."educationField",
-      p."educationYear",
-      p."scrapeDepth",
-      (p.role_embedding <=> ${vectorString}::vector) as role_distance
-    FROM "Person" p
-    ${whereClause}
-    ORDER BY
-      role_distance ASC,
-      CASE p."emailStatus"::text
-        WHEN 'VERIFIED' THEN 0
-        WHEN 'MANUAL'   THEN 1
-        WHEN 'UNVERIFIED' THEN 2
-        ELSE 3
-      END ASC,
-      p."emailConfidence" DESC NULLS LAST
-    LIMIT ${fetchLimit}
-  `);
-
-  console.log(`[VectorQuery] Raw rows returned: ${rows.length}${rows.length > 0 ? ` | distance range: ${Number(rows[0].role_distance).toFixed(4)} → ${Number(rows[rows.length - 1].role_distance).toFixed(4)}` : ''}`);
-  if (rows.length > 0) {
-    console.log(`[VectorQuery] Top 3: ${rows.slice(0, 3).map(r => `${r.role}@${r.company}(d=${Number(r.role_distance).toFixed(3)})`).join(', ')}`);
-  }
-
-  // If pre-resolved aliases were used, exact-match DB query is sufficient — skip post-filter
-  const filtered = (filters.companyAliases && filters.companyAliases.length > 0)
-    ? rows
-    : applyPostQueryFilters(rows, filters.companies || company);
-  const limited = filtered.slice(0, limit);
-
-  if (limited.length === 0) return [];
-
-  // Fetch source links (raw SQL can't do nested selects)
-  const personIds = limited.map(p => p.id);
-  const sourceLinks = await prisma.sourceLink.findMany({
-    where: {
-      personId: { in: personIds },
-      kind: 'DISCOVERY',
-    },
-    orderBy: { createdAt: 'asc' },
-    select: {
-      personId: true,
-      url: true,
-      title: true,
-      snippet: true,
-      domain: true,
-    },
-  });
-
-  // Group by personId (first link per person)
-  const sourceLinkMap = new Map<string, (typeof sourceLinks)[0]>();
-  for (const sl of sourceLinks) {
-    if (!sourceLinkMap.has(sl.personId)) {
-      sourceLinkMap.set(sl.personId, sl);
-    }
-  }
-
-  return limited.map(row => {
-    const sl = sourceLinkMap.get(row.id);
-    return {
-      ...row,
-      roleDistance: row.role_distance,
-      sourceLinks: sl
-        ? [{ url: sl.url, title: sl.title, snippet: sl.snippet, domain: sl.domain }]
-        : [],
-    };
+export async function findPeopleByFilters(filters: PersonFilters): Promise<PersonResult[]> {
+  // Map PersonFilters → PersonFiltersV2 and delegate
+  return findPeopleByFiltersV2({
+    company: filters.company,
+    limit: filters.limit,
+    companyAliases: filters.companyAliases,
+    role: filters.role,
+    roleSpecificity: filters.roleSpecificity,
+    location: filters.location,
+    university: filters.university,
+    requireEmail: filters.requireEmail,
+    excludePersonIds: filters.excludePersonIds,
   });
 }
 
@@ -2265,4 +2005,884 @@ export async function saveShortProfilesBatch(
   console.log(`[saveShortProfilesBatch] Saved ${profiles.length} profiles (${newCount} new, ${existingCount} existing) in ${Date.now() - startTime}ms`);
 
   return results;
+}
+
+
+// ============================================================================
+// V2 Retrieval: Hybrid Vector + pg_trgm
+// ============================================================================
+
+/**
+ * Filter criteria for the V2 retrieval path.
+ * Uses pg_trgm for fuzzy company matching and pgvector for semantic role matching.
+ * Ranking is handled entirely in SQL ORDER BY (no post-query rankCandidates).
+ */
+export interface PersonFiltersV2 {
+  /** Primary company name to search for. */
+  company: string;
+  /** Maximum number of results to return. */
+  limit: number;
+  /** Pre-resolved company aliases (from company-alias service). */
+  companyAliases?: string[];
+  /** Role/title to match via vector cosine distance. */
+  role?: string;
+  /** Controls vector similarity threshold: narrow=0.28, standard=0.38, broad=0.48. */
+  roleSpecificity?: 'narrow' | 'standard' | 'broad';
+  /** City, state, or "City, State" for location filtering. */
+  location?: string;
+  /** School name or abbreviation for university filtering. */
+  university?: string;
+  /** If true (default), only return people with email addresses. */
+  requireEmail?: boolean;
+  /** Person IDs to exclude (already displayed, sent, hidden). */
+  excludePersonIds?: string[];
+  /** Company match mode: 'exact' for case-insensitive equality, 'fuzzy' for trgm similarity. Default 'fuzzy'. */
+  companyMatchMode?: 'exact' | 'fuzzy';
+  /** pg_trgm similarity threshold for company matching. Default 0.3. */
+  companySimThreshold?: number;
+}
+
+/**
+ * V2 retrieval function using hybrid vector + pg_trgm matching.
+ *
+ * Company filter: pg_trgm similarity (fuzzy) or exact match for short aliases (<=3 chars).
+ * Role filter: pgvector cosine distance with specificity-based thresholds.
+ * Location/university/email: same ILIKE approach as V1.
+ * Ranking: SQL ORDER BY (role_distance, company_similarity, email quality) -- no post-query re-ranking.
+ *
+ * Falls back to ILIKE role matching if OpenAI embedding fails.
+ */
+export async function findPeopleByFiltersV2(
+  filters: PersonFiltersV2
+): Promise<PersonResult[]> {
+  const {
+    company,
+    role,
+    location,
+    university,
+    requireEmail = true,
+    excludePersonIds,
+    limit,
+    companyMatchMode = 'fuzzy',
+    companySimThreshold = 0.3,
+  } = filters;
+
+  // ── Resolve role embedding (if role provided) ──
+  let searchEmbedding: number[] | null = null;
+  let useVectorPath = false;
+
+  if (role && role.trim() && isVectorRoleMatchingEnabled()) {
+    searchEmbedding = await getSearchRoleEmbedding(role);
+    if (searchEmbedding) {
+      useVectorPath = true;
+    } else {
+      console.warn(`[PersonServiceV2] Embedding FAILED for role="${role}" -- falling back to ILIKE role matching`);
+    }
+  }
+
+  const vectorString = searchEmbedding ? `[${searchEmbedding.join(',')}]` : null;
+
+  // ── Role threshold (only used when vector path is active) ──
+  const SPECIFICITY_THRESHOLDS = { narrow: 0.28, standard: 0.38, broad: 0.48 } as const;
+  const roleThreshold = SPECIFICITY_THRESHOLDS[filters.roleSpecificity || 'standard'];
+
+  // ── Build WHERE conditions ──
+  const conditions: Prisma.Sql[] = [Prisma.sql`1=1`];
+
+  // ── Company filter ──
+  if (company && company.trim()) {
+    const companyConditions: Prisma.Sql[] = [];
+
+    // Collect all names to check: primary company + aliases
+    const allNames: string[] = [company.trim()];
+    if (filters.companyAliases && filters.companyAliases.length > 0) {
+      for (const alias of filters.companyAliases) {
+        if (alias.trim() && !allNames.some(n => n.toLowerCase() === alias.trim().toLowerCase())) {
+          allNames.push(alias.trim());
+        }
+      }
+    }
+
+    // Short aliases (<=3 chars): exact case-insensitive match.
+    // When companyAliases are provided, the alias ILIKE patterns below handle
+    // substring matches (e.g., "Boston Consulting Group (BCG)"). Without aliases,
+    // we add a word-boundary regex fallback so short names like "BCG" still match
+    // "BCG X" or "Boston Consulting Group (BCG)" but NOT mid-word hits like
+    // "Bags" for "GS" or "DraftKings" for "GS".
+    const hasAliases = filters.companyAliases && filters.companyAliases.length > 0;
+    const shortAliases = allNames.filter(n => n.length <= 3);
+    for (const alias of shortAliases) {
+      if (hasAliases) {
+        // Aliases will provide ILIKE coverage; exact match is sufficient here
+        companyConditions.push(Prisma.sql`lower(p.company) = lower(${alias})`);
+      } else {
+        // No aliases: combine exact match with word-boundary regex fallback.
+        // Escape regex-special characters in the alias (e.g., "S&T" -> "S\\&T")
+        // then wrap with boundary anchors that match start/end of string or
+        // common delimiters (space, hyphen, paren, comma).
+        const escapedAlias = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const boundaryPattern = `(^|[\\s\\-\\(\\,])${escapedAlias}($|[\\s\\-\\)\\,])`;
+        companyConditions.push(
+          Prisma.sql`(lower(p.company) = lower(${alias}) OR p.company ~* ${boundaryPattern})`
+        );
+      }
+    }
+
+    // Longer names: pg_trgm similarity or exact ILIKE depending on mode
+    const longNames = allNames.filter(n => n.length > 3);
+    if (longNames.length > 0) {
+      if (companyMatchMode === 'fuzzy') {
+        // Set trgm threshold for the % operator within this query
+        // We use a subquery approach: similarity() >= threshold in WHERE
+        for (const name of longNames) {
+          companyConditions.push(
+            Prisma.sql`similarity(lower(p.company), lower(${name})) >= ${companySimThreshold}`
+          );
+        }
+      } else {
+        // Exact mode: case-insensitive contains (same as V1)
+        for (const name of longNames) {
+          companyConditions.push(Prisma.sql`p.company ILIKE ${'%' + name + '%'}`);
+        }
+      }
+    }
+
+    // Also check pre-resolved aliases via ILIKE as fallback
+    // (backward compatible with company-alias service output)
+    if (filters.companyAliases && filters.companyAliases.length > 0) {
+      for (const alias of filters.companyAliases) {
+        if (alias.length > 3) {
+          companyConditions.push(Prisma.sql`p.company ILIKE ${'%' + alias + '%'}`);
+        }
+      }
+    }
+
+    if (companyConditions.length > 0) {
+      conditions.push(Prisma.sql`(${Prisma.join(companyConditions, ' OR ')})`);
+    }
+  }
+
+  // ── Role filter ──
+  if (role && role.trim()) {
+    if (useVectorPath && vectorString) {
+      // Vector path: include rows WITH embedding that pass threshold,
+      // plus rows WITHOUT embedding (ranked last via role_distance = 1.0)
+      conditions.push(Prisma.sql`(
+        p.role_embedding IS NULL
+        OR (p.role_embedding <=> ${vectorString}::vector) <= ${roleThreshold}
+      )`);
+    } else {
+      // ILIKE fallback: use role alias expansion (same as V1)
+      const roleTerms = getRoleSearchTerms(role);
+      const roleConditions = roleTerms.map(term =>
+        Prisma.sql`p.role ILIKE ${'%' + term + '%'}`
+      );
+      conditions.push(Prisma.sql`(${Prisma.join(roleConditions, ' OR ')})`);
+    }
+  }
+
+  // ── Location filter ── (unchanged from V1)
+  if (location && location.trim()) {
+    const locationParts = location.split(',').map(p => p.trim()).filter(Boolean);
+    const locConditions = locationParts.map(part => {
+      const term = '%' + part + '%';
+      return Prisma.sql`(p.city ILIKE ${term} OR p.state ILIKE ${term})`;
+    });
+    conditions.push(Prisma.sql`(${Prisma.join(locConditions, ' OR ')})`);
+  }
+
+  // ── University filter ── (unchanged from V1)
+  if (university && university.trim()) {
+    const keywords = getUniversityKeywords(university);
+    const kwConditions = keywords.map(kw => {
+      const term = '%' + kw + '%';
+      return Prisma.sql`(p."educationSchool" ILIKE ${term} OR p.schools::text ILIKE ${term})`;
+    });
+    conditions.push(Prisma.sql`(${Prisma.join(kwConditions, ' AND ')})`);
+  }
+
+  // ── Email filter ── (unchanged from V1)
+  if (requireEmail) {
+    conditions.push(Prisma.sql`p.email IS NOT NULL`);
+    conditions.push(Prisma.sql`(p."emailDeliverable" = true OR p."emailDeliverable" IS NULL)`);
+  } else {
+    conditions.push(Prisma.sql`NOT (p.email IS NULL AND p."apolloEnrichedAt" IS NOT NULL)`);
+    conditions.push(Prisma.sql`(p."emailDeliverable" = true OR p."emailDeliverable" IS NULL)`);
+  }
+
+  // ── Exclude filter ──
+  if (excludePersonIds && excludePersonIds.length > 0) {
+    conditions.push(Prisma.sql`p.id NOT IN (${Prisma.join(excludePersonIds)})`);
+  }
+
+  // ── Must have role, not incoming/future ──
+  conditions.push(Prisma.sql`p.role IS NOT NULL`);
+  conditions.push(Prisma.sql`p.role !~* '^(incoming|future)\\s+'`);
+
+  // ── Assemble query ──
+  const whereClause = Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}`;
+  const fetchLimit = limit * 2; // Overfetch pattern (safety margin)
+
+  // Build SELECT columns for scoring
+  // role_distance: vector cosine distance (lower = better), 1.0 penalty for missing embeddings
+  // company_similarity: pg_trgm similarity score (higher = better)
+  const roleDistanceExpr = (useVectorPath && vectorString)
+    ? Prisma.sql`CASE
+        WHEN p.role_embedding IS NOT NULL
+        THEN (p.role_embedding <=> ${vectorString}::vector)
+        ELSE 1.0
+      END`
+    : Prisma.sql`0.0`;
+
+  // Build company similarity: GREATEST across primary name + all aliases
+  const allCompanyNames: string[] = [];
+  if (company && company.trim()) allCompanyNames.push(company.trim());
+  if (filters.companyAliases) {
+    for (const alias of filters.companyAliases) {
+      if (alias.trim() && alias.length > 3) allCompanyNames.push(alias.trim());
+    }
+  }
+
+  let companySimilarityExpr: Prisma.Sql;
+  if (allCompanyNames.length > 0) {
+    const simExprs = allCompanyNames.map(name =>
+      Prisma.sql`similarity(lower(p.company), lower(${name}))`
+    );
+    companySimilarityExpr = simExprs.length === 1
+      ? simExprs[0]
+      : Prisma.sql`GREATEST(${Prisma.join(simExprs, ', ')})`;
+  } else {
+    companySimilarityExpr = Prisma.sql`0.0`;
+  }
+
+  // Build ORDER BY based on whether role was provided
+  let orderByClause: Prisma.Sql;
+  if (role && role.trim() && useVectorPath) {
+    // Role specified + vector active: sort by role distance first
+    orderByClause = Prisma.sql`ORDER BY
+      role_distance ASC,
+      company_similarity DESC,
+      CASE p."emailStatus"::text
+        WHEN 'VERIFIED' THEN 0
+        WHEN 'MANUAL'   THEN 1
+        WHEN 'UNVERIFIED' THEN 2
+        ELSE 3
+      END ASC,
+      p."emailConfidence" DESC NULLS LAST`;
+  } else if (company && company.trim()) {
+    // No role (or ILIKE fallback): sort by company similarity first
+    orderByClause = Prisma.sql`ORDER BY
+      company_similarity DESC,
+      CASE p."emailStatus"::text
+        WHEN 'VERIFIED' THEN 0
+        WHEN 'MANUAL'   THEN 1
+        WHEN 'UNVERIFIED' THEN 2
+        ELSE 3
+      END ASC,
+      p."emailConfidence" DESC NULLS LAST`;
+  } else {
+    // Neither role nor company: email quality only
+    orderByClause = Prisma.sql`ORDER BY
+      CASE p."emailStatus"::text
+        WHEN 'VERIFIED' THEN 0
+        WHEN 'MANUAL'   THEN 1
+        WHEN 'UNVERIFIED' THEN 2
+        ELSE 3
+      END ASC,
+      p."emailConfidence" DESC NULLS LAST`;
+  }
+
+  console.log(`[PersonServiceV2] Filters: company="${company}", aliases=${filters.companyAliases?.length ?? 0}, role="${role}", roleSpecificity=${filters.roleSpecificity || 'standard'}, location="${location}", university="${university}", requireEmail=${requireEmail}, excludeIds=${excludePersonIds?.length ?? 0}, companyMatchMode=${companyMatchMode}, companySimThreshold=${companySimThreshold}, vectorPath=${useVectorPath}, fetchLimit=${fetchLimit}`);
+
+  const rows = await prisma.$queryRaw<Array<{
+    id: string;
+    fullName: string;
+    firstName: string | null;
+    lastName: string | null;
+    company: string;
+    role: string | null;
+    linkedinUrl: string | null;
+    email: string | null;
+    emailStatus: string | null;
+    emailConfidence: number | null;
+    emailDeliverable: boolean | null;
+    emailVerifiedAt: Date | null;
+    emailVerificationReason: string | null;
+    city: string | null;
+    state: string | null;
+    country: string | null;
+    educationSchool: string | null;
+    educationDegree: string | null;
+    educationField: string | null;
+    educationYear: string | null;
+    scrapeDepth: string;
+    role_distance: number;
+    company_similarity: number;
+  }>>(Prisma.sql`
+    SELECT
+      p.id,
+      p."fullName",
+      p."firstName",
+      p."lastName",
+      p.company,
+      p.role,
+      p."linkedinUrl",
+      p.email,
+      p."emailStatus"::text,
+      p."emailConfidence",
+      p."emailDeliverable",
+      p."emailVerifiedAt",
+      p."emailVerificationReason",
+      p.city,
+      p.state,
+      p.country,
+      p."educationSchool",
+      p."educationDegree",
+      p."educationField",
+      p."educationYear",
+      p."scrapeDepth",
+      ${roleDistanceExpr} as role_distance,
+      ${companySimilarityExpr} as company_similarity
+    FROM "Person" p
+    ${whereClause}
+    ${orderByClause}
+    LIMIT ${fetchLimit}
+  `);
+
+  console.log(`[PersonServiceV2] Raw rows returned: ${rows.length}${rows.length > 0
+    ? ` | role_distance range: ${Number(rows[0].role_distance).toFixed(4)} -> ${Number(rows[rows.length - 1].role_distance).toFixed(4)} | company_similarity range: ${Number(rows[0].company_similarity).toFixed(4)} -> ${Number(rows[rows.length - 1].company_similarity).toFixed(4)}`
+    : ''}`);
+  if (rows.length > 0) {
+    console.log(`[PersonServiceV2] Top 3: ${rows.slice(0, 3).map(r =>
+      `${r.role}@${r.company}(rd=${Number(r.role_distance).toFixed(3)},cs=${Number(r.company_similarity).toFixed(3)})`
+    ).join(', ')}`);
+  }
+
+  // Trim to requested limit (no post-query company filter needed -- trgm handles it in SQL)
+  const limited = rows.slice(0, limit);
+
+  if (limited.length === 0) return [];
+
+  // ── Fetch source links (second query, same pattern as V1) ──
+  const personIds = limited.map(p => p.id);
+  const sourceLinks = await prisma.sourceLink.findMany({
+    where: {
+      personId: { in: personIds },
+      kind: 'DISCOVERY',
+    },
+    orderBy: { createdAt: 'asc' },
+    select: {
+      personId: true,
+      url: true,
+      title: true,
+      snippet: true,
+      domain: true,
+    },
+  });
+
+  // Group by personId (first link per person)
+  const sourceLinkMap = new Map<string, (typeof sourceLinks)[0]>();
+  for (const sl of sourceLinks) {
+    if (!sourceLinkMap.has(sl.personId)) {
+      sourceLinkMap.set(sl.personId, sl);
+    }
+  }
+
+  return limited.map(row => {
+    const sl = sourceLinkMap.get(row.id);
+    return {
+      ...row,
+      roleDistance: row.role_distance,
+      sourceLinks: sl
+        ? [{ url: sl.url, title: sl.title, snippet: sl.snippet, domain: sl.domain }]
+        : [],
+    };
+  });
+}
+
+
+// ============================================================================
+// V3 Retrieval: Two-Pass Hybrid with Match Tiers
+// ============================================================================
+
+/** Classification of how closely a result matched the search role. */
+export type MatchTier = 'exact' | 'near_exact' | 'similar';
+
+/** V3 result extends PersonResult with tier and score metadata. */
+export interface PersonResultV3 extends PersonResult {
+  matchTier: MatchTier;
+  matchScore: number; // 0.0 (worst) to 1.0 (best)
+}
+
+/** Tier sort order for deterministic ranking: exact first, similar last. */
+const TIER_ORDER: Record<MatchTier, number> = { exact: 0, near_exact: 1, similar: 2 };
+
+/**
+ * V3 retrieval: two-pass hybrid with match tiers.
+ *
+ * Architecture:
+ *   Query A — ILIKE text match on p.role (catches exact + near_exact matches).
+ *   Query B — pgvector cosine search (catches semantic/synonym matches).
+ * Both queries run in parallel. Results are merged, deduplicated (A wins),
+ * scored, sorted by tier then score, and sliced to the requested limit.
+ *
+ * When no role is provided, falls through to a single V2-style query with all
+ * results assigned matchTier='exact' and matchScore=1.0.
+ */
+export async function findPeopleByFiltersV3(
+  filters: PersonFiltersV2
+): Promise<PersonResultV3[]> {
+  const {
+    company,
+    role,
+    location,
+    university,
+    requireEmail = true,
+    excludePersonIds,
+    limit,
+    companyMatchMode = 'fuzzy',
+    companySimThreshold = 0.3,
+  } = filters;
+
+  // ── No role provided: delegate to single-pass and tag as exact ──
+  if (!role || !role.trim()) {
+    const v2Results = await findPeopleByFiltersV2(filters);
+    return v2Results.map(r => ({ ...r, matchTier: 'exact' as MatchTier, matchScore: 1.0 }));
+  }
+
+  // ── Resolve role embedding ──
+  let searchEmbedding: number[] | null = null;
+  let vectorPathAvailable = false;
+
+  if (isVectorRoleMatchingEnabled()) {
+    searchEmbedding = await getSearchRoleEmbedding(role);
+    if (searchEmbedding) {
+      vectorPathAvailable = true;
+    } else {
+      console.warn(`[PersonServiceV3] Embedding FAILED for role="${role}" -- Query B (vector) will be skipped`);
+    }
+  }
+
+  const vectorString = searchEmbedding ? `[${searchEmbedding.join(',')}]` : null;
+
+  const SPECIFICITY_THRESHOLDS = { narrow: 0.28, standard: 0.38, broad: 0.48 } as const;
+  const roleThreshold = SPECIFICITY_THRESHOLDS[filters.roleSpecificity || 'standard'];
+  const fetchLimit = limit * 2;
+
+  // ── Build shared WHERE conditions (company, location, university, email, excludes) ──
+  // These are identical between Query A and Query B, factored into a helper.
+  function buildSharedConditions(): Prisma.Sql[] {
+    const conditions: Prisma.Sql[] = [Prisma.sql`1=1`];
+
+    // ── Company filter ──
+    if (company && company.trim()) {
+      const companyConditions: Prisma.Sql[] = [];
+      const allNames: string[] = [company.trim()];
+      if (filters.companyAliases && filters.companyAliases.length > 0) {
+        for (const alias of filters.companyAliases) {
+          if (alias.trim() && !allNames.some(n => n.toLowerCase() === alias.trim().toLowerCase())) {
+            allNames.push(alias.trim());
+          }
+        }
+      }
+
+      const hasAliases = filters.companyAliases && filters.companyAliases.length > 0;
+      const shortAliases = allNames.filter(n => n.length <= 3);
+      for (const alias of shortAliases) {
+        if (hasAliases) {
+          companyConditions.push(Prisma.sql`lower(p.company) = lower(${alias})`);
+        } else {
+          const escapedAlias = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const boundaryPattern = `(^|[\\s\\-\\(\\,])${escapedAlias}($|[\\s\\-\\)\\,])`;
+          companyConditions.push(
+            Prisma.sql`(lower(p.company) = lower(${alias}) OR p.company ~* ${boundaryPattern})`
+          );
+        }
+      }
+
+      const longNames = allNames.filter(n => n.length > 3);
+      if (longNames.length > 0) {
+        if (companyMatchMode === 'fuzzy') {
+          for (const name of longNames) {
+            companyConditions.push(
+              Prisma.sql`similarity(lower(p.company), lower(${name})) >= ${companySimThreshold}`
+            );
+          }
+        } else {
+          for (const name of longNames) {
+            companyConditions.push(Prisma.sql`p.company ILIKE ${'%' + name + '%'}`);
+          }
+        }
+      }
+
+      if (filters.companyAliases && filters.companyAliases.length > 0) {
+        for (const alias of filters.companyAliases) {
+          if (alias.length > 3) {
+            companyConditions.push(Prisma.sql`p.company ILIKE ${'%' + alias + '%'}`);
+          }
+        }
+      }
+
+      if (companyConditions.length > 0) {
+        conditions.push(Prisma.sql`(${Prisma.join(companyConditions, ' OR ')})`);
+      }
+    }
+
+    // ── Location filter ──
+    if (location && location.trim()) {
+      const locationParts = location.split(',').map(p => p.trim()).filter(Boolean);
+      const locConditions = locationParts.map(part => {
+        const term = '%' + part + '%';
+        return Prisma.sql`(p.city ILIKE ${term} OR p.state ILIKE ${term})`;
+      });
+      conditions.push(Prisma.sql`(${Prisma.join(locConditions, ' OR ')})`);
+    }
+
+    // ── University filter ──
+    if (university && university.trim()) {
+      const keywords = getUniversityKeywords(university);
+      const kwConditions = keywords.map(kw => {
+        const term = '%' + kw + '%';
+        return Prisma.sql`(p."educationSchool" ILIKE ${term} OR p.schools::text ILIKE ${term})`;
+      });
+      conditions.push(Prisma.sql`(${Prisma.join(kwConditions, ' AND ')})`);
+    }
+
+    // ── Email filter ──
+    if (requireEmail) {
+      conditions.push(Prisma.sql`p.email IS NOT NULL`);
+      conditions.push(Prisma.sql`(p."emailDeliverable" = true OR p."emailDeliverable" IS NULL)`);
+    } else {
+      conditions.push(Prisma.sql`NOT (p.email IS NULL AND p."apolloEnrichedAt" IS NOT NULL)`);
+      conditions.push(Prisma.sql`(p."emailDeliverable" = true OR p."emailDeliverable" IS NULL)`);
+    }
+
+    // ── Exclude filter ──
+    if (excludePersonIds && excludePersonIds.length > 0) {
+      conditions.push(Prisma.sql`p.id NOT IN (${Prisma.join(excludePersonIds)})`);
+    }
+
+    // ── Must have role, not incoming/future ──
+    conditions.push(Prisma.sql`p.role IS NOT NULL`);
+    conditions.push(Prisma.sql`p.role !~* '^(incoming|future)\\s+'`);
+
+    return conditions;
+  }
+
+  // ── Company similarity expression (reused by both queries) ──
+  const allCompanyNames: string[] = [];
+  if (company && company.trim()) allCompanyNames.push(company.trim());
+  if (filters.companyAliases) {
+    for (const alias of filters.companyAliases) {
+      if (alias.trim() && alias.length > 3) allCompanyNames.push(alias.trim());
+    }
+  }
+
+  let companySimilarityExpr: Prisma.Sql;
+  if (allCompanyNames.length > 0) {
+    const simExprs = allCompanyNames.map(name =>
+      Prisma.sql`similarity(lower(p.company), lower(${name}))`
+    );
+    companySimilarityExpr = simExprs.length === 1
+      ? simExprs[0]
+      : Prisma.sql`GREATEST(${Prisma.join(simExprs, ', ')})`;
+  } else {
+    companySimilarityExpr = Prisma.sql`0.0`;
+  }
+
+  // ── Row type returned by both raw queries ──
+  type RawRow = {
+    id: string;
+    fullName: string;
+    firstName: string | null;
+    lastName: string | null;
+    company: string;
+    role: string | null;
+    linkedinUrl: string | null;
+    email: string | null;
+    emailStatus: string | null;
+    emailConfidence: number | null;
+    emailDeliverable: boolean | null;
+    emailVerifiedAt: Date | null;
+    emailVerificationReason: string | null;
+    city: string | null;
+    state: string | null;
+    country: string | null;
+    educationSchool: string | null;
+    educationDegree: string | null;
+    educationField: string | null;
+    educationYear: string | null;
+    scrapeDepth: string;
+    role_distance: number;
+    company_similarity: number;
+    match_tier: string;
+  };
+
+  const selectColumns = (roleDistExpr: Prisma.Sql, matchTierExpr: Prisma.Sql) => Prisma.sql`
+    SELECT
+      p.id,
+      p."fullName",
+      p."firstName",
+      p."lastName",
+      p.company,
+      p.role,
+      p."linkedinUrl",
+      p.email,
+      p."emailStatus"::text,
+      p."emailConfidence",
+      p."emailDeliverable",
+      p."emailVerifiedAt",
+      p."emailVerificationReason",
+      p.city,
+      p.state,
+      p.country,
+      p."educationSchool",
+      p."educationDegree",
+      p."educationField",
+      p."educationYear",
+      p."scrapeDepth",
+      ${roleDistExpr} as role_distance,
+      ${companySimilarityExpr} as company_similarity,
+      ${matchTierExpr} as match_tier
+    FROM "Person" p
+  `;
+
+  // ── Query A: ILIKE text match (exact + near_exact) ──
+  function buildQueryA(): Promise<RawRow[]> {
+    const conditions = buildSharedConditions();
+
+    // Role ILIKE filter
+    conditions.push(Prisma.sql`p.role ILIKE ${'%' + role!.trim() + '%'}`);
+
+    const whereClause = Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}`;
+
+    // Exact match classification: if trimmed lowercase role equals search role, it's 'exact'; else 'near_exact'
+    const matchTierExpr = Prisma.sql`CASE
+      WHEN lower(trim(p.role)) = lower(trim(${role!.trim()})) THEN 'exact'
+      ELSE 'near_exact'
+    END`;
+
+    // role_distance: use vector distance if available (for scoring), else null/0
+    const roleDistExpr = (vectorPathAvailable && vectorString)
+      ? Prisma.sql`CASE
+          WHEN p.role_embedding IS NOT NULL
+          THEN (p.role_embedding <=> ${vectorString}::vector)
+          ELSE NULL
+        END`
+      : Prisma.sql`NULL`;
+
+    const orderByClause = Prisma.sql`ORDER BY
+      CASE WHEN lower(trim(p.role)) = lower(trim(${role!.trim()})) THEN 0 ELSE 1 END ASC,
+      role_distance ASC NULLS LAST,
+      company_similarity DESC,
+      CASE p."emailStatus"::text
+        WHEN 'VERIFIED' THEN 0
+        WHEN 'MANUAL'   THEN 1
+        WHEN 'UNVERIFIED' THEN 2
+        ELSE 3
+      END ASC,
+      p."emailConfidence" DESC NULLS LAST`;
+
+    return prisma.$queryRaw<RawRow[]>(Prisma.sql`
+      ${selectColumns(roleDistExpr, matchTierExpr)}
+      ${whereClause}
+      ${orderByClause}
+      LIMIT ${fetchLimit}
+    `);
+  }
+
+  // ── Query B: Vector semantic search (similar tier, excludes ILIKE matches) ──
+  function buildQueryB(): Promise<RawRow[]> {
+    if (!vectorPathAvailable || !vectorString) {
+      return Promise.resolve([]);
+    }
+
+    const conditions = buildSharedConditions();
+
+    // Vector distance threshold
+    conditions.push(Prisma.sql`p.role_embedding IS NOT NULL`);
+    conditions.push(Prisma.sql`(p.role_embedding <=> ${vectorString}::vector) <= ${roleThreshold}`);
+
+    // Exclude ILIKE matches (already handled by Query A)
+    conditions.push(Prisma.sql`p.role NOT ILIKE ${'%' + role!.trim() + '%'}`);
+
+    const whereClause = Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}`;
+
+    const matchTierExpr = Prisma.sql`'similar'`;
+    const roleDistExpr = Prisma.sql`(p.role_embedding <=> ${vectorString}::vector)`;
+
+    const orderByClause = Prisma.sql`ORDER BY
+      role_distance ASC,
+      company_similarity DESC,
+      CASE p."emailStatus"::text
+        WHEN 'VERIFIED' THEN 0
+        WHEN 'MANUAL'   THEN 1
+        WHEN 'UNVERIFIED' THEN 2
+        ELSE 3
+      END ASC,
+      p."emailConfidence" DESC NULLS LAST`;
+
+    return prisma.$queryRaw<RawRow[]>(Prisma.sql`
+      ${selectColumns(roleDistExpr, matchTierExpr)}
+      ${whereClause}
+      ${orderByClause}
+      LIMIT ${fetchLimit}
+    `);
+  }
+
+  // ── Issue 3 fix: skip ILIKE for short role codes (<=3 chars) ──
+  // Short terms like "PM", "DS", "QA" produce excessive ILIKE noise via %PM%
+  // matching substrings in unrelated roles. Vector search handles these better.
+  const skipIlike = role!.trim().length <= 3;
+
+  console.log(`[PersonServiceV3] Filters: company="${company}", aliases=${filters.companyAliases?.length ?? 0}, role="${role}", roleSpecificity=${filters.roleSpecificity || 'standard'}, location="${location}", university="${university}", requireEmail=${requireEmail}, excludeIds=${excludePersonIds?.length ?? 0}, companyMatchMode=${companyMatchMode}, vectorPath=${vectorPathAvailable}, fetchLimit=${fetchLimit}, skipIlike=${skipIlike}`);
+
+  // ── Issue 1 fix: conditional Query B execution ──
+  // Run Query A first (unless skipped for short codes). Only run Query B if
+  // Query A did not return enough exact matches to fill the requested page.
+  // This turns the common case (ILIKE saturates with exact matches) into a
+  // single-query path, cutting latency roughly in half.
+  const queryARows: RawRow[] = skipIlike ? [] : await buildQueryA();
+  const exactCount = queryARows.filter(r => r.match_tier === 'exact').length;
+
+  let queryBRows: RawRow[] = [];
+  if (exactCount < limit) {
+    queryBRows = await buildQueryB();
+  }
+
+  console.log(`[PersonServiceV3] Query A (ILIKE) returned ${queryARows.length} rows (${exactCount} exact) | Query B (vector) returned ${queryBRows.length} rows | skipIlike=${skipIlike}`);
+
+  // ── Merge and deduplicate (Query A wins) ──
+  const seenIds = new Set<string>();
+  const merged: (RawRow & { computedTier: MatchTier; computedScore: number })[] = [];
+
+  // Process Query A results first (they take priority)
+  for (const row of queryARows) {
+    if (seenIds.has(row.id)) continue;
+    seenIds.add(row.id);
+
+    const tier = row.match_tier === 'exact' ? 'exact' as MatchTier : 'near_exact' as MatchTier;
+    let score: number;
+
+    if (tier === 'exact') {
+      score = 1.0;
+    } else {
+      // near_exact: score based on role distance if available
+      const rd = row.role_distance != null ? Number(row.role_distance) : null;
+      if (rd != null) {
+        score = Math.max(0.7, Math.min(0.99, 1.0 - rd * 1.5));
+      } else {
+        score = 0.85; // No embedding available, default score
+      }
+    }
+
+    merged.push({ ...row, computedTier: tier, computedScore: score });
+  }
+
+  // Process Query B results (deduplicated against A)
+  for (const row of queryBRows) {
+    if (seenIds.has(row.id)) continue;
+    seenIds.add(row.id);
+
+    const rd = Number(row.role_distance);
+    const score = Math.max(0.0, Math.min(0.69, 1.0 - rd * 2.0));
+
+    merged.push({ ...row, computedTier: 'similar', computedScore: score });
+  }
+
+  // ── Sort: tier order ASC, then matchScore DESC within tier ──
+  merged.sort((a, b) => {
+    const tierDiff = TIER_ORDER[a.computedTier] - TIER_ORDER[b.computedTier];
+    if (tierDiff !== 0) return tierDiff;
+    return b.computedScore - a.computedScore; // higher score first
+  });
+
+  // ── Issue 2 fix: reserve minimum slots for 'similar' tier results ──
+  // When Query B ran and returned semantic neighbors, ensure at least 20% of
+  // the final result set comes from the 'similar' tier. This prevents ILIKE
+  // matches from crowding out legitimate semantic neighbors (e.g., "Software
+  // Engineer" results for a "Data Engineer" search at Stripe).
+  const exactAndNear = merged.filter(r => r.computedTier !== 'similar');
+  const similar = merged.filter(r => r.computedTier === 'similar');
+
+  let limited: typeof merged;
+  if (similar.length > 0) {
+    const minSimilarSlots = Math.min(Math.floor(limit * 0.2), similar.length);
+    const exactNearSlots = limit - minSimilarSlots;
+
+    const pickedExactNear = exactAndNear.slice(0, exactNearSlots);
+    const pickedSimilar = similar.slice(0, minSimilarSlots);
+
+    // If exactAndNear didn't fill their slots, give overflow to similar
+    const extraSlots = exactNearSlots - pickedExactNear.length;
+    const overflowSimilar = extraSlots > 0
+      ? similar.slice(minSimilarSlots, minSimilarSlots + extraSlots)
+      : [];
+
+    limited = [...pickedExactNear, ...pickedSimilar, ...overflowSimilar];
+  } else {
+    // No similar results (Query B was skipped or returned nothing) — just slice
+    limited = merged.slice(0, limit);
+  }
+
+  if (limited.length === 0) return [];
+
+  console.log(`[PersonServiceV3] After merge+dedup: ${merged.length} total, returning ${limited.length} | Tier breakdown: exact=${limited.filter(r => r.computedTier === 'exact').length}, near_exact=${limited.filter(r => r.computedTier === 'near_exact').length}, similar=${limited.filter(r => r.computedTier === 'similar').length}`);
+
+  // ── Fetch source links (same pattern as V2) ──
+  const personIds = limited.map(p => p.id);
+  const sourceLinks = await prisma.sourceLink.findMany({
+    where: {
+      personId: { in: personIds },
+      kind: 'DISCOVERY',
+    },
+    orderBy: { createdAt: 'asc' },
+    select: {
+      personId: true,
+      url: true,
+      title: true,
+      snippet: true,
+      domain: true,
+    },
+  });
+
+  const sourceLinkMap = new Map<string, (typeof sourceLinks)[0]>();
+  for (const sl of sourceLinks) {
+    if (!sourceLinkMap.has(sl.personId)) {
+      sourceLinkMap.set(sl.personId, sl);
+    }
+  }
+
+  return limited.map(row => {
+    const sl = sourceLinkMap.get(row.id);
+    return {
+      id: row.id,
+      fullName: row.fullName,
+      firstName: row.firstName,
+      lastName: row.lastName,
+      company: row.company,
+      role: row.role,
+      linkedinUrl: row.linkedinUrl,
+      email: row.email,
+      emailStatus: row.emailStatus,
+      emailConfidence: row.emailConfidence,
+      emailDeliverable: row.emailDeliverable,
+      emailVerifiedAt: row.emailVerifiedAt,
+      emailVerificationReason: row.emailVerificationReason,
+      city: row.city,
+      state: row.state,
+      country: row.country,
+      educationSchool: row.educationSchool,
+      educationDegree: row.educationDegree,
+      educationField: row.educationField,
+      educationYear: row.educationYear,
+      scrapeDepth: row.scrapeDepth,
+      roleDistance: row.role_distance != null ? Number(row.role_distance) : undefined,
+      matchTier: row.computedTier,
+      matchScore: row.computedScore,
+      sourceLinks: sl
+        ? [{ url: sl.url, title: sl.title, snippet: sl.snippet, domain: sl.domain }]
+        : [],
+    };
+  });
 }

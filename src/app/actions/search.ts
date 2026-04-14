@@ -10,12 +10,13 @@ import prisma from '@/lib/prisma';
 import { checkEmailCredits } from '@/lib/services/credits';
 import {
   getExcludedPersonIds,
-  findPeopleByFilters,
+  findPeopleByFiltersV3,
   findPeopleByLinkedInUrls,
   findPeopleByName,
   saveScrapedProfile,
-  PersonFilters,
+  PersonFiltersV2,
   PersonResult,
+  MatchTier,
   isVectorRoleMatchingEnabled,
   saveShortProfile,
   saveShortProfilesBatch,
@@ -79,6 +80,8 @@ export interface SearchResultWithDraft {
   resumeId: string | null;
   scrapeDepth: string;
   savedForLater: boolean;
+  matchTier?: 'exact' | 'near_exact' | 'similar';
+  matchScore?: number;
   score?: number;
   scoreBreakdown?: ScoreBreakdown;
   llmDraftGenerated?: boolean;
@@ -115,6 +118,8 @@ interface PersonWithSource {
   educationField: string | null;
   educationYear: string | null;
   scrapeDepth?: string;
+  matchTier?: MatchTier;
+  matchScore?: number;
   sourceLinks: Array<{
     url: string;
     title: string;
@@ -343,6 +348,8 @@ async function buildResultsWithDrafts(
         userCandidateId,
         resumeId: template.attachResume ? template.resumeId : null,
         savedForLater,
+        matchTier: person.matchTier,
+        matchScore: person.matchScore,
         score,
         scoreBreakdown: breakdown,
       };
@@ -656,7 +663,7 @@ export async function searchPeopleV2Action(
         });
       }
 
-      const filters: PersonFilters = {
+      const filters: PersonFiltersV2 = {
         company: dbFilters.company || '',
         companyAliases: companyAliases.length > 0 ? companyAliases : undefined,
         location: dbFilters.location || undefined,
@@ -669,7 +676,7 @@ export async function searchPeopleV2Action(
       };
 
       const dbStart = Date.now();
-      let people = await findPeopleByFilters(filters);
+      let people = await findPeopleByFiltersV3(filters);
       dbResultCount = people.length;
       console.log(`[SearchV2] DB returned ${dbResultCount} results in ${Date.now() - dbStart}ms`);
       log.info('search-v2', 'DB query complete', {
@@ -1044,7 +1051,7 @@ export async function loadMoreV2Action(
           aliases: companyAliases,
         });
 
-        const dbFilterInput: PersonFilters = {
+        const dbFilterInput: PersonFiltersV2 = {
           company: dbFilters.company,
           companyAliases: companyAliases.length > 0 ? companyAliases : undefined,
           location: dbFilters.location || undefined,
@@ -1057,7 +1064,7 @@ export async function loadMoreV2Action(
         };
 
         const dbStart = Date.now();
-        const dbPeople = await findPeopleByFilters(dbFilterInput);
+        const dbPeople = await findPeopleByFiltersV3(dbFilterInput);
         const dbProbeMs = Date.now() - dbStart;
         console.log(`[LoadMoreV2] DB-first probe returned ${dbPeople.length} results in ${dbProbeMs}ms`);
         log.info('loadmore-v2', 'DB-first probe complete', {

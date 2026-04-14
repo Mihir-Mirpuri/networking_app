@@ -34,6 +34,12 @@ export interface SuggestedSearch {
   filters: ParsedFilters;
 }
 
+export interface SuggestedAlternative {
+  label: string;
+  filters: ParsedFilters;
+  linkedInFilters: LinkedInFilters;
+}
+
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
@@ -47,7 +53,7 @@ export interface ExtractFiltersInput {
 }
 
 interface LLMResponse {
-  status: 'ready' | 'needs_selection' | 'off_topic' | 'person_lookup';
+  status: 'ready' | 'needs_selection' | 'off_topic' | 'person_lookup' | 'unsupported';
   confidence?: 'high' | 'low';
   filters: {
     company: string | null;
@@ -80,6 +86,17 @@ interface LLMResponse {
   person_company?: string;
   selectables?: Array<{ label: string; filter_key: 'company' | 'role'; filter_value: string }>;
   suggested_searches?: Array<{ label: string; company: string; role: string | null }>;
+  unsupported_criteria?: string[];
+  suggested_alternative?: {
+    label: string;
+    filters: {
+      company: string | null;
+      role: string | null;
+      university: string | null;
+      location: string | null;
+    };
+    linkedin_filters: LLMResponse['linkedin_filters'];
+  };
   message: string;
 }
 
@@ -88,6 +105,7 @@ export type ExtractFiltersResult =
   | { success: true; status: 'needs_selection'; filters: ParsedFilters; assistantMessage: string; selectables: Selectable[]; allSelectables?: Selectable[] }
   | { success: true; status: 'person_lookup'; assistantMessage: string; personName: string; personCompany?: string }
   | { success: true; status: 'off_topic'; filters: ParsedFilters; assistantMessage: string }
+  | { success: true; status: 'unsupported'; assistantMessage: string; unsupportedCriteria: string[]; suggestedAlternative?: SuggestedAlternative }
   | { success: true; status: 'blocked'; assistantMessage: string }
   | { success: false; error: string };
 
@@ -316,6 +334,63 @@ export async function extractSearchFiltersAction(
         assistantMessage: message,
         personName,
         personCompany: response.content.person_company?.trim() || undefined,
+      };
+    }
+
+    if (status === 'unsupported') {
+      const unsupportedCriteria = response.content.unsupported_criteria || [];
+      log.decision('ai-search', 'unsupported branch', {
+        unsupportedCriteria,
+        hasSuggestedAlternative: !!response.content.suggested_alternative,
+      });
+
+      let suggestedAlternative: SuggestedAlternative | undefined;
+      if (response.content.suggested_alternative) {
+        const alt = response.content.suggested_alternative;
+
+        // Convert the alternative's filters from LLM nulls to ParsedFilters (undefined)
+        const altFilters: ParsedFilters = {};
+        if (alt.filters.company) altFilters.company = alt.filters.company;
+        if (alt.filters.role) altFilters.role = alt.filters.role;
+        if (alt.filters.university) altFilters.university = alt.filters.university;
+        if (alt.filters.location) altFilters.location = alt.filters.location;
+
+        // Convert the alternative's linkedin_filters from snake_case to camelCase
+        const altLinkedInFilters = convertLinkedInFilters(alt.linkedin_filters);
+
+        // Resolve company URL for the alternative so it's ready to search
+        if (altFilters.company) {
+          try {
+            const resolved = await resolveCompanyUrl(altFilters.company, altFilters.role || undefined);
+            if (resolved.url) {
+              altLinkedInFilters.currentCompanies = [resolved.url];
+            }
+          } catch {
+            // Fall through — alternative still usable without resolved URL
+          }
+        }
+
+        suggestedAlternative = {
+          label: alt.label,
+          filters: altFilters,
+          linkedInFilters: altLinkedInFilters,
+        };
+
+        log.info('ai-search', 'Unsupported with suggested alternative', {
+          label: alt.label,
+          altFilters,
+          altLinkedInFilters,
+        });
+      }
+
+      console.log(`[AI Search] Unsupported criteria: ${unsupportedCriteria.join(', ')}`);
+
+      return {
+        success: true,
+        status: 'unsupported',
+        assistantMessage: message,
+        unsupportedCriteria,
+        suggestedAlternative,
       };
     }
 

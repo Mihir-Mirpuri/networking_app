@@ -4,7 +4,8 @@ import { useState, useCallback } from 'react';
 import { SearchSidebar } from './SearchSidebar';
 import { MainSearchView, DisplayMessage } from './MainSearchView';
 import { NewHeader } from './NewHeader';
-import { ParsedFilters, Selectable } from '@/app/actions/ai-search';
+import { ParsedFilters, Selectable, SuggestedAlternative } from '@/app/actions/ai-search';
+import type { LinkedInFilters } from '@/lib/types/linkedin-filters';
 import { EmailChatProvider } from '@/contexts/EmailChatContext';
 
 interface AppShellProps {
@@ -16,6 +17,7 @@ export function AppShell({ initialRemainingDaily, isSubscribed }: AppShellProps)
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pendingQuery, setPendingQuery] = useState<string | null>(null);
   const [pendingFilters, setPendingFilters] = useState<ParsedFilters | null>(null);
+  const [pendingLinkedInFilters, setPendingLinkedInFilters] = useState<LinkedInFilters | null>(null);
   const [aiMode, setAiMode] = useState(true);
 
   // Chat state lifted from MainSearchView
@@ -70,9 +72,22 @@ export function AppShell({ initialRemainingDaily, isSubscribed }: AppShellProps)
     setSidebarOpen(false);
   }, []);
 
+  const handleSuggestedAlternativeClick = useCallback((alt: SuggestedAlternative) => {
+    // Add a user message showing what they clicked
+    const userMsgId = `user-${Date.now()}`;
+    setMessages(prev => [
+      ...prev,
+      { id: userMsgId, role: 'user', content: alt.label },
+    ]);
+    setCurrentFilters(alt.filters);
+    setPendingLinkedInFilters(alt.linkedInFilters);
+    setPendingFilters(alt.filters);
+  }, []);
+
   const handleQueryProcessed = useCallback(() => {
     setPendingQuery(null);
     setPendingFilters(null);
+    setPendingLinkedInFilters(null);
   }, []);
 
   return (
@@ -91,6 +106,7 @@ export function AppShell({ initialRemainingDaily, isSubscribed }: AppShellProps)
           isSearching={isSearching}
           onSelectableClick={handleSelectableClick}
           onShowMoreSelectables={handleShowMoreSelectables}
+          onSuggestedAlternativeClick={handleSuggestedAlternativeClick}
           onClearChat={handleClearChat}
           isSubscribed={isSubscribed}
         />
@@ -104,6 +120,7 @@ export function AppShell({ initialRemainingDaily, isSubscribed }: AppShellProps)
               initialRemainingDaily={initialRemainingDaily}
               pendingQuery={pendingQuery}
               pendingFilters={pendingFilters}
+              pendingLinkedInFilters={pendingLinkedInFilters}
               onQueryProcessed={handleQueryProcessed}
               aiMode={aiMode}
               messages={messages}

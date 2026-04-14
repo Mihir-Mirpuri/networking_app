@@ -197,9 +197,14 @@ export function PersonCard({
       )}
 
       {/* Role */}
-      <p className="text-sm text-white font-medium mb-4 truncate w-full" title={person.role || 'Professional'}>
-        {person.role || 'Professional'}
-      </p>
+      <div className="mb-4 w-full">
+        <p className="text-sm text-white font-medium truncate" title={person.role || 'Professional'}>
+          {person.role || 'Professional'}
+        </p>
+        {person.matchTier === 'similar' && (
+          <span className="text-[10px] text-gray-400 mt-0.5 inline-block">Related role</span>
+        )}
+      </div>
 
       {/* Info section */}
       <div className="w-full space-y-2 text-left mb-4">

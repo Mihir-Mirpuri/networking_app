@@ -20,7 +20,7 @@ import { Toast } from '@/components/ui/Toast';
 import { LimitReachedModal, dispatchCreditsChanged } from '@/components/credits';
 import { HiddenPeopleBar } from '@/components/search/HiddenPeopleBar';
 import { searchPeopleV2Action, lookupPersonAction, SearchResultWithDraft } from '@/app/actions/search';
-import { extractSearchFiltersAction, ParsedFilters, ChatMessage, Selectable } from '@/app/actions/ai-search';
+import { extractSearchFiltersAction, ParsedFilters, ChatMessage, Selectable, SuggestedAlternative } from '@/app/actions/ai-search';
 import { useSearchResults } from '@/hooks/useSearchResults';
 import { LoginPromptModal } from '@/components/auth/LoginPromptModal';
 import type { LinkedInFilters } from '@/lib/types/linkedin-filters';
@@ -37,12 +37,15 @@ export interface DisplayMessage {
   selectables?: Selectable[];
   allSelectables?: Selectable[];
   selectablesPage?: number;
+  suggestedAlternative?: SuggestedAlternative;
+  unsupportedCriteria?: string[];
 }
 
 interface MainSearchViewProps {
   initialRemainingDaily: number;
   pendingQuery: string | null;
   pendingFilters: ParsedFilters | null;
+  pendingLinkedInFilters?: LinkedInFilters | null;
   onQueryProcessed: () => void;
   aiMode?: boolean;
   isAuthenticated?: boolean;
@@ -80,6 +83,7 @@ export function MainSearchView({
   initialRemainingDaily,
   pendingQuery,
   pendingFilters,
+  pendingLinkedInFilters,
   onQueryProcessed,
   aiMode,
   isAuthenticated = true,
@@ -378,6 +382,25 @@ export function MainSearchView({
       return;
     }
 
+    // Handle unsupported criteria — show message + suggested alternative card
+    if (extractResult.status === 'unsupported') {
+      setMessages(prev =>
+        prev.map(m =>
+          m.id === assistantMsgId
+            ? {
+                ...m,
+                content: extractResult.assistantMessage,
+                unsupportedCriteria: extractResult.unsupportedCriteria,
+                suggestedAlternative: extractResult.suggestedAlternative,
+                isLoading: false,
+              }
+            : m
+        )
+      );
+      setIsExtracting(false);
+      return;
+    }
+
     const { filters, assistantMessage } = extractResult;
     setCurrentFilters(filters);
 
@@ -457,11 +480,11 @@ export function MainSearchView({
         setIsSearching(true);
         hook.resetResults();
 
-        runSearch(pendingFilters);
+        runSearch(pendingFilters, pendingLinkedInFilters ?? undefined);
         onQueryProcessed();
       }
     }
-  }, [pendingFilters, runSearch, onQueryProcessed]);
+  }, [pendingFilters, pendingLinkedInFilters, runSearch, onQueryProcessed]);
 
   const handleRemoveFilter = async (key: keyof ParsedFilters) => {
     const updated = { ...currentFilters };
