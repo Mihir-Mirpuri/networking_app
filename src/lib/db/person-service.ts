@@ -2146,27 +2146,21 @@ export async function findPeopleByFiltersV2(
       }
     }
 
-    // Longer names: pg_trgm similarity or exact ILIKE depending on mode
-    const longNames = allNames.filter(n => n.length > 3);
-    if (longNames.length > 0) {
+    // Primary company name (user input): fuzzy or ILIKE depending on mode
+    const primaryName = company.trim();
+    if (primaryName.length > 3) {
       if (companyMatchMode === 'fuzzy') {
-        // Set trgm threshold for the % operator within this query
-        // We use a subquery approach: similarity() >= threshold in WHERE
-        for (const name of longNames) {
-          companyConditions.push(
-            Prisma.sql`similarity(lower(p.company), lower(${name})) >= ${companySimThreshold}`
-          );
-        }
+        companyConditions.push(
+          Prisma.sql`similarity(lower(p.company), lower(${primaryName})) >= ${companySimThreshold}`
+        );
       } else {
-        // Exact mode: case-insensitive contains (same as V1)
-        for (const name of longNames) {
-          companyConditions.push(Prisma.sql`p.company ILIKE ${'%' + name + '%'}`);
-        }
+        companyConditions.push(Prisma.sql`p.company ILIKE ${'%' + primaryName + '%'}`);
       }
     }
 
-    // Also check pre-resolved aliases via ILIKE as fallback
-    // (backward compatible with company-alias service output)
+    // Aliases: ILIKE only (NOT fuzzy similarity — shared suffixes like
+    // "& Company" cause false positives, e.g. "Bain & Company" matching
+    // "McKinsey & Company" at similarity=0.36)
     if (filters.companyAliases && filters.companyAliases.length > 0) {
       for (const alias of filters.companyAliases) {
         if (alias.length > 3) {
@@ -2518,21 +2512,20 @@ export async function findPeopleByFiltersV3(
         }
       }
 
-      const longNames = allNames.filter(n => n.length > 3);
-      if (longNames.length > 0) {
+      // Primary company name: fuzzy or ILIKE depending on mode
+      const primaryName = company.trim();
+      if (primaryName.length > 3) {
         if (companyMatchMode === 'fuzzy') {
-          for (const name of longNames) {
-            companyConditions.push(
-              Prisma.sql`similarity(lower(p.company), lower(${name})) >= ${companySimThreshold}`
-            );
-          }
+          companyConditions.push(
+            Prisma.sql`similarity(lower(p.company), lower(${primaryName})) >= ${companySimThreshold}`
+          );
         } else {
-          for (const name of longNames) {
-            companyConditions.push(Prisma.sql`p.company ILIKE ${'%' + name + '%'}`);
-          }
+          companyConditions.push(Prisma.sql`p.company ILIKE ${'%' + primaryName + '%'}`);
         }
       }
 
+      // Aliases: ILIKE only (NOT fuzzy — shared suffixes like "& Company"
+      // cause false positives across different companies)
       if (filters.companyAliases && filters.companyAliases.length > 0) {
         for (const alias of filters.companyAliases) {
           if (alias.length > 3) {
