@@ -9,16 +9,15 @@
  *
  * Categories are labeled so failures can be traced to a specific input type.
  *
- * NOTE: multi-turn conversations (context carryover) are not covered here —
- * the harness invokes each query with empty conversation history. A separate
- * fixture would be needed for multi-turn tests.
+ * Multi-turn tests set `conversationHistory` and `currentFilters` on the
+ * test case; the harness passes these through to the LLM call.
  */
 
 import type { LinkedInFilters, DBFilters } from '@/lib/types/linkedin-filters';
 
 // ─── Expected-behavior schema ────────────────────────────────────────────────
 
-export type ExpectedStatus = 'ready' | 'needs_selection' | 'off_topic' | 'person_lookup';
+export type ExpectedStatus = 'ready' | 'needs_selection' | 'off_topic' | 'person_lookup' | 'unsupported';
 
 /** A partial matcher: only listed fields are checked. Arrays use subset semantics. */
 export interface ExpectedExtraction {
@@ -46,6 +45,27 @@ export interface ExpectedExtraction {
   // Role specificity bucket
   roleSpecificity?: 'narrow' | 'standard' | 'broad';
 
+  // For status=unsupported
+  /** Subset match — each string must appear in at least one actual criterion (case-insensitive). */
+  unsupportedCriteria?: string[];
+  /** Validate the reformulated suggested_alternative.filters. */
+  suggestedAlternativeFilters?: Partial<DBFilters>;
+  /** Validate the reformulated suggested_alternative.linkedin_filters. */
+  suggestedAlternativeLinkedInFilters?: Partial<LinkedInFilters>;
+  /** Substring match on suggested_alternative.label. */
+  suggestedAlternativeLabel?: string;
+
+  // For status=ready — suggested searches
+  /** Minimum number of suggested_searches entries returned. */
+  suggestedSearchesMin?: number;
+
+  // Message quality (any status)
+  /** Substrings the message field must contain (case-insensitive). */
+  messageContains?: string[];
+
+  // Company ambiguity flag
+  companyNameAmbiguous?: boolean;
+
   // For status=off_topic — no additional fields.
 }
 
@@ -65,6 +85,10 @@ export interface DiscoveryTestCase {
   category: string;
   query: string;
   description: string;
+  /** For multi-turn tests: prior conversation messages. */
+  conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
+  /** For multi-turn tests: filters carried over from a previous search. */
+  currentFilters?: Partial<DBFilters>;
   expected: {
     extraction: ExpectedExtraction;
     search?: ExpectedSearch;
