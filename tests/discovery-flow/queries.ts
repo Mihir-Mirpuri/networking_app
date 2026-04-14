@@ -1264,4 +1264,278 @@ export const QUERIES: DiscoveryTestCase[] = [
       search: { shouldRun: false },
     },
   },
+
+  // ═══ 20. Unsupported — degree type ═════════════════════════════════════════
+  {
+    id: 'unsupported-phd',
+    category: 'unsupported-degree',
+    query: 'PhD data scientists at Google',
+    description: '"PhD" is unsupported degree type → unsupported. Alternative keeps Data Scientist at Google.',
+    expected: {
+      extraction: {
+        status: 'unsupported',
+        unsupportedCriteria: ['PhD'],
+        suggestedAlternativeFilters: { company: 'Google', role: 'Data Scientist' },
+        suggestedAlternativeLinkedInFilters: { currentJobTitles: ['Data Scientist'] },
+        messageContains: ["can't filter", 'degree'],
+      },
+      search: { shouldRun: false },
+    },
+  },
+  {
+    id: 'unsupported-mba',
+    category: 'unsupported-degree',
+    query: 'MBA grads at McKinsey',
+    description: '"MBA" unsupported → alternative keeps McKinsey.',
+    expected: {
+      extraction: {
+        status: 'unsupported',
+        unsupportedCriteria: ['MBA'],
+        suggestedAlternativeFilters: { company: 'McKinsey' },
+        messageContains: ["can't filter", 'degree'],
+      },
+      search: { shouldRun: false },
+    },
+  },
+  {
+    id: 'unsupported-masters',
+    category: 'unsupported-degree',
+    query: 'Masters students at Meta',
+    description: '"Masters" unsupported degree → alternative keeps Meta.',
+    expected: {
+      extraction: {
+        status: 'unsupported',
+        unsupportedCriteria: ['Masters'],
+        suggestedAlternativeFilters: { company: 'Meta' },
+        messageContains: ["can't filter", 'degree'],
+      },
+      search: { shouldRun: false },
+    },
+  },
+
+  // ═══ 21. Unsupported — skills/technologies ═════════════════════════════════
+  {
+    id: 'unsupported-python',
+    category: 'unsupported-skills',
+    query: 'Python engineers at Stripe',
+    description: '"Python" is unsupported skill → alternative keeps engineers at Stripe.',
+    expected: {
+      extraction: {
+        status: 'unsupported',
+        unsupportedCriteria: ['Python'],
+        suggestedAlternativeFilters: { company: 'Stripe' },
+        messageContains: ["can't filter", 'skill'],
+      },
+      search: { shouldRun: false },
+    },
+  },
+  {
+    id: 'unsupported-react',
+    category: 'unsupported-skills',
+    query: 'React developers at Meta',
+    description: '"React" unsupported skill → alternative keeps Meta.',
+    expected: {
+      extraction: {
+        status: 'unsupported',
+        unsupportedCriteria: ['React'],
+        suggestedAlternativeFilters: { company: 'Meta' },
+        messageContains: ["can't filter"],
+      },
+      search: { shouldRun: false },
+    },
+  },
+  {
+    id: 'unsupported-kubernetes',
+    category: 'unsupported-skills',
+    query: 'people who know Kubernetes at Google',
+    description: '"Kubernetes" unsupported skill → alternative keeps Google.',
+    expected: {
+      extraction: {
+        status: 'unsupported',
+        unsupportedCriteria: ['Kubernetes'],
+        suggestedAlternativeFilters: { company: 'Google' },
+        messageContains: ["can't filter"],
+      },
+      search: { shouldRun: false },
+    },
+  },
+
+  // ═══ 22. Unsupported — compensation ════════════════════════════════════════
+  {
+    id: 'unsupported-salary',
+    category: 'unsupported-compensation',
+    query: 'engineers making $200k+ at Google',
+    description: '"$200k+" unsupported salary → alternative keeps engineers at Google.',
+    expected: {
+      extraction: {
+        status: 'unsupported',
+        unsupportedCriteria: ['$200k'],
+        suggestedAlternativeFilters: { company: 'Google' },
+        messageContains: ["can't filter", 'salary'],
+      },
+      search: { shouldRun: false },
+    },
+  },
+  {
+    id: 'unsupported-high-paying',
+    category: 'unsupported-compensation',
+    query: 'high paying PM jobs in SF',
+    description: '"high paying" unsupported compensation → alternative keeps PM + SF.',
+    expected: {
+      extraction: {
+        status: 'unsupported',
+        unsupportedCriteria: ['paying'],
+        suggestedAlternativeFilters: { role: 'Product Manager', location: 'San Francisco, California' },
+        messageContains: ["can't filter"],
+      },
+      search: { shouldRun: false },
+    },
+  },
+
+  // ═══ 23. Unsupported — work mode ═══════════════════════════════════════════
+  {
+    id: 'unsupported-remote',
+    category: 'unsupported-work-mode',
+    query: 'remote engineers at Stripe',
+    description: '"remote" unsupported work mode → alternative keeps engineers at Stripe.',
+    expected: {
+      extraction: {
+        status: 'unsupported',
+        unsupportedCriteria: ['remote'],
+        suggestedAlternativeFilters: { company: 'Stripe' },
+        messageContains: ["can't filter", 'remote'],
+      },
+      search: { shouldRun: false },
+    },
+  },
+  {
+    id: 'unsupported-hybrid',
+    category: 'unsupported-work-mode',
+    query: 'hybrid PMs at Google in NYC',
+    description: '"hybrid" unsupported → alternative keeps PM + Google + NYC.',
+    expected: {
+      extraction: {
+        status: 'unsupported',
+        unsupportedCriteria: ['hybrid'],
+        suggestedAlternativeFilters: { company: 'Google', role: 'Product Manager', location: 'New York, New York' },
+        messageContains: ["can't filter"],
+      },
+      search: { shouldRun: false },
+    },
+  },
+
+  // ═══ 24. Unsupported — other (visa, hiring, certifications) ════════════════
+  {
+    id: 'unsupported-h1b',
+    category: 'unsupported-other',
+    query: 'H1B engineers at Meta',
+    description: '"H1B" unsupported visa → alternative keeps engineers at Meta.',
+    expected: {
+      extraction: {
+        status: 'unsupported',
+        unsupportedCriteria: ['H1B'],
+        suggestedAlternativeFilters: { company: 'Meta' },
+        messageContains: ["can't filter"],
+      },
+      search: { shouldRun: false },
+    },
+  },
+  {
+    id: 'unsupported-hiring',
+    category: 'unsupported-other',
+    query: 'engineers at Google who are hiring',
+    description: '"hiring" unsupported → alternative keeps engineers at Google.',
+    expected: {
+      extraction: {
+        status: 'unsupported',
+        unsupportedCriteria: ['hiring'],
+        suggestedAlternativeFilters: { company: 'Google' },
+        messageContains: ["can't filter"],
+      },
+      search: { shouldRun: false },
+    },
+  },
+  {
+    id: 'unsupported-cfa',
+    category: 'unsupported-other',
+    query: 'CFA holders at Goldman Sachs',
+    description: '"CFA" unsupported cert → alternative approximates with functionIds=["10"] (Finance).',
+    expected: {
+      extraction: {
+        status: 'unsupported',
+        unsupportedCriteria: ['CFA'],
+        suggestedAlternativeFilters: { company: 'Goldman Sachs' },
+        suggestedAlternativeLinkedInFilters: { functionIds: ['10'] },
+        messageContains: ["can't filter", 'certification'],
+      },
+      search: { shouldRun: false },
+    },
+  },
+
+  // ═══ 25. Unsupported — reformulation quality ══════════════════════════════
+  {
+    id: 'unsupported-series-b',
+    category: 'unsupported-reformulation',
+    query: 'Series B engineers in Austin',
+    description: '"Series B" unsupported funding → alternative approximates with companyHeadcount + keeps Austin.',
+    expected: {
+      extraction: {
+        status: 'unsupported',
+        unsupportedCriteria: ['Series B'],
+        suggestedAlternativeLinkedInFilters: { companyHeadcount: ['D', 'E'] },
+        suggestedAlternativeLabel: 'Austin',
+        messageContains: ["can't filter", 'funding'],
+      },
+      search: { shouldRun: false },
+    },
+  },
+  {
+    id: 'unsupported-cpa',
+    category: 'unsupported-reformulation',
+    query: 'CPA accountants at Deloitte',
+    description: '"CPA" unsupported cert → alternative approximates with functionIds=["1"] (Accounting).',
+    expected: {
+      extraction: {
+        status: 'unsupported',
+        unsupportedCriteria: ['CPA'],
+        suggestedAlternativeFilters: { company: 'Deloitte' },
+        suggestedAlternativeLinkedInFilters: { functionIds: ['1'] },
+        suggestedAlternativeLabel: 'Deloitte',
+        messageContains: ["can't filter", 'certification'],
+      },
+      search: { shouldRun: false },
+    },
+  },
+  {
+    id: 'unsupported-pmp',
+    category: 'unsupported-reformulation',
+    query: 'PMP project managers at IBM',
+    description: '"PMP" unsupported cert → alternative approximates with functionIds=["20"] (Program Mgmt).',
+    expected: {
+      extraction: {
+        status: 'unsupported',
+        unsupportedCriteria: ['PMP'],
+        suggestedAlternativeFilters: { company: 'IBM' },
+        suggestedAlternativeLinkedInFilters: { functionIds: ['20'] },
+        suggestedAlternativeLabel: 'IBM',
+        messageContains: ["can't filter", 'certification'],
+      },
+      search: { shouldRun: false },
+    },
+  },
+  {
+    id: 'unsupported-fintech-pms',
+    category: 'unsupported-reformulation',
+    query: 'fintech PMs in NYC',
+    description: '"fintech" unsupported industry → alternative keeps PM + NYC.',
+    expected: {
+      extraction: {
+        status: 'unsupported',
+        unsupportedCriteria: ['fintech'],
+        suggestedAlternativeFilters: { role: 'Product Manager', location: 'New York, New York' },
+        messageContains: ["can't filter", 'industry'],
+      },
+      search: { shouldRun: false },
+    },
+  },
 ];
