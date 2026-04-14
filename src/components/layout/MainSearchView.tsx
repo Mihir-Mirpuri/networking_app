@@ -20,7 +20,7 @@ import { Toast } from '@/components/ui/Toast';
 import { LimitReachedModal, dispatchCreditsChanged } from '@/components/credits';
 import { HiddenPeopleBar } from '@/components/search/HiddenPeopleBar';
 import { searchPeopleV2Action, lookupPersonAction, SearchResultWithDraft } from '@/app/actions/search';
-import { extractSearchFiltersAction, ParsedFilters, ChatMessage, Selectable, SuggestedAlternative } from '@/app/actions/ai-search';
+import { extractSearchFiltersAction, ParsedFilters, ChatMessage, Selectable, SuggestedAlternative, SuggestedSearch } from '@/app/actions/ai-search';
 import { useSearchResults } from '@/hooks/useSearchResults';
 import { LoginPromptModal } from '@/components/auth/LoginPromptModal';
 import type { LinkedInFilters } from '@/lib/types/linkedin-filters';
@@ -38,6 +38,7 @@ export interface DisplayMessage {
   allSelectables?: Selectable[];
   selectablesPage?: number;
   suggestedAlternative?: SuggestedAlternative;
+  suggestedSearches?: SuggestedSearch[];
   unsupportedCriteria?: string[];
 }
 
@@ -444,10 +445,11 @@ export function MainSearchView({
 
     // status === 'ready' — set isSearching in the same batch as the message
     // so the main UI loading state stays in sync with the chat message
+    const readySuggestedSearches = extractResult.suggestedSearches;
     setMessages(prev =>
       prev.map(m =>
         m.id === assistantMsgId
-          ? { ...m, content: assistantMessage, filters, isLoading: false }
+          ? { ...m, content: assistantMessage, filters, suggestedSearches: readySuggestedSearches, isLoading: false }
           : m
       )
     );

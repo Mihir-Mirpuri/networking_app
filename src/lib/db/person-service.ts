@@ -2928,3 +2928,146 @@ export async function findPeopleByFiltersV3(
     };
   });
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Search-to-Person Tagging
+//
+// Links Person rows to the Search that discovered them, preserving LinkedIn's
+// relevance ordering. Used to serve cached results for advanced filter searches
+// (seniority, function, headcount, etc.) whose filter dimensions aren't stored
+// on the Person table.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const SEARCH_TAG_TTL_DAYS = 30;
+
+/**
+ * Tag an ordered list of people to a Search row, preserving position.
+ * Uses createMany with skipDuplicates so re-tagging the same person
+ * for the same search is a safe no-op.
+ */
+export async function tagPeopleToSearch(
+  searchId: string,
+  personIds: string[],
+  startPosition: number,
+  page: number
+): Promise<void> {
+  if (personIds.length === 0) return;
+
+  const data = personIds.map((personId, idx) => ({
+    searchId,
+    personId,
+    position: startPosition + idx,
+    page,
+  }));
+
+  await prisma.searchPerson.createMany({
+    data,
+    skipDuplicates: true,
+  });
+}
+
+/**
+ * Retrieve tagged people for a Search, ordered by position (LinkedIn relevance).
+ * Returns the same shape as PersonResult so the result plugs directly into
+ * buildResultsWithDrafts.
+ */
+export async function getTaggedPeopleForSearch(
+  searchId: string,
+  excludePersonIds: string[],
+  limit: number
+): Promise<PersonResult[]> {
+  const rows = await prisma.searchPerson.findMany({
+    where: {
+      searchId,
+      ...(excludePersonIds.length > 0
+        ? { personId: { notIn: excludePersonIds } }
+        : {}),
+    },
+    orderBy: { position: 'asc' },
+    take: limit,
+    include: {
+      person: {
+        include: {
+          sourceLinks: {
+            where: { kind: 'DISCOVERY' },
+            orderBy: { createdAt: 'asc' },
+            take: 1,
+          },
+        },
+      },
+    },
+  });
+
+  return rows.map((row) => {
+    const p = row.person;
+    const sl = p.sourceLinks[0] || null;
+    return {
+      id: p.id,
+      fullName: p.fullName,
+      firstName: p.firstName,
+      lastName: p.lastName,
+      company: p.company,
+      role: p.role,
+      linkedinUrl: p.linkedinUrl,
+      email: p.email,
+      emailStatus: p.emailStatus,
+      emailConfidence: p.emailConfidence,
+      emailDeliverable: p.emailDeliverable,
+      emailVerifiedAt: p.emailVerifiedAt,
+      emailVerificationReason: p.emailVerificationReason,
+      city: p.city,
+      state: p.state,
+      country: p.country,
+      educationSchool: p.educationSchool,
+      educationDegree: p.educationDegree,
+      educationField: p.educationField,
+      educationYear: p.educationYear,
+      scrapeDepth: p.scrapeDepth,
+      sourceLinks: sl
+        ? [{ url: sl.url, title: sl.title, snippet: sl.snippet, domain: sl.domain }]
+        : [],
+    };
+  });
+}
+
+/**
+ * Get the maximum position value for a given search's tagged people.
+ * Returns -1 if no tags exist yet (so startPosition = maxPos + 1 = 0).
+ */
+export async function getMaxSearchPersonPosition(
+  searchId: string
+): Promise<number> {
+  const result = await prisma.searchPerson.aggregate({
+    where: { searchId },
+    _max: { position: true },
+  });
+  return result._max.position ?? -1;
+}
+
+/**
+ * Remove all SearchPerson tags for a search.
+ * Called when the queryHash changes (same basic filters, different advanced
+ * filters) so stale cached ordering is cleared before re-tagging.
+ */
+export async function clearSearchPersonTags(
+  searchId: string
+): Promise<void> {
+  await prisma.searchPerson.deleteMany({
+    where: { searchId },
+  });
+}
+
+/**
+ * Count how many SearchPerson rows exist for a given search.
+ * Used for the cache-hit check (need >= 5 tagged people to serve from cache).
+ */
+export async function getSearchPersonCount(
+  searchId: string
+): Promise<number> {
+  return prisma.searchPerson.count({
+    where: { searchId },
+  });
+}
+
+/** TTL constant exported for use in search actions */
+export { SEARCH_TAG_TTL_DAYS };

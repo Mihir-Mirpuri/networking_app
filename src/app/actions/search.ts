@@ -20,6 +20,12 @@ import {
   isVectorRoleMatchingEnabled,
   saveShortProfile,
   saveShortProfilesBatch,
+  tagPeopleToSearch,
+  getTaggedPeopleForSearch,
+  getMaxSearchPersonPosition,
+  clearSearchPersonTags,
+  getSearchPersonCount,
+  SEARCH_TAG_TTL_DAYS,
 } from '@/lib/db/person-service';
 import {
   getCompanyPattern,
@@ -382,6 +388,7 @@ export interface SearchMetaV2 {
   totalMatchesOnLinkedIn: number; // totalElements from LinkedIn pagination
   linkedInPage?: number;          // Current page fetched (for next-page requests)
   totalLinkedInPages?: number;    // Total pages available on LinkedIn
+  fromCache?: boolean;            // True when results served from SearchPerson tag cache
 }
 
 export type SearchActionV2Result = {
@@ -524,10 +531,11 @@ export async function searchPeopleV2Action(
     // Look up existing scrape cursor for this search (keyed off the
     // composite unique index). Used to resume Load More from wherever the
     // last fetch left off, rather than always starting at Apify page 1.
+    // Also returns id/updatedAt/queryHash for the SearchPerson cache check.
     const existingRow = await prisma.$queryRaw<
-      Array<{ lastCsePageScraped: number; totalLinkedInMatches: number | null }>
+      Array<{ id: string; lastCsePageScraped: number; totalLinkedInMatches: number | null; updatedAt: Date; queryHash: string | null }>
     >`
-      SELECT "lastCsePageScraped", "totalLinkedInMatches"
+      SELECT "id", "lastCsePageScraped", "totalLinkedInMatches", "updatedAt", "queryHash"
       FROM "Search"
       WHERE COALESCE(company, '') = ${dbFilters.company || ''}
         AND COALESCE(role, '') = ${dbFilters.role || ''}
@@ -550,6 +558,11 @@ export async function searchPeopleV2Action(
     // advanced if we actually fetch an Apify page in this request.
     let newCursor = existingCursor;
 
+    // Compute queryHash early so we can use it for the cache check
+    const queryHash = createHash('sha256')
+      .update(JSON.stringify(linkedInFilters))
+      .digest('hex');
+
     if (hasAdvancedFilters) {
       // ===== ADVANCED PATH: Skip DB, call LinkedIn Short directly =====
       console.log(`[SearchV2] PATH: Advanced (LinkedIn-first) — skipping DB`);
@@ -570,6 +583,84 @@ export async function searchPeopleV2Action(
           )
           .map(([k]) => k),
       });
+
+      // ── Cache-hit check: serve tagged people if available + fresh ──
+      // Only for advanced queries — simple queries always use DB-first flow.
+      if (existingRow[0]) {
+        const searchRowForCache = existingRow[0];
+        const ageMs = Date.now() - new Date(searchRowForCache.updatedAt).getTime();
+        const ageDays = ageMs / (1000 * 60 * 60 * 24);
+        const hashMatches = searchRowForCache.queryHash === queryHash;
+
+        if (!hashMatches && searchRowForCache.queryHash) {
+          // Same basic filters but different advanced filters — clear old tags
+          console.log(`[SearchV2] queryHash mismatch — clearing old SearchPerson tags`);
+          log.info('search-v2', 'Cache hash mismatch — clearing tags', {
+            oldHash: searchRowForCache.queryHash?.slice(0, 8),
+            newHash: queryHash.slice(0, 8),
+          });
+          await clearSearchPersonTags(searchRowForCache.id);
+        } else if (hashMatches && ageDays <= SEARCH_TAG_TTL_DAYS) {
+          const tagCount = await getSearchPersonCount(searchRowForCache.id);
+          if (tagCount >= 5) {
+            console.log(`[SearchV2] CACHE HIT: ${tagCount} tagged people, age=${ageDays.toFixed(1)}d`);
+            log.decision('search-v2', 'Serving from SearchPerson cache', {
+              searchId: searchRowForCache.id,
+              tagCount,
+              ageDays: Math.round(ageDays),
+            });
+
+            const cachedPeople = await getTaggedPeopleForSearch(
+              searchRowForCache.id,
+              allExcludedIds,
+              input.limit
+            );
+
+            let template: ResolvedTemplate;
+            if (userId) {
+              template = await resolveTemplateForUser(userId, input.templateId);
+            } else {
+              const defaultTemplate = EMAIL_TEMPLATES[0];
+              template = { id: defaultTemplate.id, subject: defaultTemplate.subject, body: defaultTemplate.body, attachResume: false, resumeId: null };
+            }
+
+            const orderedPeople = cachedPeople.map(person => ({
+              candidate: { ...person, emailDeliverable: person.emailDeliverable ?? null, emailVerifiedAt: person.emailVerifiedAt ?? null, emailVerificationReason: person.emailVerificationReason ?? null } as PersonWithSource,
+              score: 0,
+              breakdown: {} as ScoreBreakdown,
+            }));
+
+            results = await buildResultsWithDrafts(orderedPeople, userId, template, user);
+
+            const elapsed = Date.now() - searchStart;
+            console.log(`[SearchV2] CACHE: Done in ${elapsed}ms — ${results.length} results from cache`);
+            log.info('search-v2', 'Returning cached results', {
+              resultCount: results.length,
+              elapsedMs: elapsed,
+            });
+
+            return {
+              success: true,
+              results,
+              searchMeta: {
+                hasMore: tagCount > cachedPeople.length + allExcludedIds.length,
+                isAdvancedQuery: true,
+                haikuCalls: 0,
+                serperCalls: 0,
+                shortModePages: 0,
+                totalCostCents: 0,
+                dbResultCount: results.length,
+                apiResultCount: 0,
+                totalMatchesOnLinkedIn: searchRowForCache.totalLinkedInMatches ?? 0,
+                fromCache: true,
+              },
+              remainingDaily,
+              hiddenCount,
+            };
+          }
+        }
+      }
+
       const apiStart = Date.now();
 
       // Initial search always starts fresh at page 1 so the user sees the
@@ -850,9 +941,7 @@ export async function searchPeopleV2Action(
     const totalCostCents =
       parseCost.costCents + (shortModePages * 10);
 
-    const queryHash = createHash('sha256')
-      .update(JSON.stringify(linkedInFilters))
-      .digest('hex');
+    // queryHash was computed earlier (before the advanced/simple branch)
 
     // Resolved `totalLinkedInMatches` — prefer the live value from this
     // request, fall back to the previously-stored value so Path C (DB-only,
@@ -885,10 +974,10 @@ export async function searchPeopleV2Action(
       completedAt: new Date(),
     };
 
-    // Try UPDATE first; if no row matched, INSERT. This avoids triggering
-    // Prisma's P2002 error log on the COALESCE-based unique constraint
-    // (which Prisma doesn't know about and would log as an error otherwise).
-    const updatedRows = await prisma.$executeRaw`
+    // Try UPDATE first (RETURNING id); if no row matched, INSERT.
+    // This avoids triggering Prisma's P2002 error log on the COALESCE-based
+    // unique constraint (which Prisma doesn't know about).
+    const updatedSearchRows = await prisma.$queryRaw<Array<{ id: string }>>`
       UPDATE "Search"
       SET "queryHash" = ${searchCreateData.queryHash},
           "rawQuery" = ${searchCreateData.rawQuery},
@@ -905,10 +994,22 @@ export async function searchPeopleV2Action(
         AND COALESCE(role, '') = ${dbFilters.role || ''}
         AND COALESCE(university, '') = ${dbFilters.university || ''}
         AND COALESCE(location, '') = ${dbFilters.location || ''}
+      RETURNING "id"
     `;
 
-    if (updatedRows === 0) {
-      await prisma.search.create({ data: searchCreateData });
+    let searchRowId: string;
+    if (updatedSearchRows.length > 0) {
+      searchRowId = updatedSearchRows[0].id;
+    } else {
+      const created = await prisma.search.create({ data: searchCreateData });
+      searchRowId = created.id;
+    }
+
+    // ===== Tag results to this Search row (preserves relevance order) =====
+    // Only tag advanced queries — simple queries reconstruct from DB columns.
+    if (hasAdvancedFilters) {
+      const resultPersonIds = results.map(r => r.id);
+      await tagPeopleToSearch(searchRowId, resultPersonIds, 0, 0);
     }
 
     if (userId) {
@@ -1053,6 +1154,22 @@ export async function loadMoreV2Action(
     });
 
     try {
+      // Look up the Search row early so both Tier 1 (DB) and Tier 2 (Apify)
+      // can tag results to it via SearchPerson.
+      const searchRow = await prisma.$queryRaw<
+        Array<{ id: string; lastCsePageScraped: number; totalLinkedInMatches: number | null }>
+      >`
+        SELECT "id", "lastCsePageScraped", "totalLinkedInMatches"
+        FROM "Search"
+        WHERE COALESCE(company, '') = ${dbFilters.company || ''}
+          AND COALESCE(role, '') = ${dbFilters.role || ''}
+          AND COALESCE(university, '') = ${dbFilters.university || ''}
+          AND COALESCE(location, '') = ${dbFilters.location || ''}
+        ORDER BY "updatedAt" DESC
+        LIMIT 1
+      `;
+      const searchRowId = searchRow[0]?.id ?? null;
+
       // ── Tier 1: drain remaining DB rows before hitting Apify ──
       // Covers: (a) initial search took DB-only path, client cache exhausted;
       // (b) popular searches where DB had >limit rows and the first batch
@@ -1140,22 +1257,9 @@ export async function loadMoreV2Action(
       }
 
       // ── Tier 2: Apify Short mode ──
-      // Look up the cursor and totalMatches for this search.
-      const existingRow = await prisma.$queryRaw<
-        Array<{ id: string; lastCsePageScraped: number; totalLinkedInMatches: number | null }>
-      >`
-        SELECT "id", "lastCsePageScraped", "totalLinkedInMatches"
-        FROM "Search"
-        WHERE COALESCE(company, '') = ${dbFilters.company || ''}
-          AND COALESCE(role, '') = ${dbFilters.role || ''}
-          AND COALESCE(university, '') = ${dbFilters.university || ''}
-          AND COALESCE(location, '') = ${dbFilters.location || ''}
-        ORDER BY "updatedAt" DESC
-        LIMIT 1
-      `;
-
-      const currentCursor = existingRow[0]?.lastCsePageScraped ?? 0;
-      const totalMatches = existingRow[0]?.totalLinkedInMatches ?? null;
+      // Reuse the searchRow queried above (before Tier 1).
+      const currentCursor = searchRow[0]?.lastCsePageScraped ?? 0;
+      const totalMatches = searchRow[0]?.totalLinkedInMatches ?? null;
 
       const { shouldFetch, nextPage } = computeNextApifyPage(currentCursor, totalMatches);
 
@@ -1216,9 +1320,9 @@ export async function loadMoreV2Action(
 
       // Persist the advanced cursor + fresh totalMatches immediately, so
       // concurrent Load More clicks don't double-fetch the same page.
-      if (existingRow[0]) {
+      if (searchRow[0]) {
         await prisma.search.update({
-          where: { id: existingRow[0].id },
+          where: { id: searchRow[0].id },
           data: {
             lastCsePageScraped: nextPage,
             totalLinkedInMatches: effectiveTotalMatches,
@@ -1274,6 +1378,13 @@ export async function loadMoreV2Action(
 
       const results = await buildResultsWithDrafts(orderedPeople, userId, template, user);
       const hasMore = hasMoreApifyPages(nextPage, effectiveTotalMatches);
+
+      // Tag Apify results to the Search row for cache
+      if (searchRowId) {
+        const maxPos = await getMaxSearchPersonPosition(searchRowId);
+        const personIds = results.map(r => r.id);
+        await tagPeopleToSearch(searchRowId, personIds, maxPos + 1, nextPage);
+      }
 
       const elapsed = Date.now() - loadStart;
       console.log(`[LoadMoreV2] ✓ Done in ${elapsed}ms — ${results.length} results from page ${nextPage}, hasMore=${hasMore}`);

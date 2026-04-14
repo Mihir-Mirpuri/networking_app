@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react';
 import { SearchSidebar } from './SearchSidebar';
 import { MainSearchView, DisplayMessage } from './MainSearchView';
 import { NewHeader } from './NewHeader';
-import { ParsedFilters, Selectable, SuggestedAlternative } from '@/app/actions/ai-search';
+import { ParsedFilters, Selectable, SuggestedAlternative, SuggestedSearch } from '@/app/actions/ai-search';
 import type { LinkedInFilters } from '@/lib/types/linkedin-filters';
 import { EmailChatProvider } from '@/contexts/EmailChatContext';
 
@@ -84,6 +84,18 @@ export function AppShell({ initialRemainingDaily, isSubscribed }: AppShellProps)
     setPendingFilters(alt.filters);
   }, []);
 
+  const handleSuggestedSearchClick = useCallback((search: SuggestedSearch) => {
+    // Add a user message showing what they clicked
+    const userMsgId = `user-${Date.now()}`;
+    setMessages(prev => [
+      ...prev,
+      { id: userMsgId, role: 'user', content: search.label },
+    ]);
+    setCurrentFilters(search.filters);
+    // No pendingLinkedInFilters needed — runSearch builds minimal LI filters from ParsedFilters
+    setPendingFilters(search.filters);
+  }, []);
+
   const handleQueryProcessed = useCallback(() => {
     setPendingQuery(null);
     setPendingFilters(null);
@@ -107,6 +119,7 @@ export function AppShell({ initialRemainingDaily, isSubscribed }: AppShellProps)
           onSelectableClick={handleSelectableClick}
           onShowMoreSelectables={handleShowMoreSelectables}
           onSuggestedAlternativeClick={handleSuggestedAlternativeClick}
+          onSuggestedSearchClick={handleSuggestedSearchClick}
           onClearChat={handleClearChat}
           isSubscribed={isSubscribed}
         />

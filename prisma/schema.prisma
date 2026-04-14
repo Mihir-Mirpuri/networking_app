@@ -136,6 +136,7 @@ model Person {
   sourceLinks             SourceLink[]
   userCandidates          UserCandidate[]
   insights                PersonInsight[]
+  searchPeople            SearchPerson[]
 
   @@unique([fullName, company])
   @@index([emailStatus])
@@ -173,6 +174,7 @@ model Search {
   completedAt           DateTime?
   createdAt             DateTime       @default(now())
   updatedAt             DateTime       @default(now()) @updatedAt
+  searchPeople          SearchPerson[]
 
   @@index([createdAt])
   @@index([completedAt])
@@ -716,4 +718,20 @@ model RoleEmbedding {
   role      String                          @unique // normalized: lowercase, trimmed
   embedding Unsupported("vector(1536)")
   createdAt DateTime                        @default(now())
+}
+
+model SearchPerson {
+  id        String   @id @default(cuid())
+  searchId  String
+  personId  String
+  position  Int      // Preserves LinkedIn relevance order (0-based)
+  page      Int      @default(0) // Which API page (for Load More tracking)
+  createdAt DateTime @default(now())
+
+  search Search @relation(fields: [searchId], references: [id], onDelete: Cascade)
+  person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@unique([searchId, personId])
+  @@index([searchId, position])
+  @@index([personId])
 }
