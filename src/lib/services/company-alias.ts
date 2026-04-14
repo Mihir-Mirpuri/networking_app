@@ -10,7 +10,7 @@
  */
 
 import prisma from '@/lib/prisma';
-import { completeJson } from '@/lib/services/groq';
+import { completeJson } from '@/lib/services/anthropic';
 import { normalizeCompanyForMatch } from '@/lib/db/person-service';
 
 export interface ResolvedCompanyAliases {
@@ -78,7 +78,6 @@ export async function resolveCompanyAliases(input: string): Promise<ResolvedComp
         'If unsure, return {"canonicalName": "<input>", "aliases": ["<input>"]}',
       userPrompt: input.trim(),
       options: {
-        model: 'llama-3.1-8b-instant',
         temperature: 0.1,
         maxTokens: 200,
       },

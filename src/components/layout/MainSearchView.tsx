@@ -256,6 +256,12 @@ export function MainSearchView({
       return;
     }
 
+    if (!result) {
+      console.log(`[Search] V2 search #${thisSearchId} returned undefined result`);
+      setIsSearching(false);
+      return;
+    }
+
     if (result.success) {
       console.log(`[Search] V2 search #${thisSearchId} returned ${result.results.length} results, advanced=${result.searchMeta.isAdvancedQuery}`);
       incrementGuestQueryCount();

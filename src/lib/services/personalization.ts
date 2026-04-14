@@ -1,6 +1,6 @@
 import prisma from '@/lib/prisma';
 import { ResumeSummary } from './resume-summary';
-import { complete } from '@/lib/services/groq';
+import { complete } from '@/lib/services/anthropic';
 
 // ===== LLM Email Generation =====
 
@@ -74,27 +74,43 @@ export async function generateEmailWithLLM(
 
   const userContext = resumeSummary ? buildUserContext(resumeSummary) : '';
 
-  let systemPrompt = `You are a college student writing a cold outreach email to a professional. Write a short, direct email.
-
-STRUCTURE (follow this exactly):
-- Line 1: "Hello {first_name},"
-- Blank line
-- Paragraph 1 (2-3 sentences): Introduce yourself (name, year, school, major) and state your interest. Ask for a specific time (e.g., "10-15 minutes on the phone").
-- Blank line
-- Paragraph 2 (1 sentence): Mention you've attached your resume for context.
-- Blank line
+  let systemPrompt = `STRUCTURE:
+- Greeting: "Hello {first_name}," (safe, respectful, non-threatening)
+- Body: Introduce yourself briefly (name, school, year, major) and state why you're reaching out. Lead with the main point — don't bury it. If you share a mutual connection or commonality, open with that. Make a specific, low-commitment ask — request a concrete time ("10-15 minutes for a quick phone call") rather than something vague ("I'd love to pick your brain").
 - Sign-off: "Warm regards,\\n{sender_name}"
 
+SUBJECT LINE:
+- Be specific and personal — generic subjects like "Quick Question" or "Hello" get ignored.
+- If you have a hook (shared school, mutual contact, specific role), put it in the subject.
+- Keep it under 8 words. Curiosity works: hint at the reason without giving everything away.
+
+TONE & VOICE:
+- Sound like a real college student sending a genuine email — not a template, not a LinkedIn bot.
+- Casual but respectful. Write like you'd speak to someone you admire but don't know yet.
+- Use personal pronouns naturally: "I", "you", "your".
+- Use active voice ("I'm studying finance at NYU" not "Finance is being studied by me").
+- Contractions are fine and preferred — "I'm", "I'd", "you're" sound more natural than "I am", "I would".
+
+WHAT TO AVOID:
+- Filler phrases that waste the reader's time: "I hope this email finds you well", "I came across your profile", "I'm reaching out because", "I would be thrilled", "I was excited to see"
+- Flattery that sounds hollow: "Your career is truly inspiring", "I'm so impressed by your journey"
+- Hedging language: "I was just wondering if maybe", "I don't want to take too much of your time"
+- Padded words: "actually", "basically", "really", "very", "truly", "definitely"
+- Sounding desperate or overly eager — confidence is respectful
+
+PSYCHOLOGY (use sparingly, not formulaically):
+- Mutual connection is the strongest opener — a shared school, club, contact, or interest makes the email feel relevant rather than random.
+- Specificity signals effort. Mentioning their actual role or company shows you didn't mass-send this.
+- A short email respects the reader's time and is more likely to get a response than a long one.
+- People respond to clear asks. "Could we talk for 15 minutes this week?" beats "I'd love to connect sometime."
+
 RULES:
-1. EXACTLY 2 short paragraphs in the body — no more
-2. Be direct and straight to the point — every sentence must serve a purpose
-3. NO filler phrases: "I hope this email finds you well", "I came across your profile", "I was excited to see", "I would be thrilled", "I am reaching out because"
-4. Sound like a real college student — casual but respectful, not overly polished or enthusiastic
-5. Each email should be unique — vary how you express interest based on the recipient's role/company
-6. Use paragraph breaks (blank lines) between paragraphs — do NOT write a wall of text`;
+1. Keep it short — a few focused paragraphs, not a wall of text.
+2. Every sentence must earn its place. If removing it doesn't change the email, cut it.
+3. Each email must be unique — vary phrasing based on the recipient's role and company.`;
 
   if (sentEmailExamples && sentEmailExamples.length > 0) {
-    systemPrompt += `\n7. If example emails from the sender are provided, match their writing style closely`;
+    systemPrompt += `\n4. If example emails from the sender are provided, match their writing style closely.`;
   }
 
   systemPrompt += `
@@ -142,7 +158,6 @@ ${referenceTemplate.body}`;
     systemPrompt,
     userPrompt,
     options: {
-      model: 'llama-3.3-70b-versatile',
       temperature: 0.7,
       maxTokens: 300,
     },
@@ -209,7 +224,6 @@ REQUESTED CHANGE: ${instruction}`;
     systemPrompt,
     userPrompt,
     options: {
-      model: 'llama-3.3-70b-versatile',
       temperature: 0.5,
       maxTokens: 300,
     },
@@ -346,7 +360,6 @@ BODY:
   const completion = await complete({
     userPrompt: prompt,
     options: {
-      model: 'llama-3.3-70b-versatile',
       temperature: 0.7,
       maxTokens: 400,
     },
@@ -492,7 +505,6 @@ BODY:
   const completion = await complete({
     userPrompt: prompt,
     options: {
-      model: 'llama-3.3-70b-versatile',
       temperature: 0.7,
       maxTokens: 400,
     },
@@ -581,7 +593,6 @@ BODY:
   const completion = await complete({
     userPrompt: prompt,
     options: {
-      model: 'llama-3.3-70b-versatile',
       temperature: 0.7,
       maxTokens: 300,
     },
@@ -614,9 +625,16 @@ export interface ConversationalRefineInput {
     firstName: string | null;
     company: string;
     role: string | null;
+    city?: string | null;
+    state?: string | null;
+    educationSchool?: string | null;
+    educationDegree?: string | null;
+    educationField?: string | null;
   };
   userId: string;
   selectedInsights?: Array<{ label: string; detail: string; type: string }>;
+  allInsights?: Array<{ label: string; detail: string; type: string; source: string }>;
+  resumeSummary?: ResumeSummary | null;
 }
 
 export interface ConversationalRefineResult {
@@ -628,27 +646,41 @@ export interface ConversationalRefineResult {
 /**
  * Refine an email through conversational interaction.
  * Maintains conversation context for natural back-and-forth editing.
- * Uses llama-3.1-8b-instant for speed and cost efficiency.
+ * Uses Claude Haiku for speed and cost efficiency.
  */
 export async function refineEmailConversational(
   input: ConversationalRefineInput
 ): Promise<ConversationalRefineResult> {
-  const { subject, body, userMessage, conversationHistory, person, userId, selectedInsights } = input;
+  const { subject, body, userMessage, conversationHistory, person, userId, selectedInsights, allInsights, resumeSummary } = input;
 
   const personName = person.firstName || 'the recipient';
-  const hasInsights = selectedInsights && selectedInsights.length > 0;
+  const hasSelectedInsights = selectedInsights && selectedInsights.length > 0;
 
-  // Truncate email - allow more when insights are present (need room for context)
-  const maxBodyLen = hasInsights ? 2500 : 1000;
+  // Truncate email
+  const maxBodyLen = 2500;
   const truncatedBody = body.length > maxBodyLen ? body.slice(0, maxBodyLen) + '...' : body;
 
-  // Build insights section for prompt
-  const insightsBlock = hasInsights
-    ? `\nPERSON INSIGHTS (selected by the sender to incorporate naturally into the email):
-${selectedInsights.map(i => `- ${i.label}: ${i.detail}`).join('\n')}
+  // Build person profile block from all available data
+  const profileParts: string[] = [];
+  if (person.role) profileParts.push(`Role: ${person.role}`);
+  if (person.company) profileParts.push(`Company: ${person.company}`);
+  const location = [person.city, person.state].filter(Boolean).join(', ');
+  if (location) profileParts.push(`Location: ${location}`);
+  const education = [person.educationSchool, person.educationDegree, person.educationField].filter(Boolean).join(', ');
+  if (education) profileParts.push(`Education: ${education}`);
 
-When asked to incorporate these insights, weave them naturally into the email body. Do NOT list them as bullet points — integrate them conversationally as part of the email's narrative.\n`
-    : '';
+  // Build insights block — always include all available insights for context
+  let insightsBlock = '';
+  if (allInsights && allInsights.length > 0) {
+    insightsBlock += `\nWHAT WE KNOW ABOUT ${(person.firstName || 'THE RECIPIENT').toUpperCase()} (from LinkedIn and web research):
+${allInsights.map(i => `- [${i.type}] ${i.label}: ${i.detail}`).join('\n')}\n`;
+  }
+
+  if (hasSelectedInsights) {
+    insightsBlock += `\nINSIGHTS THE SENDER SELECTED TO INCORPORATE:
+${selectedInsights.map(i => `- ${i.label}: ${i.detail}`).join('\n')}
+When asked to incorporate these, weave them naturally into the email body.\n`;
+  }
 
   const systemPrompt = `You are an AI assistant helping a college student refine their cold outreach email. You have a natural, conversational style.
 
@@ -657,52 +689,64 @@ Subject: ${subject}
 Body:
 ${truncatedBody}
 
-RECIPIENT: ${personName}${person.role ? `, ${person.role}` : ''} at ${person.company}
-${insightsBlock}
-YOUR ROLE:
-1. Make the requested changes to the email
-2. Respond naturally to the user - acknowledge what you changed
-3. Keep responses brief but friendly
-4. If the request is unclear, ask for clarification
-5. Don't over-explain changes - just make them and briefly confirm
+RECIPIENT: ${personName}${profileParts.length > 0 ? '\n' + profileParts.join('\n') : ''}
+${insightsBlock}${resumeSummary ? `\nSENDER'S BACKGROUND (from their resume):
+${resumeSummary.rawSummary ? resumeSummary.rawSummary : ''}${resumeSummary.organizations?.length ? '\nOrganizations: ' + resumeSummary.organizations.join(', ') : ''}${resumeSummary.activities?.length ? '\nActivities: ' + resumeSummary.activities.join(', ') : ''}${resumeSummary.interests?.length ? '\nInterests: ' + resumeSummary.interests.join(', ') : ''}${resumeSummary.skills?.length ? '\nSkills: ' + resumeSummary.skills.join(', ') : ''}
+` : ''}
+You operate in two modes depending on the user's message:
 
-IMPORTANT RULES:
+MODE: edit — when the user requests a specific change to the email
+- Make the requested changes to the email
+- Briefly confirm what you changed
 - Only modify what the user asks for
 - Keep the same greeting and sign-off unless explicitly asked to change
 - Sound like a real college student - casual but respectful
 - NO corporate speak or excessive enthusiasm
 
-Return in this EXACT format:
+MODE: chat — when the user is chatting, asking a question, saying hello, or the message isn't a clear edit request
+- Respond naturally and conversationally
+- Do NOT change the email
+- If the user asks something vague like "how can we improve this?", ask clarifying questions about what they want changed
 
+RESPONSE STYLE:
+- Be concise. No preamble, no filler. Get to the point immediately.
+- Use bullets for lists. Keep them tight.
+- Longer responses are fine when the content demands it, but every sentence must earn its place.
+
+Pick the mode based on the user's message and return in the matching format:
+
+If MODE is edit:
+MODE: edit
 SUBJECT: [updated subject line]
 BODY:
 [updated email body]
 ---
-RESPONSE: [your brief, natural response to the user about what you changed]`;
+RESPONSE: [your brief response about what you changed]
 
-  // Build conversation messages (last 6 turns for context)
-  const messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }> = [
-    { role: 'system', content: systemPrompt },
-  ];
+If MODE is chat:
+MODE: chat
+RESPONSE: [your conversational reply]`;
 
-  // Add recent conversation history
-  for (const msg of conversationHistory.slice(-6)) {
-    messages.push({
-      role: msg.role,
-      content: msg.content,
-    });
+  // Build user prompt with conversation history so the LLM has full context
+  let userPrompt = '';
+
+  if (conversationHistory.length > 0) {
+    userPrompt += 'CONVERSATION SO FAR:\n';
+    for (const msg of conversationHistory.slice(-6)) {
+      const label = msg.role === 'user' ? 'User' : 'Assistant';
+      userPrompt += `${label}: ${msg.content}\n`;
+    }
+    userPrompt += '\n';
   }
 
-  // Add current user message
-  messages.push({ role: 'user', content: userMessage });
+  userPrompt += `User: ${userMessage}`;
 
   const response = await complete({
     systemPrompt,
-    userPrompt: userMessage,
+    userPrompt,
     options: {
-      model: hasInsights ? 'llama-3.3-70b-versatile' : 'llama-3.1-8b-instant',
       temperature: 0.5,
-      maxTokens: hasInsights ? 600 : 400,
+      maxTokens: hasSelectedInsights ? 600 : 400,
     },
     metadata: {
       userId,
@@ -712,13 +756,27 @@ RESPONSE: [your brief, natural response to the user about what you changed]`;
 
   const text = response.content;
 
-  // Parse the response - handle various separator formats from LLM
+  // Detect mode — chat mode if LLM says "MODE: chat" or if there's no SUBJECT/BODY block
+  const isEditMode = /MODE:\s*edit/i.test(text) || (/SUBJECT:/i.test(text) && /BODY:/i.test(text));
+
+  if (!isEditMode) {
+    // Chat mode — extract just the response, leave email unchanged
+    const chatResponse = text
+      .replace(/^MODE:\s*chat\s*/i, '')
+      .replace(/^RESPONSE:\s*/i, '')
+      .trim();
+
+    return {
+      subject,
+      body,
+      assistantMessage: chatResponse || text.trim(),
+    };
+  }
+
+  // Edit mode — parse structured response
   const subjectMatch = text.match(/SUBJECT:\s*([^\n]+)/);
-  // Match BODY content up to any separator line (---, RESPONSE:, or end)
   const bodyMatch = text.match(/BODY:\s*([\s\S]*?)(?=\n---+|\nRESPONSE:|$)/);
-  // Match RESPONSE: with or without --- prefix
   const responseMatch = text.match(/(?:---+\s*\n?)?RESPONSE:\s*([\s\S]+)$/);
-  // Also try to capture any text after --- if RESPONSE: is missing
   const fallbackResponseMatch = !responseMatch ? text.match(/\n---+\s*\n([\s\S]+)$/) : null;
 
   const newSubject = subjectMatch?.[1]?.trim() || subject;
@@ -730,12 +788,10 @@ RESPONSE: [your brief, natural response to the user about what you changed]`;
     newBody = newBody.substring(0, responseLeakIdx).replace(/\n?---+\s*$/, '').trim();
   }
 
-  // Also strip any trailing --- and explanatory notes (LLM sometimes adds these without RESPONSE: prefix)
   newBody = newBody.replace(/\n---+\s*[\s\S]*$/, '').trim();
-  // Strip any trailing "I shortened..." type notes that leaked without separator
   newBody = newBody.replace(/\n+I (?:shortened|made|updated|changed|removed|added|edited|rewrote|revised)[\s\S]*$/i, '').trim();
 
-  const assistantMessage = responseMatch?.[1]?.trim() || fallbackResponseMatch?.[1]?.trim() || "I've updated your email.";
+  const assistantMessage = responseMatch?.[1]?.trim() || fallbackResponseMatch?.[1]?.trim() || "Done! I've updated your email.";
 
   return {
     subject: newSubject,

@@ -40,6 +40,20 @@ export const authOptions: NextAuthOptions = {
     async signIn({ user, isNewUser }) {
       if (!user.id) return;
 
+      // Onboarding flow is currently disabled — auto-complete on first sign-in
+      // so users go straight to the app. Profile fields are collected lazily
+      // at first-send time via ProfileCompletionModal.
+      if (isNewUser) {
+        try {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { onboardingCompleted: true },
+          });
+        } catch (error) {
+          console.error(`[Auth] Failed to auto-complete onboarding for ${user.id}:`, error);
+        }
+      }
+
       // Handle referral signup for new users
       if (isNewUser && user.email) {
         try {

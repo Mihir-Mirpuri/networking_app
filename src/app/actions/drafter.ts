@@ -2,14 +2,9 @@
 
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import {
-  analyzeTemplateGaps,
-  processGapResponse,
-  generateDraft,
-  refineDraft,
-  RecipientContext,
-  IdentifiedGap,
-} from '@/lib/services/drafter';
+import { RecipientContext, IdentifiedGap } from '@/lib/services/drafter';
+import { analyzeTemplateGaps, processGapResponse } from '@/lib/services/drafter/gap-analysis';
+import { generateDraft, refineDraft } from '@/lib/services/drafter/draft-generation';
 
 // ============================================================================
 // Analyze Template Gaps Action

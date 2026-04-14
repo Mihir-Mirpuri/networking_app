@@ -9,6 +9,7 @@ import {
   createTemplateAction,
   updateTemplateAction,
   deleteTemplateAction,
+  deleteAccountAction,
   UserProfile,
   TemplateData,
 } from '@/app/actions/profile';
@@ -742,6 +743,10 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
   const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
   const [isPortalLoading, setIsPortalLoading] = useState(false);
 
+  // Delete account state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
   useEffect(() => {
     if (status === 'authenticated') {
@@ -842,6 +847,21 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
 
   const handleSignOut = () => {
     signOut({ callbackUrl: '/app' });
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== 'DELETE') return;
+
+    setIsDeletingAccount(true);
+    const result = await deleteAccountAction();
+
+    if (result.success) {
+      // Sign out and redirect to home
+      signOut({ callbackUrl: '/' });
+    } else {
+      setIsDeletingAccount(false);
+      setProfileError(result.error);
+    }
   };
 
   const handleUploadResume = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1103,10 +1123,84 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                     <p className="text-xs text-[#707070]">Permanently remove your account and all data</p>
                   </div>
                 </div>
-                <button className="text-xs font-semibold text-[#ef4444] border border-[#ef4444]/40 rounded-lg px-5 py-2.5 hover:bg-[#ef4444]/10 transition-colors">
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="text-xs font-semibold text-[#ef4444] border border-[#ef4444]/40 rounded-lg px-5 py-2.5 hover:bg-[#ef4444]/10 transition-colors"
+                >
                   Delete
                 </button>
               </div>
+
+              {/* Delete Account Confirmation Modal */}
+              {showDeleteConfirm && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+                  <div className="bg-[#1a1a1a] border border-[#3a3a3a] rounded-xl p-6 max-w-md w-full mx-4">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 rounded-full bg-[#ef4444]/20 flex items-center justify-center">
+                        <svg className="w-5 h-5 text-[#ef4444]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-white">Delete Account</h3>
+                        <p className="text-sm text-[#707070]">This action cannot be undone</p>
+                      </div>
+                    </div>
+
+                    <p className="text-sm text-[#a0a0a0] mb-4">
+                      This will permanently delete your account and all associated data including:
+                    </p>
+                    <ul className="text-sm text-[#a0a0a0] mb-4 list-disc list-inside space-y-1">
+                      <li>Your profile and preferences</li>
+                      <li>All saved contacts and outreach history</li>
+                      <li>Email templates and drafts</li>
+                      <li>Uploaded resumes</li>
+                    </ul>
+
+                    <p className="text-sm text-white mb-2">
+                      Type <span className="font-mono bg-[#2a2a2a] px-1.5 py-0.5 rounded text-[#ef4444]">DELETE</span> to confirm:
+                    </p>
+                    <input
+                      type="text"
+                      value={deleteConfirmText}
+                      onChange={(e) => setDeleteConfirmText(e.target.value)}
+                      placeholder="Type DELETE"
+                      className="w-full px-3 py-2 bg-[#252525] border border-[#3a3a3a] rounded-lg text-white text-sm mb-4 focus:outline-none focus:border-[#ef4444]/50"
+                      disabled={isDeletingAccount}
+                    />
+
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => {
+                          setShowDeleteConfirm(false);
+                          setDeleteConfirmText('');
+                        }}
+                        disabled={isDeletingAccount}
+                        className="flex-1 py-2.5 border border-[#3a3a3a] text-white text-sm font-semibold rounded-lg hover:bg-[#303030] transition-colors disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleDeleteAccount}
+                        disabled={deleteConfirmText !== 'DELETE' || isDeletingAccount}
+                        className="flex-1 py-2.5 bg-[#ef4444] text-white text-sm font-semibold rounded-lg hover:bg-[#dc2626] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      >
+                        {isDeletingAccount ? (
+                          <>
+                            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                            </svg>
+                            Deleting...
+                          </>
+                        ) : (
+                          'Delete Account'
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -1302,7 +1396,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
           {/* ── Right: Main area with floating compose card ── */}
           <div
             className="flex-1 flex items-center justify-center bg-[#212121] relative"
-            onClick={(e) => { if (e.target === e.currentTarget) setEditingTemplate(null); }}
+            onMouseDown={(e) => { if (e.target === e.currentTarget) setEditingTemplate(null); }}
           >
             {/* Template editor card */}
             <div className="w-full max-w-[680px] max-h-[720px] h-[85vh] bg-[#141414] rounded-xl border border-[#2a2a2a] shadow-2xl flex flex-col overflow-hidden">

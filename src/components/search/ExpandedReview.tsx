@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { SearchResultWithDraft, generateLLMDraftAction, regenerateDraftAction } from '@/app/actions/search';
 import { scheduleEmailAction } from '@/app/actions/send';
 import { getResumesAction, ResumeData } from '@/app/actions/resume';
@@ -486,6 +487,7 @@ export function ExpandedReview({
   onDraftGenerated,
 }: ExpandedReviewProps) {
   console.log('[ExpandedReview] Component rendered, currentIndex:', currentIndex);
+  const router = useRouter();
   const person = results[currentIndex];
   const [subject, setSubject] = useState(person?.draftSubject || '');
   const [body, setBody] = useState(person?.draftBody || '');
@@ -515,7 +517,11 @@ export function ExpandedReview({
   const [linkUrl, setLinkUrl] = useState('');
   const [linkText, setLinkText] = useState('');
   const [linkPopoverPos, setLinkPopoverPos] = useState<{ top: number; left: number } | null>(null);
+  const [isUploadingResume, setIsUploadingResume] = useState(false);
+  const [showSaveAttachmentPrompt, setShowSaveAttachmentPrompt] = useState(false);
+  const [newlyUploadedResumeId, setNewlyUploadedResumeId] = useState<string | null>(null);
   const resumeDropdownRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const savedSelectionRef = useRef<Range | null>(null);
   const linkPopoverRef = useRef<HTMLDivElement>(null);
@@ -525,6 +531,7 @@ export function ExpandedReview({
 
   const [selectedTemplateId, setSelectedTemplateId] = useState(defaultTemplateId || '');
   const userEditedRef = useRef(false);
+  const awaitingTemplateRegenRef = useRef(false);
 
   const { openEmailChat, closeEmailChat, currentEmail, updateEmail, fetchInsights } = useEmailChat();
   const isPushingToContextRef = useRef(false);
@@ -653,6 +660,16 @@ export function ExpandedReview({
       requestAnimationFrame(() => { isPushingToContextRef.current = false; });
     }
   }, [subject, body]);
+
+  // Sync local body/subject when a template switch finishes regenerating the draft
+  useEffect(() => {
+    if (!awaitingTemplateRegenRef.current) return;
+    if (!currentPerson) return;
+    awaitingTemplateRegenRef.current = false;
+    userEditedRef.current = false;
+    setSubject(currentPerson.draftSubject || '');
+    setBodyAndSyncDom(currentPerson.draftBody || '');
+  }, [currentPerson?.draftBody, currentPerson?.draftSubject]);
 
   // Sync context → local (when AI refines)
   useEffect(() => {
@@ -903,6 +920,74 @@ export function ExpandedReview({
     }
   }, [showScheduleModal, scheduledDateTime]);
 
+  const handleUploadResume = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingResume(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/resume/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+      if (data.success && data.resume) {
+        // Add the new resume to the list and select it
+        setResumes(prev => [...prev, data.resume]);
+        setSelectedResumeId(data.resume.id);
+        setShowResumeDropdown(false);
+        // Show prompt to save to attachments
+        setNewlyUploadedResumeId(data.resume.id);
+        setShowSaveAttachmentPrompt(true);
+      }
+    } catch (error) {
+      console.error('Failed to upload resume:', error);
+    } finally {
+      setIsUploadingResume(false);
+      // Reset the file input so the same file can be selected again
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleSaveAttachment = () => {
+    // Keep it saved (do nothing, it's already in DB)
+    setShowSaveAttachmentPrompt(false);
+    setNewlyUploadedResumeId(null);
+  };
+
+  const handleDontSaveAttachment = async () => {
+    // Delete from DB but keep attached for this email session
+    if (newlyUploadedResumeId) {
+      try {
+        await fetch(`/api/resume/delete?id=${newlyUploadedResumeId}`, {
+          method: 'DELETE',
+        });
+        // Remove from the resumes list but keep selectedResumeId for this session
+        setResumes(prev => prev.filter(r => r.id !== newlyUploadedResumeId));
+      } catch (error) {
+        console.error('Failed to delete resume:', error);
+      }
+    }
+    setShowSaveAttachmentPrompt(false);
+    setNewlyUploadedResumeId(null);
+  };
+
+  const handleAttachmentClick = () => {
+    // If no attachment is selected, open file picker directly
+    if (!selectedResumeId) {
+      fileInputRef.current?.click();
+    } else {
+      // If attachment exists, show dropdown
+      setShowResumeDropdown(!showResumeDropdown);
+    }
+  };
+
   if (!currentPerson) return null;
 
   const canSend = !status && !showSuccess && !limitReached;
@@ -917,7 +1002,7 @@ export function ExpandedReview({
       </div>
 
       {/* ── Right: Main area with floating compose card ── */}
-      <div className="flex-1 flex items-center justify-center bg-[#212121] relative" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="flex-1 flex items-center justify-center bg-[#212121] relative" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
         {/* Compose modal card */}
         <div className="w-full max-w-[680px] max-h-[720px] h-[85vh] bg-[#141414] rounded-xl border border-[#2a2a2a] shadow-2xl flex flex-col overflow-hidden">
           {/* Success/Failure overlays */}
@@ -940,6 +1025,7 @@ export function ExpandedReview({
                   key={t.id}
                   onClick={() => {
                     setSelectedTemplateId(t.id);
+                    awaitingTemplateRegenRef.current = true;
                     onTemplateChange(t.id, internalIndex);
                   }}
                   disabled={!canSend || isRegenerating}
@@ -955,6 +1041,17 @@ export function ExpandedReview({
             ) : (
               <span className={`px-4 py-2.5 text-xs font-semibold text-white ${accentColor} rounded-t-lg`}>Default Template</span>
             )}
+
+            <button
+              onClick={() => router.push('/profile?tab=templates')}
+              className="px-3 py-1.5 ml-1 text-xs font-medium text-[#aaa] hover:text-white hover:bg-[#252525] rounded-md transition-colors flex items-center gap-1"
+              title="Add a new template"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+              Add template
+            </button>
 
             <div className="flex-1" />
 
@@ -1028,33 +1125,81 @@ export function ExpandedReview({
           </div>
 
 
-          {/* ── Attachment (Gmail style) ── */}
+          {/* ── Attachment (Gmail style chip) ── */}
           {selectedResumeId && (
             <div className="px-5 py-2 flex-shrink-0">
-              <div className="flex items-center gap-1">
-                <span className="text-[13px] text-[#6364FF]">
-                  {resumes.find(r => r.id === selectedResumeId)?.filename || 'Resume attached'}
-                </span>
-                <div className="flex-1" />
-                <button onClick={() => setSelectedResumeId(null)} className="text-[#888] hover:text-white transition-colors">
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                  </svg>
-                </button>
+              <div className="flex items-center gap-3">
+                <div className="inline-flex items-center gap-2 px-3 py-2 bg-[#252525] border border-[#333] rounded-2xl hover:bg-[#2a2a2a] transition-colors group">
+                  {/* File icon */}
+                  <div className="w-8 h-8 rounded bg-[#ea4335] flex items-center justify-center flex-shrink-0">
+                    <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/>
+                    </svg>
+                  </div>
+                  {/* Filename */}
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-[13px] text-white truncate max-w-[200px]">
+                      {resumes.find(r => r.id === selectedResumeId)?.filename || 'Resume attached'}
+                    </span>
+                  </div>
+                  {/* Remove button */}
+                  <button
+                    onClick={() => { setSelectedResumeId(null); setShowSaveAttachmentPrompt(false); }}
+                    className="p-1 text-[#888] hover:text-white hover:bg-[#333] rounded-full transition-colors ml-1"
+                    title="Remove attachment"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                {/* Save to attachments prompt */}
+                {showSaveAttachmentPrompt && (
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-[#888]">Save to attachments?</span>
+                    <button
+                      onClick={handleSaveAttachment}
+                      className="px-2 py-1 text-white bg-[#333] hover:bg-[#404040] rounded transition-colors"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={handleDontSaveAttachment}
+                      className="px-2 py-1 text-[#888] hover:text-white transition-colors"
+                    >
+                      Just this once
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}
 
           {/* ── Bottom bar ── */}
           <div className="flex items-center gap-1.5 px-5 py-2.5 bg-[#1a1a1a] border-t border-[#2a2a2a] flex-shrink-0">
+            {/* Hidden file input for resume upload */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.doc,.docx"
+              onChange={handleUploadResume}
+              disabled={isUploadingResume}
+              className="hidden"
+            />
+
             {/* Attach file / resume */}
             <div className="relative" ref={resumeDropdownRef}>
               <ToolbarButton
                 title={selectedResumeId ? 'Change attachment' : 'Attach file'}
-                onClick={() => setShowResumeDropdown(!showResumeDropdown)}
+                onClick={handleAttachmentClick}
                 active={!!selectedResumeId}
               >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13" /></svg>
+                {isUploadingResume ? (
+                  <LoadingDots className="text-[#888]" />
+                ) : (
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13" /></svg>
+                )}
               </ToolbarButton>
 
               {showResumeDropdown && (
@@ -1074,9 +1219,20 @@ export function ExpandedReview({
                       }`}
                     >
                       {resume.filename}
-                      {resume.isActive && <span className="text-[#6364FF] ml-1">(Active)</span>}
                     </button>
                   ))}
+                  <div className="border-t border-[#333] mt-1 pt-1">
+                    <button
+                      onClick={() => { fileInputRef.current?.click(); }}
+                      disabled={isUploadingResume}
+                      className="w-full text-left px-3 py-2 text-xs text-[#6364FF] hover:bg-[#252525] flex items-center gap-2 disabled:opacity-50"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                      </svg>
+                      {isUploadingResume ? 'Uploading...' : 'Upload new file'}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

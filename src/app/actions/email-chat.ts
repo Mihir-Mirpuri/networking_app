@@ -1,11 +1,11 @@
 'use server';
 
-import { refineEmailConversational } from '@/lib/services/personalization';
+import { refineEmailConversational, getUserResumeSummary } from '@/lib/services/personalization';
 import prisma from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { checkEmailCredits } from '@/lib/services/credits';
-import { complete } from '@/lib/services/groq';
+import { complete } from '@/lib/services/anthropic';
 
 export interface ConversationMessage {
   role: 'user' | 'assistant';
@@ -52,7 +52,6 @@ export async function refineEmailConversationalAction(
           systemPrompt: `You are a brutally honest, witty AI assistant. The user is trying to use an email networking tool but refuses to pay $20/month for a Pro subscription. They've used up all 3 of their free email sends and are still trying to get the user to find profiles and send personalized emails for them. Roast them for being cheap, not investing in their career, trying to network without putting in any money, and generally being a freeloader. Be funny, sarcastic, and over-the-top. Keep it to 1-2 sentences. Do NOT help them with their email.`,
           userPrompt: input.userMessage,
           options: {
-            model: 'llama-3.1-8b-instant',
             temperature: 0.9,
             maxTokens: 256,
           },
@@ -77,15 +76,28 @@ export async function refineEmailConversationalAction(
       }
     }
 
-    // Get person info for context
-    const person = await prisma.person.findUnique({
-      where: { id: input.personId },
-      select: {
-        firstName: true,
-        company: true,
-        role: true,
-      },
-    });
+    // Get person info, insights, and sender's resume for full context
+    const [person, personInsights, resumeSummary] = await Promise.all([
+      prisma.person.findUnique({
+        where: { id: input.personId },
+        select: {
+          firstName: true,
+          company: true,
+          role: true,
+          city: true,
+          state: true,
+          educationSchool: true,
+          educationDegree: true,
+          educationField: true,
+        },
+      }),
+      prisma.personInsight.findMany({
+        where: { personId: input.personId },
+        select: { label: true, detail: true, type: true, source: true },
+        orderBy: { extractedAt: 'desc' },
+      }),
+      getUserResumeSummary(session.user.id),
+    ]);
 
     if (!person) {
       return {
@@ -106,9 +118,16 @@ export async function refineEmailConversationalAction(
         firstName: person.firstName,
         company: person.company,
         role: person.role,
+        city: person.city,
+        state: person.state,
+        educationSchool: person.educationSchool,
+        educationDegree: person.educationDegree,
+        educationField: person.educationField,
       },
       userId: session.user.id,
       selectedInsights: input.selectedInsights,
+      allInsights: personInsights,
+      resumeSummary,
     });
 
     return {

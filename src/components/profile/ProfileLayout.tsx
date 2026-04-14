@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { ProfileSidebar, ProfileTab } from './ProfileSidebar';
 import { ProfileClient } from './ProfileClient';
@@ -14,9 +15,16 @@ interface ProfileLayoutProps {
   userImage: string;
 }
 
+const VALID_TABS: ProfileTab[] = ['account', 'resumes', 'templates'];
+
 export function ProfileLayout({ userEmail, userName, userImage }: ProfileLayoutProps) {
   const { status } = useSession();
-  const [activeTab, setActiveTab] = useState<ProfileTab>('account');
+  const searchParams = useSearchParams();
+  const initialTab = (() => {
+    const t = searchParams?.get('tab');
+    return t && (VALID_TABS as string[]).includes(t) ? (t as ProfileTab) : 'account';
+  })();
+  const [activeTab, setActiveTab] = useState<ProfileTab>(initialTab);
   const [university, setUniversity] = useState<string | null>(null);
   const [isSubscribed, setIsSubscribed] = useState(false);
 

@@ -27,12 +27,8 @@ export type {
 // Templates
 export { PRESET_TEMPLATES, getTemplateById } from './templates';
 
-// Gap analysis functions
-export {
-  analyzeTemplateGaps,
-  processGapResponse,
-  extractPlaceholders,
-} from './gap-analysis';
-
-// Draft generation functions
-export { generateDraft, refineDraft } from './draft-generation';
+// NOTE: LLM-dependent functions (analyzeTemplateGaps, processGapResponse,
+// generateDraft, refineDraft, extractPlaceholders) are server-only because they
+// import the Anthropic client which uses Node.js APIs. Import them directly:
+//   import { analyzeTemplateGaps, processGapResponse, extractPlaceholders } from '@/lib/services/drafter/gap-analysis';
+//   import { generateDraft, refineDraft } from '@/lib/services/drafter/draft-generation';
