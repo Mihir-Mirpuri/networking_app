@@ -7,7 +7,7 @@ import { ProfileSidebar, ProfileTab } from './ProfileSidebar';
 import { ProfileClient } from './ProfileClient';
 import { NewHeader } from '@/components/layout/NewHeader';
 import { getProfileAction } from '@/app/actions/profile';
-import { getSubscriptionStatus } from '@/app/actions/subscription';
+import { useSubscription } from '@/contexts/SubscriptionContext';
 
 interface ProfileLayoutProps {
   userEmail: string;
@@ -26,7 +26,8 @@ export function ProfileLayout({ userEmail, userName, userImage }: ProfileLayoutP
   })();
   const [activeTab, setActiveTab] = useState<ProfileTab>(initialTab);
   const [university, setUniversity] = useState<string | null>(null);
-  const [isSubscribed, setIsSubscribed] = useState(false);
+  const { isSubscribed: ctxIsSubscribed } = useSubscription();
+  const isSubscribed = ctxIsSubscribed ?? false;
 
   useEffect(() => {
     if (status === 'authenticated') {
@@ -34,9 +35,6 @@ export function ProfileLayout({ userEmail, userName, userImage }: ProfileLayoutP
         if (result.success) {
           setUniversity(result.profile.university);
         }
-      });
-      getSubscriptionStatus().then((result) => {
-        setIsSubscribed(result.isSubscribed ?? false);
       });
     }
   }, [status]);

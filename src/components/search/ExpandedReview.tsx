@@ -9,7 +9,7 @@ import { LoadingDots } from './LoadingSpinner';
 import { TemplateData } from '@/app/actions/profile';
 import { useEmailChat } from '@/contexts/EmailChatContext';
 import type { PersonInsightResponse } from '@/app/actions/person-insights';
-import { getSubscriptionStatus } from '@/app/actions/subscription';
+import { useSubscription } from '@/contexts/SubscriptionContext';
 // SearchableCombobox removed — no longer used in this layout
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
@@ -251,18 +251,12 @@ function ChatSidebar() {
   } = useEmailChat();
 
   const [inputValue, setInputValue] = useState('');
-  const [isSubscribed, setIsSubscribed] = useState<boolean | null>(null);
+  const { isSubscribed } = useSubscription();
   const [selectedInsights, setSelectedInsights] = useState<PersonInsightResponse[]>([]);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const selectedInsightIds = new Set(selectedInsights.map(i => i.id));
-
-  useEffect(() => {
-    getSubscriptionStatus().then((status) => {
-      setIsSubscribed(status.isSubscribed ?? false);
-    });
-  }, []);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -341,11 +335,11 @@ function ChatSidebar() {
       <div className="flex-1 overflow-y-auto px-3 py-4 space-y-3">
         {/* Person insights as AI first message */}
         {insightsLoading && insights.length === 0 ? (
-          <div className="flex gap-2 w-full">
+          <div className="flex gap-2">
             <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#252525] flex items-center justify-center mt-1">
               <SignalLogoSmall className="w-3 h-3 text-white" />
             </div>
-            <div className={`flex-1 rounded-2xl px-3 py-2 rounded-bl-md ${isSubscribed === false ? 'bg-[#22C55E]' : 'bg-[#3b66f5]'}`}>
+            <div className={`flex-1 rounded-2xl px-3 py-2 rounded-bl-md ${isSubscribed === null ? 'bg-[#2a2a2a]' : isSubscribed ? 'bg-[#3b66f5]' : 'bg-[#22C55E]'}`}>
               <TypingIndicator />
             </div>
           </div>
@@ -513,7 +507,7 @@ export function ExpandedReview({
   const [selectedResumeId, setSelectedResumeId] = useState<string | null>(null);
   const [showResumeDropdown, setShowResumeDropdown] = useState(false);
   const [showLinkModal, setShowLinkModal] = useState(false);
-  const [isSubscribed, setIsSubscribed] = useState<boolean | null>(null);
+  const { isSubscribed } = useSubscription();
   const [linkUrl, setLinkUrl] = useState('');
   const [linkText, setLinkText] = useState('');
   const [linkPopoverPos, setLinkPopoverPos] = useState<{ top: number; left: number } | null>(null);
@@ -546,13 +540,6 @@ export function ExpandedReview({
     userEditedRef.current = false;
     setSelectedResumeId(nextPerson?.resumeId || null);
   }
-
-  // Fetch subscription status
-  useEffect(() => {
-    getSubscriptionStatus().then((status) => {
-      setIsSubscribed(status.isSubscribed ?? false);
-    });
-  }, []);
 
   // Fetch resumes on mount
   useEffect(() => {

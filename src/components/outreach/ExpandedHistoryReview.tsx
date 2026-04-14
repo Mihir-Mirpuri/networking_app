@@ -9,7 +9,7 @@ import { getResumesAction, ResumeData } from '@/app/actions/resume';
 import { LoadingSpinner } from '@/components/search/LoadingSpinner';
 import { useEmailChat } from '@/contexts/EmailChatContext';
 import type { PersonInsightResponse } from '@/app/actions/person-insights';
-import { getSubscriptionStatus } from '@/app/actions/subscription';
+import { useSubscription } from '@/contexts/SubscriptionContext';
 import { LimitReachedModal, dispatchCreditsChanged } from '@/components/credits';
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
@@ -212,18 +212,12 @@ function ChatSidebar() {
   } = useEmailChat();
 
   const [inputValue, setInputValue] = useState('');
-  const [isSubscribed, setIsSubscribed] = useState<boolean | null>(null);
+  const { isSubscribed } = useSubscription();
   const [selectedInsights, setSelectedInsights] = useState<PersonInsightResponse[]>([]);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const selectedInsightIds = new Set(selectedInsights.map(i => i.id));
-
-  useEffect(() => {
-    getSubscriptionStatus().then((status) => {
-      setIsSubscribed(status.isSubscribed ?? false);
-    });
-  }, []);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -562,7 +556,7 @@ export function ExpandedHistoryReview({
   const [sendSuccess, setSendSuccess] = useState(false);
 
   // Other state
-  const [isSubscribed, setIsSubscribed] = useState<boolean | null>(null);
+  const { isSubscribed } = useSubscription();
   const [resumes, setResumes] = useState<ResumeData[]>([]);
   const [selectedResumeId, setSelectedResumeId] = useState<string | null>(null);
   const [showResumeDropdown, setShowResumeDropdown] = useState(false);
@@ -601,13 +595,6 @@ export function ExpandedHistoryReview({
       });
     }
   }, [tracker.gmailThreadId]);
-
-  // Fetch subscription status
-  useEffect(() => {
-    getSubscriptionStatus().then((status) => {
-      setIsSubscribed(status.isSubscribed ?? false);
-    });
-  }, []);
 
   // Fetch resumes on mount
   useEffect(() => {

@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import { useEmailChat } from '@/contexts/EmailChatContext';
 import type { PersonInsightResponse } from '@/app/actions/person-insights';
-import { getSubscriptionStatus } from '@/app/actions/subscription';
+import { useSubscription } from '@/contexts/SubscriptionContext';
 
 // Signal logo component
 function SignalLogo({ className }: { className?: string }) {
@@ -293,14 +293,7 @@ export function EmailChatPanel() {
   } = useEmailChat();
 
   const [inputValue, setInputValue] = useState('');
-  const [isSubscribed, setIsSubscribed] = useState<boolean | null>(null);
-
-  // Fetch subscription status
-  useEffect(() => {
-    getSubscriptionStatus().then((status) => {
-      setIsSubscribed(status.isSubscribed ?? false);
-    });
-  }, []);
+  const { isSubscribed } = useSubscription();
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 

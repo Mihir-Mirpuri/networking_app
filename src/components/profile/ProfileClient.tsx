@@ -22,8 +22,8 @@ import {
 import {
   createCheckoutSession,
   createCustomerPortalSession,
-  getSubscriptionStatus,
 } from '@/app/actions/subscription';
+import { useSubscription } from '@/contexts/SubscriptionContext';
 import { SearchableCombobox } from '@/components/search/SearchableCombobox';
 import { UNIVERSITIES } from '@/lib/constants';
 
@@ -825,12 +825,12 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
   const [showEmailPrefs, setShowEmailPrefs] = useState(false);
   const [loadedPdfs, setLoadedPdfs] = useState<Set<string>>(new Set());
 
-  // Subscription state
-  const [subscription, setSubscription] = useState<{
-    isSubscribed: boolean;
-    currentPeriodEnd?: Date | null;
-  }>({ isSubscribed: false });
-  const [isLoadingSubscription, setIsLoadingSubscription] = useState(true);
+  // Subscription state (from shared context)
+  const { isSubscribed: ctxIsSubscribed, currentPeriodEnd, isLoading: isLoadingSubscription } = useSubscription();
+  const subscription = {
+    isSubscribed: ctxIsSubscribed ?? false,
+    currentPeriodEnd: currentPeriodEnd ?? null,
+  };
   const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
   const [isPortalLoading, setIsPortalLoading] = useState(false);
 
@@ -844,7 +844,6 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
       loadProfile();
       loadTemplates();
       loadResumes();
-      loadSubscription();
     }
   }, [status]);
 
@@ -875,16 +874,6 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
       setResumes(result.resumes);
     }
     setIsLoadingResumes(false);
-  };
-
-  const loadSubscription = async () => {
-    setIsLoadingSubscription(true);
-    const result = await getSubscriptionStatus();
-    setSubscription({
-      isSubscribed: result.isSubscribed ?? false,
-      currentPeriodEnd: result.currentPeriodEnd,
-    });
-    setIsLoadingSubscription(false);
   };
 
   // Auto-save profile on change (debounced)
