@@ -23,7 +23,6 @@ JSON SCHEMA:
   "role_specificity": "narrow" | "standard" | "broad",
   "filters": { "company": string|null, "role": string|null, "university": string|null, "location": string|null },
   "linkedin_filters": {
-    "search_query": string|null,
     "locations": string[]|null,
     "current_companies": string[]|null,
     "past_companies": string[]|null,
@@ -74,12 +73,10 @@ JSON SCHEMA:
    NO -> Go to 3.
 
 2.5. Does the request contain UNSUPPORTED CRITERIA? (See UNSUPPORTED CRITERIA LIST below.)
-   Check each word/phrase against the list. Three outcomes:
-   A) ALL criteria are supported OR the only unsupported part is an INDUSTRY TERM (fintech, biotech, healthtech, edtech, etc.)
-      -> status: "ready". Move industry term to search_query, set confidence: "medium". Go to FILTER RULES.
-   B) Request contains HARD UNSUPPORTED criteria (degree type, salary, visa, remote, certifications, funding stage, hiring status, connections)
+   Check each word/phrase against the list. Two outcomes:
+   A) Request contains ANY unsupported criteria (industry terms, skills/technologies, degree type, salary, visa, remote, certifications, funding stage, hiring status, connections)
       -> status: "unsupported". Set unsupported_criteria, suggested_alternative, and message. STOP.
-   C) No unsupported criteria at all
+   B) No unsupported criteria at all
       -> status: "ready". Go to FILTER RULES.
 
 3. Is it a CATEGORY instead of a company? (YC companies, FAANG, MAANG, big tech, MBB, bulge bracket, hedge funds, startups, AI startups, fintech startups, unicorns, top X, leading X, tech companies, consulting firms, investment banks, law firms, Series A/B/C)
@@ -161,12 +158,10 @@ RULE 8 -- EXPERIENCE:
 RULE 9 -- RECENTLY CHANGED JOBS:
   "recently joined", "new hires", "just started" -> recently_changed_jobs: true (~90 days)
 
-RULE 10 -- SKILLS/KEYWORDS (search_query):
-- ONLY for skills, technologies, or domain terms with no structured filter: "kubernetes", "machine learning", "fintech"
-- NEVER include company names or job titles in search_query.
-- Boolean operators: AND, OR, NOT, and parentheses all work.
-  "python AND kubernetes" = requires both. "python OR golang" = broadens. "kubernetes NOT devops" = excludes devops. "(terraform OR kubernetes) AND python" = grouping works.
-- Matches broadly (title, headline, summary, hidden skills). Page 1 results are most relevant.
+RULE 10 -- search_query is DISABLED:
+- NEVER set search_query. It is unreliable and produces unpredictable results.
+- If the user asks for a specific skill, technology, or keyword filter (e.g. "Python engineers", "Kubernetes people", "fintech PMs"), return status: "unsupported" with unsupported_criteria listing the keyword/skill. Build a suggested_alternative that drops the keyword and keeps all other supported filters.
+- Any term that doesn't map to a structured filter (company, role, university, location, seniority, function, headcount, experience, past companies, past titles, recently changed jobs, exclude filters) must be treated as unsupported.
 
 RULE 11 -- EXCLUDE FILTERS:
 - "not in California" -> exclude_locations: ["California"]
@@ -186,9 +181,8 @@ HARD UNSUPPORTED (always return "unsupported"):
 - CERTIFICATIONS: certified, CPA, CFA, PMP, AWS certified, board certified
 - CONNECTIONS: well-connected, influencer, thought leader, many connections
 
-SOFT UNSUPPORTED (approximate with search_query, return "ready" confidence: "medium"):
 - INDUSTRY_SECTOR: fintech, healthtech, edtech, biotech, cleantech, proptech, insurtech, agtech, martech, govtech, legaltech, regtech
-  -> Move the industry term into search_query. Do NOT return "unsupported".
+- SKILLS_TECHNOLOGIES: Python, Kubernetes, React, machine learning, terraform, or any specific skill/technology/framework/language
 
 === REFORMULATION RULES ===
 
@@ -212,6 +206,8 @@ Reformulation table:
 | CPA | Approximate | function_ids: ["1"] |
 | PMP | Approximate | function_ids: ["20"] |
 | AWS certified | Drop | None |
+| fintech, biotech, industry terms | Drop | None |
+| Python, Kubernetes, skills/tech | Drop | None |
 
 RULE 12 -- FILTER PERSISTENCE:
 - If previous filters exist and user doesn't mention them, KEEP previous values.
@@ -229,14 +225,8 @@ RULE 12 -- FILTER PERSISTENCE:
 HIGH confidence (company + title + location + function_ids + schools + past_companies + exclude filters + recently_changed_jobs + seniority 200/210/220/300/310/320):
   "Searching for [role] at [company]" or "Searching for people at [company]" -- brief, no caveats.
 
-MEDIUM confidence (search_query is set):
-  "Searching for [keyword] people at [company]. Keyword search is broad -- most results will match but some may only mention [keyword] in their full profile."
-
 MEDIUM confidence (company_headcount is set):
   "Searching for [role] at [company size] companies. Company size is approximate."
-
-MEDIUM confidence (industry term moved to search_query):
-  "Searching for [role] in [industry]. '[industry]' is a keyword filter -- most results will be relevant but some may only mention it in their profile."
 
 UNSUPPORTED status:
   "I can't filter by [list unsupported criteria]. Here's the closest search I can run:"
@@ -294,7 +284,7 @@ User: "directors at Google"
 {"status":"ready","confidence":"high","role_specificity":"standard","filters":{"company":"Google","role":"Director","university":null,"location":null},"linkedin_filters":{"seniority_level_ids":["220"]},"company_name_ambiguous":false,"person_name":null,"person_company":null,"unsupported_criteria":null,"suggested_alternative":null,"selectables":[],"suggested_searches":[{"label":"Directors at Meta","company":"Meta","role":"Director"}],"message":"Searching for directors at Google"}
 
 User: "people who know Python and Kubernetes at Stripe"
-{"status":"ready","confidence":"high","role_specificity":"standard","filters":{"company":"Stripe","role":null,"university":null,"location":null},"linkedin_filters":{"search_query":"python AND kubernetes"},"company_name_ambiguous":false,"person_name":null,"person_company":null,"unsupported_criteria":null,"suggested_alternative":null,"selectables":[],"suggested_searches":[],"message":"Searching for Python + Kubernetes people at Stripe. Keyword search is broad -- most results will match but some may only mention these skills in their full profile."}
+{"status":"unsupported","confidence":"high","filters":{"company":"Stripe","role":null,"university":null,"location":null},"linkedin_filters":{},"company_name_ambiguous":false,"person_name":null,"person_company":null,"unsupported_criteria":["Python (skill)","Kubernetes (skill)"],"suggested_alternative":{"label":"People at Stripe","filters":{"company":"Stripe","role":null,"university":null,"location":null},"linkedin_filters":{}},"selectables":[],"suggested_searches":[],"message":"I can't filter by specific skills (Python, Kubernetes). Here's the closest search I can run:"}
 
 User: "MIT grads at Stripe"
 {"status":"ready","confidence":"high","role_specificity":"standard","filters":{"company":"Stripe","role":null,"university":"Massachusetts Institute of Technology","location":null},"linkedin_filters":{"schools":["Massachusetts Institute of Technology"]},"company_name_ambiguous":false,"person_name":null,"person_company":null,"unsupported_criteria":null,"suggested_alternative":null,"selectables":[],"suggested_searches":[],"message":"Searching for MIT alumni at Stripe"}
@@ -321,7 +311,7 @@ User: "engineers at Series B startups in Austin"
 {"status":"unsupported","confidence":"high","filters":{"company":null,"role":"Software Engineer","university":null,"location":"Austin"},"linkedin_filters":{},"company_name_ambiguous":false,"person_name":null,"person_company":null,"unsupported_criteria":["Series B funding stage"],"suggested_alternative":{"label":"Engineers at mid-size companies in Austin","filters":{"company":null,"role":"Software Engineer","university":null,"location":"Austin"},"linkedin_filters":{"current_job_titles":["Software Engineer"],"locations":["Austin"],"company_headcount":["D","E"]}},"selectables":[],"suggested_searches":[],"message":"I can't filter by funding stage (Series B). Here's the closest search I can run:"}
 
 User: "fintech PMs in NYC"
-{"status":"ready","confidence":"medium","role_specificity":"standard","filters":{"company":null,"role":"Product Manager","university":null,"location":"New York"},"linkedin_filters":{"current_job_titles":["Product Manager"],"locations":["New York"],"search_query":"fintech"},"company_name_ambiguous":false,"person_name":null,"person_company":null,"unsupported_criteria":null,"suggested_alternative":null,"selectables":[],"suggested_searches":[],"message":"Searching for Product Managers in fintech in New York. 'fintech' is a keyword filter -- most results will be relevant but some may only mention it in their profile."}
+{"status":"unsupported","confidence":"high","filters":{"company":null,"role":"Product Manager","university":null,"location":"New York"},"linkedin_filters":{},"company_name_ambiguous":false,"person_name":null,"person_company":null,"unsupported_criteria":["fintech (industry)"],"suggested_alternative":{"label":"Product Managers in New York","filters":{"company":null,"role":"Product Manager","university":null,"location":"New York"},"linkedin_filters":{"current_job_titles":["Product Manager"],"locations":["New York"]}},"selectables":[],"suggested_searches":[],"message":"I can't filter by industry (fintech). Here's the closest search I can run:"}
 
 User: "biotech engineers in Boston"
-{"status":"ready","confidence":"medium","role_specificity":"broad","filters":{"company":null,"role":"Engineer","university":null,"location":"Boston"},"linkedin_filters":{"function_ids":["8"],"locations":["Boston"],"search_query":"biotech"},"company_name_ambiguous":false,"person_name":null,"person_company":null,"unsupported_criteria":null,"suggested_alternative":null,"selectables":[],"suggested_searches":[],"message":"Searching for engineers in biotech in Boston. 'biotech' is a keyword filter -- most results will be relevant but some may only mention it in their profile."}`;
+{"status":"unsupported","confidence":"high","filters":{"company":null,"role":"Engineer","university":null,"location":"Boston"},"linkedin_filters":{},"company_name_ambiguous":false,"person_name":null,"person_company":null,"unsupported_criteria":["biotech (industry)"],"suggested_alternative":{"label":"Engineers in Boston","filters":{"company":null,"role":"Engineer","university":null,"location":"Boston"},"linkedin_filters":{"function_ids":["8"],"locations":["Boston"]}},"selectables":[],"suggested_searches":[],"message":"I can't filter by industry (biotech). Here's the closest search I can run:"}`;
