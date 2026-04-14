@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { SearchResultWithDraft, generateLLMDraftAction, regenerateDraftAction } from '@/app/actions/search';
 import { scheduleEmailAction } from '@/app/actions/send';
 import { getResumesAction, ResumeData } from '@/app/actions/resume';
@@ -486,9 +487,19 @@ export function ExpandedReview({
   onDraftGenerated,
 }: ExpandedReviewProps) {
   console.log('[ExpandedReview] Component rendered, currentIndex:', currentIndex);
+  const router = useRouter();
   const person = results[currentIndex];
   const [subject, setSubject] = useState(person?.draftSubject || '');
   const [body, setBody] = useState(person?.draftBody || '');
+  // Bumped only for EXTERNAL body updates (person switch, AI refine, context sync, etc).
+  // Used to drive a useEffect that resyncs the contentEditable's innerHTML.
+  // User typing updates `body` via onInput but does NOT bump this — that way the
+  // DOM-sync effect never runs during typing and the caret/selection is preserved.
+  const [bodyVersion, setBodyVersion] = useState(0);
+  const setBodyAndSyncDom = (newBody: string) => {
+    setBody(newBody);
+    setBodyVersion((v) => v + 1);
+  };
   const [isSending, setIsSending] = useState(false);
   const [internalIndex, setInternalIndex] = useState(currentIndex);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
@@ -505,15 +516,22 @@ export function ExpandedReview({
   const [isSubscribed, setIsSubscribed] = useState<boolean | null>(null);
   const [linkUrl, setLinkUrl] = useState('');
   const [linkText, setLinkText] = useState('');
+  const [linkPopoverPos, setLinkPopoverPos] = useState<{ top: number; left: number } | null>(null);
+  const [isUploadingResume, setIsUploadingResume] = useState(false);
+  const [showSaveAttachmentPrompt, setShowSaveAttachmentPrompt] = useState(false);
+  const [newlyUploadedResumeId, setNewlyUploadedResumeId] = useState<string | null>(null);
   const resumeDropdownRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const savedSelectionRef = useRef<Range | null>(null);
+  const linkPopoverRef = useRef<HTMLDivElement>(null);
 
   const currentPerson = results[internalIndex];
   const status = currentPerson ? sendStatuses.get(currentPerson.id) : undefined;
 
   const [selectedTemplateId, setSelectedTemplateId] = useState(defaultTemplateId || '');
   const userEditedRef = useRef(false);
+  const awaitingTemplateRegenRef = useRef(false);
 
   const { openEmailChat, closeEmailChat, currentEmail, updateEmail, fetchInsights } = useEmailChat();
   const isPushingToContextRef = useRef(false);
@@ -524,7 +542,7 @@ export function ExpandedReview({
     setPrevIndex(internalIndex);
     const nextPerson = results[internalIndex];
     setSubject(nextPerson?.draftSubject || '');
-    setBody(nextPerson?.draftBody || '');
+    setBodyAndSyncDom(nextPerson?.draftBody || '');
     userEditedRef.current = false;
     setSelectedResumeId(nextPerson?.resumeId || null);
   }
@@ -557,6 +575,20 @@ export function ExpandedReview({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showResumeDropdown]);
 
+  // Click outside handler for link popover
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (linkPopoverRef.current && !linkPopoverRef.current.contains(e.target as Node)) {
+        setShowLinkModal(false);
+        setLinkPopoverPos(null);
+        setLinkUrl('');
+        setLinkText('');
+      }
+    };
+    if (showLinkModal) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showLinkModal]);
+
   // Auto-personalize
   useEffect(() => {
     if (!autoPersonalize) return;
@@ -570,7 +602,7 @@ export function ExpandedReview({
       }).then((result) => {
         if (result.success && !userEditedRef.current && personId === results[idx]?.id) {
           setSubject(result.subject);
-          setBody(result.body);
+          setBodyAndSyncDom(result.body);
           onDraftGenerated?.(idx, result.subject, result.body);
         }
       }).catch((err) => {
@@ -598,7 +630,7 @@ export function ExpandedReview({
         console.log('[Draft] Regeneration result:', result);
         if (result.success && !userEditedRef.current && personId === results[idx]?.id) {
           setSubject(result.subject);
-          setBody(result.body);
+          setBodyAndSyncDom(result.body);
         }
       }).catch((err) => {
         console.warn('[Draft] Template regeneration failed:', err);
@@ -629,13 +661,23 @@ export function ExpandedReview({
     }
   }, [subject, body]);
 
+  // Sync local body/subject when a template switch finishes regenerating the draft
+  useEffect(() => {
+    if (!awaitingTemplateRegenRef.current) return;
+    if (!currentPerson) return;
+    awaitingTemplateRegenRef.current = false;
+    userEditedRef.current = false;
+    setSubject(currentPerson.draftSubject || '');
+    setBodyAndSyncDom(currentPerson.draftBody || '');
+  }, [currentPerson?.draftBody, currentPerson?.draftSubject]);
+
   // Sync context → local (when AI refines)
   useEffect(() => {
     if (isPushingToContextRef.current) return;
     if (currentEmail && currentPerson) {
       if (currentEmail.subject !== subject || currentEmail.body !== body) {
         setSubject(currentEmail.subject);
-        setBody(currentEmail.body);
+        setBodyAndSyncDom(currentEmail.body);
         userEditedRef.current = true;
       }
     }
@@ -646,31 +688,27 @@ export function ExpandedReview({
   }, [closeEmailChat]);
 
   // Sync body state into the contentEditable editor.
-  // We track what the editor last wrote to avoid overwriting during typing.
-  const editorBodyRef = useRef(body);
+  // This effect ONLY runs when bodyVersion changes (i.e., for external updates
+  // via setBodyAndSyncDom). It does NOT run when the user types — that path
+  // calls plain setBody, which leaves bodyVersion alone, so the DOM is left
+  // untouched and the caret/selection is preserved.
   useEffect(() => {
-    if (editorRef.current && body !== editorBodyRef.current) {
+    if (editorRef.current) {
       editorRef.current.innerHTML = body.replace(/\n/g, '<br>');
-      editorBodyRef.current = body;
     }
-  }, [body]);
-
-  // Also keep editorBodyRef in sync when the user types
-  useEffect(() => {
-    const editor = editorRef.current;
-    if (!editor) return;
-    const handler = () => {
-      editorBodyRef.current = editor.innerText;
-    };
-    editor.addEventListener('input', handler);
-    return () => editor.removeEventListener('input', handler);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bodyVersion]);
 
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (showScheduleModal) {
+        if (showLinkModal) {
+          setShowLinkModal(false);
+          setLinkPopoverPos(null);
+          setLinkUrl('');
+          setLinkText('');
+        } else if (showScheduleModal) {
           setShowScheduleModal(false);
           setScheduledDateTime('');
           setScheduleError(null);
@@ -705,11 +743,108 @@ export function ExpandedReview({
     const anchor = `<a href="${linkUrl}" target="_blank" rel="noopener noreferrer">${displayText}</a>`;
     document.execCommand('insertHTML', false, anchor);
     userEditedRef.current = true;
-    if (editor) setBody(editor.innerText);
+    setBody(editor.innerText);
     setShowLinkModal(false);
+    setLinkPopoverPos(null);
     setLinkUrl('');
     setLinkText('');
     savedSelectionRef.current = null;
+  };
+
+  const toggleBulletList = () => {
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) {
+      editor.focus();
+      document.execCommand('insertHTML', false, '<ul><li>&nbsp;</li></ul>');
+      userEditedRef.current = true;
+      setBody(editor.innerText);
+      return;
+    }
+
+    // Check if cursor is inside a list item - if so, remove the bullet
+    const anchorNode = sel.anchorNode;
+    const li = anchorNode?.parentElement?.closest('li');
+    if (li) {
+      const ul = li.closest('ul');
+      const text = li.textContent || '';
+
+      // Create a text node with the content
+      const textNode = document.createTextNode(text.trim() || '\u00A0');
+
+      // If this is the only item in the list, replace the whole ul
+      if (ul && ul.children.length === 1) {
+        ul.parentNode?.replaceChild(textNode, ul);
+      } else {
+        // Multiple items - just replace this li with text + br
+        const br = document.createElement('br');
+        li.parentNode?.insertBefore(textNode, li);
+        li.parentNode?.insertBefore(br, li);
+        li.remove();
+      }
+
+      // Place cursor at the text
+      const newRange = document.createRange();
+      newRange.setStart(textNode, textNode.length);
+      newRange.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(newRange);
+
+      userEditedRef.current = true;
+      setBody(editor.innerText);
+      return;
+    }
+
+    const range = sel.getRangeAt(0);
+    const selectedText = sel.toString();
+
+    if (selectedText.trim()) {
+      // Has selected text - convert each line to a bullet point
+      const lines = selectedText.split('\n').filter(line => line.trim());
+      const listItems = lines.map(line => `<li>${line.trim()}</li>`).join('');
+      const bulletList = `<ul>${listItems}</ul>`;
+
+      range.deleteContents();
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = bulletList;
+      const frag = document.createDocumentFragment();
+      while (tempDiv.firstChild) {
+        frag.appendChild(tempDiv.firstChild);
+      }
+      range.insertNode(frag);
+      sel.removeAllRanges();
+    } else {
+      // Cursor on a line but no text selected - wrap current line in bullet
+      if (anchorNode && anchorNode.nodeType === Node.TEXT_NODE && anchorNode.textContent?.trim()) {
+        const textNode = anchorNode as Text;
+        const text = textNode.textContent || '';
+
+        // Create the bullet list with this line's content
+        const ul = document.createElement('ul');
+        const li = document.createElement('li');
+        li.textContent = text.trim();
+        ul.appendChild(li);
+
+        // Replace the text node with the list
+        textNode.parentNode?.replaceChild(ul, textNode);
+
+        // Place cursor at end of the list item
+        const newRange = document.createRange();
+        newRange.selectNodeContents(li);
+        newRange.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+      } else {
+        // Empty line or non-text node - insert new bullet
+        editor.focus();
+        document.execCommand('insertHTML', false, '<ul><li>&nbsp;</li></ul>');
+      }
+    }
+
+    userEditedRef.current = true;
+    setBody(editor.innerText);
   };
 
   const handleSend = async () => {
@@ -785,6 +920,74 @@ export function ExpandedReview({
     }
   }, [showScheduleModal, scheduledDateTime]);
 
+  const handleUploadResume = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingResume(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/resume/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+      if (data.success && data.resume) {
+        // Add the new resume to the list and select it
+        setResumes(prev => [...prev, data.resume]);
+        setSelectedResumeId(data.resume.id);
+        setShowResumeDropdown(false);
+        // Show prompt to save to attachments
+        setNewlyUploadedResumeId(data.resume.id);
+        setShowSaveAttachmentPrompt(true);
+      }
+    } catch (error) {
+      console.error('Failed to upload resume:', error);
+    } finally {
+      setIsUploadingResume(false);
+      // Reset the file input so the same file can be selected again
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleSaveAttachment = () => {
+    // Keep it saved (do nothing, it's already in DB)
+    setShowSaveAttachmentPrompt(false);
+    setNewlyUploadedResumeId(null);
+  };
+
+  const handleDontSaveAttachment = async () => {
+    // Delete from DB but keep attached for this email session
+    if (newlyUploadedResumeId) {
+      try {
+        await fetch(`/api/resume/delete?id=${newlyUploadedResumeId}`, {
+          method: 'DELETE',
+        });
+        // Remove from the resumes list but keep selectedResumeId for this session
+        setResumes(prev => prev.filter(r => r.id !== newlyUploadedResumeId));
+      } catch (error) {
+        console.error('Failed to delete resume:', error);
+      }
+    }
+    setShowSaveAttachmentPrompt(false);
+    setNewlyUploadedResumeId(null);
+  };
+
+  const handleAttachmentClick = () => {
+    // If no attachment is selected, open file picker directly
+    if (!selectedResumeId) {
+      fileInputRef.current?.click();
+    } else {
+      // If attachment exists, show dropdown
+      setShowResumeDropdown(!showResumeDropdown);
+    }
+  };
+
   if (!currentPerson) return null;
 
   const canSend = !status && !showSuccess && !limitReached;
@@ -799,7 +1002,7 @@ export function ExpandedReview({
       </div>
 
       {/* ── Right: Main area with floating compose card ── */}
-      <div className="flex-1 flex items-center justify-center bg-[#212121] relative" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="flex-1 flex items-center justify-center bg-[#212121] relative" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
         {/* Compose modal card */}
         <div className="w-full max-w-[680px] max-h-[720px] h-[85vh] bg-[#141414] rounded-xl border border-[#2a2a2a] shadow-2xl flex flex-col overflow-hidden">
           {/* Success/Failure overlays */}
@@ -822,6 +1025,7 @@ export function ExpandedReview({
                   key={t.id}
                   onClick={() => {
                     setSelectedTemplateId(t.id);
+                    awaitingTemplateRegenRef.current = true;
                     onTemplateChange(t.id, internalIndex);
                   }}
                   disabled={!canSend || isRegenerating}
@@ -837,6 +1041,17 @@ export function ExpandedReview({
             ) : (
               <span className={`px-4 py-2.5 text-xs font-semibold text-white ${accentColor} rounded-t-lg`}>Default Template</span>
             )}
+
+            <button
+              onClick={() => router.push('/profile?tab=templates')}
+              className="px-3 py-1.5 ml-1 text-xs font-medium text-[#aaa] hover:text-white hover:bg-[#252525] rounded-md transition-colors flex items-center gap-1"
+              title="Add a new template"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+              Add template
+            </button>
 
             <div className="flex-1" />
 
@@ -868,7 +1083,7 @@ export function ExpandedReview({
               value={subject}
               onChange={(e) => { userEditedRef.current = true; setSubject(e.target.value); }}
               placeholder="Enter subject..."
-              className={`flex-1 text-[13px] text-white bg-transparent outline-none placeholder-[#3a3a3a] focus:ring-0 ${isRegenerating || isGeneratingDraft ? 'opacity-50' : ''}`}
+              className={`flex-1 text-[13px] text-white bg-transparent outline-none placeholder-[#3a3a3a] focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none ${isRegenerating || isGeneratingDraft ? 'opacity-50' : ''}`}
             />
             {isGeneratingDraft && (
               <span className="text-[11px] text-[#888] flex items-center gap-1 flex-shrink-0">
@@ -884,47 +1099,107 @@ export function ExpandedReview({
               contentEditable
               suppressContentEditableWarning
               onInput={() => {
+                if (!editorRef.current) return;
                 userEditedRef.current = true;
-                if (editorRef.current) setBody(editorRef.current.innerText);
+                setBody(editorRef.current.innerText);
               }}
               onPaste={(e) => {
                 e.preventDefault();
                 const text = e.clipboardData.getData('text/plain');
-                document.execCommand('insertText', false, text);
+                // Convert plain-text newlines to <br> elements so the editor's
+                // DOM uses a single line-break primitive. Mixing raw \n text
+                // chars (rendered via white-space: pre-wrap) with <br>s inserted
+                // by Enter creates invisible cursor positions between adjacent
+                // breaks — first Enter appears to "do nothing".
+                const html = text
+                  .replace(/&/g, '&amp;')
+                  .replace(/</g, '&lt;')
+                  .replace(/>/g, '&gt;')
+                  .replace(/\r\n/g, '\n')
+                  .replace(/\n/g, '<br>');
+                document.execCommand('insertHTML', false, html);
               }}
-              className={`w-full min-h-[300px] text-sm text-white bg-transparent outline-none leading-[1.7] focus:ring-0 [&_a]:text-[#6364FF] [&_a]:underline ${isRegenerating || isGeneratingDraft ? 'opacity-50' : ''}`}
+              className={`w-full min-h-[300px] text-sm text-white bg-transparent outline-none leading-[1.7] focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none [&_a]:text-[#6364FF] [&_a]:underline [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1 [&_li]:pl-1 ${isRegenerating || isGeneratingDraft ? 'opacity-50' : ''}`}
               style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
             />
           </div>
 
 
-          {/* ── Attachment (Gmail style) ── */}
+          {/* ── Attachment (Gmail style chip) ── */}
           {selectedResumeId && (
             <div className="px-5 py-2 flex-shrink-0">
-              <div className="flex items-center gap-1">
-                <span className="text-[13px] text-[#6364FF]">
-                  {resumes.find(r => r.id === selectedResumeId)?.filename || 'Resume attached'}
-                </span>
-                <div className="flex-1" />
-                <button onClick={() => setSelectedResumeId(null)} className="text-[#888] hover:text-white transition-colors">
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                  </svg>
-                </button>
+              <div className="flex items-center gap-3">
+                <div className="inline-flex items-center gap-2 px-3 py-2 bg-[#252525] border border-[#333] rounded-2xl hover:bg-[#2a2a2a] transition-colors group">
+                  {/* File icon */}
+                  <div className="w-8 h-8 rounded bg-[#ea4335] flex items-center justify-center flex-shrink-0">
+                    <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/>
+                    </svg>
+                  </div>
+                  {/* Filename */}
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-[13px] text-white truncate max-w-[200px]">
+                      {resumes.find(r => r.id === selectedResumeId)?.filename || 'Resume attached'}
+                    </span>
+                  </div>
+                  {/* Remove button */}
+                  <button
+                    onClick={() => { setSelectedResumeId(null); setShowSaveAttachmentPrompt(false); }}
+                    className="p-1 text-[#888] hover:text-white hover:bg-[#333] rounded-full transition-colors ml-1"
+                    title="Remove attachment"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                {/* Save to attachments prompt */}
+                {showSaveAttachmentPrompt && (
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-[#888]">Save to attachments?</span>
+                    <button
+                      onClick={handleSaveAttachment}
+                      className="px-2 py-1 text-white bg-[#333] hover:bg-[#404040] rounded transition-colors"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={handleDontSaveAttachment}
+                      className="px-2 py-1 text-[#888] hover:text-white transition-colors"
+                    >
+                      Just this once
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}
 
           {/* ── Bottom bar ── */}
           <div className="flex items-center gap-1.5 px-5 py-2.5 bg-[#1a1a1a] border-t border-[#2a2a2a] flex-shrink-0">
+            {/* Hidden file input for resume upload */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.doc,.docx"
+              onChange={handleUploadResume}
+              disabled={isUploadingResume}
+              className="hidden"
+            />
+
             {/* Attach file / resume */}
             <div className="relative" ref={resumeDropdownRef}>
               <ToolbarButton
                 title={selectedResumeId ? 'Change attachment' : 'Attach file'}
-                onClick={() => setShowResumeDropdown(!showResumeDropdown)}
+                onClick={handleAttachmentClick}
                 active={!!selectedResumeId}
               >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13" /></svg>
+                {isUploadingResume ? (
+                  <LoadingDots className="text-[#888]" />
+                ) : (
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13" /></svg>
+                )}
               </ToolbarButton>
 
               {showResumeDropdown && (
@@ -944,36 +1219,115 @@ export function ExpandedReview({
                       }`}
                     >
                       {resume.filename}
-                      {resume.isActive && <span className="text-[#6364FF] ml-1">(Active)</span>}
                     </button>
                   ))}
+                  <div className="border-t border-[#333] mt-1 pt-1">
+                    <button
+                      onClick={() => { fileInputRef.current?.click(); }}
+                      disabled={isUploadingResume}
+                      className="w-full text-left px-3 py-2 text-xs text-[#6364FF] hover:bg-[#252525] flex items-center gap-2 disabled:opacity-50"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                      </svg>
+                      {isUploadingResume ? 'Uploading...' : 'Upload new file'}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
 
             {/* Formatting tools inline */}
-            <ToolbarButton title="Bold (Ctrl+B)" onClick={() => document.execCommand('bold')}>
+            <ToolbarButton title="Bold (Ctrl+B)" onClick={() => { editorRef.current?.focus(); document.execCommand('bold'); }}>
               <span className="text-xs font-bold">B</span>
             </ToolbarButton>
-            <ToolbarButton title="Italic (Ctrl+I)" onClick={() => document.execCommand('italic')}>
+            <ToolbarButton title="Italic (Ctrl+I)" onClick={() => { editorRef.current?.focus(); document.execCommand('italic'); }}>
               <span className="text-xs italic">I</span>
             </ToolbarButton>
-            <ToolbarButton title="Underline (Ctrl+U)" onClick={() => document.execCommand('underline')}>
+            <ToolbarButton title="Underline (Ctrl+U)" onClick={() => { editorRef.current?.focus(); document.execCommand('underline'); }}>
               <span className="text-xs underline">U</span>
             </ToolbarButton>
-            <ToolbarButton title="Bulleted list" onClick={() => document.execCommand('insertUnorderedList')}>
+            <ToolbarButton title="Bulleted list" onClick={toggleBulletList}>
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0ZM3.75 12h.007v.008H3.75V12Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm-.375 5.25h.007v.008H3.75v-.008Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" /></svg>
             </ToolbarButton>
-            <ToolbarButton title="Insert link (Ctrl+K)" onClick={() => {
-              const sel = window.getSelection();
-              if (sel && sel.rangeCount > 0) {
-                savedSelectionRef.current = sel.getRangeAt(0).cloneRange();
-                setLinkText(sel.toString());
-              }
-              setShowLinkModal(true);
-            }}>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" /></svg>
-            </ToolbarButton>
+            <div className="relative">
+              <ToolbarButton title="Insert link (Ctrl+K)" onClick={() => {
+                const sel = window.getSelection();
+                if (sel && sel.rangeCount > 0) {
+                  savedSelectionRef.current = sel.getRangeAt(0).cloneRange();
+                  setLinkText(sel.toString());
+                  // Get position for inline popover
+                  const range = sel.getRangeAt(0);
+                  const rect = range.getBoundingClientRect();
+                  // Position above the selection, centered
+                  setLinkPopoverPos({
+                    top: rect.top - 8,
+                    left: rect.left + rect.width / 2,
+                  });
+                } else {
+                  // No selection, position near the link button
+                  setLinkPopoverPos({ top: 0, left: 0 });
+                }
+                setShowLinkModal(true);
+              }}>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" /></svg>
+              </ToolbarButton>
+
+              {/* Gmail-style inline link popover */}
+              {showLinkModal && linkPopoverPos && (
+                <div
+                  ref={linkPopoverRef}
+                  className="fixed z-[70] bg-[#1a1a1a] rounded-lg shadow-2xl border border-[#333] p-3 w-72"
+                  style={{
+                    top: linkPopoverPos.top,
+                    left: linkPopoverPos.left,
+                    transform: 'translate(-50%, -100%)',
+                  }}
+                >
+                  <div className="space-y-2">
+                    {!linkText && (
+                      <input
+                        type="text"
+                        value={linkText}
+                        onChange={(e) => setLinkText(e.target.value)}
+                        placeholder="Text to display"
+                        className="w-full px-2.5 py-1.5 text-xs bg-[#141414] border border-[#333] rounded text-white outline-none focus:border-[#6364FF] placeholder-[#555]"
+                      />
+                    )}
+                    <div className="flex gap-2">
+                      <input
+                        type="url"
+                        value={linkUrl}
+                        onChange={(e) => setLinkUrl(e.target.value)}
+                        placeholder="Paste or type a link"
+                        autoFocus
+                        className="flex-1 px-2.5 py-1.5 text-xs bg-[#141414] border border-[#333] rounded text-white outline-none focus:border-[#6364FF] placeholder-[#555]"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            insertLink();
+                            setLinkPopoverPos(null);
+                          }
+                          if (e.key === 'Escape') {
+                            setShowLinkModal(false);
+                            setLinkPopoverPos(null);
+                            setLinkUrl('');
+                            setLinkText('');
+                          }
+                        }}
+                      />
+                      <button
+                        onClick={() => { insertLink(); setLinkPopoverPos(null); }}
+                        disabled={!linkUrl}
+                        className="px-3 py-1.5 text-xs text-white bg-[#6364FF] rounded hover:bg-[#5354EE] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Apply
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
 
             <div className="flex-1" />
 
@@ -1033,58 +1387,6 @@ export function ExpandedReview({
         </div>
       )}
 
-      {/* ── Insert Link Modal ── */}
-      {showLinkModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] p-4">
-          <div className="bg-[#1a1a1a] rounded-xl shadow-2xl border border-[#333] max-w-sm w-full p-5">
-            <h3 className="text-sm font-semibold text-white mb-4">Insert link</h3>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs text-[#888] mb-1">Text to display</label>
-                <input
-                  type="text"
-                  value={linkText}
-                  onChange={(e) => setLinkText(e.target.value)}
-                  placeholder="Link text"
-                  className="w-full px-3 py-2 text-sm bg-[#141414] border border-[#333] rounded-lg text-white outline-none focus:ring-0 focus:border-[#6364FF] placeholder-[#555]"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-[#888] mb-1">URL</label>
-                <input
-                  type="url"
-                  value={linkUrl}
-                  onChange={(e) => setLinkUrl(e.target.value)}
-                  placeholder="https://"
-                  autoFocus
-                  className="w-full px-3 py-2 text-sm bg-[#141414] border border-[#333] rounded-lg text-white outline-none focus:ring-0 focus:border-[#6364FF] placeholder-[#555]"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      insertLink();
-                    }
-                  }}
-                />
-              </div>
-            </div>
-            <div className="flex gap-2 justify-end mt-4">
-              <button
-                onClick={() => { setShowLinkModal(false); setLinkUrl(''); setLinkText(''); }}
-                className="px-4 py-2 text-sm text-[#aaa] border border-[#333] rounded-lg hover:bg-[#252525] transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={insertLink}
-                disabled={!linkUrl}
-                className="px-4 py-2 text-sm text-white bg-[#6364FF] rounded-lg hover:bg-[#5354EE] disabled:opacity-50 transition-colors"
-              >
-                Insert
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

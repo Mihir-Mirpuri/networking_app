@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useSession } from 'next-auth/react';
 import { OutreachTrackerEntry, ThreadMessage, getThreadMessages } from '@/app/actions/outreach';
 import { generateFollowUpFromThreadAction } from '@/app/actions/personalize';
 import { sendFollowUpAction } from '@/app/actions/send';
@@ -429,9 +430,10 @@ interface ThreadMessageItemProps {
   onToggle: () => void;
   contactName: string | null;
   contactEmail: string;
+  userImage?: string | null;
 }
 
-function ThreadMessageItem({ message, isExpanded, onToggle, contactName, contactEmail }: ThreadMessageItemProps) {
+function ThreadMessageItem({ message, isExpanded, onToggle, contactName, contactEmail, userImage }: ThreadMessageItemProps) {
   const formatDate = (date: Date) => {
     const d = new Date(date);
     const now = new Date();
@@ -456,7 +458,7 @@ function ThreadMessageItem({ message, isExpanded, onToggle, contactName, contact
 
   const sender = formatSender(message.sender);
   const isYou = message.direction === 'SENT';
-  const initials = isYou ? 'Y' : getInitials(sender.name, sender.email);
+  const initials = getInitials(sender.name, sender.email);
 
   return (
     <div className="border-b border-[#2a2a2a] last:border-b-0">
@@ -466,11 +468,15 @@ function ThreadMessageItem({ message, isExpanded, onToggle, contactName, contact
         onClick={onToggle}
       >
         {/* Avatar */}
-        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-medium ${
-          isYou ? 'bg-[#2563EB] text-white' : 'bg-[#505050] text-white'
-        }`}>
-          {initials}
-        </div>
+        {isYou && userImage ? (
+          <img src={userImage} alt="" className="w-8 h-8 rounded-full flex-shrink-0 object-cover" />
+        ) : (
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-medium ${
+            isYou ? 'bg-[#2563EB] text-white' : 'bg-[#505050] text-white'
+          }`}>
+            {initials}
+          </div>
+        )}
 
         {/* Sender info */}
         <div className="flex-1 min-w-0">
@@ -535,14 +541,19 @@ export function ExpandedHistoryReview({
   tracker,
   onClose,
 }: ExpandedHistoryReviewProps) {
+  const { data: session } = useSession();
+
   // Thread state
   const [threadMessages, setThreadMessages] = useState<ThreadMessage[]>([]);
   const [isLoadingThread, setIsLoadingThread] = useState(false);
   const [threadError, setThreadError] = useState<string | null>(null);
   const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set());
 
+  // Compose mode state
+  const [isComposeMode, setIsComposeMode] = useState(false);
+
   // Follow-up compose state
-  const [followUpSubject, setFollowUpSubject] = useState('');
+  const [followUpSubject, setFollowUpSubject] = useState(tracker.emailSubject ? `Re: ${tracker.emailSubject}` : '');
   const [followUpBody, setFollowUpBody] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -563,8 +574,11 @@ export function ExpandedHistoryReview({
   const savedSelectionRef = useRef<Range | null>(null);
 
   const userEditedRef = useRef(false);
-  const { openEmailChat, closeEmailChat, currentEmail, updateEmail } = useEmailChat();
+  const { openEmailChat, closeEmailChat, currentEmail, updateEmail, fetchInsights } = useEmailChat();
   const isPushingToContextRef = useRef(false);
+
+  // Track if initial expand has happened
+  const hasInitialExpandedRef = useRef(false);
 
   // Fetch thread messages
   useEffect(() => {
@@ -574,8 +588,12 @@ export function ExpandedHistoryReview({
       getThreadMessages(tracker.gmailThreadId).then((result) => {
         if (result.success) {
           setThreadMessages(result.messages);
-          // Collapse all messages by default
-          setExpandedMessages(new Set());
+          // Expand the most recent message by default (only on initial load)
+          if (result.messages.length > 0 && !hasInitialExpandedRef.current) {
+            const mostRecentMessage = result.messages[result.messages.length - 1];
+            setExpandedMessages(new Set([mostRecentMessage.messageId]));
+            hasInitialExpandedRef.current = true;
+          }
         } else {
           setThreadError(result.error);
         }
@@ -583,13 +601,6 @@ export function ExpandedHistoryReview({
       });
     }
   }, [tracker.gmailThreadId]);
-
-  // Auto-generate follow-up when thread loads
-  useEffect(() => {
-    if (tracker.gmailThreadId && threadMessages.length > 0 && !followUpBody && !isGenerating) {
-      handleGenerateFollowUp();
-    }
-  }, [tracker.gmailThreadId, threadMessages.length]);
 
   // Fetch subscription status
   useEffect(() => {
@@ -621,6 +632,13 @@ export function ExpandedHistoryReview({
       openEmailChat(tracker.id, tracker.contactName || tracker.contactEmail, followUpSubject, followUpBody);
     }
   }, [tracker.id, openEmailChat]);
+
+  // Fetch person insights when component mounts
+  useEffect(() => {
+    if (tracker.personId) {
+      fetchInsights(tracker.personId);
+    }
+  }, [tracker.personId, fetchInsights]);
 
   // Sync local edits → context
   useEffect(() => {
@@ -675,14 +693,14 @@ export function ExpandedHistoryReview({
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
         e.preventDefault();
-        if (!isSending && followUpBody.trim()) {
+        if (isComposeMode && !isSending && followUpBody.trim()) {
           handleSendFollowUp();
         }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, isSending, followUpBody]);
+  }, [onClose, isSending, followUpBody, isComposeMode]);
 
   const handleGenerateFollowUp = async () => {
     if (!tracker.gmailThreadId) return;
@@ -760,6 +778,16 @@ export function ExpandedHistoryReview({
     });
   };
 
+  const handleReplyClick = () => {
+    setIsComposeMode(true);
+    // Collapse all messages when entering compose mode
+    setExpandedMessages(new Set());
+    // Focus the editor after a short delay to allow DOM to update
+    setTimeout(() => {
+      editorRef.current?.focus();
+    }, 100);
+  };
+
   const insertLink = () => {
     if (!linkUrl) return;
     const editor = editorRef.current;
@@ -781,6 +809,105 @@ export function ExpandedHistoryReview({
     setLinkUrl('');
     setLinkText('');
     savedSelectionRef.current = null;
+  };
+
+  const toggleBulletList = () => {
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) {
+      editor.focus();
+      document.execCommand('insertHTML', false, '<ul><li>&nbsp;</li></ul>');
+      userEditedRef.current = true;
+      editorBodyRef.current = editor.innerText;
+      setFollowUpBody(editor.innerText);
+      return;
+    }
+
+    // Check if cursor is inside a list item - if so, remove the bullet
+    const anchorNode = sel.anchorNode;
+    const li = anchorNode?.parentElement?.closest('li');
+    if (li) {
+      const ul = li.closest('ul');
+      const text = li.textContent || '';
+
+      // Create a text node with the content
+      const textNode = document.createTextNode(text.trim() || '\u00A0');
+
+      // If this is the only item in the list, replace the whole ul
+      if (ul && ul.children.length === 1) {
+        ul.parentNode?.replaceChild(textNode, ul);
+      } else {
+        // Multiple items - just replace this li with text + br
+        const br = document.createElement('br');
+        li.parentNode?.insertBefore(textNode, li);
+        li.parentNode?.insertBefore(br, li);
+        li.remove();
+      }
+
+      // Place cursor at the text
+      const newRange = document.createRange();
+      newRange.setStart(textNode, textNode.length);
+      newRange.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(newRange);
+
+      userEditedRef.current = true;
+      editorBodyRef.current = editor.innerText;
+      setFollowUpBody(editor.innerText);
+      return;
+    }
+
+    const range = sel.getRangeAt(0);
+    const selectedText = sel.toString();
+
+    if (selectedText.trim()) {
+      // Has selected text - convert each line to a bullet point
+      const lines = selectedText.split('\n').filter(line => line.trim());
+      const listItems = lines.map(line => `<li>${line.trim()}</li>`).join('');
+      const bulletList = `<ul>${listItems}</ul>`;
+
+      range.deleteContents();
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = bulletList;
+      const frag = document.createDocumentFragment();
+      while (tempDiv.firstChild) {
+        frag.appendChild(tempDiv.firstChild);
+      }
+      range.insertNode(frag);
+      sel.removeAllRanges();
+    } else {
+      // Cursor on a line but no text selected - wrap current line in bullet
+      if (anchorNode && anchorNode.nodeType === Node.TEXT_NODE && anchorNode.textContent?.trim()) {
+        const textNode = anchorNode as Text;
+        const text = textNode.textContent || '';
+
+        // Create the bullet list with this line's content
+        const ul = document.createElement('ul');
+        const li = document.createElement('li');
+        li.textContent = text.trim();
+        ul.appendChild(li);
+
+        // Replace the text node with the list
+        textNode.parentNode?.replaceChild(ul, textNode);
+
+        // Place cursor at end of the list item
+        const newRange = document.createRange();
+        newRange.selectNodeContents(li);
+        newRange.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+      } else {
+        // Empty line or non-text node - insert new bullet
+        editor.focus();
+        document.execCommand('insertHTML', false, '<ul><li>&nbsp;</li></ul>');
+      }
+    }
+
+    userEditedRef.current = true;
+    editorBodyRef.current = editor.innerText;
+    setFollowUpBody(editor.innerText);
   };
 
   const accentColor = isSubscribed === null ? 'bg-[#2a2a2a]' : isSubscribed ? 'bg-[#2563EB]' : 'bg-[#22C55E]';
@@ -811,108 +938,151 @@ export function ExpandedHistoryReview({
             </div>
           )}
 
-          {/* ── Header ── */}
-          <div className="flex items-center px-5 bg-[#1a1a1a] flex-shrink-0">
-            <span className={`px-4 py-2.5 text-xs font-semibold text-white ${accentColor} rounded-t-lg`}>
-              Follow Up
-            </span>
-            <span className="px-3 py-2.5 text-xs text-[#888]">
-              {threadMessages.length} {threadMessages.length === 1 ? 'message' : 'messages'} in thread
-            </span>
-
-            <div className="flex-1" />
-
-            <button onClick={onClose} className="p-1 text-[#888] hover:text-white transition-colors" aria-label="Close">
-              <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-
-          {/* ── To field ── */}
-          <div className="flex items-center px-5 py-2.5 border-b border-[#2a2a2a] flex-shrink-0">
-            <span className="text-[13px] text-[#888] w-14 flex-shrink-0">To</span>
-            <span className="text-[13px] font-semibold text-white">
-              {tracker.contactName || tracker.contactEmail}
-            </span>
-            {(tracker.role || tracker.company) && (
-              <span className="text-xs text-[#888] ml-2">
-                {tracker.role ? `${tracker.role} at ` : ''}{tracker.company}
+          {/* ── Fixed Header ── */}
+          <div className="flex-shrink-0">
+            {/* Header bar */}
+            <div className="flex items-center px-5 bg-[#1a1a1a]">
+              <span className={`px-4 py-2.5 text-xs font-semibold text-white ${accentColor} rounded-t-lg`}>
+                Follow Up
               </span>
-            )}
-          </div>
 
-          {/* ── Thread Messages (collapsed) ── */}
-          {isLoadingThread ? (
-            <div className="flex items-center justify-center py-6 border-b border-[#2a2a2a]">
-              <LoadingSpinner size="sm" />
-              <span className="ml-2 text-sm text-[#888]">Loading conversation...</span>
-            </div>
-          ) : threadError ? (
-            <div className="px-5 py-4 border-b border-[#2a2a2a]">
-              <p className="text-sm text-red-400">{threadError}</p>
-            </div>
-          ) : threadMessages.length > 0 ? (
-            <div className="border-b border-[#2a2a2a] max-h-[200px] overflow-y-auto bg-[#0f0f0f]">
-              {threadMessages.map((message) => (
-                <ThreadMessageItem
-                  key={message.messageId}
-                  message={message}
-                  isExpanded={expandedMessages.has(message.messageId)}
-                  onToggle={() => toggleMessage(message.messageId)}
-                  contactName={tracker.contactName}
-                  contactEmail={tracker.contactEmail}
-                />
-              ))}
-            </div>
-          ) : null}
+              <div className="flex-1" />
 
-          {/* ── Subject field ── */}
-          <div className="flex items-center px-5 py-2.5 border-b border-[#2a2a2a] flex-shrink-0">
-            <span className="text-[13px] text-[#888] w-14 flex-shrink-0">Subject</span>
-            <input
-              type="text"
-              value={followUpSubject}
-              onChange={(e) => { userEditedRef.current = true; setFollowUpSubject(e.target.value); }}
-              placeholder="Re: ..."
-              className={`flex-1 text-[13px] text-white bg-transparent outline-none placeholder-[#3a3a3a] focus:ring-0 ${isGenerating ? 'opacity-50' : ''}`}
-            />
-            {isGenerating && (
-              <span className="text-[11px] text-[#888] flex items-center gap-1 flex-shrink-0">
-                <LoadingSpinner size="sm" /> Generating...
+              {/* AI generate follow up button */}
+              {isComposeMode && (
+                <button
+                  onClick={handleGenerateFollowUp}
+                  disabled={isGenerating}
+                  className="flex items-center gap-1.5 px-3 py-1.5 mr-2 text-xs text-[#888] hover:text-white transition-colors disabled:opacity-50"
+                >
+                  {isGenerating ? (
+                    <>
+                      <LoadingSpinner size="sm" />
+                      <span>Generating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z" />
+                      </svg>
+                      <span>AI generate follow up</span>
+                    </>
+                  )}
+                </button>
+              )}
+
+              <button onClick={onClose} className="p-1.5 text-[#888] hover:text-white transition-colors" aria-label="Close">
+                <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* To field */}
+            <div className="flex items-center px-5 py-2.5 border-b border-[#2a2a2a]">
+              <span className="text-[13px] text-[#888] w-14 flex-shrink-0">To</span>
+              <span className="text-[13px] font-semibold text-white">
+                {tracker.contactName || tracker.contactEmail}
               </span>
-            )}
+              {(tracker.role || tracker.company) && (
+                <span className="text-xs text-[#888] ml-2">
+                  {tracker.role ? `${tracker.role} at ` : ''}{tracker.company}
+                </span>
+              )}
+            </div>
+
+            {/* Subject field */}
+            <div className="flex items-center px-5 py-2.5 border-b border-[#2a2a2a]">
+              <span className="text-[13px] text-[#888] w-14 flex-shrink-0">Subject</span>
+              <input
+                type="text"
+                value={followUpSubject}
+                onChange={(e) => { userEditedRef.current = true; setFollowUpSubject(e.target.value); }}
+                placeholder="Re: ..."
+                className={`flex-1 text-[13px] text-white bg-transparent outline-none placeholder-[#3a3a3a] focus:ring-0 ${isGenerating ? 'opacity-50' : ''}`}
+              />
+            </div>
           </div>
 
-          {/* ── Follow-up body (contentEditable) ── */}
-          <div className="flex-1 overflow-y-auto px-5 py-5">
-            <div
-              ref={editorRef}
-              contentEditable
-              suppressContentEditableWarning
-              onInput={() => {
-                userEditedRef.current = true;
-                if (editorRef.current) setFollowUpBody(editorRef.current.innerText);
-              }}
-              onPaste={(e) => {
-                e.preventDefault();
-                const text = e.clipboardData.getData('text/plain');
-                document.execCommand('insertText', false, text);
-              }}
-              className={`w-full min-h-[150px] text-sm text-white bg-transparent outline-none leading-[1.7] focus:ring-0 [&_a]:text-[#6364FF] [&_a]:underline ${isGenerating ? 'opacity-50' : ''}`}
-              style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
-            />
+          {/* ── Scrollable Content ── */}
+          <div className="flex-1 overflow-y-auto">
+            {/* Thread Messages */}
+            {isLoadingThread ? (
+              <div className="flex items-center justify-center py-6">
+                <LoadingSpinner size="sm" />
+                <span className="ml-2 text-sm text-[#888]">Loading conversation...</span>
+              </div>
+            ) : threadError ? (
+              <div className="px-5 py-4">
+                <p className="text-sm text-red-400">{threadError}</p>
+              </div>
+            ) : threadMessages.length > 0 ? (
+              <div className="bg-[#0f0f0f]">
+                {threadMessages.map((message) => (
+                  <ThreadMessageItem
+                    key={message.messageId}
+                    message={message}
+                    isExpanded={expandedMessages.has(message.messageId)}
+                    onToggle={() => toggleMessage(message.messageId)}
+                    contactName={tracker.contactName}
+                    contactEmail={tracker.contactEmail}
+                    userImage={session?.user?.image}
+                  />
+                ))}
+              </div>
+            ) : null}
+
+            {/* Reply button - shown when not in compose mode */}
+            {!isComposeMode && !isLoadingThread && threadMessages.length > 0 && (
+              <div className="px-5 py-4">
+                <button
+                  onClick={handleReplyClick}
+                  className={`px-4 py-2 rounded-lg ${accentColor} ${accentHover} text-white text-sm font-medium transition-colors flex items-center gap-2`}
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
+                  </svg>
+                  Send follow up
+                </button>
+              </div>
+            )}
+
+
+            {/* Divider between thread and compose */}
+            {isComposeMode && threadMessages.length > 0 && (
+              <div className="border-t border-[#2a2a2a]" />
+            )}
+
+            {/* Follow-up body (contentEditable) */}
+            <div className={`px-5 py-5 ${!isComposeMode ? 'opacity-40 pointer-events-none' : ''}`}>
+              <div
+                ref={editorRef}
+                contentEditable={isComposeMode}
+                suppressContentEditableWarning
+                onInput={() => {
+                  userEditedRef.current = true;
+                  if (editorRef.current) setFollowUpBody(editorRef.current.innerText);
+                }}
+                onPaste={(e) => {
+                  e.preventDefault();
+                  const text = e.clipboardData.getData('text/plain');
+                  document.execCommand('insertText', false, text);
+                }}
+                className={`w-full min-h-[150px] text-sm text-white bg-transparent leading-[1.7] [&_a]:text-[#6364FF] [&_a]:underline [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1 [&_li]:pl-1 ${isGenerating ? 'opacity-50' : ''}`}
+                style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', outline: 'none', border: 'none', boxShadow: 'none' }}
+              />
+            </div>
           </div>
 
           {/* Error message */}
           {sendError && (
-            <div className="px-5 py-2 bg-red-900/20 border-t border-red-900/30">
+            <div className="px-5 py-2 bg-red-900/20 border-t border-red-900/30 flex-shrink-0">
               <p className="text-sm text-red-400">{sendError}</p>
             </div>
           )}
 
           {/* ── Attachment (Gmail style) ── */}
-          {selectedResumeId && (
+          {selectedResumeId && isComposeMode && (
             <div className="px-5 py-2 flex-shrink-0 border-t border-[#2a2a2a]">
               <div className="flex items-center gap-1">
                 <span className="text-[13px] text-[#6364FF]">
@@ -929,14 +1099,7 @@ export function ExpandedHistoryReview({
           )}
 
           {/* ── Bottom bar ── */}
-          <div className="flex items-center gap-1.5 px-5 py-2.5 bg-[#1a1a1a] border-t border-[#2a2a2a] flex-shrink-0">
-            {/* Regenerate */}
-            <ToolbarButton title="Regenerate follow-up" onClick={handleGenerateFollowUp}>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
-              </svg>
-            </ToolbarButton>
-
+          <div className={`flex items-center gap-1.5 px-5 py-2.5 bg-[#1a1a1a] border-t border-[#2a2a2a] flex-shrink-0 ${!isComposeMode ? 'opacity-40 pointer-events-none' : ''}`}>
             {/* Attach file / resume */}
             <div className="relative" ref={resumeDropdownRef}>
               <ToolbarButton
@@ -981,6 +1144,9 @@ export function ExpandedHistoryReview({
             <ToolbarButton title="Underline (Ctrl+U)" onClick={() => document.execCommand('underline')}>
               <span className="text-xs underline">U</span>
             </ToolbarButton>
+            <ToolbarButton title="Bulleted list" onClick={toggleBulletList}>
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0ZM3.75 12h.007v.008H3.75V12Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm-.375 5.25h.007v.008H3.75v-.008Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" /></svg>
+            </ToolbarButton>
             <ToolbarButton title="Insert link (Ctrl+K)" onClick={() => {
               const sel = window.getSelection();
               if (sel && sel.rangeCount > 0) {
@@ -994,7 +1160,7 @@ export function ExpandedHistoryReview({
 
             <div className="flex-1" />
 
-            {/* Send Follow-Up button */}
+            {/* Send button */}
             <button
               onClick={handleSendFollowUp}
               disabled={isSending || isGenerating || !followUpBody.trim()}
@@ -1006,7 +1172,7 @@ export function ExpandedHistoryReview({
                   Sending...
                 </>
               ) : (
-                'Send Follow-Up'
+                'Send'
               )}
             </button>
           </div>

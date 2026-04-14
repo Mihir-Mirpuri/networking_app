@@ -33,6 +33,7 @@ export interface OutreachTrackerEntry {
   createdAt: Date;
   updatedAt: Date;
   userCandidateId: string | null;
+  personId: string | null;
   gmailThreadId: string | null;
   messageCount: number;
 }
@@ -317,6 +318,7 @@ export async function getOutreachTrackers(
       take: limit + 1,
       cursor: cursorObj,
       skip: cursor ? 1 : 0,
+      include: { userCandidate: { select: { personId: true } } },
     });
 
     const hasMore = trackers.length > limit;
@@ -375,6 +377,7 @@ export async function getOutreachTrackers(
         createdAt: t.createdAt,
         updatedAt: t.updatedAt,
         userCandidateId: t.userCandidateId,
+        personId: t.userCandidate?.personId ?? null,
         gmailThreadId: t.gmailThreadId,
         messageCount: t.gmailThreadId ? messageCountMap.get(t.gmailThreadId) || 0 : 0,
       })),
@@ -401,6 +404,7 @@ export async function getInitialOutreachTrackers(userId: string): Promise<{
       where: { userId },
       orderBy: { createdAt: 'desc' },
       take: 51,
+      include: { userCandidate: { select: { personId: true } } },
     });
 
     const hasMore = trackers.length > 50;
@@ -459,6 +463,7 @@ export async function getInitialOutreachTrackers(userId: string): Promise<{
         createdAt: t.createdAt,
         updatedAt: t.updatedAt,
         userCandidateId: t.userCandidateId,
+        personId: t.userCandidate?.personId ?? null,
         gmailThreadId: t.gmailThreadId,
         messageCount: t.gmailThreadId ? messageCountMap.get(t.gmailThreadId) || 0 : 0,
       })),
@@ -520,6 +525,7 @@ export async function updateOutreachTracker(
     const updated = await prisma.outreachTracker.update({
       where: { id },
       data,
+      include: { userCandidate: { select: { personId: true } } },
     });
 
     // TEMPORARILY DISABLED: querying SendLog instead of messages table (gmail.readonly removed)
@@ -563,6 +569,7 @@ export async function updateOutreachTracker(
         createdAt: updated.createdAt,
         updatedAt: updated.updatedAt,
         userCandidateId: updated.userCandidateId,
+        personId: updated.userCandidate?.personId ?? null,
         gmailThreadId: updated.gmailThreadId,
         messageCount,
       },
@@ -1368,6 +1375,7 @@ export async function createOutreachTracker(params: {
         createdAt: tracker.createdAt,
         updatedAt: tracker.updatedAt,
         userCandidateId: tracker.userCandidateId,
+        personId: null,
         gmailThreadId: tracker.gmailThreadId,
         messageCount: 0,
       },

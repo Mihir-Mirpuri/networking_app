@@ -92,6 +92,14 @@ const SECTIONS: { key: HistorySection; label: string; icon: React.ReactNode }[] 
 ];
 
 function FiltersTab({ f, stats }: { f: HistorySidebarFilterProps; stats: HistorySidebarStats }) {
+  const [animatedIn, setAnimatedIn] = useState(false);
+
+  useEffect(() => {
+    // Trigger staggered animation on mount
+    const timer = setTimeout(() => setAnimatedIn(true), 50);
+    return () => clearTimeout(timer);
+  }, []);
+
   const sectionCounts: Record<HistorySection, number> = {
     all: stats.totalTrackers,
     starred: stats.starredCount,
@@ -103,7 +111,14 @@ function FiltersTab({ f, stats }: { f: HistorySidebarFilterProps; stats: History
   return (
     <div className="flex flex-col flex-1 overflow-y-auto">
       {/* Stats Quadrant */}
-      <div className="py-3 border-b border-[#1a1a1a] flex justify-center">
+      <div
+        className="py-3 border-b border-[#1a1a1a] flex justify-center"
+        style={{
+          opacity: animatedIn ? 1 : 0,
+          transform: animatedIn ? 'translateY(0)' : 'translateY(8px)',
+          transition: 'opacity 0.2s ease-out, transform 0.2s ease-out',
+        }}
+      >
         <div className="grid grid-cols-2 gap-y-3" style={{ columnGap: 0, gridTemplateColumns: 'auto auto' }}>
           <div className="text-center px-4">
             <p className="text-3xl font-bold text-white tabular-nums leading-none">{stats.totalEmailsSent}</p>
@@ -127,10 +142,15 @@ function FiltersTab({ f, stats }: { f: HistorySidebarFilterProps; stats: History
       {/* Section Filters */}
       <div className="px-4 py-3 border-b border-[#1a1a1a]">
         <div className="flex flex-col gap-1">
-          {SECTIONS.map((section) => (
+          {SECTIONS.map((section, index) => (
             <button
               key={section.key}
               onClick={() => f.onSectionChange(section.key)}
+              style={{
+                opacity: animatedIn ? 1 : 0,
+                transform: animatedIn ? 'translateY(0)' : 'translateY(8px)',
+                transition: `opacity 0.2s ease-out ${(index + 1) * 40}ms, transform 0.2s ease-out ${(index + 1) * 40}ms`,
+              }}
               className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
                 f.activeSection === section.key
                   ? 'bg-[#6364FF]/20 text-white'

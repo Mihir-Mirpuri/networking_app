@@ -2,7 +2,7 @@
  * Gap analysis logic for AI Email Drafter
  */
 
-import { completeJson } from '@/lib/services/groq';
+import { completeJson } from '@/lib/services/anthropic';
 import { GroqAction } from '@prisma/client';
 import {
   RecipientContext,
@@ -44,7 +44,6 @@ export async function analyzeTemplateGaps(
     systemPrompt: GAP_ANALYSIS_SYSTEM_PROMPT,
     userPrompt,
     options: {
-      model: 'llama-3.1-8b-instant',
       temperature: 0.3,
       maxTokens: 1024,
     },
@@ -99,7 +98,6 @@ export async function processGapResponse(
     systemPrompt: GAP_RESPONSE_SYSTEM_PROMPT,
     userPrompt,
     options: {
-      model: 'llama-3.1-8b-instant',
       temperature: 0.3,
       maxTokens: 512,
     },

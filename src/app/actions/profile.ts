@@ -420,3 +420,38 @@ export async function setDefaultTemplateAction(
     return { success: false, error: 'Failed to set default template' };
   }
 }
+
+// ============================================================================
+// Account Deletion
+// ============================================================================
+
+export async function deleteAccountAction(): Promise<
+  { success: true } | { success: false; error: string }
+> {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.id) {
+    return { success: false, error: 'Not authenticated' };
+  }
+
+  try {
+    const userId = session.user.id;
+
+    // Clear referredById from users that were referred by this user
+    await prisma.user.updateMany({
+      where: { referredById: userId },
+      data: { referredById: null },
+    });
+
+    // Delete the user - cascade will handle most related records
+    // (accounts, sessions, templates, candidates, resumes, send logs, etc.)
+    await prisma.user.delete({
+      where: { id: userId },
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting account:', error);
+    return { success: false, error: 'Failed to delete account' };
+  }
+}

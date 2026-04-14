@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { completeJson } from '@/lib/services/groq';
+import { completeJson } from '@/lib/services/anthropic';
 import { GroqAction } from '@prisma/client';
 
 export interface ResumeSummary {
@@ -100,7 +100,6 @@ Be concise. Only include notable items, not generic ones. Return ONLY valid JSON
     const response = await completeJson<ResumeSummary>({
       userPrompt: prompt,
       options: {
-        model: 'llama-3.3-70b-versatile',
         temperature: 0.3,
         maxTokens: 512,
       },

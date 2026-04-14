@@ -2,7 +2,7 @@
  * Draft generation logic for AI Email Drafter
  */
 
-import { completeJson } from '@/lib/services/groq';
+import { completeJson } from '@/lib/services/anthropic';
 import { GroqAction } from '@prisma/client';
 import {
   DraftGenerationInput,
@@ -48,7 +48,6 @@ export async function generateDraft(
     systemPrompt: DRAFT_GENERATION_SYSTEM_PROMPT,
     userPrompt,
     options: {
-      model: 'llama-3.3-70b-versatile',
       temperature: 0.7,
       maxTokens: 1024,
     },
@@ -84,7 +83,6 @@ export async function refineDraft(
     systemPrompt: REFINEMENT_SYSTEM_PROMPT,
     userPrompt,
     options: {
-      model: 'llama-3.3-70b-versatile',
       temperature: 0.5,
       maxTokens: 1024,
     },

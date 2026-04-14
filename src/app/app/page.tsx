@@ -49,12 +49,8 @@ export default async function AppPage() {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { onboardingCompleted: true, subscriptionStatus: true },
+    select: { subscriptionStatus: true },
   });
-
-  if (!user?.onboardingCompleted) {
-    redirect('/onboarding');
-  }
 
   const remainingDaily = await getRemainingDailyLimit(session.user.id);
   const isSubscribed = user?.subscriptionStatus === 'active' || user?.subscriptionStatus === 'trialing';

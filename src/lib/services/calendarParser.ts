@@ -11,7 +11,7 @@
  * CONFIRMED meetings (both parties agreed), not just proposals.
  */
 
-import { completeJson, GroqJsonParseError, GroqError } from '@/lib/services/groq';
+import { completeJson } from '@/lib/services/anthropic';
 import { MeetingDetectionResult } from '@/lib/utils/meetingDetector';
 import { fromZonedTime } from 'date-fns-tz';
 
@@ -536,8 +536,7 @@ export async function parseCalendarFromEmail(
       systemPrompt: SYSTEM_PROMPT,
       userPrompt,
       options: {
-        model: 'llama-3.1-8b-instant', // Fast model for extraction
-        temperature: 0.2, // Low temperature for consistent extraction
+        temperature: 0.2,
         maxTokens: 1024,
       },
       metadata: { userId, action: 'CALENDAR_PARSE' },
@@ -654,27 +653,7 @@ export async function parseCalendarFromEmail(
       result,
     };
   } catch (error) {
-    const processingTimeMs = Date.now() - startTime;
-
-    if (error instanceof GroqJsonParseError) {
-      console.error(`[CalendarParser] JSON parse error for ${messageId}:`, error.message);
-      return {
-        success: false,
-        result: null,
-        error: `Failed to parse LLM response: ${error.message}`,
-      };
-    }
-
-    if (error instanceof GroqError) {
-      console.error(`[CalendarParser] Groq error for ${messageId}:`, error.message);
-      return {
-        success: false,
-        result: null,
-        error: `LLM service error: ${error.message}`,
-      };
-    }
-
-    console.error(`[CalendarParser] Unexpected error for ${messageId}:`, error);
+    console.error(`[CalendarParser] Error for ${messageId}:`, error);
     return {
       success: false,
       result: null,
@@ -869,7 +848,6 @@ export async function parseCalendarFromThread(
       systemPrompt: THREAD_SYSTEM_PROMPT,
       userPrompt,
       options: {
-        model: 'llama-3.1-8b-instant',
         temperature: 0.2,
         maxTokens: 1500,
       },
@@ -954,27 +932,7 @@ export async function parseCalendarFromThread(
       reasoning: llmResult.reasoning,
     };
   } catch (error) {
-    if (error instanceof GroqJsonParseError) {
-      console.error(`[CalendarParser] JSON parse error for thread ${threadId}:`, error.message);
-      return {
-        success: false,
-        isConfirmed: false,
-        result: null,
-        error: `Failed to parse LLM response: ${error.message}`,
-      };
-    }
-
-    if (error instanceof GroqError) {
-      console.error(`[CalendarParser] Groq error for thread ${threadId}:`, error.message);
-      return {
-        success: false,
-        isConfirmed: false,
-        result: null,
-        error: `LLM service error: ${error.message}`,
-      };
-    }
-
-    console.error(`[CalendarParser] Unexpected error for thread ${threadId}:`, error);
+    console.error(`[CalendarParser] Error for thread ${threadId}:`, error);
     return {
       success: false,
       isConfirmed: false,
