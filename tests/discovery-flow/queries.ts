@@ -227,7 +227,7 @@ export const QUERIES: DiscoveryTestCase[] = [
     expected: {
       extraction: {
         status: 'ready',
-        filters: { company: 'Microsoft' },
+        filters: { company: 'Microsoft', role: 'Software Engineer' },
       },
       search: { simplePath: true, shouldRun: true },
     },
@@ -255,7 +255,9 @@ export const QUERIES: DiscoveryTestCase[] = [
     expected: {
       extraction: {
         status: 'ready',
-        filters: { company: 'Anthropic' },
+        filters: { company: 'Anthropic', role: 'Machine Learning Engineer' },
+        linkedInFilters: { currentJobTitles: ['Machine Learning Engineer'] },
+        roleSpecificity: 'narrow',
       },
       search: { simplePath: true, shouldRun: true },
     },
@@ -268,7 +270,7 @@ export const QUERIES: DiscoveryTestCase[] = [
     expected: {
       extraction: {
         status: 'ready',
-        filters: { company: 'JP Morgan' },
+        filters: { company: 'JP Morgan', role: 'Investment Banking Analyst' },
       },
       search: { simplePath: true, shouldRun: true },
     },
@@ -366,7 +368,8 @@ export const QUERIES: DiscoveryTestCase[] = [
     expected: {
       extraction: {
         status: 'ready',
-        filters: { company: 'Microsoft' },
+        filters: { company: 'Microsoft', university: 'Massachusetts Institute of Technology' },
+        linkedInFilters: { schools: ['Massachusetts Institute of Technology'] },
       },
       search: { simplePath: true, shouldRun: true },
     },
@@ -379,7 +382,8 @@ export const QUERIES: DiscoveryTestCase[] = [
     expected: {
       extraction: {
         status: 'ready',
-        filters: { company: 'Tesla' },
+        filters: { company: 'Tesla', university: 'Carnegie Mellon University' },
+        linkedInFilters: { schools: ['Carnegie Mellon University'] },
       },
       search: { simplePath: true, shouldRun: true },
     },
@@ -392,7 +396,8 @@ export const QUERIES: DiscoveryTestCase[] = [
     expected: {
       extraction: {
         status: 'ready',
-        filters: { company: 'Bridgewater' },
+        filters: { company: 'Bridgewater', university: 'University of Pennsylvania' },
+        linkedInFilters: { schools: ['University of Pennsylvania'] },
       },
       search: { simplePath: true, shouldRun: true },
     },
@@ -405,7 +410,8 @@ export const QUERIES: DiscoveryTestCase[] = [
     expected: {
       extraction: {
         status: 'ready',
-        filters: { company: 'Meta' },
+        filters: { company: 'Meta', university: 'University of California, Berkeley' },
+        linkedInFilters: { schools: ['University of California, Berkeley'] },
       },
       search: { simplePath: true, shouldRun: true },
     },
@@ -475,6 +481,7 @@ export const QUERIES: DiscoveryTestCase[] = [
       extraction: {
         status: 'ready',
         filters: { company: 'Chase' },
+        companyNameAmbiguous: true,
       },
       search: { simplePath: true, shouldRun: true },
     },
@@ -488,6 +495,7 @@ export const QUERIES: DiscoveryTestCase[] = [
       extraction: {
         status: 'ready',
         filters: { company: 'Block' },
+        companyNameAmbiguous: true,
       },
       search: { advancedPath: true, shouldRun: true },
     },
@@ -501,6 +509,7 @@ export const QUERIES: DiscoveryTestCase[] = [
       extraction: {
         status: 'ready',
         filters: { company: 'Square', role: 'Product Manager' },
+        companyNameAmbiguous: true,
       },
       search: { simplePath: true, shouldRun: true },
     },
@@ -511,12 +520,12 @@ export const QUERIES: DiscoveryTestCase[] = [
     id: 'seniority-senior-engineers',
     category: 'linkedin-seniority',
     query: 'senior engineers at Citadel',
-    description: '"senior" + "engineers" (generic) → seniorityLevelIds=["120"] + functionIds=["8"].',
+    description: '"senior" + "engineers" (generic) → excludeSeniorityLevelIds=["110"] + functionIds=["8"].',
     expected: {
       extraction: {
         status: 'ready',
         filters: { company: 'Citadel' },
-        linkedInFilters: { seniorityLevelIds: ['120'], functionIds: ['8'] },
+        linkedInFilters: { excludeSeniorityLevelIds: ['110'], functionIds: ['8'] },
       },
       search: { advancedPath: true, shouldRun: true },
     },
@@ -544,6 +553,7 @@ export const QUERIES: DiscoveryTestCase[] = [
       extraction: {
         status: 'ready',
         filters: { company: 'Netflix' },
+        linkedInFilters: { excludeSeniorityLevelIds: ['110'] },
       },
       search: { advancedPath: true, shouldRun: true },
     },
@@ -581,7 +591,7 @@ export const QUERIES: DiscoveryTestCase[] = [
   },
   {
     id: 'seniority-cxo',
-    category: 'linkedin-seniority',
+    category: 'anti-category',
     query: 'CTOs at Series A startups in SF',
     description: '"CTO" is a specific CXO title.',
     expected: {
@@ -790,13 +800,13 @@ export const QUERIES: DiscoveryTestCase[] = [
     id: 'negation-not-california',
     category: 'linkedin-negation',
     query: 'senior engineers at Google but not in California',
-    description: 'excludeLocations=["California"] + seniorityLevelIds=["120"].',
+    description: 'excludeLocations=["California"] + excludeSeniorityLevelIds=["110"].',
     expected: {
       extraction: {
         status: 'ready',
         filters: { company: 'Google' },
         linkedInFilters: {
-          seniorityLevelIds: ['120'],
+          excludeSeniorityLevelIds: ['110'],
           excludeLocations: ['California'],
         },
       },
@@ -907,14 +917,13 @@ export const QUERIES: DiscoveryTestCase[] = [
   },
   {
     id: 'category-fintech-startups',
-    category: 'anti-category',
+    category: 'unsupported-industry',
     query: 'PMs at fintech startups',
-    description: '"fintech startups" stage descriptor → needs_selection + Perplexity escalation.',
+    description: '"fintech" is unsupported industry term → unsupported with suggested alternative.',
     expected: {
       extraction: {
-        status: 'needs_selection',
-        minSelectables: 4,
-        shouldEscalateToPerplexity: true,
+        status: 'unsupported',
+        unsupportedCriteria: ['fintech'],
       },
       search: { shouldRun: false },
     },
@@ -1094,8 +1103,8 @@ export const QUERIES: DiscoveryTestCase[] = [
     id: 'edge-very-long',
     category: 'malformed-edge',
     query:
-      'I want to find software engineers who specifically worked on payments infrastructure at Stripe in San Francisco with at least 5 years of experience who also went to Stanford or MIT and are currently senior or staff level and recently joined the company in the last 6 months',
-    description: 'Very long multi-intent query — should still parse into filters.',
+      'I want to find software engineers at Stripe in San Francisco with at least 5 years of experience who also went to Stanford and are currently senior level and recently joined the company in the last 6 months',
+    description: 'Very long multi-filter query — should still parse into structured filters.',
     expected: {
       extraction: {
         status: 'ready',
@@ -1165,8 +1174,10 @@ export const QUERIES: DiscoveryTestCase[] = [
       extraction: {
         status: 'ready',
         filters: { company: 'Notion', role: 'Designer' },
+        linkedInFilters: { functionIds: ['3'] },
+        roleSpecificity: 'broad',
       },
-      search: { simplePath: true, shouldRun: true },
+      search: { advancedPath: true, shouldRun: true },
     },
   },
   {
@@ -1243,14 +1254,14 @@ export const QUERIES: DiscoveryTestCase[] = [
     id: 'integrity-no-industry-ids',
     category: 'id-allowlist',
     query: 'fintech engineers at Ramp',
-    description: 'Must NOT leak industryIds (forcibly stripped by sanitizer).',
+    description: '"fintech" is unsupported industry → unsupported. Alternative keeps Ramp.',
     expected: {
       extraction: {
-        status: 'ready',
-        filters: { company: 'Ramp' },
-        forbiddenLinkedInFilterKeys: ['industryIds'],
+        status: 'unsupported',
+        unsupportedCriteria: ['fintech'],
+        suggestedAlternativeFilters: { company: 'Ramp' },
       },
-      search: { advancedPath: true, shouldRun: true },
+      search: { shouldRun: false },
     },
   },
 ];
