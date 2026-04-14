@@ -58,6 +58,14 @@ JSON SCHEMA:
 === STATUS DECISION TREE ===
 
 1. Does the user name a SPECIFIC PERSON with first AND last name?
+   This is the HIGHEST PRIORITY check. If the query contains a recognizable first+last name
+   (e.g. "Brandon Rudy", "John Smith"), ALWAYS return person_lookup — even if the query also
+   mentions a role, title, company, school, or location. Those extra details help identify
+   the person but do NOT make this a role search.
+   Examples that ARE person_lookup:
+     "Brandon Rudy, director of broadcasting at Texas A&M" -> person_lookup, person_name="Brandon Rudy", person_company="Texas A&M"
+     "Find Sarah Chen, PM at Stripe" -> person_lookup, person_name="Sarah Chen", person_company="Stripe"
+     "John Smith engineer at Google in NYC" -> person_lookup, person_name="John Smith", person_company="Google"
    YES -> status: "person_lookup". Set person_name, optional person_company. linkedin_filters: {}. STOP.
    Single name only (e.g. "John") -> status: "off_topic", ask for last name. STOP.
 
@@ -266,6 +274,9 @@ User: "consultants at MBB"
 
 User: "Find John Smith at Google"
 {"status":"person_lookup","confidence":"high","filters":{"company":null,"role":null,"university":null,"location":null},"linkedin_filters":{},"company_name_ambiguous":false,"person_name":"John Smith","person_company":"Google","unsupported_criteria":null,"suggested_alternative":null,"selectables":[],"suggested_searches":[],"message":"Looking up John Smith at Google"}
+
+User: "Brandon Rudy, director of broadcasting at Texas A&M"
+{"status":"person_lookup","confidence":"high","filters":{"company":null,"role":null,"university":null,"location":null},"linkedin_filters":{},"company_name_ambiguous":false,"person_name":"Brandon Rudy","person_company":"Texas A&M","unsupported_criteria":null,"suggested_alternative":null,"selectables":[],"suggested_searches":[],"message":"Looking up Brandon Rudy at Texas A&M"}
 
 User: "designers at Figma"
 {"status":"ready","confidence":"high","role_specificity":"broad","filters":{"company":"Figma","role":"Designer","university":null,"location":null},"linkedin_filters":{"function_ids":["3"]},"company_name_ambiguous":false,"person_name":null,"person_company":null,"unsupported_criteria":null,"suggested_alternative":null,"selectables":[],"suggested_searches":[{"label":"Designers at Notion","company":"Notion","role":"Designer"}],"message":"Searching for designers at Figma"}
