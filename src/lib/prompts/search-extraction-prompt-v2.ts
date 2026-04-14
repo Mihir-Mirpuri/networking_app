@@ -119,10 +119,42 @@ RULE 3 -- COMPANY:
 - "ex-[Company]" or "formerly at" -> past_companies with raw company name.
 - NEVER put company names in search_query.
 
-RULE 4 -- SCHOOL:
+RULE 4 -- SCHOOL vs EMPLOYER (universities):
 - MUST use full official names. Abbreviations return ZERO results.
   "MIT" -> "Massachusetts Institute of Technology", "Stanford" -> "Stanford University", "Harvard" -> "Harvard University", "UT Austin" -> "University of Texas at Austin", "Wharton" -> "The Wharton School", "HBS" -> "Harvard Business School", "CMU" -> "Carnegie Mellon University", "Cal"/"Berkeley" -> "University of California, Berkeley", "Georgia Tech" -> "Georgia Institute of Technology", "UCLA" -> "University of California, Los Angeles", "NYU" -> "New York University", "UPenn" -> "University of Pennsylvania", "USC" -> "University of Southern California", "UIUC" -> "University of Illinois Urbana-Champaign", "Caltech" -> "California Institute of Technology"
-- "from [X]" = university.
+
+*** CRITICAL: Universities can be EMPLOYERS, not just schools. ***
+  When the role is a STAFF/ADMINISTRATIVE role (not a student/academic role), the university is the EMPLOYER.
+  -> Set filters.company = university name. Do NOT set filters.university or schools.
+  STAFF roles (university = EMPLOYER): Director, Coordinator, Manager, Coach, Administrator, Advisor, Broadcasting, Athletics, Communications, Admissions, Marketing, IT, Facilities, Librarian, Recruiter, Development Officer, Dean, Provost, Chancellor, President
+  ACADEMIC/STUDENT roles (university = SCHOOL): Software Engineer, Data Scientist, Product Manager, Researcher, Professor, Postdoc, Fellow, Analyst, Consultant — these are alumni roles, use schools filter.
+
+  Decision rule:
+  IF role is clearly a university staff/admin role -> treat university as EMPLOYER
+  IF role is a generic industry role (engineer, PM, analyst) -> treat university as SCHOOL (alumni filter)
+  IF ambiguous -> default to employer, since staff searches are more common when naming a university + role
+
+  WHEN UNIVERSITY IS EMPLOYER:
+  -> Set filters.company = university name, filters.university = null
+  -> In linkedin_filters: put the university name in search_query (NOT current_companies). University LinkedIn URLs are unreliable for company resolution. searchQuery matches the company name in profile text.
+  -> Still set current_job_titles for the role.
+  Example: "Directors of Broadcasting at Texas A&M" -> company="Texas A&M University", linkedin_filters: { current_job_titles: ["Director of Broadcasting"], search_query: "Texas A&M" }
+
+  WHEN UNIVERSITY IS SCHOOL (alumni):
+  -> Set filters.university = full official name, filters.company = null (or the other company if specified)
+  -> In linkedin_filters: use schools: ["Full University Name"]
+
+  Examples:
+  "Directors of Broadcasting at Texas A&M" -> company="Texas A&M University", university=null, linkedin_filters: { current_job_titles: ["Director of Broadcasting"], search_query: "Texas A&M" }
+  "coaches at University of Texas" -> company="University of Texas", university=null, linkedin_filters: { current_job_titles: ["Coach"], search_query: "University of Texas" }
+  "admissions coordinators at Stanford" -> company="Stanford University", university=null, linkedin_filters: { current_job_titles: ["Admissions Coordinator"], search_query: "Stanford University" }
+  "software engineers from MIT" -> company=null, university="Massachusetts Institute of Technology", linkedin_filters: { current_job_titles: ["Software Engineer"], schools: ["Massachusetts Institute of Technology"] }
+  "Stanford grads at Google" -> company="Google", university="Stanford University", linkedin_filters: { schools: ["Stanford University"] }
+  "PMs from Harvard at Meta" -> company="Meta", university="Harvard University", linkedin_filters: { current_job_titles: ["Product Manager"], schools: ["Harvard University"] }
+
+- "from [X]" = university ONLY if the role is a generic industry role. If the role is a staff role, treat as employer.
+- "[role] at [University]" = employer (company) when the role is staff/admin.
+- "[University] grads/alumni" = always school.
 
 RULE 5 -- SENIORITY (seniority_level_ids):
   IDs: "100"=In Training, "110"=Entry, "120"=Senior, "130"=Strategic, "200"=Entry Manager, "210"=Experienced Manager, "220"=Director, "300"=VP, "310"=CXO, "320"=Owner/Partner
