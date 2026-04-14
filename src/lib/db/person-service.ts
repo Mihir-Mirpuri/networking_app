@@ -5,6 +5,7 @@ import { EmailStatus } from '@prisma/client';
 import { ScrapedProfile } from '@/lib/services/linkedin-scraper';
 import { getSearchRoleEmbedding, stampPersonRoleEmbedding } from '@/lib/services/embeddings';
 import { Prisma } from '@prisma/client';
+import { log } from '@/lib/services/discovery-logger';
 
 /**
  * Common university abbreviation → keyword expansions.
@@ -2002,7 +2003,24 @@ export async function saveShortProfilesBatch(
 
   const newCount = results.filter(r => r.isNew).length;
   const existingCount = results.filter(r => r.personId && !r.isNew).length;
+  const failedCount = results.filter(r => !r.personId).length;
+  const collisionCount = categorized.filter(c => c._category === 'collision').length;
   console.log(`[saveShortProfilesBatch] Saved ${profiles.length} profiles (${newCount} new, ${existingCount} existing) in ${Date.now() - startTime}ms`);
+  log.info('person-service', 'saveShortProfilesBatch complete', {
+    input: profiles.length,
+    normalized: normalized.length,
+    matchedByUrl: matchedByUrl.length,
+    unmatchedByUrl: unmatchedByUrl.length,
+    categories: {
+      full: categorized.filter(c => c._category === 'full').length,
+      updateUrl: categorized.filter(c => c._category === 'update-url').length,
+      backfillName: categorized.filter(c => c._category === 'backfill-name').length,
+      collision: collisionCount,
+      new: categorized.filter(c => c._category === 'new').length,
+    },
+    results: { new: newCount, existing: existingCount, failed: failedCount },
+    durationMs: Date.now() - startTime,
+  });
 
   return results;
 }
@@ -2736,6 +2754,14 @@ export async function findPeopleByFiltersV3(
   const skipIlike = role!.trim().length <= 3;
 
   console.log(`[PersonServiceV3] Filters: company="${company}", aliases=${filters.companyAliases?.length ?? 0}, role="${role}", roleSpecificity=${filters.roleSpecificity || 'standard'}, location="${location}", university="${university}", requireEmail=${requireEmail}, excludeIds=${excludePersonIds?.length ?? 0}, companyMatchMode=${companyMatchMode}, vectorPath=${vectorPathAvailable}, fetchLimit=${fetchLimit}, skipIlike=${skipIlike}`);
+  log.info('person-service', 'findPeopleByFiltersV3 started', {
+    company, role, location, university, requireEmail,
+    aliasCount: filters.companyAliases?.length ?? 0,
+    roleSpecificity: filters.roleSpecificity || 'standard',
+    excludeCount: excludePersonIds?.length ?? 0,
+    companyMatchMode, vectorPathAvailable, skipIlike,
+    roleThreshold, fetchLimit,
+  });
 
   // ── Issue 1 fix: conditional Query B execution ──
   // Run Query A first (unless skipped for short codes). Only run Query B if
@@ -2751,6 +2777,12 @@ export async function findPeopleByFiltersV3(
   }
 
   console.log(`[PersonServiceV3] Query A (ILIKE) returned ${queryARows.length} rows (${exactCount} exact) | Query B (vector) returned ${queryBRows.length} rows | skipIlike=${skipIlike}`);
+  log.info('person-service', 'Query A+B results', {
+    queryA: { rows: queryARows.length, exact: exactCount, nearExact: queryARows.length - exactCount, skipped: skipIlike },
+    queryB: { rows: queryBRows.length, ran: exactCount < limit && vectorPathAvailable },
+    sampleA: queryARows.slice(0, 3).map(r => ({ name: r.fullName, role: r.role, company: r.company, tier: r.match_tier, dist: r.role_distance })),
+    sampleB: queryBRows.slice(0, 3).map(r => ({ name: r.fullName, role: r.role, company: r.company, dist: r.role_distance })),
+  });
 
   // ── Merge and deduplicate (Query A wins) ──
   const seenIds = new Set<string>();
@@ -2827,7 +2859,24 @@ export async function findPeopleByFiltersV3(
 
   if (limited.length === 0) return [];
 
-  console.log(`[PersonServiceV3] After merge+dedup: ${merged.length} total, returning ${limited.length} | Tier breakdown: exact=${limited.filter(r => r.computedTier === 'exact').length}, near_exact=${limited.filter(r => r.computedTier === 'near_exact').length}, similar=${limited.filter(r => r.computedTier === 'similar').length}`);
+  const tierBreakdown = {
+    exact: limited.filter(r => r.computedTier === 'exact').length,
+    near_exact: limited.filter(r => r.computedTier === 'near_exact').length,
+    similar: limited.filter(r => r.computedTier === 'similar').length,
+  };
+  console.log(`[PersonServiceV3] After merge+dedup: ${merged.length} total, returning ${limited.length} | Tier breakdown: exact=${tierBreakdown.exact}, near_exact=${tierBreakdown.near_exact}, similar=${tierBreakdown.similar}`);
+  log.info('person-service', 'findPeopleByFiltersV3 complete', {
+    mergedTotal: merged.length,
+    dedupedFromA: queryARows.length - merged.filter(r => r.computedTier !== 'similar').length,
+    returning: limited.length,
+    tierBreakdown,
+    topResults: limited.slice(0, 5).map(r => ({
+      name: r.fullName, role: r.role, company: r.company,
+      tier: r.computedTier, score: r.computedScore.toFixed(3),
+      roleDist: r.role_distance != null ? Number(r.role_distance).toFixed(4) : null,
+      companySim: Number(r.company_similarity).toFixed(3),
+    })),
+  });
 
   // ── Fetch source links (same pattern as V2) ──
   const personIds = limited.map(p => p.id);

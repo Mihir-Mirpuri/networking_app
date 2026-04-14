@@ -10,6 +10,7 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import prisma from '@/lib/prisma';
+import { log } from '@/lib/services/discovery-logger';
 
 let anthropicClient: Anthropic | null = null;
 
@@ -59,10 +60,24 @@ async function findCompanyLinkedInUrlViaSonnet(companyName: string): Promise<str
     const match = text.match(/https?:\/\/(www\.)?linkedin\.com\/company\/[a-zA-Z0-9_-]+/);
     const url = match?.[0] || null;
 
-    console.log(`[CompanyResolver] Sonnet resolved "${companyName}" → ${url || 'null'} (${Date.now() - start}ms)`);
+    const elapsed = Date.now() - start;
+    console.log(`[CompanyResolver] Sonnet resolved "${companyName}" → ${url || 'null'} (${elapsed}ms)`);
+    log.api('company-resolver', {
+      service: 'anthropic-sonnet',
+      endpoint: 'resolveCompanyUrl',
+      request: { companyName },
+      response: { url },
+      durationMs: elapsed,
+      costUsd: COST_PER_SONNET_CALL_CENTS / 100,
+    });
     return url;
   } catch (err) {
-    console.warn(`[CompanyResolver] Sonnet failed for "${companyName}" (${Date.now() - start}ms):`, err instanceof Error ? err.message : err);
+    const elapsed = Date.now() - start;
+    console.warn(`[CompanyResolver] Sonnet failed for "${companyName}" (${elapsed}ms):`, err instanceof Error ? err.message : err);
+    log.error('company-resolver', `Sonnet failed for "${companyName}"`, {
+      durationMs: elapsed,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return null;
   }
 }
@@ -92,6 +107,7 @@ export async function resolveCompanyUrl(
 
     if (cached) {
       console.log(`[CompanyResolver] "${companyName}" → ${cached.url} (cached)`);
+      log.info('company-resolver', 'Cache hit', { companyName, url: cached.url });
       return { url: cached.url, cost: { llmCalls: 0, costCents: 0 } };
     }
   } catch (err) {
@@ -114,6 +130,7 @@ export async function resolveCompanyUrl(
     }
   } else {
     console.warn(`[CompanyResolver] No LinkedIn URL found for "${companyName}"`);
+    log.warn('company-resolver', `No LinkedIn URL found for "${companyName}"`);
   }
 
   return {

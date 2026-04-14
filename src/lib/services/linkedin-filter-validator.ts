@@ -130,6 +130,9 @@ export function sanitizeLinkedInFilters(
   raw: LinkedInFilters | undefined | null
 ): LinkedInFilters {
   if (!raw) return {};
+  const inputKeys = Object.entries(raw)
+    .filter(([, v]) => v !== undefined && v !== null && !(Array.isArray(v) && v.length === 0))
+    .map(([k]) => k);
   const result: LinkedInFilters = { ...raw };
 
   // ─── Seniority ──────────────────────────────────────────────
@@ -211,6 +214,19 @@ export function sanitizeLinkedInFilters(
   // ─── Industry (forcibly stripped — no longer supported) ────
   if ('industryIds' in (result as Record<string, unknown>)) {
     delete (result as Record<string, unknown>).industryIds;
+  }
+
+  // ─── Log summary of sanitization ──────────────────────────
+  const outputKeys = Object.entries(result)
+    .filter(([, v]) => v !== undefined && v !== null && !(Array.isArray(v) && v.length === 0))
+    .map(([k]) => k);
+  const droppedKeys = inputKeys.filter(k => !outputKeys.includes(k));
+  if (droppedKeys.length > 0) {
+    log.warn('filter-validator', `Sanitized: dropped keys [${droppedKeys.join(', ')}]`, {
+      inputKeys,
+      outputKeys,
+      droppedKeys,
+    });
   }
 
   return result;

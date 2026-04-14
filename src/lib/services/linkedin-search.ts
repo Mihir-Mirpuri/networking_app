@@ -308,6 +308,9 @@ export async function searchLinkedInShort(
     const skippedCount = rawCount - profiles.length;
     if (skippedCount > 0) {
       console.warn(`[LinkedInSearch] Skipped ${skippedCount} malformed profiles out of ${rawCount} raw items`);
+      log.warn('linkedin-search', `Skipped ${skippedCount} malformed profiles`, {
+        rawCount, validCount: profiles.length, skippedCount,
+      });
     }
 
     // Extract pagination from first item's _meta

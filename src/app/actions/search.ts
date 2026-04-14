@@ -643,6 +643,11 @@ export async function searchPeopleV2Action(
         });
       }
 
+      log.info('search-v2', 'Advanced path ordering complete', {
+        apiProfiles: apiResult.profiles.length,
+        orderedAfterExclusion: orderedPeople.length,
+        excluded: apiResult.profiles.length - orderedPeople.length,
+      });
       const draftsStart = Date.now();
       results = await buildResultsWithDrafts(orderedPeople, userId, template, user);
       console.log(`[SearchV2] Built ${results.length} results with drafts in ${Date.now() - draftsStart}ms`);
@@ -774,6 +779,12 @@ export async function searchPeopleV2Action(
         }
 
         console.log(`[SearchV2] Merged ${orderedPeople.length} results (${orderedPeople.length - dbOnlyPeople.length} from LinkedIn, ${dbOnlyPeople.length} DB-only)`);
+        log.info('search-v2', 'Merge complete (simple path)', {
+          linkedInResults: orderedPeople.length - dbOnlyPeople.length,
+          dbOnlyResults: dbOnlyPeople.length,
+          totalMerged: orderedPeople.length,
+          excludedByIds: apiResult.profiles.length - (orderedPeople.length - dbOnlyPeople.length),
+        });
 
         const draftsStart2 = Date.now();
         results = await buildResultsWithDrafts(orderedPeople.slice(0, input.limit), userId, template, user);
@@ -822,6 +833,12 @@ export async function searchPeopleV2Action(
         }
 
         rankedPeople = rankedPeople.slice(0, input.limit);
+        log.info('search-v2', 'DB-only ranking complete', {
+          rankingMethod: vectorActive ? 'vector' : 'heuristic',
+          candidatesBeforeSlice: people.length,
+          returning: rankedPeople.length,
+          topScores: rankedPeople.slice(0, 3).map(r => ({ score: r.score, company: r.candidate.company, role: r.candidate.role })),
+        });
 
         const draftsStart2 = Date.now();
         results = await buildResultsWithDrafts(rankedPeople, userId, template, user);
@@ -1219,16 +1236,24 @@ export async function loadMoreV2Action(
       // Build results in LinkedIn's order
       const excludeSet = new Set(input.excludePersonIds);
       const orderedPeople: Array<{ candidate: PersonWithSource; score: number; breakdown: ScoreBreakdown }> = [];
+      let loadMoreNotInDb = 0;
+      let loadMoreExcluded = 0;
       for (const profile of apiResult.profiles) {
         const person = profile.linkedinUrl ? personMap.get(profile.linkedinUrl) : null;
-        if (!person) continue;
-        if (excludeSet.has(person.id)) continue;
+        if (!person) { loadMoreNotInDb++; continue; }
+        if (excludeSet.has(person.id)) { loadMoreExcluded++; continue; }
         orderedPeople.push({
           candidate: { ...person, emailDeliverable: null, emailVerifiedAt: null, emailVerificationReason: null } as PersonWithSource,
           score: 0,
           breakdown: {} as ScoreBreakdown,
         });
       }
+      log.info('loadmore-v2', 'Load-more dedup complete', {
+        apiProfiles: apiResult.profiles.length,
+        notInDb: loadMoreNotInDb,
+        excluded: loadMoreExcluded,
+        returning: orderedPeople.length,
+      });
 
       // Get user info for draft generation
       let user = null;
