@@ -18,7 +18,6 @@ import {
   PersonResult,
   MatchTier,
   isVectorRoleMatchingEnabled,
-  saveShortProfile,
   saveShortProfilesBatch,
   tagPeopleToSearch,
   getTaggedPeopleForSearch,

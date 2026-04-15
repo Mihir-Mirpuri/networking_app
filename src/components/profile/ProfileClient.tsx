@@ -15,7 +15,6 @@ import {
 } from '@/app/actions/profile';
 import {
   getResumesAction,
-  setActiveResumeAction,
   deleteResumeAction,
   ResumeData,
 } from '@/app/actions/resume';
@@ -24,8 +23,6 @@ import {
   createCustomerPortalSession,
 } from '@/app/actions/subscription';
 import { useSubscription } from '@/contexts/SubscriptionContext';
-import { SearchableCombobox } from '@/components/search/SearchableCombobox';
-import { UNIVERSITIES } from '@/lib/constants';
 
 type ProfileTab = 'account' | 'resumes' | 'templates';
 
@@ -153,9 +150,6 @@ const PLACEHOLDER_CATEGORIES = [
     ],
   },
 ];
-
-// Flatten for backward compatibility
-const DEFAULT_PLACEHOLDERS = PLACEHOLDER_CATEGORIES.flatMap(cat => cat.placeholders.map(p => p.key));
 
 // ─── Shared pill utilities ─────────────────────────────────────────────────────
 
@@ -1014,10 +1008,6 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
     }
   };
 
-  const handleSignOut = () => {
-    signOut({ callbackUrl: '/app' });
-  };
-
   const handleDeleteAccount = async () => {
     if (deleteConfirmText !== 'DELETE') return;
 
@@ -1064,7 +1054,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
         throw new Error(message);
       }
 
-      const data = await response.json();
+      await response.json();
 
       setResumeSuccess(true);
       setTimeout(() => setResumeSuccess(false), 3000);
@@ -1075,15 +1065,6 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
       setResumeError(error instanceof Error ? error.message : 'Failed to upload resume');
     } finally {
       setIsUploadingResume(false);
-    }
-  };
-
-  const handleSetActiveResume = async (resumeId: string) => {
-    const result = await setActiveResumeAction(resumeId);
-    if (result.success) {
-      await loadResumes();
-    } else {
-      setResumeError(result.error);
     }
   };
 
@@ -1103,28 +1084,6 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   };
-
-  const formatDate = (date: Date): string => {
-    const now = new Date();
-    const diff = now.getTime() - new Date(date).getTime();
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-
-    if (days === 0) return 'today';
-    if (days === 1) return 'yesterday';
-    if (days < 7) return `${days} days ago`;
-    if (days < 30) {
-      const weeks = Math.floor(days / 7);
-      return `${weeks} ${weeks === 1 ? 'week' : 'weeks'} ago`;
-    }
-    return new Date(date).toLocaleDateString();
-  };
-
-  const initials = (profile.name || userName || userEmail || '?')
-    .split(' ')
-    .map(n => n[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
 
   const TAB_TITLES: Record<string, { title: string; subtitle: string }> = {
     account: { title: 'Account', subtitle: 'Your profile, plan, and preferences' },

@@ -125,7 +125,7 @@ export async function getAutoPersonalizeAction(): Promise<boolean> {
  */
 export async function updateTimezoneAction(
   timezone: string,
-  force: boolean = false
+  _force: boolean = false
 ): Promise<{ success: true; updated: boolean } | { success: false; error: string }> {
   const session = await getServerSession(authOptions);
 

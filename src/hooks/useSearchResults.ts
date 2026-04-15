@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { SearchResultWithDraft, regenerateDraftAction, loadMoreV2Action, SearchMetaV2 } from '@/app/actions/search';
+import { SearchResultWithDraft, regenerateDraftAction, loadMoreV2Action } from '@/app/actions/search';
 import { sendSingleEmailAction, sendEmailsAction, PersonToSend } from '@/app/actions/send';
 import { getTemplatesAction, getAutoPersonalizeAction, TemplateData } from '@/app/actions/profile';
 import { hidePersonAction, toggleSavedForLaterAction } from '@/app/actions/search';
 import { EMAIL_TEMPLATES } from '@/lib/constants';
-import { LimitReachedModal, dispatchCreditsChanged } from '@/components/credits';
+import { dispatchCreditsChanged } from '@/components/credits';
 import { useSession } from 'next-auth/react';
 import type { LinkedInFilters, DBFilters } from '@/lib/types/linkedin-filters';
 
@@ -59,7 +59,7 @@ export function useSearchResults({ initialRemainingDaily }: UseSearchResultsOpti
   const [hiddenCount, setHiddenCount] = useState(0);
   const retryTimerRef = useRef<NodeJS.Timeout | null>(null);
   const retryCountRef = useRef(0);
-  const MAX_RETRIES = 5;
+
 
   // V2 unified pagination state:
   //   allBatchResults = every profile fetched so far (initial search + all

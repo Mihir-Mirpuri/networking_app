@@ -48,7 +48,6 @@ interface MainSearchViewProps {
   pendingFilters: ParsedFilters | null;
   pendingLinkedInFilters?: LinkedInFilters | null;
   onQueryProcessed: () => void;
-  aiMode?: boolean;
   isAuthenticated?: boolean;
   // Lifted state from AppShell
   messages: DisplayMessage[];
@@ -86,7 +85,6 @@ export function MainSearchView({
   pendingFilters,
   pendingLinkedInFilters,
   onQueryProcessed,
-  aiMode,
   isAuthenticated = true,
   messages,
   setMessages,
@@ -494,28 +492,6 @@ export function MainSearchView({
     }
   }, [pendingFilters, pendingLinkedInFilters, runSearch, onQueryProcessed]);
 
-  const handleRemoveFilter = async (key: keyof ParsedFilters) => {
-    const updated = { ...currentFilters };
-    delete updated[key];
-    setCurrentFilters(updated);
-
-    if (key === 'company') {
-      hook.resetResults();
-      setMessages(prev => [
-        ...prev,
-        { id: `assistant-${Date.now()}`, role: 'assistant', content: 'Company filter removed. Please specify a company to search.' },
-      ]);
-    } else {
-      setMessages(prev => [
-        ...prev,
-        { id: `assistant-${Date.now()}`, role: 'assistant', content: `Removed ${key} filter. Updating results...` },
-      ]);
-      setIsSearching(true);
-      hook.resetResults();
-      await runSearch(updated);
-    }
-  };
-
   const activeFilterEntries = Object.entries(currentFilters).filter(([, v]) => v) as [string, string][];
   const hasResults = hook.results.length > 0;
   const showChat = hook.expandedIndex === null && !hook.showBulkReview;
@@ -549,12 +525,9 @@ export function MainSearchView({
             />
             <ResultsList
               results={hook.results}
-              onReviewAndSend={() => hook.setShowBulkReview(true)}
               onExpand={hook.setExpandedIndex}
               onHide={hook.handleHidePerson}
               onToggleSaveForLater={hook.handleToggleSaveForLater}
-              isSending={hook.isSending}
-              sendingIndex={undefined}
               sendStatuses={hook.sendStatuses}
               limitReached={hook.limitReached}
               onLimitReached={() => hook.setShowLimitModal(true)}
@@ -621,7 +594,6 @@ export function MainSearchView({
           <BulkReview
             results={hook.results}
             onClose={() => hook.setShowBulkReview(false)}
-            onSendAll={hook.handleBulkSend}
             sendStatuses={hook.sendStatuses}
             templates={hook.templates}
             onApplyTemplateToAll={hook.handleApplyTemplateToAll}

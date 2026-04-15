@@ -3,7 +3,7 @@
  * Run with: npx tsx src/lib/utils/meetingDetector.test.ts
  */
 
-import { detectPotentialMeeting, detectMeetingInEmail, MeetingDetectionResult } from './meetingDetector';
+import { detectPotentialMeeting, detectMeetingInEmail } from './meetingDetector';
 
 interface TestCase {
   name: string;

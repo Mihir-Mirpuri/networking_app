@@ -28,14 +28,6 @@ function SignalLogoSmall({ className }: { className?: string }) {
   );
 }
 
-function SparkleIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" />
-    </svg>
-  );
-}
-
 // ─── Typing Indicator ────────────────────────────────────────────────────────
 
 function TypingIndicator() {
@@ -93,21 +85,18 @@ function ToolbarButton({ children, title, onClick, active }: { children: React.R
   );
 }
 
-function ToolbarDivider() {
-  return <div className="w-px h-4 bg-[#333] mx-0.5" />;
-}
+
 
 // ─── Insights as Chat Message ────────────────────────────────────────────────
 
 interface InsightsChatMessageProps {
   insights: PersonInsightResponse[];
   personName: string;
-  isSubscribed: boolean | null;
   selectedInsightIds: Set<string>;
   onSelectInsight: (insight: PersonInsightResponse) => void;
 }
 
-function InsightsChatMessage({ insights, personName, isSubscribed, selectedInsightIds, onSelectInsight }: InsightsChatMessageProps) {
+function InsightsChatMessage({ insights, personName, selectedInsightIds, onSelectInsight }: InsightsChatMessageProps) {
   const linkedinInsights = insights.filter(i => i.source === 'linkedin' || i.source === 'database');
   const googleInsights = insights.filter(i => i.source !== 'linkedin' && i.source !== 'database');
   const firstName = personName.split(' ')[0];
@@ -347,7 +336,6 @@ function ChatSidebar() {
           <InsightsChatMessage
             insights={insights}
             personName={currentPersonName}
-            isSubscribed={isSubscribed}
             selectedInsightIds={selectedInsightIds}
             onSelectInsight={handleSelectInsight}
           />
@@ -507,7 +495,6 @@ export function ExpandedReview({
   const [selectedResumeId, setSelectedResumeId] = useState<string | null>(null);
   const [showResumeDropdown, setShowResumeDropdown] = useState(false);
   const [showLinkModal, setShowLinkModal] = useState(false);
-  const { isSubscribed } = useSubscription();
   const [linkUrl, setLinkUrl] = useState('');
   const [linkText, setLinkText] = useState('');
   const [linkPopoverPos, setLinkPopoverPos] = useState<{ top: number; left: number } | null>(null);

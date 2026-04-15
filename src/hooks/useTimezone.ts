@@ -10,7 +10,7 @@ import { updateTimezoneAction } from '@/app/actions/profile';
  * Should be called once near the root of the app (e.g., in layout or providers).
  */
 export function useTimezone() {
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const hasSynced = useRef(false);
 
   useEffect(() => {

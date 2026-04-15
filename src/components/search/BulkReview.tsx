@@ -8,7 +8,6 @@ import { SearchableCombobox } from './SearchableCombobox';
 interface BulkReviewProps {
   results: SearchResultWithDraft[];
   onClose: () => void;
-  onSendAll: (emails: { index: number; subject: string; body: string }[]) => Promise<void>;
   sendStatuses: Map<string, 'success' | 'failed' | 'pending'>;
   templates?: TemplateData[];
   onApplyTemplateToAll?: (templateId: string) => Promise<void>;
@@ -23,14 +22,13 @@ interface EmailDraft {
 export function BulkReview({
   results,
   onClose,
-  onSendAll,
   sendStatuses,
   templates,
   onApplyTemplateToAll,
   isRegenerating,
 }: BulkReviewProps) {
   const [drafts, setDrafts] = useState<Map<number, EmailDraft>>(new Map());
-  const [isSending, setIsSending] = useState(false);
+
 
   // Get only sendable results (not already sent — email resolved on send if missing)
   const sendableResults = results
@@ -78,25 +76,6 @@ export function BulkReview({
     });
   };
 
-  const handleSendAll = async () => {
-    const emailsToSend = sendableResults
-      .filter(({ index }) => {
-        const draft = drafts.get(index);
-        return draft && draft.subject && draft.body;
-      })
-      .map(({ index }) => ({
-        index,
-        subject: drafts.get(index)!.subject,
-        body: drafts.get(index)!.body,
-      }));
-
-    if (emailsToSend.length === 0) return;
-
-    setIsSending(true);
-    await onSendAll(emailsToSend);
-    setIsSending(false);
-    onClose();
-  };
 
   return (
     <div className="fixed inset-0 bg-surface-900/50 flex items-center justify-center z-50 p-4">

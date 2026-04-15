@@ -1,7 +1,7 @@
 'use client';
 
 import { CalendarEvent } from '../types';
-import { getMonthGridDays, isSameDay } from '../utils';
+import { getMonthGridDays } from '../utils';
 import { MonthDayCell } from './MonthDayCell';
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];

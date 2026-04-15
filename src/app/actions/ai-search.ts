@@ -199,8 +199,8 @@ function shouldEscalateToPerplexity(
  */
 function extractCategoryFromContext(
   userMessage: string,
-  groqMessage: string,
-  selectables: Selectable[]
+  _groqMessage: string,
+  _selectables: Selectable[]
 ): string {
   // If selectables look like sub-categories (contain words like "startups", "portfolio", "companies"),
   // they won't help us build a category — use the user message instead

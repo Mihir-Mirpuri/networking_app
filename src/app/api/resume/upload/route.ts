@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Ensure the bucket exists (create if it doesn't)
-    const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+    const { data: buckets } = await supabase.storage.listBuckets();
     const bucketExists = buckets?.some((bucket) => bucket.id === 'resumes');
 
     if (!bucketExists) {
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(arrayBuffer);
 
     // Upload to Supabase Storage
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from('resumes')
       .upload(fileName, buffer, {
         contentType: file.type,

@@ -13,7 +13,6 @@ import { CREDITS_CHANGED_EVENT } from '@/components/credits';
 import {
   PaperAirplaneIcon,
   ClockIcon,
-  CalendarDaysIcon,
   UserCircleIcon,
   MegaphoneIcon,
 } from '@heroicons/react/24/outline';
@@ -74,7 +73,7 @@ export function Header() {
     return () => window.removeEventListener(CREDITS_CHANGED_EVENT, loadCredits);
   }, [loadCredits]);
 
-  const { data: pendingSuggestionsCount, refetch } = usePolling(
+  const { refetch } = usePolling(
     async () => {
       const result = await getPendingSuggestionsCountAction();
       return result.success ? result.data ?? 0 : 0;

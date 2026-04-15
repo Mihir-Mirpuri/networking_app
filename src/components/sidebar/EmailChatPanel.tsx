@@ -34,18 +34,7 @@ function TypingIndicator() {
   );
 }
 
-function InsightsSkeleton() {
-  return (
-    <div className="space-y-2 px-3 py-2">
-      {[1, 2, 3, 4].map((i) => (
-        <div key={i} className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded bg-[#252525] animate-pulse flex-shrink-0" />
-          <div className="flex-1 h-4 rounded bg-[#252525] animate-pulse" style={{ width: `${60 + i * 8}%` }} />
-        </div>
-      ))}
-    </div>
-  );
-}
+
 
 // ─── Initial Greeting Component ───────────────────────────────────────────────
 
@@ -63,21 +52,8 @@ function InitialGreeting({ isSubscribed }: { isSubscribed: boolean | null }) {
     currentPersonName,
   } = useEmailChat();
 
-  const [expandedInsightIds, setExpandedInsightIds] = useState<Set<string>>(new Set());
   const [linkedinOpen, setLinkedinOpen] = useState(true);
   const [googleOpen, setGoogleOpen] = useState(true);
-
-  const toggleExpand = (id: string) => {
-    setExpandedInsightIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  };
 
   // Group insights by source
   const { linkedinInsights, googleInsights } = useMemo(() => {

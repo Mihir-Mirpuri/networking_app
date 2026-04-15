@@ -1,6 +1,6 @@
 import prisma from '@/lib/prisma';
 import { SearchResult } from '@/lib/services/discovery';
-import { EmailResult, EducationInfo, EmploymentInfo } from '@/lib/services/enrichment';
+import { EmailResult, EducationInfo } from '@/lib/services/enrichment';
 import { EmailStatus } from '@prisma/client';
 import { ScrapedProfile } from '@/lib/services/linkedin-scraper';
 import { getSearchRoleEmbedding, stampPersonRoleEmbedding } from '@/lib/services/embeddings';
@@ -453,7 +453,7 @@ export async function saveSearchResult(
   searchResult: SearchResult,
   emailResult: EmailResult & { existingPerson?: { id: string; email: string | null; emailStatus: string; emailConfidence: number | null } },
   university: string,
-  draftData: EmailDraftData
+  _draftData: EmailDraftData
 ): Promise<{
   personId: string;
   userCandidateId: string;
@@ -868,25 +868,6 @@ async function getSchoolMatchIds(university: string): Promise<string[]> {
     Prisma.sql`SELECT id FROM "Person" WHERE ${whereClause}`
   );
   return matches.map(r => r.id);
-}
-
-/**
- * Apply post-query filtering: company fuzzy match.
- * Person exclusions (sent/hidden) are handled at the DB level via excludePersonIds.
- */
-function applyPostQueryFilters<T extends { company: string }>(
-  people: T[],
-  searchCompany: string | string[] | undefined
-): T[] {
-  if (!searchCompany) return people;
-  const companies = Array.isArray(searchCompany) ? searchCompany : [searchCompany];
-  const normalized = companies.map(c => normalizeCompanyForMatch(c)).filter(Boolean);
-  if (normalized.length === 0) return people;
-
-  return people.filter((person) => {
-    const np = normalizeCompanyForMatch(person.company);
-    return normalized.some(nsc => companiesMatch(np, nsc));
-  });
 }
 
 /**

@@ -5,7 +5,6 @@
 import Groq from 'groq-sdk';
 import {
   GroqModel,
-  GroqRequestOptions,
   GroqCompletionRequest,
   GroqCompletionResponse,
 } from './types';

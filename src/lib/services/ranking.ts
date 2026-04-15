@@ -72,15 +72,6 @@ function normalize(str: string | null | undefined): string {
 }
 
 /**
- * Tokenize a string into words for comparison
- */
-function tokenize(str: string): Set<string> {
-  const normalized = normalize(str);
-  if (!normalized) return new Set();
-  return new Set(normalized.split(' ').filter(word => word.length > 0));
-}
-
-/**
  * Calculate Jaccard similarity between two token sets
  */
 function jaccardSimilarity(set1: Set<string>, set2: Set<string>): number {

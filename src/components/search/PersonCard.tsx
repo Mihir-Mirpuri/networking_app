@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { SearchResultWithDraft } from '@/app/actions/search';
 import { EnvelopeIcon, AcademicCapIcon, MapPinIcon, BuildingOfficeIcon, CheckIcon, BookmarkIcon } from '@heroicons/react/24/outline';
 import { BookmarkIcon as BookmarkIconSolid } from '@heroicons/react/24/solid';
@@ -27,7 +26,7 @@ interface PersonCardProps {
   onExpand: () => void;
   onHide?: () => void;
   onToggleSaveForLater?: () => void;
-  isSending: boolean;
+
   sendStatus?: 'success' | 'failed' | 'pending';
   scheduledFor?: Date | null;
   limitReached?: boolean;
@@ -39,7 +38,6 @@ export function PersonCard({
   onExpand,
   onHide,
   onToggleSaveForLater,
-  isSending,
   sendStatus,
   scheduledFor,
   limitReached,
@@ -87,7 +85,6 @@ export function PersonCard({
     .join('')
     .toUpperCase();
 
-  const [justToggled, setJustToggled] = useState(false);
   const gradient = nameToGradient(person.fullName);
   const isSent = sendStatus === 'success';
   const isFailed = sendStatus === 'failed';
