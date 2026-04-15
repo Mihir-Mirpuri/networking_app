@@ -254,7 +254,7 @@ export function PersonCard({
         ) : limitReached ? (
           <div
             onClick={(e) => { e.stopPropagation(); onLimitReached?.(); }}
-            className="text-sm w-full justify-center btn-primary opacity-50 cursor-not-allowed flex items-center"
+            className="text-sm w-full justify-center inline-flex items-center px-4 py-2.5 bg-[#2a2a2a] text-white font-medium rounded-lg opacity-50 cursor-not-allowed transition-all duration-200"
           >
             <EnvelopeIcon className="w-4 h-4 mr-1.5" />
             Limit reached
@@ -262,7 +262,7 @@ export function PersonCard({
         ) : (
           <div
             onClick={onExpand}
-            className="text-sm w-full justify-center btn-primary flex items-center"
+            className="text-sm w-full justify-center inline-flex items-center px-4 py-2.5 bg-[#2a2a2a] text-white font-medium rounded-lg hover:bg-[#333] transition-all duration-200"
           >
             <EnvelopeIcon className="w-4 h-4 mr-1.5" />
             Send Email

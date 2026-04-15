@@ -15,7 +15,6 @@ import {
 } from '@/app/actions/profile';
 import {
   getResumesAction,
-  setActiveResumeAction,
   deleteResumeAction,
   ResumeData,
 } from '@/app/actions/resume';
@@ -1078,15 +1077,6 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
     }
   };
 
-  const handleSetActiveResume = async (resumeId: string) => {
-    const result = await setActiveResumeAction(resumeId);
-    if (result.success) {
-      await loadResumes();
-    } else {
-      setResumeError(result.error);
-    }
-  };
-
   const handleDeleteResume = async (resumeId: string) => {
     if (!confirm('Are you sure you want to delete this resume?')) return;
 
@@ -1231,15 +1221,6 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                       aria-hidden="true"
                       className="pointer-events-none absolute -top-16 -right-16 h-44 w-44 rounded-full bg-[var(--accent)]/[0.06] blur-3xl"
                     />
-                    {/* Concentric ring backdrop behind avatar */}
-                    <div
-                      aria-hidden="true"
-                      className="pointer-events-none absolute -left-6 -top-6 h-36 w-36 rounded-full border border-[var(--accent)]/10"
-                    />
-                    <div
-                      aria-hidden="true"
-                      className="pointer-events-none absolute -left-2 -top-2 h-28 w-28 rounded-full border border-[var(--accent)]/[0.08]"
-                    />
 
                     <div className="relative">
                       <div className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--accent)]">
@@ -1260,10 +1241,10 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                           <img
                             src={userImage}
                             alt={userName}
-                            className="relative w-14 h-14 rounded-full ring-2 ring-[var(--accent)]/40"
+                            className="relative w-14 h-14 rounded-full"
                           />
                         ) : (
-                          <div className="relative w-14 h-14 rounded-full bg-gradient-to-br from-[#7B7CFF] to-[#4E4FDB] flex items-center justify-center text-base font-bold text-white ring-2 ring-[var(--accent)]/40">
+                          <div className="relative w-14 h-14 rounded-full bg-gradient-to-br from-[#7B7CFF] to-[#4E4FDB] flex items-center justify-center text-base font-bold text-white">
                             {(profile.name || userName || '?').split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()}
                           </div>
                         )}
@@ -1664,11 +1645,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                 <div key={resume.id} className="group flex flex-col items-center gap-2">
                   {/* Document thumbnail */}
                   <div
-                    className={`relative w-full aspect-[3/4] rounded-md bg-[#F5F5F5] overflow-hidden cursor-pointer transition-all hover:shadow-lg ${
-                      resume.isActive
-                        ? 'ring-2 ring-[var(--accent)] shadow-[0_2px_12px_rgba(99,100,255,0.15)]'
-                        : 'hover:ring-1 hover:ring-[#505050]'
-                    }`}
+                    className="relative w-full aspect-[3/4] rounded-md bg-[#F5F5F5] overflow-hidden cursor-pointer transition-all hover:shadow-lg hover:ring-1 hover:ring-[#505050]"
                     onClick={() => setExpandedResume(resume)}
                   >
                     {/* PDF thumbnail with spinner until loaded */}
@@ -1715,11 +1692,6 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
 
                   {/* Filename */}
                   <p className="text-[11px] text-white font-medium truncate max-w-full text-center">{resume.filename}</p>
-
-                  {/* Active badge */}
-                  {resume.isActive && (
-                    <span className="text-[9px] font-semibold text-[var(--accent)] bg-[var(--accent)]/15 px-2.5 py-0.5 rounded-full">Active</span>
-                  )}
                 </div>
               ))}
 
