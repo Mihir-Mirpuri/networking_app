@@ -815,7 +815,7 @@ export async function parseCalendarFromThread(
   input: ThreadParserInput
 ): Promise<ThreadParserOutput> {
   const startTime = Date.now();
-  const { messageId, threadId, thread, userEmail, userTimezone } = input;
+  const { threadId, thread, userTimezone } = input;
 
   console.log(`[CalendarParser] Processing thread ${threadId} (${thread.length} messages)`);
 

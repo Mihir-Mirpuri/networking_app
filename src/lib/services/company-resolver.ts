@@ -91,7 +91,7 @@ async function findCompanyLinkedInUrlViaSonnet(companyName: string): Promise<str
  */
 export async function resolveCompanyUrl(
   companyName: string,
-  context?: string
+  _context?: string
 ): Promise<CompanyResolveResult> {
   const normalized = normalizeCompanyName(companyName);
 

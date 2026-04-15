@@ -49,7 +49,7 @@ export function OutreachTrackerClient({
   const [trackers, setTrackers] = useState<OutreachTrackerEntry[]>(initialTrackers);
   const [scheduledEmails, setScheduledEmails] = useState<ScheduledEmailEntry[]>(initialScheduledEmails);
   const [savedForLater, setSavedForLater] = useState<SavedForLaterEntry[]>(initialSavedForLater);
-  const [stats, setStats] = useState<OutreachStats>(initialStats);
+  const [_stats, setStats] = useState<OutreachStats>(initialStats);
   const [cursor, setCursor] = useState<string | null>(initialCursor);
   const [hasMore, setHasMore] = useState(initialHasMore);
 

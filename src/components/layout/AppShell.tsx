@@ -13,12 +13,12 @@ interface AppShellProps {
   isSubscribed: boolean;
 }
 
-export function AppShell({ initialRemainingDaily, isSubscribed }: AppShellProps) {
+export function AppShell({ initialRemainingDaily }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pendingQuery, setPendingQuery] = useState<string | null>(null);
   const [pendingFilters, setPendingFilters] = useState<ParsedFilters | null>(null);
   const [pendingLinkedInFilters, setPendingLinkedInFilters] = useState<LinkedInFilters | null>(null);
-  const [aiMode, setAiMode] = useState(true);
+  const [aiMode] = useState(true);
 
   // Chat state lifted from MainSearchView
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
@@ -112,7 +112,6 @@ export function AppShell({ initialRemainingDaily, isSubscribed }: AppShellProps)
           onClose={() => setSidebarOpen(false)}
           onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
           aiMode={aiMode}
-          onAiModeChange={setAiMode}
           messages={messages}
           isExtracting={isExtracting}
           isSearching={isSearching}
@@ -121,7 +120,6 @@ export function AppShell({ initialRemainingDaily, isSubscribed }: AppShellProps)
           onSuggestedAlternativeClick={handleSuggestedAlternativeClick}
           onSuggestedSearchClick={handleSuggestedSearchClick}
           onClearChat={handleClearChat}
-          isSubscribed={isSubscribed}
         />
         <div className="flex-1 flex flex-col overflow-hidden">
           <NewHeader
@@ -135,7 +133,6 @@ export function AppShell({ initialRemainingDaily, isSubscribed }: AppShellProps)
               pendingFilters={pendingFilters}
               pendingLinkedInFilters={pendingLinkedInFilters}
               onQueryProcessed={handleQueryProcessed}
-              aiMode={aiMode}
               messages={messages}
               setMessages={setMessages}
               currentFilters={currentFilters}

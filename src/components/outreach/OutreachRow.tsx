@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { OutreachTrackerEntry, updateOutreachTracker, toggleResponseReceived } from '@/app/actions/outreach';
+import { OutreachTrackerEntry, updateOutreachTracker } from '@/app/actions/outreach';
 import { NotesModal } from './NotesModal';
 import { InteractionModal } from './InteractionModal';
 import { ColumnKey } from './OutreachFilters';
@@ -107,7 +107,7 @@ function CustomCell({ trackerId, columnKey, width, getValue, onChange }: {
   );
 }
 
-export function OutreachRow({ tracker, onUpdate, onDelete, onToggleStar, onToggleResponse, onRowClick, visibleColumns, columnWidths, getColumnLabel, getCustomCellValue, onCustomCellChange }: OutreachRowProps) {
+export function OutreachRow({ tracker, onUpdate, onDelete, onToggleStar, onToggleResponse, onRowClick, visibleColumns, columnWidths, getColumnLabel: _getColumnLabel, getCustomCellValue, onCustomCellChange }: OutreachRowProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [showInteractionModal, setShowInteractionModal] = useState(false);

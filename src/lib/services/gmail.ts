@@ -11,16 +11,6 @@ interface SendResult {
   error?: string;
 }
 
-interface MimeMessageOptions {
-  to: string;
-  from: string;
-  subject: string;
-  body: string;
-  attachment?: { filename: string; content: Buffer; mimeType: string };
-  inReplyTo?: string; // Message-ID for threading
-  references?: string; // Message-ID for threading
-}
-
 export interface EmailAttachment {
   filename: string;
   content: Buffer;

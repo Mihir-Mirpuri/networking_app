@@ -19,7 +19,7 @@ interface DayColumnProps {
 }
 
 export function DayColumn({ date, events, onEventClick, onTimeSlotClick }: DayColumnProps) {
-  const { dayName, dayNumber } = formatDayHeader(date);
+  const { dayName } = formatDayHeader(date);
   const today = isToday(date);
 
   // Filter events for this day (excluding all-day events which go in header)

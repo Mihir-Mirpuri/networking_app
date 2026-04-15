@@ -162,7 +162,7 @@ export function formatForDateTimeInput(date: Date): string {
 
 const HOUR_HEIGHT = 48; // pixels per hour
 const START_HOUR = 0; // 12 AM
-const END_HOUR = 24; // 12 AM next day
+// END_HOUR removed — unused
 
 /**
  * Calculates the top position and height for an event in the week view

@@ -470,7 +470,6 @@ export async function personalizeWithFoundInfo(
     personName,
     personCompany,
     personRole,
-    senderName,
     userId,
   } = input;
 
@@ -558,7 +557,6 @@ export async function generateFollowUpEmail(
     personName,
     personCompany,
     personRole,
-    senderName,
     userId,
   } = input;
 

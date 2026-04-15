@@ -35,7 +35,6 @@ interface SearchSidebarProps {
   onToggleSidebar?: () => void;
   isSearching?: boolean;
   aiMode: boolean;
-  onAiModeChange: (aiMode: boolean) => void;
   // Chat props
   messages: DisplayMessage[];
   isExtracting: boolean;
@@ -44,7 +43,6 @@ interface SearchSidebarProps {
   onSuggestedAlternativeClick: (alt: SuggestedAlternative) => void;
   onSuggestedSearchClick: (search: SuggestedSearch) => void;
   onClearChat: () => void;
-  isSubscribed: boolean;
 }
 
 export function SearchSidebar({
@@ -55,7 +53,6 @@ export function SearchSidebar({
   onToggleSidebar,
   isSearching,
   aiMode,
-  onAiModeChange,
   messages,
   isExtracting,
   onSelectableClick,
@@ -63,7 +60,6 @@ export function SearchSidebar({
   onSuggestedAlternativeClick,
   onSuggestedSearchClick,
   onClearChat,
-  isSubscribed,
 }: SearchSidebarProps) {
   const { data: session } = useSession();
   const [inputValue, setInputValue] = useState('');

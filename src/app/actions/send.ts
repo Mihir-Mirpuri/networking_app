@@ -417,7 +417,7 @@ export async function scheduleEmailAction(
   }
 
   // Check daily limit (count at schedule time)
-  const { canSend, remaining } = await checkDailyLimit(session.user.id);
+  const { canSend } = await checkDailyLimit(session.user.id);
   if (!canSend) {
     return {
       email: resolvedEmail,
@@ -605,7 +605,7 @@ export async function sendFollowUpAction(
   }
 
   // Check daily limit
-  const { canSend, remaining } = await checkDailyLimit(session.user.id);
+  const { canSend } = await checkDailyLimit(session.user.id);
   if (!canSend) {
     return {
       email: input.toEmail,

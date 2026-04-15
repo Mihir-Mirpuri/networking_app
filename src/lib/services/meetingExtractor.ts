@@ -20,7 +20,6 @@ import {
   toStorableFormat,
   ParsedMeetingResult,
   ThreadMessage,
-  ThreadParserInput,
 } from '@/lib/services/calendarParser';
 import { detectMeetingInEmail } from '@/lib/utils/meetingDetector';
 
