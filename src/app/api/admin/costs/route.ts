@@ -35,8 +35,8 @@ export async function GET(req: NextRequest) {
     ? new Date(searchParams.get('endDate')!)
     : now;
 
-  // Clamp endDate to end of day
-  endDate.setHours(23, 59, 59, 999);
+  // Clamp endDate to end of day (UTC so date-only strings work correctly)
+  endDate.setUTCHours(23, 59, 59, 999);
 
   const serviceFilter = searchParams.get('service');
   const userIdFilter = searchParams.get('userId');
@@ -56,11 +56,11 @@ export async function GET(req: NextRequest) {
     : Prisma.empty;
 
   const todayStart = new Date(now);
-  todayStart.setHours(0, 0, 0, 0);
+  todayStart.setUTCHours(0, 0, 0, 0);
 
   const weekStart = new Date(now);
-  weekStart.setDate(weekStart.getDate() - 7);
-  weekStart.setHours(0, 0, 0, 0);
+  weekStart.setUTCDate(weekStart.getUTCDate() - 7);
+  weekStart.setUTCHours(0, 0, 0, 0);
 
   // Summary: today
   const todayRows = await prisma.$queryRaw<{ totalCost: number; callCount: bigint }[]>`
