@@ -86,7 +86,7 @@ model User {
   ExtractedMeetingSuggestion ExtractedMeetingSuggestion[]
   searchLogs                 SearchLog[]
   invitations                Invitation[]
-  groqUsageLogs              GroqUsageLog[]
+  apiCostLogs                ApiCostLog[]
 }
 
 model VerificationToken {
@@ -618,37 +618,19 @@ model CompanyAlias {
   @@index([canonicalName])
 }
 
-enum GroqAction {
-  EMAIL_GENERATION
-  EMAIL_REFINEMENT
-  PERSONALIZATION
-  PERSONALIZATION_FOUND_INFO
-  FOLLOW_UP
-  RESUME_PARSE
-  COMPANY_ALIAS
-  CALENDAR_PARSE
-  CALENDAR_THREAD_PARSE
-  SEARCH_FILTER_EXTRACTION
-  DRAFTER_GAP_ANALYSIS
-  DRAFTER_GENERATION
-  DRAFTER_REFINEMENT
-  PERSON_INSIGHT_EXTRACTION
-}
-
-model GroqUsageLog {
-  id               String     @id @default(cuid())
-  userId           String?
-  action           GroqAction
-  model            String
-  promptTokens     Int
-  completionTokens Int
-  totalTokens      Int
-  durationMs       Int?
-  error            Boolean    @default(false)
-  createdAt        DateTime   @default(now())
+model ApiCostLog {
+  id         String   @id @default(cuid())
+  service    String
+  action     String
+  costUsd    Float
+  durationMs Int?
+  userId     String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
+  @@index([service])
   @@index([userId])
   @@index([createdAt])
   @@index([action])
