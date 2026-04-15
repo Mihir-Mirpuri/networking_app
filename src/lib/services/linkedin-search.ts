@@ -12,6 +12,7 @@
 
 import { ApifyClient } from 'apify-client';
 import { log, APIFY_SHORT_COST_PER_PAGE } from '@/lib/services/discovery-logger';
+import { logApiCost, APIFY_SHORT_COST_PER_PAGE as APIFY_SHORT_COST } from '@/lib/services/cost-logger';
 
 const APIFY_API_KEY = process.env.APIFY_API_KEY;
 const ACTOR_ID = 'harvestapi/linkedin-profile-search';
@@ -352,6 +353,19 @@ export async function searchLinkedInShort(
       costUsd: takePages * APIFY_SHORT_COST_PER_PAGE,
     });
 
+    logApiCost({
+      service: 'apify-short',
+      action: 'SEARCH',
+      costUsd: takePages * APIFY_SHORT_COST,
+      durationMs: elapsed,
+      metadata: {
+        profileCount: profiles.length,
+        totalElements: pagination.totalElements,
+        pages: takePages,
+        startPage,
+      },
+    });
+
     return {
       profiles,
       pagination,
@@ -368,6 +382,13 @@ export async function searchLinkedInShort(
       request: actorInput,
       durationMs: elapsed,
       error: error instanceof Error ? error.message : String(error),
+    });
+    logApiCost({
+      service: 'apify-short',
+      action: 'SEARCH',
+      costUsd: takePages * APIFY_SHORT_COST,
+      durationMs: elapsed,
+      metadata: { error: true, pages: takePages, startPage },
     });
     throw error;
   }

@@ -4,6 +4,7 @@
  */
 
 import { log, PERPLEXITY_SONAR_COST_PER_REQUEST } from '@/lib/services/discovery-logger';
+import { logApiCost, PERPLEXITY_SONAR_COST_PER_REQUEST as PERPLEXITY_COST } from '@/lib/services/cost-logger';
 
 interface PerplexityResponse {
   id: string;
@@ -86,6 +87,13 @@ export async function findCompanyLinkedInUrl(
         durationMs: Date.now() - startTime,
         error: `HTTP ${response.status}`,
       }, 'findCompanyLinkedInUrl');
+      logApiCost({
+        service: 'perplexity',
+        action: 'COMPANY_URL_LOOKUP',
+        costUsd: PERPLEXITY_COST,
+        durationMs: Date.now() - startTime,
+        metadata: { companyName, error: true, statusCode: response.status },
+      });
       return null;
     }
 
@@ -119,6 +127,13 @@ export async function findCompanyLinkedInUrl(
         durationMs: Date.now() - startTime,
         costUsd: PERPLEXITY_SONAR_COST_PER_REQUEST,
       }, 'findCompanyLinkedInUrl');
+      logApiCost({
+        service: 'perplexity',
+        action: 'COMPANY_URL_LOOKUP',
+        costUsd: PERPLEXITY_COST,
+        durationMs: Date.now() - startTime,
+        metadata: { companyName, url: null, error: true, reason: 'non-company-url' },
+      });
       return null;
     }
 
@@ -135,6 +150,13 @@ export async function findCompanyLinkedInUrl(
       durationMs: Date.now() - startTime,
       costUsd: PERPLEXITY_SONAR_COST_PER_REQUEST,
     }, 'findCompanyLinkedInUrl');
+    logApiCost({
+      service: 'perplexity',
+      action: 'COMPANY_URL_LOOKUP',
+      costUsd: PERPLEXITY_COST,
+      durationMs: Date.now() - startTime,
+      metadata: { companyName, url },
+    });
     return url;
   } catch (err) {
     console.warn(`[Perplexity] findCompanyLinkedInUrl failed for "${companyName}":`, err);
@@ -149,6 +171,13 @@ export async function findCompanyLinkedInUrl(
       durationMs: Date.now() - startTime,
       error: err instanceof Error ? err.message : String(err),
     }, 'findCompanyLinkedInUrl');
+    logApiCost({
+      service: 'perplexity',
+      action: 'COMPANY_URL_LOOKUP',
+      costUsd: 0,
+      durationMs: Date.now() - startTime,
+      metadata: { companyName, error: true },
+    });
     return null;
   } finally {
     clearTimeout(timeout);
@@ -236,6 +265,13 @@ Rules:
         durationMs: Date.now() - startTime,
         error: fetchErr instanceof Error ? fetchErr.message : String(fetchErr),
       }, 'fetchCompaniesForCategory');
+      logApiCost({
+        service: 'perplexity',
+        action: 'CATEGORY_COMPANIES',
+        costUsd: 0,
+        durationMs: Date.now() - startTime,
+        metadata: { category, role, error: true },
+      });
       throw fetchErr;
     }
 
@@ -253,6 +289,13 @@ Rules:
         durationMs: Date.now() - startTime,
         error: `HTTP ${response.status}`,
       }, 'fetchCompaniesForCategory');
+      logApiCost({
+        service: 'perplexity',
+        action: 'CATEGORY_COMPANIES',
+        costUsd: PERPLEXITY_COST,
+        durationMs: Date.now() - startTime,
+        metadata: { category, role, error: true, statusCode: response.status },
+      });
       throw new Error(`Perplexity API error: ${response.status}`);
     }
 
@@ -279,6 +322,13 @@ Rules:
         costUsd: PERPLEXITY_SONAR_COST_PER_REQUEST,
         error: 'JSON parse failed',
       }, 'fetchCompaniesForCategory');
+      logApiCost({
+        service: 'perplexity',
+        action: 'CATEGORY_COMPANIES',
+        costUsd: PERPLEXITY_COST,
+        durationMs: Date.now() - startTime,
+        metadata: { category, role, error: true, reason: 'json-parse-failed' },
+      });
       throw new Error('Failed to parse Perplexity response');
     }
 
@@ -306,6 +356,13 @@ Rules:
       durationMs: Date.now() - startTime,
       costUsd: PERPLEXITY_SONAR_COST_PER_REQUEST,
     }, 'fetchCompaniesForCategory');
+    logApiCost({
+      service: 'perplexity',
+      action: 'CATEGORY_COMPANIES',
+      costUsd: PERPLEXITY_COST,
+      durationMs: Date.now() - startTime,
+      metadata: { category, role, companyCount: companies.length },
+    });
     return companies;
   } finally {
     clearTimeout(timeout);

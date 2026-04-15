@@ -10,6 +10,7 @@
 
 import OpenAI from 'openai';
 import prisma from '@/lib/prisma';
+import { logApiCost, openaiEmbeddingCost } from '@/lib/services/cost-logger';
 
 const MODEL = 'text-embedding-3-small';
 const DIMENSIONS = 1536;
@@ -41,6 +42,14 @@ export async function generateRoleEmbedding(role: string): Promise<number[] | nu
       model: MODEL,
       input: role.trim(),
       dimensions: DIMENSIONS,
+    });
+    const totalTokens = response.usage?.total_tokens ?? 0;
+    logApiCost({
+      service: 'openai-embeddings',
+      action: 'ROLE_EMBEDDING',
+      costUsd: openaiEmbeddingCost(totalTokens),
+      durationMs: Date.now() - start,
+      metadata: { role: role.trim(), totalTokens },
     });
     console.log(`[Embeddings] Generated embedding for "${role}" in ${Date.now() - start}ms`);
     return response.data[0].embedding;

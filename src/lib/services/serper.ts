@@ -5,6 +5,8 @@
  * Used for LinkedIn profile discovery via `site:linkedin.com/in` queries.
  */
 
+import { logApiCost, SERPER_COST_PER_REQUEST } from '@/lib/services/cost-logger';
+
 const SERPER_API_KEY = process.env.SERPER_API_KEY;
 
 export interface SerperResult {
@@ -58,6 +60,13 @@ export async function searchSerper(query: string, page: number = 1): Promise<Ser
     if (!response.ok) {
       const body = await response.text();
       console.error(`[Serper] API error ${response.status} (${Date.now() - start}ms): ${body.slice(0, 200)}`);
+      logApiCost({
+        service: 'serper',
+        action: 'SEARCH',
+        costUsd: SERPER_COST_PER_REQUEST,
+        durationMs: Date.now() - start,
+        metadata: { query, page, error: true, statusCode: response.status },
+      });
       return [];
     }
 
@@ -69,6 +78,13 @@ export async function searchSerper(query: string, page: number = 1): Promise<Ser
       position: r.position,
     }));
     console.log(`[Serper] ${results.length} results in ${Date.now() - start}ms (page ${page}, query: "${query.slice(0, 80)}")`);
+    logApiCost({
+      service: 'serper',
+      action: 'SEARCH',
+      costUsd: SERPER_COST_PER_REQUEST,
+      durationMs: Date.now() - start,
+      metadata: { query, page, resultCount: results.length },
+    });
     return results;
   } catch (error) {
     console.error(`[Serper] Fetch failed after ${Date.now() - start}ms:`, error instanceof Error ? error.message : error);

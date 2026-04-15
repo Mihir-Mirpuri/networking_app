@@ -24,6 +24,7 @@ import {
   APIFY_FULL_COST_PER_PROFILE_EMAIL,
   APIFY_FULL_COST_PER_PROFILE_NO_EMAIL,
 } from '@/lib/services/discovery-logger';
+import { logApiCost, APIFY_FULL_COST_PER_PROFILE_EMAIL as FULL_COST_EMAIL, APIFY_FULL_COST_PER_PROFILE_NO_EMAIL as FULL_COST_NO_EMAIL } from '@/lib/services/cost-logger';
 
 const APIFY_API_KEY = process.env.APIFY_API_KEY;
 const ACTOR_ID = 'LpVuK3Zozwuipa5bp';
@@ -676,6 +677,19 @@ export async function scrapeLinkedInProfiles(
       costUsd: allProfiles.length * costPerProfile,
     });
 
+    logApiCost({
+      service: 'apify-full',
+      action: 'SCRAPE',
+      costUsd: allProfiles.length * (includeEmail ? FULL_COST_EMAIL : FULL_COST_NO_EMAIL),
+      durationMs: elapsed,
+      metadata: {
+        urlCount: linkedinUrls.length,
+        profileCount: allProfiles.length,
+        failedCount: failedUrls.length,
+        mode: includeEmail ? 'email' : 'no-email',
+      },
+    });
+
     return allProfiles;
   } catch (error) {
     const elapsed = Date.now() - scrapeStart;
@@ -690,6 +704,17 @@ export async function scrapeLinkedInProfiles(
       },
       durationMs: elapsed,
       error: error instanceof Error ? error.message : String(error),
+    });
+    logApiCost({
+      service: 'apify-full',
+      action: 'SCRAPE',
+      costUsd: 0,
+      durationMs: elapsed,
+      metadata: {
+        urlCount: linkedinUrls.length,
+        mode: includeEmail ? 'email' : 'no-email',
+        error: true,
+      },
     });
     throw error;
   }

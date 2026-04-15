@@ -1,3 +1,5 @@
+import { logApiCost, APOLLO_COST_PER_LOOKUP } from '@/lib/services/cost-logger';
+
 const APOLLO_API_KEY = process.env.APOLLO_API_KEY;
 
 interface ApolloEducation {
@@ -151,6 +153,7 @@ export async function findEmail(params: FindEmailParams): Promise<EmailResult> {
 
   console.log(`[Apollo] Looking up: ${firstName} ${lastName} at ${company}${linkedinUrl ? ` (LinkedIn: ${linkedinUrl})` : ''}`);
 
+  const startTime = Date.now();
   try {
     // Build request body with optional LinkedIn URL
     const requestBody: Record<string, string> = {
@@ -177,6 +180,13 @@ export async function findEmail(params: FindEmailParams): Promise<EmailResult> {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('[Apollo] API error:', response.status, errorText);
+      logApiCost({
+        service: 'apollo',
+        action: 'ENRICHMENT',
+        costUsd: APOLLO_COST_PER_LOOKUP,
+        durationMs: Date.now() - startTime,
+        metadata: { company, apolloStatus: 'API_ERROR', statusCode: response.status },
+      });
       return {
         email: null,
         status: 'MISSING',
@@ -205,6 +215,13 @@ export async function findEmail(params: FindEmailParams): Promise<EmailResult> {
 
       console.log(`[Apollo] Found: ${person.email || 'no email'} (${isVerified ? 'verified' : 'unverified'}), location: ${locationStr}, education: ${education?.schoolName || 'unknown'}, employment: ${employment?.company || 'unknown'} - ${employment?.title || 'unknown'}`);
 
+      logApiCost({
+        service: 'apollo',
+        action: 'ENRICHMENT',
+        costUsd: APOLLO_COST_PER_LOOKUP,
+        durationMs: Date.now() - startTime,
+        metadata: { company, apolloStatus: 'SUCCESS', hasEmail: !!person.email },
+      });
       return {
         email: person.email || null,
         status: person.email ? (isVerified ? 'VERIFIED' : 'UNVERIFIED') : 'MISSING',
@@ -222,6 +239,13 @@ export async function findEmail(params: FindEmailParams): Promise<EmailResult> {
     }
 
     console.log(`[Apollo] No person found for ${firstName} ${lastName}`);
+    logApiCost({
+      service: 'apollo',
+      action: 'ENRICHMENT',
+      costUsd: APOLLO_COST_PER_LOOKUP,
+      durationMs: Date.now() - startTime,
+      metadata: { company, apolloStatus: 'NOT_FOUND' },
+    });
     return {
       email: null,
       status: 'MISSING',
@@ -236,6 +260,13 @@ export async function findEmail(params: FindEmailParams): Promise<EmailResult> {
     };
   } catch (error) {
     console.error('[Apollo] Enrichment error:', error);
+    logApiCost({
+      service: 'apollo',
+      action: 'ENRICHMENT',
+      costUsd: 0,
+      durationMs: Date.now() - startTime,
+      metadata: { company, apolloStatus: 'API_ERROR', error: true },
+    });
     return {
       email: null,
       status: 'MISSING',
