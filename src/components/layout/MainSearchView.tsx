@@ -455,6 +455,13 @@ export function MainSearchView({
   }, [isExtracting, isSearching, messages, currentFilters, runSearch]);
 
 
+  // Reset processed-query tracker when chat is cleared so the same suggestion can be re-submitted
+  useEffect(() => {
+    if (messages.length === 0) {
+      lastProcessedQueryRef.current = null;
+    }
+  }, [messages.length]);
+
   // Process pending query from sidebar
   useEffect(() => {
     if (pendingQuery && pendingQuery !== lastProcessedQueryRef.current) {

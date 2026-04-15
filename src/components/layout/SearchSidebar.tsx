@@ -185,11 +185,11 @@ export function SearchSidebar({
                 <div className="flex-1 flex flex-col p-3 overflow-y-auto">
                   <div className="space-y-3">
                     {/* Initial greeting - always shown */}
-                    <div className="flex gap-2 max-w-[85%]">
+                    <div className="flex gap-2 w-[85%]">
                       <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#252525] flex items-center justify-center mt-1">
                         <SignalLogo className="w-3 h-3 text-white" />
                       </div>
-                      <div className={`rounded-2xl px-3 py-2 text-sm text-white rounded-bl-md w-fit bg-[var(--accent)]`}>
+                      <div className={`rounded-2xl px-3 py-2 text-sm text-white rounded-bl-md flex-1 min-w-0 bg-[var(--accent)]`}>
                         <p>Hi{session?.user?.name ? ` ${session.user.name.split(' ')[0]}` : ''}! I&apos;m Signl. Who would you like to find today? Try:</p>
                         <div className="mt-2 space-y-1">
                           <button
@@ -238,11 +238,11 @@ export function SearchSidebar({
                         ) : (
                           // AI message - left-aligned with bubble and Signal logo
                           // Blue for premium (like iMessage), green for free (like SMS), neutral while loading
-                          <div className="flex gap-2 max-w-[85%]">
+                          <div className={`flex gap-2 ${msg.isLoading ? 'w-fit' : 'w-[85%]'}`}>
                             <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#252525] flex items-center justify-center mt-1">
                               <SignalLogo className="w-3 h-3 text-white" />
                             </div>
-                            <div className={`rounded-2xl px-3 py-2 text-sm text-white rounded-bl-md w-fit bg-[var(--accent)]`}>
+                            <div className={`rounded-2xl px-3 py-2 text-sm text-white rounded-bl-md ${msg.isLoading ? 'w-fit' : 'flex-1 min-w-0'} bg-[var(--accent)]`}>
                               {msg.isLoading ? (
                                 <div className="flex items-center gap-1.5 py-1">
                                   <div className="w-1.5 h-1.5 rounded-full bg-[#505050] animate-bounce" style={{ animationDelay: '0ms' }} />
@@ -301,7 +301,7 @@ export function SearchSidebar({
                                             key={i}
                                             onClick={() => onSuggestedSearchClick(s)}
                                             disabled={isExtracting || isSearching}
-                                            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-white bg-[var(--accent-badge-bg)] border border-[var(--accent-border)] rounded-full opacity-60 hover:opacity-100 hover:border-[var(--accent)] transition-all duration-200 disabled:cursor-not-allowed"
+                                            className="flex items-center gap-1.5 px-2.5 py-1.5 max-w-full text-xs font-medium text-white bg-[var(--accent-badge-bg)] border border-[var(--accent-border)] rounded-full opacity-60 hover:opacity-100 hover:border-[var(--accent)] transition-all duration-200 disabled:cursor-not-allowed"
                                           >
                                             <svg className="w-3 h-3 flex-shrink-0 text-white/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                               <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
