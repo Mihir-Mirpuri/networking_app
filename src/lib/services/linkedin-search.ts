@@ -146,6 +146,47 @@ export interface LinkedInSearchResult {
  * Parse location text into city, state, country.
  * Input: "San Francisco, California, United States"
  */
+const KNOWN_COUNTRIES = new Set([
+  'united states', 'united kingdom', 'canada', 'australia', 'india',
+  'germany', 'france', 'brazil', 'mexico', 'japan', 'china', 'singapore',
+  'ireland', 'israel', 'netherlands', 'spain', 'italy', 'sweden',
+  'switzerland', 'south korea', 'united arab emirates', 'malaysia',
+  'south africa', 'new zealand', 'philippines', 'indonesia', 'thailand',
+  'vietnam', 'poland', 'belgium', 'austria', 'denmark', 'norway',
+  'finland', 'portugal', 'czech republic', 'romania', 'hungary',
+  'colombia', 'argentina', 'chile', 'peru', 'nigeria', 'kenya',
+  'egypt', 'pakistan', 'bangladesh', 'sri lanka', 'taiwan',
+  'hong kong', 'états-unis', 'usa',
+]);
+
+const US_STATES = new Set([
+  'alabama', 'alaska', 'arizona', 'arkansas', 'california', 'colorado',
+  'connecticut', 'delaware', 'florida', 'georgia', 'hawaii', 'idaho',
+  'illinois', 'indiana', 'iowa', 'kansas', 'kentucky', 'louisiana',
+  'maine', 'maryland', 'massachusetts', 'michigan', 'minnesota',
+  'mississippi', 'missouri', 'montana', 'nebraska', 'nevada',
+  'new hampshire', 'new jersey', 'new mexico', 'new york', 'north carolina',
+  'north dakota', 'ohio', 'oklahoma', 'oregon', 'pennsylvania',
+  'rhode island', 'south carolina', 'south dakota', 'tennessee', 'texas',
+  'utah', 'vermont', 'virginia', 'washington', 'west virginia',
+  'wisconsin', 'wyoming', 'district of columbia',
+  // Abbreviations
+  'al', 'ak', 'az', 'ar', 'ca', 'co', 'ct', 'de', 'fl', 'ga', 'hi',
+  'id', 'il', 'in', 'ia', 'ks', 'ky', 'la', 'me', 'md', 'ma', 'mi',
+  'mn', 'ms', 'mo', 'mt', 'ne', 'nv', 'nh', 'nj', 'nm', 'ny', 'nc',
+  'nd', 'oh', 'ok', 'or', 'pa', 'ri', 'sc', 'sd', 'tn', 'tx', 'ut',
+  'vt', 'va', 'wa', 'wv', 'wi', 'wy', 'dc',
+]);
+
+/** Returns true if the string looks like a US state or region (e.g. "Texas Metropolitan Area") */
+function isUSStateOrRegion(s: string): boolean {
+  const lower = s.toLowerCase();
+  if (US_STATES.has(lower)) return true;
+  // Handle "Texas Metropolitan Area", "Texas Area", "Virginia Area", etc.
+  const stripped = lower.replace(/\s*(metropolitan\s+)?area$/i, '').trim();
+  return US_STATES.has(stripped);
+}
+
 function parseLocationText(text: string | null | undefined): {
   city: string | null;
   state: string | null;
@@ -158,15 +199,19 @@ function parseLocationText(text: string | null | undefined): {
   if (parts.length >= 3) {
     return { city: parts[0], state: parts[1], country: parts[2] };
   } else if (parts.length === 2) {
-    return { city: parts[0], state: null, country: parts[1] };
+    const second = parts[1];
+    // If the second part is a US state/region, it's "City, State" (not "City, Country")
+    if (isUSStateOrRegion(second)) {
+      return { city: parts[0], state: second, country: 'United States' };
+    }
+    // If it's a known country, it's "City, Country"
+    if (KNOWN_COUNTRIES.has(second.toLowerCase())) {
+      return { city: parts[0], state: null, country: second };
+    }
+    // Default: assume "City, State/Region" (most LinkedIn profiles are US-based)
+    return { city: parts[0], state: second, country: null };
   } else if (parts.length === 1) {
-    const KNOWN_COUNTRIES = [
-      'united states', 'united kingdom', 'canada', 'australia', 'india',
-      'germany', 'france', 'brazil', 'mexico', 'japan', 'china', 'singapore',
-      'ireland', 'israel', 'netherlands', 'spain', 'italy', 'sweden',
-      'switzerland', 'south korea',
-    ];
-    if (KNOWN_COUNTRIES.includes(parts[0].toLowerCase())) {
+    if (KNOWN_COUNTRIES.has(parts[0].toLowerCase())) {
       return { city: null, state: null, country: parts[0] };
     }
     return { city: parts[0], state: null, country: null };

@@ -775,12 +775,13 @@ export function buildPersonWhereClause(filters: Omit<PersonFilters, 'limit'>, sc
     where.company = { contains: company.trim(), mode: 'insensitive' as const };
   }
 
-  // Location filter — split "City, State" and match city OR state
+  // Location filter — split "City, State" and match city, state, OR country
   if (location && location.trim()) {
     const parts = location.split(',').map(p => p.trim()).filter(Boolean);
     const locConditions = parts.flatMap(part => [
       { city: { contains: part, mode: 'insensitive' as const } },
       { state: { contains: part, mode: 'insensitive' as const } },
+      { country: { contains: part, mode: 'insensitive' as const } },
     ]);
     if (!where.AND) where.AND = [];
     (where.AND as unknown[]).push({ OR: locConditions });
