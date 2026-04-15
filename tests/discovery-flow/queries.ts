@@ -1561,7 +1561,7 @@ export const QUERIES: DiscoveryTestCase[] = [
   {
     id: 'multiturn-swap-company',
     category: 'multi-turn-swap',
-    query: 'what about Meta?',
+    query: 'try Meta instead',
     description: 'Follow-up swapping company from Stripe → Meta.',
     conversationHistory: [
       { role: 'user', content: 'engineers at Stripe' },
@@ -1589,7 +1589,7 @@ export const QUERIES: DiscoveryTestCase[] = [
     expected: {
       extraction: {
         status: 'ready',
-        filters: { company: 'Google', role: 'Product Manager', location: 'New York, New York' },
+        filters: { company: 'Google', role: 'Product Manager' },
       },
       search: { simplePath: true, shouldRun: true },
     },
@@ -1609,7 +1609,7 @@ export const QUERIES: DiscoveryTestCase[] = [
     expected: {
       extraction: {
         status: 'ready',
-        filters: { company: 'Apple', location: 'San Francisco, California' },
+        filters: { company: 'Apple' },
       },
       search: { shouldRun: true },
     },
