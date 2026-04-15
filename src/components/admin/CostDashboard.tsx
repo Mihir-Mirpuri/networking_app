@@ -167,7 +167,7 @@ export function CostDashboard() {
 
   if (error) {
     return (
-      <div className="bg-white rounded-xl border border-surface-200 p-5 text-red-600">
+      <div className="bg-surface-100 rounded-xl border border-surface-200 p-5 text-red-600">
         Error: {error}
       </div>
     );
@@ -186,7 +186,7 @@ export function CostDashboard() {
             className={`px-4 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
               rangeDays === days
                 ? 'bg-blue-600 text-white border-blue-600'
-                : 'bg-white text-surface-600 border-surface-200 hover:bg-surface-50'
+                : 'bg-surface-200 text-surface-500 border-surface-300 hover:bg-surface-300'
             }`}
           >
             {label}
@@ -196,7 +196,7 @@ export function CostDashboard() {
 
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-4">
-        <div className="bg-white rounded-xl border border-surface-200 p-5">
+        <div className="bg-surface-100 rounded-xl border border-surface-200 p-5">
           <p className="text-sm text-surface-500 mb-1">Today</p>
           <p className="text-3xl font-bold text-surface-900 font-mono">
             {formatCost(data.summary.today.totalCost)}
@@ -205,7 +205,7 @@ export function CostDashboard() {
             {data.summary.today.callCount.toLocaleString()} calls
           </p>
         </div>
-        <div className="bg-white rounded-xl border border-surface-200 p-5">
+        <div className="bg-surface-100 rounded-xl border border-surface-200 p-5">
           <p className="text-sm text-surface-500 mb-1">Last 7 Days</p>
           <p className="text-3xl font-bold text-surface-900 font-mono">
             {formatCost(data.summary.week.totalCost)}
@@ -214,7 +214,7 @@ export function CostDashboard() {
             {data.summary.week.callCount.toLocaleString()} calls
           </p>
         </div>
-        <div className="bg-white rounded-xl border border-surface-200 p-5">
+        <div className="bg-surface-100 rounded-xl border border-surface-200 p-5">
           <p className="text-sm text-surface-500 mb-1">Last {rangeDays} Days</p>
           <p className="text-3xl font-bold text-surface-900 font-mono">
             {formatCost(data.summary.filtered.totalCost)}
@@ -226,25 +226,28 @@ export function CostDashboard() {
       </div>
 
       {/* Daily spend stacked bar chart */}
-      <div className="bg-white rounded-xl border border-surface-200 p-5">
+      <div className="bg-surface-100 rounded-xl border border-surface-200 p-5">
         <h2 className="text-base font-semibold text-surface-900 mb-4">Daily Spend by Service</h2>
         {dailyChartData.length === 0 ? (
           <p className="text-surface-400 text-sm py-8 text-center">No data</p>
         ) : (
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={dailyChartData} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#303030" />
               <XAxis
                 dataKey="date"
-                tick={{ fontSize: 11, fill: '#64748b' }}
+                tick={{ fontSize: 11, fill: '#b0b0b0' }}
                 tickLine={false}
               />
               <YAxis
-                tick={{ fontSize: 11, fill: '#64748b' }}
+                tick={{ fontSize: 11, fill: '#b0b0b0' }}
                 tickLine={false}
                 tickFormatter={(v) => `$${Number(v).toFixed(3)}`}
               />
               <Tooltip
+                contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #303030', borderRadius: '8px' }}
+                labelStyle={{ color: '#d0d0d0' }}
+                itemStyle={{ color: '#e8e8e8' }}
                 formatter={(value, name) => [
                   formatCost(Number(value ?? 0)),
                   SERVICE_LABELS[String(name)] ?? String(name),
@@ -252,7 +255,7 @@ export function CostDashboard() {
               />
               <Legend
                 formatter={(value) => SERVICE_LABELS[value] ?? value}
-                wrapperStyle={{ fontSize: 12 }}
+                wrapperStyle={{ fontSize: 12, color: '#d0d0d0' }}
               />
               {allServices.map((service, i) => (
                 <Bar
@@ -269,7 +272,7 @@ export function CostDashboard() {
 
       {/* Service breakdown: pie + table */}
       <div className="grid grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl border border-surface-200 p-5">
+        <div className="bg-surface-100 rounded-xl border border-surface-200 p-5">
           <h2 className="text-base font-semibold text-surface-900 mb-4">Spend by Service</h2>
           {pieData.length === 0 ? (
             <p className="text-surface-400 text-sm py-8 text-center">No data</p>
@@ -283,22 +286,28 @@ export function CostDashboard() {
                   cx="50%"
                   cy="50%"
                   outerRadius={90}
-                  label={({ name, percent }) =>
-                    `${name} ${((percent ?? 0) * 100).toFixed(1)}%`
-                  }
+                  label={({ name, percent, x, y, textAnchor }) => (
+                    <text x={x} y={y} textAnchor={textAnchor} fill="#d0d0d0" fontSize={11}>
+                      {`${name} ${((percent ?? 0) * 100).toFixed(1)}%`}
+                    </text>
+                  )}
                   labelLine={false}
                 >
                   {pieData.map((entry, i) => (
                     <Cell key={entry.name} fill={COLORS[i % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value) => formatCost(Number(value ?? 0))} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #303030', borderRadius: '8px' }}
+                  itemStyle={{ color: '#e8e8e8' }}
+                  formatter={(value) => formatCost(Number(value ?? 0))}
+                />
               </PieChart>
             </ResponsiveContainer>
           )}
         </div>
 
-        <div className="bg-white rounded-xl border border-surface-200 overflow-hidden">
+        <div className="bg-surface-100 rounded-xl border border-surface-200 overflow-hidden">
           <div className="px-5 py-4 border-b border-surface-100">
             <h2 className="text-base font-semibold text-surface-900">Service Summary</h2>
           </div>
@@ -345,7 +354,7 @@ export function CostDashboard() {
       </div>
 
       {/* By action */}
-      <div className="bg-white rounded-xl border border-surface-200 overflow-hidden">
+      <div className="bg-surface-100 rounded-xl border border-surface-200 overflow-hidden">
         <div className="px-5 py-4 border-b border-surface-100">
           <h2 className="text-base font-semibold text-surface-900">Spend by Action</h2>
         </div>
@@ -387,7 +396,7 @@ export function CostDashboard() {
       </div>
 
       {/* By user */}
-      <div className="bg-white rounded-xl border border-surface-200 overflow-hidden">
+      <div className="bg-surface-100 rounded-xl border border-surface-200 overflow-hidden">
         <div className="px-5 py-4 border-b border-surface-100">
           <h2 className="text-base font-semibold text-surface-900">Spend by User (Top 20)</h2>
         </div>
