@@ -1151,7 +1151,7 @@ export function ExpandedHistoryReview({
             <button
               onClick={handleSendFollowUp}
               disabled={isSending || isGenerating || !followUpBody.trim()}
-              className={`px-5 py-2 rounded-full ${accentColor} ${accentHover} text-white text-xs font-semibold disabled:opacity-50 transition-colors flex items-center gap-2`}
+              className="btn-primary text-sm rounded-full px-5 py-2 disabled:opacity-50 flex items-center gap-2"
             >
               {isSending ? (
                 <>

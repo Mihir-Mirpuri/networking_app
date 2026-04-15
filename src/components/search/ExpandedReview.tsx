@@ -1309,7 +1309,7 @@ export function ExpandedReview({
             <button
               onClick={limitReached ? () => onLimitReached?.() : handleSend}
               disabled={limitReached ? false : (!canSend || isSending)}
-              className={`px-5 py-2 rounded-full ${accentColor} ${accentHover} text-white text-xs font-semibold disabled:opacity-50 transition-colors`}
+              className="btn-primary text-sm rounded-full px-5 py-2 disabled:opacity-50"
             >
               {isSending ? 'Sending...' : limitReached ? 'Limit reached' : 'Send'}
             </button>
