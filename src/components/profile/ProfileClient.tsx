@@ -242,6 +242,168 @@ let draggingPill: HTMLElement | null = null;
 // Set when a PillInput/PillEditor focuses; intentionally not cleared on blur
 // (clicking the sidebar blurs the editor, but we still want that click to target it).
 let activePlaceholderInsert: ((placeholderKey: string) => void) | null = null;
+// Save the cursor position as character offset when insert variable menu opens
+let savedCursorOffset: number | null = null;
+// Reference to the currently active editor element for saving selection from PlaceholderMenu
+let activeEditorElement: HTMLDivElement | null = null;
+
+// Calculate character offset from selection within editor (matches htmlToText format)
+function getSelectionOffset(el: HTMLElement): number | null {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return null;
+  const range = selection.getRangeAt(0);
+  if (!el.contains(range.startContainer)) return null;
+
+  let offset = 0;
+  let found = false;
+
+  const processNode = (node: Node): boolean => {
+    if (found) return true;
+
+    if (node === range.startContainer) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        offset += range.startOffset;
+      }
+      found = true;
+      return true;
+    }
+
+    if (node.nodeType === Node.TEXT_NODE) {
+      offset += (node.textContent || '').length;
+    } else if (node.nodeType === Node.ELEMENT_NODE) {
+      const elem = node as HTMLElement;
+      if (elem.classList.contains('pill-placeholder')) {
+        // Check if cursor is right after this pill
+        if (range.startContainer === elem.parentNode) {
+          const children = Array.from(elem.parentNode!.childNodes);
+          const pillIndex = children.indexOf(elem);
+          if (range.startOffset === pillIndex + 1) {
+            offset += (elem.getAttribute('data-placeholder') || '').length;
+            found = true;
+            return true;
+          }
+        }
+        offset += (elem.getAttribute('data-placeholder') || '').length;
+      } else if (elem.classList.contains('pill-text') || elem.classList.contains('pill-remove')) {
+        // Skip - handled by parent pill-placeholder
+      } else if (elem.tagName === 'BR') {
+        offset += 1; // newline
+      } else if (elem.tagName === 'DIV' && offset > 0) {
+        offset += 1; // newline before div content
+        for (const child of Array.from(elem.childNodes)) {
+          if (processNode(child)) return true;
+        }
+      } else {
+        for (const child of Array.from(elem.childNodes)) {
+          if (processNode(child)) return true;
+        }
+      }
+    }
+    return false;
+  };
+
+  for (const child of Array.from(el.childNodes)) {
+    if (processNode(child)) break;
+  }
+
+  return found ? offset : null;
+}
+
+// Set cursor at character offset within editor (matches htmlToText format)
+function setCursorAtOffset(el: HTMLElement, targetOffset: number): void {
+  let currentOffset = 0;
+  let cursorSet = false;
+
+  const setSelection = (node: Node, offset: number) => {
+    const range = document.createRange();
+    range.setStart(node, offset);
+    range.collapse(true);
+    const selection = window.getSelection();
+    if (selection) {
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+    cursorSet = true;
+  };
+
+  const setSelectionAfter = (node: Node) => {
+    const range = document.createRange();
+    range.setStartAfter(node);
+    range.collapse(true);
+    const selection = window.getSelection();
+    if (selection) {
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+    cursorSet = true;
+  };
+
+  const processNode = (node: Node): boolean => {
+    if (cursorSet) return true;
+
+    if (node.nodeType === Node.TEXT_NODE) {
+      const text = node.textContent || '';
+      if (currentOffset + text.length >= targetOffset) {
+        setSelection(node, targetOffset - currentOffset);
+        return true;
+      }
+      currentOffset += text.length;
+    } else if (node.nodeType === Node.ELEMENT_NODE) {
+      const elem = node as HTMLElement;
+      if (elem.classList.contains('pill-placeholder')) {
+        const keyLen = (elem.getAttribute('data-placeholder') || '').length;
+        if (currentOffset + keyLen >= targetOffset) {
+          setSelectionAfter(elem);
+          return true;
+        }
+        currentOffset += keyLen;
+      } else if (elem.classList.contains('pill-text') || elem.classList.contains('pill-remove')) {
+        // Skip
+      } else if (elem.tagName === 'BR') {
+        if (currentOffset + 1 >= targetOffset) {
+          setSelectionAfter(elem);
+          return true;
+        }
+        currentOffset += 1;
+      } else if (elem.tagName === 'DIV' && currentOffset > 0) {
+        if (currentOffset + 1 >= targetOffset) {
+          // Cursor at start of this div
+          if (elem.firstChild) {
+            setSelection(elem.firstChild.nodeType === Node.TEXT_NODE ? elem.firstChild : elem, 0);
+          } else {
+            setSelection(elem, 0);
+          }
+          return true;
+        }
+        currentOffset += 1;
+        for (const child of Array.from(elem.childNodes)) {
+          if (processNode(child)) return true;
+        }
+      } else {
+        for (const child of Array.from(elem.childNodes)) {
+          if (processNode(child)) return true;
+        }
+      }
+    }
+    return false;
+  };
+
+  for (const child of Array.from(el.childNodes)) {
+    if (processNode(child)) break;
+  }
+
+  // If cursor not set, place at end
+  if (!cursorSet) {
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(false);
+    const selection = window.getSelection();
+    if (selection) {
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+  }
+}
 
 function insertPillAtCursor(
   editorRef: React.RefObject<HTMLDivElement>,
@@ -251,8 +413,16 @@ function insertPillAtCursor(
   const el = editorRef.current;
   if (!el) return;
   el.focus();
+
+  // Restore cursor position from saved offset if available
+  if (savedCursorOffset !== null) {
+    setCursorAtOffset(el, savedCursorOffset);
+    savedCursorOffset = null;
+  }
+
   const selection = window.getSelection();
   let range: Range;
+
   if (
     selection &&
     selection.rangeCount > 0 &&
@@ -419,9 +589,13 @@ function PillInput({ value, onChange, placeholder }: PillInputProps) {
         onClick={handleClick}
         onFocus={() => {
           setIsFocused(true);
+          activeEditorElement = editorRef.current;
           activePlaceholderInsert = (key) => insertPillAtCursor(editorRef, key, handleInput);
         }}
-        onBlur={() => { setIsFocused(false); syncFromValue(); }}
+        onBlur={() => {
+          setIsFocused(false);
+          syncFromValue();
+        }}
         onPaste={handlePaste}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
@@ -576,9 +750,13 @@ function PillEditor({ value, onChange, placeholder }: PillEditorProps) {
         onClick={handleClick}
         onFocus={() => {
           setIsFocused(true);
+          activeEditorElement = editorRef.current;
           activePlaceholderInsert = (key) => insertPillAtCursor(editorRef, key, handleInput);
         }}
-        onBlur={() => { setIsFocused(false); syncFromValue(); }}
+        onBlur={() => {
+          setIsFocused(false);
+          syncFromValue();
+        }}
         onPaste={handlePaste}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
@@ -632,7 +810,16 @@ function PlaceholderMenu() {
     <div ref={ref} className="relative">
       <button
         type="button"
-        onMouseDown={(e) => e.preventDefault()}
+        onMouseDown={(e) => {
+          e.preventDefault();
+          // Save cursor position NOW before focus is stolen by the search input
+          if (activeEditorElement) {
+            const offset = getSelectionOffset(activeEditorElement);
+            if (offset !== null) {
+              savedCursorOffset = offset;
+            }
+          }
+        }}
         onClick={() => setOpen((o) => !o)}
         className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${
           open

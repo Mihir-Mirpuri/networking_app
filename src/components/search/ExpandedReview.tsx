@@ -966,13 +966,8 @@ export function ExpandedReview({
   };
 
   const handleAttachmentClick = () => {
-    // If no attachment is selected, open file picker directly
-    if (!selectedResumeId) {
-      fileInputRef.current?.click();
-    } else {
-      // If attachment exists, show dropdown
-      setShowResumeDropdown(!showResumeDropdown);
-    }
+    // Always show dropdown with saved attachments + upload option
+    setShowResumeDropdown(!showResumeDropdown);
   };
 
   if (!currentPerson) return null;
@@ -1210,7 +1205,7 @@ export function ExpandedReview({
                   ))}
                   <div className="border-t border-[#333] mt-1 pt-1">
                     <button
-                      onClick={() => { fileInputRef.current?.click(); }}
+                      onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
                       disabled={isUploadingResume}
                       className="w-full text-left px-3 py-2 text-xs text-[#6364FF] hover:bg-[#252525] flex items-center gap-2 disabled:opacity-50"
                     >

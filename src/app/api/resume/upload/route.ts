@@ -5,7 +5,7 @@ import prisma from '@/lib/prisma';
 import { createClient } from '@supabase/supabase-js';
 import { summarizeResume } from '@/lib/services/resume-summary';
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB (Gmail's limit)
 const ALLOWED_MIME_TYPES = [
   'application/pdf',
   'application/msword',
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
       // Create the bucket if it doesn't exist
       const { data: bucketData, error: createError } = await supabase.storage.createBucket('resumes', {
         public: false,
-        fileSizeLimit: 10 * 1024 * 1024, // 10MB
+        fileSizeLimit: 25 * 1024 * 1024, // 25MB (Gmail's limit)
         allowedMimeTypes: ALLOWED_MIME_TYPES,
       });
 
