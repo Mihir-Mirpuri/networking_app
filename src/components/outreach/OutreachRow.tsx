@@ -87,7 +87,7 @@ function CustomCell({ trackerId, columnKey, width, getValue, onChange }: {
             if (e.key === 'Escape') setIsEditing(false);
           }}
           onClick={(e) => e.stopPropagation()}
-          className="w-full bg-[#333] border border-[#505050] rounded px-1.5 py-0.5 text-[13px] text-white outline-none focus:border-[#6364FF] font-['Inter']"
+          className="w-full bg-[#333] border border-[#505050] rounded px-1.5 py-0.5 text-[13px] text-white outline-none focus:border-[var(--accent)] font-['Inter']"
         />
       </div>
     );
@@ -267,7 +267,7 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onToggleStar, onToggl
         return (
           <div className="px-2 flex justify-center shrink-0" style={{ width }} data-column={col}>
             {tracker.notes ? (
-              <svg className="w-4 h-4 text-[#6364FF]" fill="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 text-[var(--accent)]" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm-1 2l5 5h-5V4zM6 20V4h6v6h6v10H6z"/>
                 <path d="M8 12h8v2H8zm0 4h8v2H8z"/>
               </svg>

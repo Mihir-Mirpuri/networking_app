@@ -121,7 +121,7 @@ export function ProfileSidebar({
       {/* Plan badge */}
       <span className={`px-3 py-1 rounded-full text-[10px] font-semibold ${
         isSubscribed
-          ? 'bg-[#6364FF]/15 text-[#6364FF]'
+          ? 'bg-[var(--accent-badge-bg)] text-[var(--accent-text)]'
           : 'bg-[#303030] text-white'
       }`}>
         {isSubscribed ? 'PRO Plan' : 'Free Plan'}

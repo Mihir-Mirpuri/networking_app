@@ -1055,7 +1055,7 @@ export function ExpandedHistoryReview({
                   const text = e.clipboardData.getData('text/plain');
                   document.execCommand('insertText', false, text);
                 }}
-                className={`w-full min-h-[150px] text-sm text-white bg-transparent leading-[1.7] [&_a]:text-[#6364FF] [&_a]:underline [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1 [&_li]:pl-1 ${isGenerating ? 'opacity-50' : ''}`}
+                className={`w-full min-h-[150px] text-sm text-white bg-transparent leading-[1.7] [&_a]:text-[var(--accent)] [&_a]:underline [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1 [&_li]:pl-1 ${isGenerating ? 'opacity-50' : ''}`}
                 style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', outline: 'none', border: 'none', boxShadow: 'none' }}
               />
             </div>
@@ -1072,7 +1072,7 @@ export function ExpandedHistoryReview({
           {selectedResumeId && isComposeMode && (
             <div className="px-5 py-2 flex-shrink-0 border-t border-[#2a2a2a]">
               <div className="flex items-center gap-1">
-                <span className="text-[13px] text-[#6364FF]">
+                <span className="text-[13px] text-[var(--accent)]">
                   {resumes.find(r => r.id === selectedResumeId)?.filename || 'Resume attached'}
                 </span>
                 <div className="flex-1" />
@@ -1114,7 +1114,7 @@ export function ExpandedHistoryReview({
                       }`}
                     >
                       {resume.filename}
-                      {resume.isActive && <span className="text-[#6364FF] ml-1">(Active)</span>}
+                      {resume.isActive && <span className="text-[var(--accent)] ml-1">(Active)</span>}
                     </button>
                   ))}
                 </div>
@@ -1179,7 +1179,7 @@ export function ExpandedHistoryReview({
                   value={linkText}
                   onChange={(e) => setLinkText(e.target.value)}
                   placeholder="Link text"
-                  className="w-full px-3 py-2 text-sm bg-[#141414] border border-[#333] rounded-lg text-white outline-none focus:ring-0 focus:border-[#6364FF] placeholder-[#555]"
+                  className="w-full px-3 py-2 text-sm bg-[#141414] border border-[#333] rounded-lg text-white outline-none focus:ring-0 focus:border-[var(--accent)] placeholder-[#555]"
                 />
               </div>
               <div>
@@ -1190,7 +1190,7 @@ export function ExpandedHistoryReview({
                   onChange={(e) => setLinkUrl(e.target.value)}
                   placeholder="https://"
                   autoFocus
-                  className="w-full px-3 py-2 text-sm bg-[#141414] border border-[#333] rounded-lg text-white outline-none focus:ring-0 focus:border-[#6364FF] placeholder-[#555]"
+                  className="w-full px-3 py-2 text-sm bg-[#141414] border border-[#333] rounded-lg text-white outline-none focus:ring-0 focus:border-[var(--accent)] placeholder-[#555]"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault();
@@ -1210,7 +1210,7 @@ export function ExpandedHistoryReview({
               <button
                 onClick={insertLink}
                 disabled={!linkUrl}
-                className="px-4 py-2 text-sm text-white bg-[#6364FF] rounded-lg hover:bg-[#5354EE] disabled:opacity-50 transition-colors"
+                className="px-4 py-2 text-sm text-white bg-[var(--accent)] rounded-lg hover:bg-[var(--accent-hover)] disabled:opacity-50 transition-colors"
               >
                 Insert
               </button>

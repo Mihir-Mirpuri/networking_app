@@ -106,7 +106,7 @@ export function WelcomeModal({ onClose }: WelcomeModalProps) {
             <div className="relative">
               <SignalLogo className="w-24 h-24 animate-bounce-slow" />
               {/* Glow effect */}
-              <div className="absolute inset-0 blur-2xl bg-[#6364FF]/20 -z-10" />
+              <div className="absolute inset-0 blur-2xl bg-[var(--accent)]/20 -z-10" />
             </div>
           </div>
 
@@ -119,7 +119,7 @@ export function WelcomeModal({ onClose }: WelcomeModalProps) {
 
           {/* Headline */}
           <h1 className="text-3xl font-bold text-white text-center mb-3">
-            Outreach <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#6364FF] to-[#0053CC]">Made Simple</span>
+            Outreach <span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--accent)] to-[#0053CC]">Made Simple</span>
           </h1>
 
           {/* Description */}
@@ -130,8 +130,8 @@ export function WelcomeModal({ onClose }: WelcomeModalProps) {
           {/* Features */}
           <div className="space-y-4 mb-8">
             <div className="flex items-start gap-4">
-              <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-[#6364FF]/10 flex items-center justify-center">
-                <svg className="w-5 h-5 text-[#6364FF]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-[var(--accent)]/10 flex items-center justify-center">
+                <svg className="w-5 h-5 text-[var(--accent-text)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
               </div>
@@ -142,8 +142,8 @@ export function WelcomeModal({ onClose }: WelcomeModalProps) {
             </div>
 
             <div className="flex items-start gap-4">
-              <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-[#6364FF]/10 flex items-center justify-center">
-                <svg className="w-5 h-5 text-[#6364FF]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-[var(--accent)]/10 flex items-center justify-center">
+                <svg className="w-5 h-5 text-[var(--accent-text)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
                 </svg>
               </div>
@@ -154,8 +154,8 @@ export function WelcomeModal({ onClose }: WelcomeModalProps) {
             </div>
 
             <div className="flex items-start gap-4">
-              <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-[#6364FF]/10 flex items-center justify-center">
-                <svg className="w-5 h-5 text-[#6364FF]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-[var(--accent)]/10 flex items-center justify-center">
+                <svg className="w-5 h-5 text-[var(--accent-text)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
                 </svg>
               </div>
@@ -170,7 +170,7 @@ export function WelcomeModal({ onClose }: WelcomeModalProps) {
           <div className="space-y-3">
             <button
               onClick={handleGetStarted}
-              className="w-full py-3 px-6 rounded-xl bg-[#6364FF] hover:bg-[#7879ff] text-white font-semibold transition-all hover:shadow-lg hover:shadow-[#6364FF]/25"
+              className="w-full py-3 px-6 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-semibold transition-all hover:shadow-lg hover:shadow-[var(--accent)]/25"
             >
               Get Started
             </button>

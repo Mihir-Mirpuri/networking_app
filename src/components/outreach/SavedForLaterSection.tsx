@@ -24,7 +24,7 @@ function SearchInput({ value, onChange }: { value: string; onChange: (v: string)
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Search saved profiles..."
-        className="w-full pl-10 pr-4 py-2 bg-[#1a1a1a] border border-[#3a3a3a] rounded-lg text-sm text-white placeholder-[#555] focus:outline-none focus:border-[#6364FF] transition-colors"
+        className="w-full pl-10 pr-4 py-2 bg-[#1a1a1a] border border-[#3a3a3a] rounded-lg text-sm text-white placeholder-[#555] focus:outline-none focus:border-[var(--accent)] transition-colors"
       />
       {value && (
         <button

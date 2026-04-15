@@ -28,7 +28,7 @@ interface ProfileCompletionModalProps {
 }
 
 const inputClass =
-  'w-full bg-[#252525] border border-[#333] rounded-md px-3 py-2 text-sm text-white placeholder-[#666] focus:outline-none focus:border-[#6364FF] transition-colors';
+  'w-full bg-[#252525] border border-[#333] rounded-md px-3 py-2 text-sm text-white placeholder-[#666] focus:outline-none focus:border-[var(--accent)] transition-colors';
 
 export function ProfileCompletionModal({
   open,
@@ -162,7 +162,7 @@ export function ProfileCompletionModal({
           <button
             type="submit"
             disabled={!isValid || saving}
-            className="bg-[#6364FF] hover:bg-[#5253E5] disabled:bg-[#333] disabled:text-[#666] text-white text-sm font-medium px-4 py-2 rounded-md transition-colors"
+            className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:bg-[#333] disabled:text-[#666] text-white text-sm font-medium px-4 py-2 rounded-md transition-colors"
           >
             {saving ? 'Saving…' : 'Save & send'}
           </button>

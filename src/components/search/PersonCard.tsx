@@ -105,7 +105,7 @@ export function PersonCard({
             onClick={(e) => { e.stopPropagation(); onToggleSaveForLater(); }}
             className={`p-1.5 rounded-lg transition-all ${
               person.savedForLater
-                ? 'text-[#6364FF] hover:text-[#5354EE] hover:bg-[#6364FF]/10'
+                ? 'text-[var(--accent-text)] hover:text-[var(--accent-text)] hover:bg-[var(--accent-tint)]'
                 : 'text-white hover:text-white hover:bg-[#404040]'
             }`}
             title={person.savedForLater ? 'Remove from saved' : 'Save for later'}

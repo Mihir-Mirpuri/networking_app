@@ -1106,7 +1106,7 @@ export function ExpandedReview({
                   .replace(/\n/g, '<br>');
                 document.execCommand('insertHTML', false, html);
               }}
-              className={`w-full min-h-[300px] text-sm text-white bg-transparent outline-none leading-[1.7] focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none [&_a]:text-[#6364FF] [&_a]:underline [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1 [&_li]:pl-1 ${isRegenerating || isGeneratingDraft ? 'opacity-50' : ''}`}
+              className={`w-full min-h-[300px] text-sm text-white bg-transparent outline-none leading-[1.7] focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none [&_a]:text-[var(--accent-text)] [&_a]:underline [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1 [&_li]:pl-1 ${isRegenerating || isGeneratingDraft ? 'opacity-50' : ''}`}
               style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
             />
           </div>
@@ -1212,7 +1212,7 @@ export function ExpandedReview({
                     <button
                       onClick={() => { fileInputRef.current?.click(); }}
                       disabled={isUploadingResume}
-                      className="w-full text-left px-3 py-2 text-xs text-[#6364FF] hover:bg-[#252525] flex items-center gap-2 disabled:opacity-50"
+                      className="w-full text-left px-3 py-2 text-xs text-[var(--accent-text)] hover:bg-[#252525] flex items-center gap-2 disabled:opacity-50"
                     >
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -1278,7 +1278,7 @@ export function ExpandedReview({
                         value={linkText}
                         onChange={(e) => setLinkText(e.target.value)}
                         placeholder="Text to display"
-                        className="w-full px-2.5 py-1.5 text-xs bg-[#141414] border border-[#333] rounded text-white outline-none focus:border-[#6364FF] placeholder-[#555]"
+                        className="w-full px-2.5 py-1.5 text-xs bg-[#141414] border border-[#333] rounded text-white outline-none focus:border-[var(--accent)] placeholder-[#555]"
                       />
                     )}
                     <div className="flex gap-2">
@@ -1288,7 +1288,7 @@ export function ExpandedReview({
                         onChange={(e) => setLinkUrl(e.target.value)}
                         placeholder="Paste or type a link"
                         autoFocus
-                        className="flex-1 px-2.5 py-1.5 text-xs bg-[#141414] border border-[#333] rounded text-white outline-none focus:border-[#6364FF] placeholder-[#555]"
+                        className="flex-1 px-2.5 py-1.5 text-xs bg-[#141414] border border-[#333] rounded text-white outline-none focus:border-[var(--accent)] placeholder-[#555]"
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
                             e.preventDefault();
@@ -1306,7 +1306,7 @@ export function ExpandedReview({
                       <button
                         onClick={() => { insertLink(); setLinkPopoverPos(null); }}
                         disabled={!linkUrl}
-                        className="px-3 py-1.5 text-xs text-white bg-[#6364FF] rounded hover:bg-[#5354EE] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="px-3 py-1.5 text-xs text-white bg-[var(--accent)] rounded hover:bg-[var(--accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       >
                         Apply
                       </button>
@@ -1365,7 +1365,7 @@ export function ExpandedReview({
               <button
                 onClick={handleSchedule}
                 disabled={isScheduling || !scheduledDateTime}
-                className="px-4 py-2 text-sm text-white bg-[#6364FF] rounded-lg hover:bg-[#5354EE] disabled:opacity-50 transition-colors"
+                className="px-4 py-2 text-sm text-white bg-[var(--accent)] rounded-lg hover:bg-[var(--accent-hover)] disabled:opacity-50 transition-colors"
               >
                 {isScheduling ? 'Scheduling...' : 'Schedule'}
               </button>
