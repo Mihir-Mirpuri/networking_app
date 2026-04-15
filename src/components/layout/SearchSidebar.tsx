@@ -422,6 +422,7 @@ export function SearchSidebar({
                     }}
                     placeholder="Describe who you're looking for..."
                     disabled={isSearching}
+                    maxLength={500}
                     rows={1}
                     className="w-full px-3 pr-10 py-2.5 text-sm bg-transparent border-none text-white placeholder-[#505050] focus:outline-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 disabled:opacity-60 disabled:cursor-not-allowed resize-none"
                     style={{ maxHeight: '80px' }}

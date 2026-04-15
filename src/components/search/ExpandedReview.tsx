@@ -414,6 +414,7 @@ function ChatSidebar() {
             onKeyDown={handleKeyDown}
             placeholder="Ask me to edit this email..."
             disabled={isProcessing}
+            maxLength={1000}
             rows={1}
             className="w-full px-3 pr-10 py-2.5 text-sm bg-transparent border-none text-white placeholder-[#505050] focus:outline-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 disabled:opacity-60 disabled:cursor-not-allowed resize-none"
             style={{ maxHeight: '80px' }}

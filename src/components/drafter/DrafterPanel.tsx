@@ -116,6 +116,7 @@ export function DrafterPanel() {
                           : 'Type your answer...'
                       }
                       disabled={isProcessing || phase === 'drafting'}
+                      maxLength={1000}
                       rows={1}
                       className="w-full px-3 py-2.5 pr-10 text-sm bg-[#1a1a1a] border border-[#303030] rounded-lg text-white placeholder:text-[#404040] focus:outline-none focus:ring-0 focus:border-[#303030] disabled:opacity-50 disabled:cursor-not-allowed resize-none transition-colors"
                       style={{ minHeight: '42px', maxHeight: '120px' }}
