@@ -157,70 +157,6 @@ const PLACEHOLDER_CATEGORIES = [
 // Flatten for backward compatibility
 const DEFAULT_PLACEHOLDERS = PLACEHOLDER_CATEGORIES.flatMap(cat => cat.placeholders.map(p => p.key));
 
-// ─── Draggable Placeholder Pill ────────────────────────────────────────────────
-
-interface DraggablePillProps {
-  placeholderKey: string;
-  label: string;
-  isSelected: boolean;
-  onToggle: () => void;
-}
-
-function DraggablePill({ placeholderKey, label, isSelected, onToggle }: DraggablePillProps) {
-  const handleDragStart = (e: React.DragEvent) => {
-    e.dataTransfer.setData('text/plain', placeholderKey);
-    e.dataTransfer.setData('application/x-placeholder', placeholderKey);
-    e.dataTransfer.effectAllowed = 'copy';
-  };
-
-  const handleInsert = (e: React.MouseEvent) => {
-    e.preventDefault();
-    if (activePlaceholderInsert) {
-      activePlaceholderInsert(placeholderKey);
-    }
-  };
-
-  const handleInfo = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    onToggle();
-  };
-
-  return (
-    <span
-      draggable
-      onDragStart={handleDragStart}
-      className={`group inline-flex items-stretch rounded-md text-[11px] font-medium transition-all cursor-grab active:cursor-grabbing select-none border ${
-        isSelected
-          ? 'bg-[#6364FF]/20 border-[#6364FF]/60 text-white'
-          : 'bg-[#6364FF]/10 border-[#6364FF]/30 text-[#a5a6ff] hover:bg-[#6364FF]/20 hover:border-[#6364FF]/55 hover:text-white'
-      }`}
-      title="Click to insert · drag to position · ⓘ for details"
-    >
-      <button
-        type="button"
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={handleInsert}
-        className="pl-2.5 pr-1.5 py-[3px] rounded-l-md"
-      >
-        {label}
-      </button>
-      <button
-        type="button"
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={handleInfo}
-        aria-label={`About ${label}`}
-        className="pr-2 pl-1 py-[3px] opacity-60 hover:opacity-100 rounded-r-md border-l border-[#6364FF]/25 flex items-center"
-      >
-        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-          <circle cx="12" cy="12" r="9" />
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 11v5M12 8h.01" />
-        </svg>
-      </button>
-    </span>
-  );
-}
-
 // ─── Shared pill utilities ─────────────────────────────────────────────────────
 
 const PILL_STYLE = 'display:inline-flex;align-items:center;gap:4px;padding:1px 5px 1px 8px;margin:0 2px;border-radius:6px;font-size:12px;font-weight:500;background:rgba(99,100,255,0.12);border:1px solid rgba(99,100,255,0.35);color:#a5a6ff;white-space:nowrap;vertical-align:baseline;cursor:grab;';
@@ -655,138 +591,100 @@ function PillEditor({ value, onChange, placeholder }: PillEditorProps) {
   );
 }
 
-// ─── Placeholders Sidebar ─────────────────────────────────────────────────────
+// ─── Insert-Variable Menu (compact popover) ───────────────────────────────────
 
-function PlaceholdersSidebar() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [expandedPill, setExpandedPill] = useState<string | null>(null);
+function PlaceholderMenu() {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const ref = useRef<HTMLDivElement>(null);
 
-  // Filter placeholders based on search query
-  const filteredCategories = PLACEHOLDER_CATEGORIES.map(category => ({
-    ...category,
-    placeholders: category.placeholders.filter(p =>
-      searchQuery === '' ||
-      p.key.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.description.toLowerCase().includes(searchQuery.toLowerCase())
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const q = query.trim().toLowerCase();
+  const filtered = PLACEHOLDER_CATEGORIES.map((c) => ({
+    ...c,
+    placeholders: c.placeholders.filter(
+      (p) => !q || p.label.toLowerCase().includes(q) || p.description.toLowerCase().includes(q)
     ),
-  })).filter(category => category.placeholders.length > 0);
+  })).filter((c) => c.placeholders.length > 0);
 
-  const handlePillToggle = (key: string) => {
-    setExpandedPill(prev => prev === key ? null : key);
+  const insert = (key: string) => {
+    if (activePlaceholderInsert) activePlaceholderInsert(key);
+    setOpen(false);
+    setQuery('');
   };
 
-  const totalCount = filteredCategories.reduce((n, c) => n + c.placeholders.length, 0);
-
   return (
-    <div className="flex flex-col h-full w-80 bg-[#141414] border-r border-[#2a2a2a] relative">
-      {/* subtle ambient accent */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{ background: 'radial-gradient(400px 200px at 50% -10%, rgba(99,100,255,0.05), transparent 70%)' }}
-      />
-
-      {/* Header — eyebrow style, matching main editor */}
-      <div className="relative px-5 pt-6 pb-4">
-        <div className="flex items-center gap-2.5 mb-4">
-          <span className="relative flex h-1.5 w-1.5">
-            <span className="absolute inset-0 rounded-full bg-[#6364FF] animate-ping opacity-60" />
-            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#6364FF]" />
-          </span>
-          <span className="text-[11px] uppercase tracking-[0.1em] text-[#606060]">Placeholders</span>
-          <span className="ml-auto text-[10px] text-[#505050] tabular-nums">{totalCount}</span>
-        </div>
-
-        {/* Title */}
-        <h3 className="text-[20px] leading-tight tracking-[-0.01em] text-white font-[family-name:var(--font-outfit)] font-normal">
-          Drag to insert
-        </h3>
-        <p className="mt-1 text-[12px] text-[#606060] leading-relaxed">
-          Tap a pill for its definition, or drag it into the subject or body.
-        </p>
-      </div>
-
-      {/* Search bar */}
-      <div className="relative px-5 pb-4">
-        <div className="relative">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#505050]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-          </svg>
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search placeholders"
-            className="w-full pl-9 pr-8 py-2 text-[12px] bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg text-white placeholder-[#505050] outline-none focus:border-[#6364FF] focus:ring-2 focus:ring-[#6364FF]/15 transition-all"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-[#505050] hover:text-white transition-colors"
-              aria-label="Clear search"
-            >
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-              </svg>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Accent rule matching the main editor */}
-      <div
-        className="relative h-px mx-5"
-        style={{ background: 'linear-gradient(90deg, #6364FF 0%, #6364FF 36px, #2a2a2a 36px, #2a2a2a 100%)' }}
-      />
-
-      {/* Placeholders content */}
-      <div className="relative flex-1 overflow-y-auto px-5 pt-5 pb-6">
-        {filteredCategories.map((category) => {
-          const selectedInCategory = category.placeholders.find(p => p.key === expandedPill);
-
-          return (
-            <div key={category.name} className="mb-5 last:mb-0">
-              <div className="flex items-center gap-2.5 mb-2.5">
-                <h4 className="text-[10px] font-medium text-[#606060] uppercase tracking-[0.18em]">
-                  {category.name}
-                </h4>
-                <div className="flex-1 h-px bg-gradient-to-r from-[#2a2a2a] to-transparent" />
-                <span className="text-[10px] text-[#404040] tabular-nums">{category.placeholders.length}</span>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {category.placeholders.map((placeholder) => (
-                  <DraggablePill
-                    key={placeholder.key}
-                    placeholderKey={placeholder.key}
-                    label={placeholder.label}
-                    isSelected={expandedPill === placeholder.key}
-                    onToggle={() => handlePillToggle(placeholder.key)}
-                  />
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => setOpen((o) => !o)}
+        className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${
+          open
+            ? 'bg-[#6364FF]/15 text-white'
+            : 'text-[#9c9dff] hover:text-white hover:bg-[#6364FF]/10'
+        }`}
+      >
+        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+        </svg>
+        Insert variable
+      </button>
+      {open && (
+        <div
+          className="absolute right-0 top-[calc(100%+6px)] w-72 bg-[#161616] border border-[#2a2a2a] rounded-xl z-20 overflow-hidden"
+          style={{ boxShadow: '0 20px 50px rgba(0,0,0,0.6)' }}
+          onMouseDown={(e) => e.preventDefault()}
+        >
+          <div className="p-2 border-b border-[#252525]">
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search variables"
+              autoFocus
+              className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-md px-2.5 py-1.5 text-[12px] text-white placeholder:text-[#505050] outline-none focus:border-[#6364FF] transition-colors"
+            />
+          </div>
+          <div className="max-h-[280px] overflow-y-auto p-1.5">
+            {filtered.map((cat) => (
+              <div key={cat.name} className="mb-1.5 last:mb-0">
+                <div className="px-2 pt-1 pb-1 text-[9px] font-medium uppercase tracking-[0.14em] text-[#606060]">
+                  {cat.name}
+                </div>
+                {cat.placeholders.map((p) => (
+                  <button
+                    key={p.key}
+                    type="button"
+                    onClick={() => insert(p.key)}
+                    className="w-full px-2 py-1.5 rounded-md text-left text-[12px] text-[#c8c9d6] hover:bg-[#6364FF]/12 hover:text-white transition-colors font-mono"
+                  >
+                    {p.label}
+                  </button>
                 ))}
               </div>
-              {selectedInCategory && (
-                <div className="mt-3 px-3 py-2.5 rounded-lg bg-[#1a1a1a] border border-[#2a2a2a]">
-                  <p className="text-[11px] text-[#d0d0d0] leading-relaxed">
-                    {selectedInCategory.description}
-                  </p>
-                </div>
-              )}
-            </div>
-          );
-        })}
-
-        {filteredCategories.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-            <div className="w-10 h-10 rounded-full border border-dashed border-[#2a2a2a] flex items-center justify-center mb-3">
-              <svg className="w-4 h-4 text-[#404040]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-              </svg>
-            </div>
-            <p className="text-[12px] text-[#606060]">No placeholders match</p>
-            <p className="text-[11px] text-[#404040] mt-0.5">&ldquo;{searchQuery}&rdquo;</p>
+            ))}
+            {filtered.length === 0 && (
+              <div className="px-3 py-8 text-center text-[11px] text-[#606060]">No matches</div>
+            )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -838,6 +736,10 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
+
+  // Contact modal state
+  const [showContactModal, setShowContactModal] = useState(false);
+  const [contactCopied, setContactCopied] = useState(false);
 
   useEffect(() => {
     if (status === 'authenticated') {
@@ -1038,9 +940,9 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
     .toUpperCase();
 
   const TAB_TITLES: Record<string, { title: string; subtitle: string }> = {
-    account: { title: 'Account', subtitle: 'Manage your profile, plan, and account' },
-    resumes: { title: 'Attachments', subtitle: 'Upload and manage files to personalize your outreach' },
-    templates: { title: 'Templates', subtitle: 'Browse and manage your email templates' },
+    account: { title: 'Account', subtitle: 'Your profile, plan, and preferences' },
+    resumes: { title: 'Attachments', subtitle: 'Files you can attach to outreach emails' },
+    templates: { title: 'Templates', subtitle: 'Reusable email templates for outreach' },
   };
 
   const currentTab = activeTab || 'account';
@@ -1051,8 +953,12 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
       {/* Header */}
       <header className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-[22px] font-bold tracking-tight">{tabInfo.title}</h1>
-          <p className="text-white text-[13px] mt-1">{tabInfo.subtitle}</p>
+          {currentTab !== 'account' && (
+            <>
+              <h1 className="text-[22px] font-bold tracking-tight">{tabInfo.title}</h1>
+              <p className="text-white text-[13px] mt-1">{tabInfo.subtitle}</p>
+            </>
+          )}
         </div>
         {currentTab === 'resumes' && (
           <label className="bg-[#6364FF] text-white text-[13px] font-semibold px-5 py-2.5 rounded-full hover:bg-[#5354EE] transition-colors cursor-pointer flex items-center gap-2">
@@ -1090,129 +996,385 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
         {currentTab === 'account' && (
         <div className="flex flex-col gap-4">
           {isLoadingProfile || isLoadingSubscription ? (
-            <div className="animate-pulse space-y-4">
-              <div className="flex gap-4">
-                <div className="flex-1 h-64 bg-[#252525] rounded-xl" />
-                <div className="flex-1 flex flex-col gap-4">
-                  <div className="flex-1 h-28 bg-[#252525] rounded-xl" />
-                  <div className="flex-1 h-28 bg-[#252525] rounded-xl" />
+            <div className="animate-pulse max-w-5xl">
+              <div className="h-24 bg-[#252525] rounded-2xl mb-6" />
+              <div className="grid gap-6 lg:grid-cols-[2fr_3fr]">
+                <div className="space-y-6">
+                  <div className="h-56 bg-[#252525] rounded-2xl" />
+                  <div className="h-40 bg-[#252525] rounded-2xl" />
+                </div>
+                <div className="space-y-6">
+                  <div className="h-72 bg-[#252525] rounded-2xl" />
+                  <div className="h-36 bg-[#252525] rounded-2xl" />
                 </div>
               </div>
-              <div className="h-16 bg-[#252525] rounded-xl" />
             </div>
           ) : (
-            <>
-              {/* Bento grid — top */}
-              <div className="flex gap-4" style={{ minHeight: 280 }}>
-                {/* Profile card — left */}
-                <div className="flex-1 bg-[#252525] border border-[#3a3a3a] rounded-xl p-8 flex flex-col items-center justify-center gap-4">
-                  {userImage ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={userImage} alt={userName} className="w-24 h-24 rounded-full ring-2 ring-[#303030]" />
-                  ) : (
-                    <div className="w-24 h-24 rounded-full bg-[#6364FF] flex items-center justify-center text-2xl font-bold text-white">
-                      {(profile.name || userName || '?').split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()}
-                    </div>
-                  )}
-                  <span className="text-2xl font-bold text-white">{profile.name || userName}</span>
-                  <span className="text-sm text-[#707070]">{userEmail}</span>
-                  {/* University chip */}
-                  <div className="relative">
-                    <SearchableCombobox
-                      options={UNIVERSITIES}
-                      value={profile.university || ''}
-                      onChange={(value) => setProfile({ ...profile, university: value })}
-                      label=""
-                      placeholder="Select university..."
-                      id="university-bento"
-                    />
-                  </div>
-                  {/* Plan badge */}
-                  <span className={`px-3.5 py-1.5 rounded-full text-xs font-semibold ${
-                    subscription.isSubscribed
-                      ? 'bg-[#6364FF]/15 text-[#6364FF]'
-                      : 'bg-[#303030] text-white'
-                  }`}>
-                    {subscription.isSubscribed ? 'PRO Plan' : 'Free Plan'}
-                  </span>
-                </div>
+            <div className="group w-full max-w-5xl rounded-3xl border border-[#3a3a3a] bg-[#252525]/85 p-6 sm:p-10 relative overflow-hidden backdrop-blur-xl">
+              {/* Subtle hover wash */}
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#6364FF]/[0.05] via-transparent to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+              />
+              {/* Top gradient hairline */}
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#6364FF]/40 to-transparent"
+              />
 
-                {/* Right stack */}
-                <div className="flex-1 flex flex-col gap-4">
-                  {/* Subscription tile */}
-                  <div className="flex-1 bg-[#252525] border border-[#3a3a3a] rounded-xl p-6 flex flex-col gap-4">
-                    <svg className="w-6 h-6 text-[#6364FF]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" />
+              {/* Header */}
+              <div className="relative mb-10">
+                <div className="inline-flex items-center gap-2 rounded-full border border-[#3a3a3a] bg-white/5 px-3 py-1 text-[10px] uppercase tracking-[0.28em] text-[#909090]">
+                  Account
+                </div>
+                <h2 className="mt-3 text-2xl font-semibold text-white tracking-tight sm:text-[28px]">
+                  Manage your Profile
+                </h2>
+              </div>
+
+              {/* Body grid */}
+              <div className="relative grid gap-6 lg:grid-cols-[2fr_3fr] lg:items-stretch">
+
+                {/* LEFT COLUMN */}
+                <div className="flex flex-col gap-6">
+                  {/* Identity */}
+                  <div className="relative rounded-2xl border border-[#3a3a3a] bg-[#1e1e1e]/70 p-6 backdrop-blur overflow-hidden">
+                    {/* Ambient glow, top-right (subtle, echoes neighbors) */}
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute -top-16 -right-16 h-44 w-44 rounded-full bg-[#6364FF]/[0.06] blur-3xl"
+                    />
+                    {/* Concentric ring backdrop behind avatar */}
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute -left-6 -top-6 h-36 w-36 rounded-full border border-[#6364FF]/10"
+                    />
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute -left-2 -top-2 h-28 w-28 rounded-full border border-[#6364FF]/[0.08]"
+                    />
+
+                    <div className="relative">
+                      <div className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-[#6364FF]">
+                        Identity
+                      </div>
+                      <p className="mt-2 text-xs text-[#909090]">How you appear in outreach.</p>
+                    </div>
+
+                    <div className="relative mt-5 flex items-center gap-4">
+                      {/* Avatar with pulse ring */}
+                      <div className="relative shrink-0">
+                        <span
+                          aria-hidden="true"
+                          className="absolute inset-0 rounded-full bg-[#6364FF]/30 blur-md"
+                        />
+                        {userImage ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={userImage}
+                            alt={userName}
+                            className="relative w-14 h-14 rounded-full ring-2 ring-[#6364FF]/40"
+                          />
+                        ) : (
+                          <div className="relative w-14 h-14 rounded-full bg-gradient-to-br from-[#7B7CFF] to-[#4E4FDB] flex items-center justify-center text-base font-bold text-white ring-2 ring-[#6364FF]/40">
+                            {(profile.name || userName || '?').split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()}
+                          </div>
+                        )}
+                        {/* Google connection dot */}
+                        <span
+                          className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#1e1e1e] ring-2 ring-[#1e1e1e]"
+                          title="Connected with Google"
+                        >
+                          <svg className="w-2.5 h-2.5" viewBox="0 0 24 24">
+                            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                          </svg>
+                        </span>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[15px] font-semibold text-white truncate">{profile.name || userName}</p>
+                        <p className="text-xs text-[#909090] truncate">{userEmail}</p>
+                        <div className="mt-1.5 inline-flex items-center gap-1.5 text-[10px] text-[#707070]">
+                          <span className="h-1 w-1 rounded-full bg-[#22C55E]" />
+                          Signed in with Google
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Support */}
+                  <div className="relative rounded-2xl border border-[#3a3a3a] bg-[#1e1e1e]/70 p-6 backdrop-blur flex-1 flex flex-col overflow-hidden">
+                    {/* Ambient glow echoing the Pro card */}
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute -bottom-20 -left-20 h-52 w-52 rounded-full bg-[#6364FF]/[0.07] blur-3xl"
+                    />
+                    {/* Decorative chat-bubble cluster */}
+                    <svg
+                      aria-hidden="true"
+                      className="pointer-events-none absolute top-5 right-5 w-16 h-16 text-[#6364FF]/25"
+                      viewBox="0 0 64 64"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={1.5}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M10 16a6 6 0 0 1 6-6h24a6 6 0 0 1 6 6v14a6 6 0 0 1-6 6H24l-8 6v-6h0a6 6 0 0 1-6-6V16z" />
+                      <path d="M26 40v2a6 6 0 0 0 6 6h14l6 4v-4a6 6 0 0 0 0-12" opacity="0.6" />
                     </svg>
-                    <div>
-                      <h3 className="text-[15px] font-semibold text-white">Subscription</h3>
-                      <p className="text-xs text-[#707070] mt-1">
-                        {subscription.isSubscribed
-                          ? `$20/month · Renews ${subscription.currentPeriodEnd ? new Date(subscription.currentPeriodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'soon'}`
-                          : '10 emails/day · Free forever'}
+
+                    <div className="relative">
+                      <div className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-[#6364FF]">
+                        Support
+                      </div>
+                      <h3 className="mt-3 text-[17px] font-semibold text-white tracking-tight">
+                        Talk to the team
+                      </h3>
+                      <p className="mt-1.5 text-[12.5px] text-[#909090] leading-relaxed max-w-[26ch]">
+                        Questions, feedback, or ideas — we&apos;re real humans and we read every message.
                       </p>
                     </div>
+
                     <div className="flex-1" />
+
+                    {/* Response-time line */}
+                    <div className="relative mt-5 flex items-center gap-2 text-[11px] text-[#808080]">
+                      <span className="relative flex h-1.5 w-1.5">
+                        <span className="absolute inline-flex h-full w-full rounded-full bg-[#22C55E] opacity-60 animate-ping" />
+                        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#22C55E]" />
+                      </span>
+                      Typically replies within a day
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => { setShowContactModal(true); setContactCopied(false); }}
+                      className="group/mail relative mt-6 w-full rounded-full border border-[#3a3a3a] bg-white/5 px-5 py-2.5 text-[12.5px] font-medium text-[#d0d0d0] hover:text-[#6364FF] hover:border-[#6364FF]/50 transition-colors text-center flex items-center justify-center gap-2"
+                    >
+                      Email the team
+                      <svg className="w-3.5 h-3.5 transition-transform duration-300 group-hover/mail:translate-x-0.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                {/* RIGHT COLUMN — Pro showcase */}
+                <div className="relative rounded-2xl border border-[#6364FF]/30 bg-[#1e1e1e]/70 p-7 backdrop-blur flex flex-col overflow-hidden">
+                  {/* Ambient indigo glow, top-right */}
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute -top-24 -right-24 h-64 w-64 rounded-full bg-[#6364FF]/20 blur-3xl"
+                  />
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#6364FF]/70 to-transparent"
+                  />
+                  {/* Decorative sparkle */}
+                  <svg
+                    aria-hidden="true"
+                    className="pointer-events-none absolute top-6 right-6 w-5 h-5 text-[#6364FF]/40"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                  >
+                    <path d="M12 2l1.5 7.5L21 12l-7.5 2.5L12 22l-1.5-7.5L3 12l7.5-2.5L12 2z" />
+                  </svg>
+
+                  {/* Header */}
+                  <div className="relative">
+                    <div className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-[#6364FF]">
+                      Signl Pro
+                      {subscription.isSubscribed && (
+                        <span className="ml-1.5 rounded-full bg-[#6364FF]/20 px-2 py-0.5 text-[9px] tracking-[0.15em] text-[#6364FF]">
+                          Current
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="mt-3 text-xl font-semibold text-white tracking-tight">
+                      {subscription.isSubscribed
+                        ? 'Your premium workspace'
+                        : 'Unlock the full Signl experience'}
+                    </h3>
+                    <div className="mt-3 flex items-baseline gap-1.5">
+                      <span className="text-4xl font-semibold text-white tracking-tight">$20</span>
+                      <span className="text-[13px] text-[#909090]">/ month</span>
+                    </div>
+                    <p className="mt-1.5 text-[12px] text-[#909090]">
+                      {subscription.isSubscribed
+                        ? `Renews ${
+                            subscription.currentPeriodEnd
+                              ? new Date(subscription.currentPeriodEnd).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
+                              : 'next cycle'
+                          }. Cancel anytime.`
+                        : 'Cancel anytime. No hidden fees.'}
+                    </p>
+                  </div>
+
+                  {/* Divider */}
+                  <div className="relative my-6 h-px bg-gradient-to-r from-transparent via-[#3a3a3a] to-transparent" />
+
+                  {/* What's included */}
+                  <div className="relative flex-1">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#707070] mb-4">
+                      What&apos;s included
+                    </p>
+                    <ul className="space-y-3.5">
+                      {[
+                        'Unlimited AI people search',
+                        'Unlimited emails sent',
+                        'Unlimited AI email assistant',
+                        'Blue AI chat bubbles',
+                      ].map((label) => (
+                        <li key={label} className="flex items-center gap-3">
+                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[#6364FF]/50 bg-[#6364FF]/15 text-[#6364FF] shadow-[0_0_12px_-2px_rgba(99,100,255,0.4)]">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                            </svg>
+                          </span>
+                          <span className="text-[13.5px] text-[#e0e0e0]">{label}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* CTA */}
+                  <div className="relative mt-7">
                     {subscription.isSubscribed ? (
                       <button
+                        type="button"
                         onClick={async () => { setIsPortalLoading(true); try { await createCustomerPortalSession(); } catch { setIsPortalLoading(false); } }}
                         disabled={isPortalLoading}
-                        className="w-full py-2.5 bg-[#6364FF] text-white text-xs font-semibold rounded-lg hover:bg-[#5354EE] transition-colors disabled:opacity-50"
+                        className="w-full rounded-full border border-[#3a3a3a] bg-white/5 px-6 py-3 text-[13px] font-semibold text-[#d0d0d0] hover:text-white hover:border-[#505050] transition-colors disabled:opacity-50"
                       >
-                        {isPortalLoading ? 'Loading...' : 'Manage Plan'}
+                        {isPortalLoading ? 'Loading…' : 'Manage plan'}
                       </button>
                     ) : (
                       <button
+                        type="button"
                         onClick={async () => { setIsCheckoutLoading(true); try { await createCheckoutSession(); } catch { setIsCheckoutLoading(false); } }}
                         disabled={isCheckoutLoading}
-                        className="w-full py-2.5 bg-[#6364FF] text-white text-xs font-semibold rounded-lg hover:bg-[#5354EE] transition-colors disabled:opacity-50"
+                        className="group/cta w-full rounded-full bg-[#6364FF] px-6 py-3.5 text-[14px] font-semibold text-white shadow-[0_20px_60px_-20px_rgba(99,100,255,0.8)] hover:-translate-y-0.5 hover:bg-[#5354EE] transition-all duration-300 disabled:opacity-50 flex items-center justify-center gap-2"
                       >
-                        {isCheckoutLoading ? 'Loading...' : 'Upgrade to Pro'}
+                        {isCheckoutLoading ? 'Loading…' : (
+                          <>
+                            Upgrade to Pro
+                            <svg className="w-4 h-4 transition-transform duration-300 group-hover/cta:translate-x-0.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                            </svg>
+                          </>
+                        )}
                       </button>
                     )}
                   </div>
-
-                  {/* Feedback tile */}
-                  <div className="flex-1 bg-[#252525] border border-[#3a3a3a] rounded-xl p-6 flex flex-col gap-4">
-                    <svg className="w-6 h-6 text-[#22C55E]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 0 1-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8Z" />
-                    </svg>
-                    <div>
-                      <h3 className="text-[15px] font-semibold text-white">Feedback</h3>
-                      <p className="text-xs text-[#707070] mt-1">Share your thoughts with us</p>
-                    </div>
-                    <div className="flex-1" />
-                    <a
-                      href="mailto:feedback@signl.to"
-                      className="w-full py-2.5 border border-[#3a3a3a] text-white text-xs font-semibold rounded-lg hover:bg-[#303030] transition-colors text-center block"
-                    >
-                      Send Email
-                    </a>
-                  </div>
                 </div>
               </div>
+            </div>
+          )}
 
-              {/* Delete row — bottom */}
-              <div className="bg-[#252525] border border-[#ef4444]/25 rounded-xl px-6 py-5 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <svg className="w-5 h-5 text-[#ef4444]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-                  </svg>
-                  <div>
-                    <h3 className="text-sm font-semibold text-white">Delete Account</h3>
-                    <p className="text-xs text-[#707070]">Permanently remove your account and all data</p>
-                  </div>
-                </div>
+          {/* Contact email modal */}
+          {showContactModal && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-[fadeIn_0.15s_ease-out]"
+              onClick={() => setShowContactModal(false)}
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="relative w-full max-w-md mx-4 rounded-3xl border border-[#3a3a3a] bg-[#1a1a1a] p-8 overflow-hidden shadow-[0_40px_100px_-20px_rgba(0,0,0,0.8)]"
+              >
+                {/* Ambient glow */}
+                <div aria-hidden="true" className="pointer-events-none absolute -top-20 -right-20 h-56 w-56 rounded-full bg-[#6364FF]/15 blur-3xl" />
+                <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#6364FF]/60 to-transparent" />
+
+                {/* Close button */}
                 <button
-                  onClick={() => setShowDeleteConfirm(true)}
-                  className="text-xs font-semibold text-[#ef4444] border border-[#ef4444]/40 rounded-lg px-5 py-2.5 hover:bg-[#ef4444]/10 transition-colors"
+                  onClick={() => setShowContactModal(false)}
+                  className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center text-[#808080] hover:text-white hover:bg-white/5 transition-colors"
+                  aria-label="Close"
                 >
-                  Delete
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
                 </button>
-              </div>
 
-              {/* Delete Account Confirmation Modal */}
-              {showDeleteConfirm && (
+                <div className="relative">
+                  {/* Envelope icon medallion */}
+                  <div className="mx-auto mb-5 w-14 h-14 rounded-2xl bg-[#6364FF]/15 border border-[#6364FF]/30 flex items-center justify-center text-[#6364FF] shadow-[0_0_40px_-10px_rgba(99,100,255,0.6)]">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l9 6 9-6M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+
+                  <h3 className="text-center text-[19px] font-semibold text-white tracking-tight">
+                    Drop us a line
+                  </h3>
+                  <p className="mt-1.5 text-center text-[12.5px] text-[#909090]">
+                    Copy the address below, or open it in your mail client.
+                  </p>
+
+                  {/* Email chip */}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText('feedback@signl.to');
+                        setContactCopied(true);
+                        setTimeout(() => setContactCopied(false), 2000);
+                      } catch {
+                        setContactCopied(false);
+                      }
+                    }}
+                    className="group/copy mt-6 w-full flex items-center justify-between gap-3 rounded-2xl border border-[#3a3a3a] bg-black/30 hover:border-[#6364FF]/50 hover:bg-[#6364FF]/[0.04] pl-5 pr-3 py-3.5 transition-colors"
+                  >
+                    <span className="font-mono text-[14px] font-medium text-white tracking-tight truncate">
+                      feedback@signl.to
+                    </span>
+                    <span className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+                      contactCopied
+                        ? 'bg-[#22C55E]/15 text-[#22C55E]'
+                        : 'bg-white/5 text-[#b0b0b0] group-hover/copy:bg-[#6364FF]/15 group-hover/copy:text-[#6364FF]'
+                    }`}>
+                      {contactCopied ? (
+                        <>
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                          </svg>
+                          Copied
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                          Copy
+                        </>
+                      )}
+                    </span>
+                  </button>
+
+                  {/* Open in mail client */}
+                  <a
+                    href="mailto:feedback@signl.to"
+                    className="mt-3 w-full flex items-center justify-center gap-2 rounded-full bg-[#6364FF] px-5 py-3 text-[13px] font-semibold text-white shadow-[0_20px_60px_-20px_rgba(99,100,255,0.8)] hover:bg-[#5354EE] transition-colors"
+                  >
+                    Open in mail app
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </a>
+
+                  <p className="mt-4 text-center text-[11px] text-[#707070]">
+                    We typically reply within a day.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Delete Account Confirmation Modal */}
+          {showDeleteConfirm && (
                 <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
                   <div className="bg-[#1a1a1a] border border-[#3a3a3a] rounded-xl p-6 max-w-md w-full mx-4">
                     <div className="flex items-center gap-3 mb-4">
@@ -1281,8 +1443,6 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                   </div>
                 </div>
               )}
-            </>
-          )}
         </div>
         )}
 
@@ -1470,10 +1630,6 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
         const isDefault = DEFAULT_TEMPLATES.some(dt => dt.id === editingTemplate.id);
         const isNew = editingTemplate.id === '__new__';
         const canDelete = !isDefault && !isNew;
-        const charCount = editingTemplate.body.length;
-        const readSec = Math.max(1, Math.round(charCount / 17));
-        const placeholderCount = (editingTemplate.body.match(/\{\{[^}]+\}\}/g) || []).length
-          + (editingTemplate.subject.match(/\{\{[^}]+\}\}/g) || []).length;
 
         const handleSave = async () => {
           if (!editingTemplate.name.trim() || !editingTemplate.body.trim()) {
@@ -1505,152 +1661,123 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
 
         return (
           <div
-            className="fixed inset-0 z-50 flex bg-[#111111] animate-fade-in"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in p-4"
+            onMouseDown={(e) => { if (e.target === e.currentTarget) setEditingTemplate(null); }}
             onKeyDown={(e) => {
               if (e.key === 'Escape') setEditingTemplate(null);
               if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); handleSave(); }
             }}
             tabIndex={-1}
           >
-            {/* ── Left: Placeholders Sidebar ── */}
-            <div className="hidden lg:block flex-shrink-0">
-              <PlaceholdersSidebar />
-            </div>
-
-            {/* ── Right: Main composition surface ── */}
             <div
-              className="flex-1 flex items-center justify-center bg-[#111111] relative overflow-hidden"
-              onMouseDown={(e) => { if (e.target === e.currentTarget) setEditingTemplate(null); }}
+              className="w-full max-w-[560px] max-h-[88vh] bg-[#141414] border border-[#252525] rounded-2xl flex flex-col overflow-hidden"
+              style={{ boxShadow: '0 25px 60px -15px rgba(0,0,0,0.7)' }}
+              onMouseDown={(e) => e.stopPropagation()}
             >
-              {/* ambient accent glow */}
-              <div
-                className="absolute inset-0 pointer-events-none opacity-60"
-                style={{ background: 'radial-gradient(900px 420px at 22% -8%, rgba(99,100,255,0.07), transparent 60%)' }}
-              />
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#252525]">
+                <h2 className="text-[13px] font-semibold text-white">
+                  {isNew ? 'New template' : isDefault ? 'Template preset' : 'Edit template'}
+                </h2>
+                <div className="flex items-center gap-0.5">
+                  {canDelete && (
+                    <button
+                      onClick={() => { handleDeleteTemplate(editingTemplate.id); setEditingTemplate(null); }}
+                      aria-label="Delete template"
+                      className="p-1.5 rounded-md text-[#606060] hover:text-[#ff6b6b] hover:bg-[#ff6b6b]/10 transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.6}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setEditingTemplate(null)}
+                    aria-label="Close"
+                    className="p-1.5 rounded-md text-[#606060] hover:text-white hover:bg-[#252525] transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
 
-              <div
-                className="relative w-full max-w-[760px] h-[88vh] max-h-[820px] bg-[#1a1a1a] rounded-2xl border border-[#2a2a2a] flex flex-col overflow-hidden"
-                style={{ boxShadow: '0 0 1px rgba(0,0,0,0.4), 0 30px 80px rgba(0,0,0,0.55)' }}
-              >
-                {/* ── Header region ── */}
-                <div className="flex-shrink-0 px-10 pt-7">
-                  {/* Eyebrow + actions */}
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2.5 text-[11px] uppercase tracking-[0.1em] text-[#606060]">
-                      <span>Template</span>
-                      <span className="text-[#404040]">·</span>
-                      <span className="inline-flex items-center gap-2 text-[#6364FF]">
-                        <span className="relative flex h-1.5 w-1.5">
-                          <span className="absolute inset-0 rounded-full bg-[#6364FF] animate-ping opacity-60" />
-                          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#6364FF]" />
-                        </span>
-                        {isNew ? 'New draft' : isDefault ? 'From preset' : 'Editing'}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {canDelete && (
-                        <button
-                          onClick={() => { handleDeleteTemplate(editingTemplate.id); setEditingTemplate(null); }}
-                          aria-label="Delete template"
-                          className="w-8 h-8 rounded-lg border border-transparent text-[#606060] hover:text-[#ff6b6b] hover:bg-[#ff6b6b]/10 hover:border-[#ff6b6b]/25 transition-colors flex items-center justify-center"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-                      )}
-                      <button
-                        onClick={() => setEditingTemplate(null)}
-                        aria-label="Close"
-                        className="w-8 h-8 rounded-lg border border-transparent text-[#606060] hover:text-white hover:bg-[#252525] hover:border-[#404040] transition-colors flex items-center justify-center"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Editable title */}
+              {/* Form body */}
+              <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+                {/* Name */}
+                <div>
+                  <label className="block text-[11px] font-medium text-[#808080] mb-1.5">Name</label>
                   <input
                     type="text"
                     value={editingTemplate.name}
                     onChange={(e) => setEditingTemplate({ ...editingTemplate, name: e.target.value })}
-                    placeholder="Untitled template"
-                    className="w-full bg-transparent border-none outline-none text-[36px] leading-[1.1] tracking-[-0.02em] text-white placeholder:text-[#404040] font-[family-name:var(--font-outfit)] font-normal"
+                    placeholder="e.g. Coffee chat request"
+                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg px-3 py-2.5 text-[13px] text-white placeholder:text-[#454545] focus:outline-none focus:border-[#6364FF] transition-colors"
                     style={{ caretColor: '#6364FF' }}
                     autoFocus={isNew}
                   />
+                </div>
 
-                  {/* Accent rule */}
-                  <div
-                    className="h-px mt-4 mb-2"
-                    style={{ background: 'linear-gradient(90deg, #6364FF 0%, #6364FF 48px, #2a2a2a 48px, #2a2a2a 100%)' }}
-                  />
-
-                  {/* Subject field */}
-                  <div className="flex items-baseline gap-5 py-3 border-b border-dashed border-[#2a2a2a]">
-                    <span className="text-[11px] uppercase tracking-[0.08em] text-[#606060] w-16 flex-shrink-0">Subject</span>
-                    <div className="flex-1">
-                      <PillInput
-                        value={editingTemplate.subject}
-                        onChange={(newSubject) => setEditingTemplate({ ...editingTemplate, subject: newSubject })}
-                        placeholder="Email subject..."
-                      />
-                    </div>
+                {/* Subject */}
+                <div>
+                  <label className="block text-[11px] font-medium text-[#808080] mb-1.5">Subject</label>
+                  <div className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg px-3 py-2.5 focus-within:border-[#6364FF] transition-colors">
+                    <PillInput
+                      value={editingTemplate.subject}
+                      onChange={(newSubject) => setEditingTemplate({ ...editingTemplate, subject: newSubject })}
+                      placeholder="Quick intro — {recipient_company}"
+                    />
                   </div>
                 </div>
 
-                {/* ── Body ── */}
-                <div className="flex-1 overflow-y-auto px-10 py-6">
-                  <PillEditor
-                    value={editingTemplate.body}
-                    onChange={(newBody) => setEditingTemplate({ ...editingTemplate, body: newBody })}
-                    placeholder="Write your email template here. Drag placeholders from the sidebar to personalize..."
-                  />
+                {/* Message */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-[11px] font-medium text-[#808080]">Message</label>
+                    <PlaceholderMenu />
+                  </div>
+                  <div className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg px-3.5 py-3 focus-within:border-[#6364FF] transition-colors">
+                    <PillEditor
+                      value={editingTemplate.body}
+                      onChange={(newBody) => setEditingTemplate({ ...editingTemplate, body: newBody })}
+                      placeholder={`Hi {recipient_first_name},\n\nI'm a {sender_year} at {sender_university}...`}
+                    />
+                  </div>
                 </div>
 
-                {/* Error */}
                 {templateError && (
-                  <div className="px-10 py-2.5 bg-red-900/15 border-t border-red-900/25 flex-shrink-0">
-                    <p className="text-[12px] text-red-400">{templateError}</p>
+                  <div className="text-[12px] text-red-400 bg-red-900/15 border border-red-900/25 rounded-md px-3 py-2">
+                    {templateError}
                   </div>
                 )}
+              </div>
 
-                {/* ── Footer ── */}
-                <div className="flex-shrink-0 flex items-center justify-between px-10 py-4 border-t border-[#2a2a2a] bg-[#141414]">
-                  <div className="flex items-center gap-5 text-[11px] text-[#606060]">
-                    <span><span className="text-[#b0b0b0] font-medium">{placeholderCount}</span> placeholders</span>
-                    <span className="text-[#303030]">·</span>
-                    <span><span className="text-[#b0b0b0] font-medium">{charCount}</span> chars</span>
-                    <span className="text-[#303030]">·</span>
-                    <span>~<span className="text-[#b0b0b0] font-medium">{readSec}s</span> read</span>
-                    <span className="lg:hidden text-[#404040]">·</span>
-                    <span className="lg:hidden">Use sidebar for placeholders</span>
-                  </div>
-
-                  <button
-                    onClick={handleSave}
-                    disabled={isSavingTemplate}
-                    className="inline-flex items-center gap-2.5 px-5 py-2.5 rounded-full text-[13px] font-semibold text-white bg-[#6364FF] hover:bg-[#7879ff] transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:-translate-y-px"
-                    style={{ boxShadow: '0 0 0 1px rgba(99,100,255,0.3), 0 8px 24px rgba(99,100,255,0.25)' }}
-                  >
-                    {isSavingTemplate ? (
-                      <>
-                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                        </svg>
-                        Saving
-                      </>
-                    ) : (
-                      <>
-                        Save template
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/15 font-medium tracking-wider">⌘↵</span>
-                      </>
-                    )}
-                  </button>
-                </div>
+              {/* Footer */}
+              <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[#252525]">
+                <button
+                  onClick={() => setEditingTemplate(null)}
+                  className="px-3.5 py-2 rounded-lg text-[12px] font-medium text-[#a0a0a0] hover:text-white hover:bg-[#252525] transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={isSavingTemplate}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-[12px] font-semibold text-white bg-[#6364FF] hover:bg-[#7879ff] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSavingTemplate ? (
+                    <>
+                      <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Saving
+                    </>
+                  ) : (
+                    'Save template'
+                  )}
+                </button>
               </div>
             </div>
           </div>
