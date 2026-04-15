@@ -1097,7 +1097,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                         <p className="text-[15px] font-semibold text-white truncate">{profile.name || userName}</p>
                         <p className="text-xs text-[#909090] truncate">{userEmail}</p>
                         <div className="mt-1.5 inline-flex items-center gap-1.5 text-[10px] text-[#707070]">
-                          <span className="h-1 w-1 rounded-full bg-[#22C55E]" />
+                          <span className="h-1 w-1 rounded-full bg-[var(--accent)]" />
                           Signed in with Google
                         </div>
                       </div>
@@ -1143,8 +1143,8 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                     {/* Response-time line */}
                     <div className="relative mt-5 flex items-center gap-2 text-[11px] text-[#808080]">
                       <span className="relative flex h-1.5 w-1.5">
-                        <span className="absolute inline-flex h-full w-full rounded-full bg-[#22C55E] opacity-60 animate-ping" />
-                        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#22C55E]" />
+                        <span className="absolute inline-flex h-full w-full rounded-full bg-[var(--accent)] opacity-60 animate-ping" />
+                        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
                       </span>
                       Typically replies within a day
                     </div>
@@ -1333,7 +1333,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                     </span>
                     <span className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${
                       contactCopied
-                        ? 'bg-[#22C55E]/15 text-[#22C55E]'
+                        ? 'bg-[var(--accent)]/15 text-[var(--accent-text)]'
                         : 'bg-white/5 text-[#b0b0b0] group-hover/copy:bg-[#6364FF]/15 group-hover/copy:text-[#6364FF]'
                     }`}>
                       {contactCopied ? (

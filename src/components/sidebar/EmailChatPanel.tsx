@@ -128,7 +128,7 @@ function InitialGreeting({ isSubscribed }: { isSubscribed: boolean | null }) {
           <div className="w-5 h-5 rounded-full bg-[#252525] flex items-center justify-center mt-1">
             <SignalLogo className="w-3 h-3 text-white" />
           </div>
-          <div className={`w-fit rounded-2xl px-3 py-2 rounded-bl-md ${isSubscribed === null ? 'bg-[#2a2a2a]' : isSubscribed ? 'bg-[#2563EB]' : 'bg-[#22C55E]'}`}>
+          <div className={`w-fit rounded-2xl px-3 py-2 rounded-bl-md ${isSubscribed === null ? 'bg-[#2a2a2a]' : 'bg-[var(--accent)]'}`}>
             <TypingIndicator />
           </div>
         </div>
@@ -142,7 +142,7 @@ function InitialGreeting({ isSubscribed }: { isSubscribed: boolean | null }) {
         <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#252525] flex items-center justify-center mt-1">
           <SignalLogo className="w-3 h-3 text-white" />
         </div>
-        <div className={`flex-1 rounded-2xl px-3 py-2 text-sm text-white rounded-bl-md ${isSubscribed === null ? 'bg-[#2a2a2a]' : isSubscribed ? 'bg-[#2563EB]' : 'bg-[#22C55E]'}`}>
+        <div className={`flex-1 rounded-2xl px-3 py-2 text-sm text-white rounded-bl-md ${isSubscribed === null ? 'bg-[#2a2a2a]' : 'bg-[var(--accent)]'}`}>
           <p className="mb-2">Here&apos;s what I found on {firstName}:</p>
 
           {/* Insights content */}
@@ -198,7 +198,7 @@ function InitialGreeting({ isSubscribed }: { isSubscribed: boolean | null }) {
                               : 'border-white/50 hover:border-white'
                           }`}>
                             {selectedInsightIds.has(insight.id) && (
-                              <svg className="w-2.5 h-2.5 text-[#2563EB]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                              <svg className="w-2.5 h-2.5 text-[var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                               </svg>
                             )}
@@ -247,7 +247,7 @@ function InitialGreeting({ isSubscribed }: { isSubscribed: boolean | null }) {
                               : 'border-white/50 hover:border-white'
                           }`}>
                             {selectedInsightIds.has(insight.id) && (
-                              <svg className="w-2.5 h-2.5 text-[#22C55E]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                              <svg className="w-2.5 h-2.5 text-[var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                               </svg>
                             )}
@@ -388,7 +388,7 @@ export function EmailChatPanel() {
                     <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#252525] flex items-center justify-center mt-1">
                       <SignalLogo className="w-3 h-3 text-white" />
                     </div>
-                    <div className={`rounded-2xl px-3 py-2 text-white rounded-bl-md ${isSubscribed === null ? 'bg-[#2a2a2a]' : isSubscribed ? 'bg-[#2563EB]' : 'bg-[#22C55E]'}`}>
+                    <div className={`rounded-2xl px-3 py-2 text-white rounded-bl-md ${isSubscribed === null ? 'bg-[#2a2a2a]' : 'bg-[var(--accent)]'}`}>
                       <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
                     </div>
                   </div>
@@ -403,7 +403,7 @@ export function EmailChatPanel() {
                   <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#252525] flex items-center justify-center mt-1">
                     <SignalLogo className="w-3 h-3 text-white" />
                   </div>
-                  <div className={`rounded-2xl px-3 py-2 rounded-bl-md ${isSubscribed === null ? 'bg-[#2a2a2a]' : isSubscribed ? 'bg-[#2563EB]' : 'bg-[#22C55E]'}`}>
+                  <div className={`rounded-2xl px-3 py-2 rounded-bl-md ${isSubscribed === null ? 'bg-[#2a2a2a]' : 'bg-[var(--accent)]'}`}>
                     <TypingIndicator />
                   </div>
                 </div>

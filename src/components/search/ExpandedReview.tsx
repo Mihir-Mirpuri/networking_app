@@ -54,10 +54,10 @@ function SendSuccessAnimation() {
   return (
     <div className="flex flex-col items-center justify-center py-6 animate-fade-in">
       <svg className="w-16 h-16" viewBox="0 0 52 52">
-        <circle className="draw-check-circle" cx="26" cy="26" r="25" fill="none" stroke="#10b981" strokeWidth="2" />
-        <path className="draw-check-mark" fill="none" stroke="#10b981" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" d="M14.1 27.2l7.1 7.2 16.7-16.8" />
+        <circle className="draw-check-circle" cx="26" cy="26" r="25" fill="none" stroke="var(--accent)" strokeWidth="2" />
+        <path className="draw-check-mark" fill="none" stroke="var(--accent)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" d="M14.1 27.2l7.1 7.2 16.7-16.8" />
       </svg>
-      <p className="mt-3 text-sm font-medium text-emerald-400">Email sent!</p>
+      <p className="mt-3 text-sm font-medium text-[var(--accent-text)]">Email sent!</p>
     </div>
   );
 }
@@ -154,7 +154,7 @@ function InsightsChatMessage({ insights, personName, isSubscribed, selectedInsig
       <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#252525] flex items-center justify-center mt-1">
         <SignalLogoSmall className="w-3 h-3 text-white" />
       </div>
-      <div className={`min-w-0 rounded-2xl px-3 py-2 rounded-bl-md space-y-2.5 text-sm text-white ${isSubscribed === false ? 'bg-[#22C55E]' : 'bg-[#3b66f5]'}`}>
+      <div className={`min-w-0 rounded-2xl px-3 py-2 rounded-bl-md space-y-2.5 text-sm text-white bg-[var(--accent)]`}>
         <p className="text-sm text-white leading-relaxed">Here&apos;s what I found on {firstName}:</p>
 
         {linkedinInsights.length > 0 && (
@@ -339,7 +339,7 @@ function ChatSidebar() {
             <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#252525] flex items-center justify-center mt-1">
               <SignalLogoSmall className="w-3 h-3 text-white" />
             </div>
-            <div className={`rounded-2xl px-3 py-2 rounded-bl-md ${isSubscribed === null ? 'bg-[#2a2a2a]' : isSubscribed ? 'bg-[#3b66f5]' : 'bg-[#22C55E]'}`}>
+            <div className={`rounded-2xl px-3 py-2 rounded-bl-md ${isSubscribed === null ? 'bg-[#2a2a2a]' : 'bg-[var(--accent)]'}`}>
               <TypingIndicator />
             </div>
           </div>
@@ -367,7 +367,7 @@ function ChatSidebar() {
                 <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#252525] flex items-center justify-center mt-1">
                   <SignalLogoSmall className="w-3 h-3 text-white" />
                 </div>
-                <div className={`rounded-2xl px-3 py-2 text-sm text-white rounded-bl-md ${isSubscribed === false ? 'bg-[#22C55E]' : 'bg-[#3b66f5]'}`}>
+                <div className={`rounded-2xl px-3 py-2 text-sm text-white rounded-bl-md bg-[var(--accent)]`}>
                   <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
                 </div>
               </div>
@@ -382,7 +382,7 @@ function ChatSidebar() {
               <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#252525] flex items-center justify-center mt-1">
                 <SignalLogoSmall className="w-3 h-3 text-white" />
               </div>
-              <div className={`rounded-2xl px-3 py-2 rounded-bl-md ${isSubscribed === false ? 'bg-[#22C55E]' : 'bg-[#3b66f5]'}`}>
+              <div className={`rounded-2xl px-3 py-2 rounded-bl-md bg-[var(--accent)]`}>
                 <TypingIndicator />
               </div>
             </div>
@@ -978,7 +978,7 @@ export function ExpandedReview({
   if (!currentPerson) return null;
 
   const canSend = !status && !showSuccess && !limitReached;
-  const accentColor = isSubscribed === false ? 'bg-[#22C55E]' : 'bg-[#2563EB]';
+  const accentColor = 'bg-[var(--accent)]';
   const accentHover = isSubscribed === false ? 'hover:bg-[#16a34a]' : 'hover:bg-[#1d4ed8]';
 
   return (
