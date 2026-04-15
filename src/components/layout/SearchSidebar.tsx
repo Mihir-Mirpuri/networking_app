@@ -199,10 +199,10 @@ export function SearchSidebar({
                             → Harvard alumni who work at Google
                           </button>
                           <button
-                            onClick={() => onSearchSubmit('VCs in San Francisco investing in AI')}
+                            onClick={() => onSearchSubmit('People who work at Goldman Sachs in the New York office who went to UT Austin')}
                             className="block w-full text-left text-white/90 hover:text-white hover:underline transition-colors"
                           >
-                            → VCs in San Francisco investing in AI
+                            → People who work at Goldman Sachs in the New York office who went to UT Austin
                           </button>
                           <button
                             onClick={() => onSearchSubmit('Product managers at Stripe')}
@@ -278,19 +278,18 @@ export function SearchSidebar({
                                   {msg.suggestedAlternative && (
                                     <div className="mt-3">
                                       <p className="text-xs text-white/60 mb-1.5">Try instead:</p>
-                                      <button
-                                        onClick={() => onSuggestedAlternativeClick(msg.suggestedAlternative!)}
-                                        disabled={isExtracting || isSearching}
-                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-[#1a2a1a] border border-[#2a4a2a] rounded-xl hover:bg-[#1e341e] hover:border-[#3a5e3a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-left"
-                                      >
-                                        <svg className="w-3.5 h-3.5 flex-shrink-0 text-white/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                          <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-                                        </svg>
-                                        <span className="truncate">{msg.suggestedAlternative.label}</span>
-                                        <svg className="w-3 h-3 flex-shrink-0 text-white/50 ml-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                          <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
-                                        </svg>
-                                      </button>
+                                      <div className="flex flex-wrap gap-1.5">
+                                        <button
+                                          onClick={() => onSuggestedAlternativeClick(msg.suggestedAlternative!)}
+                                          disabled={isExtracting || isSearching}
+                                          className="flex items-center gap-1.5 px-2.5 py-1.5 max-w-[200px] text-xs font-medium text-white bg-[var(--accent-badge-bg)] border border-[var(--accent-border)] rounded-full opacity-60 hover:opacity-100 hover:border-[var(--accent)] transition-all duration-200 disabled:cursor-not-allowed"
+                                        >
+                                          <svg className="w-3 h-3 flex-shrink-0 text-white/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                                          </svg>
+                                          <span className="truncate">{msg.suggestedAlternative.label}</span>
+                                        </button>
+                                      </div>
                                     </div>
                                   )}
                                   {msg.suggestedSearches && msg.suggestedSearches.length > 0 && (
