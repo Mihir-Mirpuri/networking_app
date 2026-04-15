@@ -30,8 +30,6 @@ export type {
   GroqErrorDetails,
 } from './types';
 
-export { GroqAction } from './types';
-
 // Errors
 export {
   GroqError,
