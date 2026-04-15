@@ -23,6 +23,40 @@
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 
+  /* Subscription-based theme colors */
+  body, body[data-theme="free"] {
+    --accent: #22C55E;
+    --accent-hover: #16A34A;
+    --accent-tint: rgba(34,197,94, 0.06);
+    --accent-border: rgba(34,197,94, 0.15);
+    --accent-text: #22C55E;
+    --accent-badge-bg: rgba(34,197,94, 0.12);
+  }
+
+  body[data-theme="pro"] {
+    --accent: #2563EB;
+    --accent-hover: #1D4ED8;
+    --accent-tint: rgba(37,99,235, 0.06);
+    --accent-border: rgba(37,99,235, 0.15);
+    --accent-text: #60A5FA;
+    --accent-badge-bg: rgba(37,99,235, 0.12);
+  }
+
+  /* Smooth theme transitions */
+  *, *::before, *::after {
+    transition-property: color, background-color, border-color, box-shadow;
+    transition-duration: 300ms;
+    transition-timing-function: ease;
+  }
+
+  /* Opt out elements that already have their own transitions or animations */
+  .animate-bounce, .animate-pulse, .animate-spin, .animate-shimmer,
+  .animate-fade-in, .animate-fade-in-up, .animate-slide-in-right,
+  .animate-scale-in, .animate-slide-up, .animate-bookmark-pop,
+  [class*="animate-signal-arc"], [class*="animate-bounce-dot"] {
+    transition-property: none;
+  }
+
   /* Hide scrollbars but keep scrolling */
   * {
     scrollbar-width: none;

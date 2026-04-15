@@ -23,18 +23,14 @@ const config: Config = {
           900: '#3b0f7a',
           950: '#1e0a3e',
         },
-        // Green accent for CTAs and action buttons
+        // Accent colors — driven by CSS custom properties for subscription theming
         accent: {
-          50: '#ecfdf5',
-          100: '#d1fae5',
-          200: '#a7f3d0',
-          300: '#6ee7b7',
-          400: '#34d399',
-          500: '#10b981',
-          600: '#059669',
-          700: '#047857',
-          800: '#065f46',
-          900: '#064e3b',
+          DEFAULT: 'var(--accent)',
+          hover: 'var(--accent-hover)',
+          tint: 'var(--accent-tint)',
+          border: 'var(--accent-border)',
+          text: 'var(--accent-text)',
+          badge: 'var(--accent-badge-bg)',
         },
         // Dark theme surface palette - neutral gray
         surface: {
