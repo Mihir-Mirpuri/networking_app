@@ -1,6 +1,6 @@
 /**
  * Anthropic (Claude) API client for text and JSON completions.
- * Logs usage to the shared GroqUsageLog table (distinguished by the `model` field).
+ * Logs usage to the ApiCostLog table via logApiCost().
  */
 
 import Anthropic from '@anthropic-ai/sdk';

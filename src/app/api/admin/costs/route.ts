@@ -38,6 +38,23 @@ export async function GET(req: NextRequest) {
   // Clamp endDate to end of day
   endDate.setHours(23, 59, 59, 999);
 
+  const serviceFilter = searchParams.get('service');
+  const userIdFilter = searchParams.get('userId');
+
+  // Build optional filter fragments
+  const serviceClause = serviceFilter
+    ? Prisma.sql` AND "service" = ${serviceFilter}`
+    : Prisma.empty;
+  const userClause = userIdFilter
+    ? Prisma.sql` AND "userId" = ${userIdFilter}`
+    : Prisma.empty;
+  const serviceClauseL = serviceFilter
+    ? Prisma.sql` AND l."service" = ${serviceFilter}`
+    : Prisma.empty;
+  const userClauseL = userIdFilter
+    ? Prisma.sql` AND l."userId" = ${userIdFilter}`
+    : Prisma.empty;
+
   const todayStart = new Date(now);
   todayStart.setHours(0, 0, 0, 0);
 
@@ -51,7 +68,7 @@ export async function GET(req: NextRequest) {
       COALESCE(SUM("costUsd"), 0) AS "totalCost",
       COUNT(*) AS "callCount"
     FROM "ApiCostLog"
-    WHERE "createdAt" >= ${todayStart}
+    WHERE "createdAt" >= ${todayStart}${serviceClause}${userClause}
   `;
 
   // Summary: week
@@ -60,7 +77,7 @@ export async function GET(req: NextRequest) {
       COALESCE(SUM("costUsd"), 0) AS "totalCost",
       COUNT(*) AS "callCount"
     FROM "ApiCostLog"
-    WHERE "createdAt" >= ${weekStart}
+    WHERE "createdAt" >= ${weekStart}${serviceClause}${userClause}
   `;
 
   // Summary: filtered range
@@ -69,7 +86,7 @@ export async function GET(req: NextRequest) {
       COALESCE(SUM("costUsd"), 0) AS "totalCost",
       COUNT(*) AS "callCount"
     FROM "ApiCostLog"
-    WHERE "createdAt" >= ${startDate} AND "createdAt" <= ${endDate}
+    WHERE "createdAt" >= ${startDate} AND "createdAt" <= ${endDate}${serviceClause}${userClause}
   `;
 
   // By service
@@ -81,7 +98,7 @@ export async function GET(req: NextRequest) {
       COALESCE(SUM("costUsd"), 0) AS "totalCost",
       COUNT(*) AS "callCount"
     FROM "ApiCostLog"
-    WHERE "createdAt" >= ${startDate} AND "createdAt" <= ${endDate}
+    WHERE "createdAt" >= ${startDate} AND "createdAt" <= ${endDate}${serviceClause}${userClause}
     GROUP BY service
     ORDER BY "totalCost" DESC
   `;
@@ -96,7 +113,7 @@ export async function GET(req: NextRequest) {
       COUNT(*) AS "callCount",
       COALESCE(AVG("costUsd"), 0) AS "avgCost"
     FROM "ApiCostLog"
-    WHERE "createdAt" >= ${startDate} AND "createdAt" <= ${endDate}
+    WHERE "createdAt" >= ${startDate} AND "createdAt" <= ${endDate}${serviceClause}${userClause}
     GROUP BY action
     ORDER BY "totalCost" DESC
   `;
@@ -119,7 +136,7 @@ export async function GET(req: NextRequest) {
       COUNT(*) AS "callCount"
     FROM "ApiCostLog" l
     LEFT JOIN "User" u ON u.id = l."userId"
-    WHERE l."createdAt" >= ${startDate} AND l."createdAt" <= ${endDate}
+    WHERE l."createdAt" >= ${startDate} AND l."createdAt" <= ${endDate}${serviceClauseL}${userClauseL}
     GROUP BY l."userId", u.name, u.email
     ORDER BY "totalCost" DESC
     LIMIT 20
@@ -135,7 +152,7 @@ export async function GET(req: NextRequest) {
       COALESCE(SUM("costUsd"), 0) AS "totalCost",
       COUNT(*) AS "callCount"
     FROM "ApiCostLog"
-    WHERE "createdAt" >= ${startDate} AND "createdAt" <= ${endDate}
+    WHERE "createdAt" >= ${startDate} AND "createdAt" <= ${endDate}${serviceClause}${userClause}
     GROUP BY DATE("createdAt"), service
     ORDER BY date ASC, service ASC
   `;
