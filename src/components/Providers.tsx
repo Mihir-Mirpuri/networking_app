@@ -22,6 +22,7 @@ function ThemeApplicator() {
   const { isSubscribed } = useSubscription();
 
   useEffect(() => {
+    if (isSubscribed === null) return;
     const theme = isSubscribed ? 'pro' : 'free';
     document.body.setAttribute('data-theme', theme);
   }, [isSubscribed]);

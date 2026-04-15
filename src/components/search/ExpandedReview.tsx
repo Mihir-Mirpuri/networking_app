@@ -400,7 +400,7 @@ function ChatSidebar() {
             {selectedInsights.map(insight => (
               <div
                 key={insight.id}
-                className="flex items-start gap-1 px-2 py-1 bg-[#3b66f5] rounded-lg text-xs text-white"
+                className="flex items-start gap-1 px-2 py-1 bg-[var(--accent)] rounded-lg text-xs text-white"
               >
                 <span>{insight.label}</span>
                 <button
@@ -979,7 +979,7 @@ export function ExpandedReview({
 
   const canSend = !status && !showSuccess && !limitReached;
   const accentColor = 'bg-[var(--accent)]';
-  const accentHover = isSubscribed === false ? 'hover:bg-[#16a34a]' : 'hover:bg-[#1d4ed8]';
+  const accentHover = 'hover:bg-[var(--accent-hover)]';
 
   return (
     <div className="fixed inset-0 z-50 flex bg-[#181818] animate-fade-in">

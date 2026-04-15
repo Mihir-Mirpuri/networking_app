@@ -360,7 +360,7 @@ function ChatSidebar() {
             {selectedInsights.map(insight => (
               <div
                 key={insight.id}
-                className="flex items-start gap-1 px-2 py-1 bg-[#3b66f5] rounded-lg text-xs text-white"
+                className="flex items-start gap-1 px-2 py-1 bg-[var(--accent)] rounded-lg text-xs text-white"
               >
                 <span>{insight.label}</span>
                 <button
@@ -466,7 +466,7 @@ function ThreadMessageItem({ message, isExpanded, onToggle, contactName, contact
           <img src={userImage} alt="" className="w-8 h-8 rounded-full flex-shrink-0 object-cover" />
         ) : (
           <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-medium ${
-            isYou ? 'bg-[#2563EB] text-white' : 'bg-[#505050] text-white'
+            isYou ? 'bg-[var(--accent)] text-white' : 'bg-[#505050] text-white'
           }`}>
             {initials}
           </div>
@@ -898,7 +898,7 @@ export function ExpandedHistoryReview({
   };
 
   const accentColor = isSubscribed === null ? 'bg-[#2a2a2a]' : 'bg-[var(--accent)]';
-  const accentHover = isSubscribed === null ? 'hover:bg-[#333]' : isSubscribed ? 'hover:bg-[#1d4ed8]' : 'hover:bg-[#16a34a]';
+  const accentHover = isSubscribed === null ? 'hover:bg-[#333]' : 'hover:bg-[var(--accent-hover)]';
 
   return (
     <div className="fixed inset-0 z-50 flex bg-[#181818] animate-fade-in">
