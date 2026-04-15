@@ -1632,4 +1632,120 @@ export const QUERIES: DiscoveryTestCase[] = [
       search: { simplePath: true, shouldRun: true },
     },
   },
+
+  // ═══ 28. Suggested searches validation ═════════════════════════════════════
+  {
+    id: 'suggested-pms-google',
+    category: 'suggested-searches',
+    query: 'PMs at Google',
+    description: 'Ready result should include 2+ suggested alternative searches.',
+    expected: {
+      extraction: {
+        status: 'ready',
+        filters: { company: 'Google', role: 'Product Manager' },
+        suggestedSearchesMin: 2,
+      },
+      search: { simplePath: true, shouldRun: true },
+    },
+  },
+  {
+    id: 'suggested-designers-figma',
+    category: 'suggested-searches',
+    query: 'designers at Figma',
+    description: 'Broad role ready result should include 2+ suggestions.',
+    expected: {
+      extraction: {
+        status: 'ready',
+        filters: { company: 'Figma' },
+        linkedInFilters: { functionIds: ['3'] },
+        suggestedSearchesMin: 2,
+      },
+      search: { advancedPath: true, shouldRun: true },
+    },
+  },
+  {
+    id: 'suggested-analysts-gs',
+    category: 'suggested-searches',
+    query: 'analysts at Goldman Sachs',
+    description: 'Finance role should include 2+ suggestions.',
+    expected: {
+      extraction: {
+        status: 'ready',
+        filters: { company: 'Goldman Sachs' },
+        suggestedSearchesMin: 2,
+      },
+      search: { simplePath: true, shouldRun: true },
+    },
+  },
+  {
+    id: 'suggested-people-stripe',
+    category: 'suggested-searches',
+    query: 'people at Stripe',
+    description: 'No-role query should still produce at least 1 suggestion.',
+    expected: {
+      extraction: {
+        status: 'ready',
+        filters: { company: 'Stripe' },
+        suggestedSearchesMin: 1,
+      },
+      search: { simplePath: true, shouldRun: true },
+    },
+  },
+
+  // ═══ 29. Message quality ═══════════════════════════════════════════════════
+  {
+    id: 'message-offtopic-weather',
+    category: 'message-quality',
+    query: 'how is the weather?',
+    description: 'Off-topic message should redirect user with helpful suggestion.',
+    expected: {
+      extraction: {
+        status: 'off_topic',
+        messageContains: ['professional contacts'],
+      },
+      search: { shouldRun: false },
+    },
+  },
+  {
+    id: 'message-offtopic-hello',
+    category: 'message-quality',
+    query: 'hello!',
+    description: 'Greeting should redirect with helpful suggestion.',
+    expected: {
+      extraction: {
+        status: 'off_topic',
+        messageContains: ['help', 'find'],
+      },
+      search: { shouldRun: false },
+    },
+  },
+  {
+    id: 'message-unsupported-phd',
+    category: 'message-quality',
+    query: 'PhD engineers at Google',
+    description: 'Unsupported message should name the specific criteria.',
+    expected: {
+      extraction: {
+        status: 'unsupported',
+        unsupportedCriteria: ['PhD'],
+        messageContains: ["can't filter", 'degree'],
+      },
+      search: { shouldRun: false },
+    },
+  },
+  {
+    id: 'message-needs-selection-mbb',
+    category: 'message-quality',
+    query: 'consultants at MBB',
+    description: 'Needs-selection message should prompt user to pick.',
+    expected: {
+      extraction: {
+        status: 'needs_selection',
+        minSelectables: 3,
+        mustContainSelectables: ['McKinsey', 'BCG', 'Bain'],
+        messageContains: ['Which'],
+      },
+      search: { shouldRun: false },
+    },
+  },
 ];
