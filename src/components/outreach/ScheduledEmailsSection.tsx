@@ -26,7 +26,7 @@ function SearchInput({ value, onChange }: { value: string; onChange: (v: string)
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Search scheduled emails..."
-        className="w-full pl-10 pr-4 py-2 bg-[#1a1a1a] border border-[#3a3a3a] rounded-lg text-sm text-white placeholder-[#555] focus:outline-none focus:border-[#6364FF] transition-colors"
+        className="w-full pl-10 pr-4 py-2 bg-[#1a1a1a] border border-[#3a3a3a] rounded-lg text-sm text-white placeholder-[#555] focus:outline-none focus:border-[var(--accent)] transition-colors"
       />
       {value && (
         <button
@@ -247,7 +247,7 @@ export function ScheduledEmailsSection({
                     {/* Scheduled For */}
                     <div className="w-[180px] px-2 shrink-0">
                       <div className="flex items-center gap-2">
-                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-[#6364FF]/15 text-[#8b8cff] font-['Inter']">
+                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--accent)]/15 text-[#8b8cff] font-['Inter']">
                           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
@@ -338,7 +338,7 @@ export function ScheduledEmailsSection({
 
             <input
               type="datetime-local"
-              className="w-full px-3 py-2 bg-[#1a1a1a] border border-[#3a3a3a] rounded-lg text-white text-sm font-['Inter'] mb-3 focus:outline-none focus:border-[#6364FF]"
+              className="w-full px-3 py-2 bg-[#1a1a1a] border border-[#3a3a3a] rounded-lg text-white text-sm font-['Inter'] mb-3 focus:outline-none focus:border-[var(--accent)]"
               value={editDateTime}
               onChange={(e) => {
                 setEditDateTime(e.target.value);
@@ -364,7 +364,7 @@ export function ScheduledEmailsSection({
               <button
                 onClick={handleEditSave}
                 disabled={isUpdating || !editDateTime}
-                className="px-4 py-2 text-sm font-medium bg-[#6364FF] text-white rounded-lg hover:bg-[#5354EE] transition-all font-['Inter'] disabled:opacity-50"
+                className="px-4 py-2 text-sm font-medium bg-[var(--accent)] text-white rounded-lg hover:bg-[var(--accent-hover)] transition-all font-['Inter'] disabled:opacity-50"
               >
                 {isUpdating ? 'Saving...' : 'Save'}
               </button>

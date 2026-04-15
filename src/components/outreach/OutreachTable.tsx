@@ -97,7 +97,7 @@ export function OutreachTable({
                   onMouseDown={(e) => handleResizeStart(col, e)}
                   onDoubleClick={() => handleDoubleClick(col)}
                 >
-                  <div className="w-[2px] h-full bg-[#404040] group-hover:bg-[#6364FF] group-hover:w-[3px] transition-all" />
+                  <div className="w-[2px] h-full bg-[#404040] group-hover:bg-[var(--accent)] group-hover:w-[3px] transition-all" />
                 </div>
               )}
             </div>

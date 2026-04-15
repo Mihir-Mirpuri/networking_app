@@ -153,7 +153,7 @@ function FiltersTab({ f, stats }: { f: HistorySidebarFilterProps; stats: History
               }}
               className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
                 f.activeSection === section.key
-                  ? 'bg-[#6364FF]/20 text-white'
+                  ? 'bg-[var(--accent-badge-bg)] text-white'
                   : 'text-[#888] hover:text-white hover:bg-[#252525]'
               }`}
             >
@@ -282,7 +282,7 @@ function ColumnsTab({ f }: { f: HistorySidebarFilterProps }) {
         }}
         className={`group flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-grab active:cursor-grabbing ${
           isDragging ? 'opacity-40 scale-95' : ''
-        } ${isDragOver ? 'bg-[#6364FF]/10' : 'hover:bg-[#252525]'}`}
+        } ${isDragOver ? 'bg-[var(--accent)]/10' : 'hover:bg-[#252525]'}`}
       >
         {/* Drag handle */}
         <svg className="w-3.5 h-3.5 text-[#444] group-hover:text-[#666] shrink-0 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -313,7 +313,7 @@ function ColumnsTab({ f }: { f: HistorySidebarFilterProps }) {
               if (e.key === 'Escape') { setEditingKey(null); setEditingLabel(''); }
             }}
             onClick={(e) => e.stopPropagation()}
-            className="text-[13px] flex-1 bg-[#333] border border-[#505050] rounded px-1.5 py-0.5 text-white outline-none focus:border-[#6364FF] min-w-0"
+            className="text-[13px] flex-1 bg-[#333] border border-[#505050] rounded px-1.5 py-0.5 text-white outline-none focus:border-[var(--accent)] min-w-0"
           />
         ) : (
           <span
@@ -348,7 +348,7 @@ function ColumnsTab({ f }: { f: HistorySidebarFilterProps }) {
             f.onToggleColumn(col);
           }}
           className={`relative w-8 h-[18px] rounded-full shrink-0 transition-colors duration-200 ${
-            isActive ? 'bg-[#6364FF]' : 'bg-[#333]'
+            isActive ? 'bg-[var(--accent)]' : 'bg-[#333]'
           }`}
         >
           <div
@@ -417,12 +417,12 @@ function ColumnsTab({ f }: { f: HistorySidebarFilterProps }) {
                 if (e.key === 'Escape') { setShowNewInput(false); setNewColumnName(''); }
               }}
               onBlur={() => { if (!newColumnName.trim()) setShowNewInput(false); }}
-              className="flex-1 bg-[#222] border border-[#3a3a3a] rounded-lg px-3 py-2 text-[13px] text-white placeholder-[#555] outline-none focus:border-[#6364FF] transition-colors min-w-0"
+              className="flex-1 bg-[#222] border border-[#3a3a3a] rounded-lg px-3 py-2 text-[13px] text-white placeholder-[#555] outline-none focus:border-[var(--accent)] transition-colors min-w-0"
             />
             <button
               onClick={handleAddColumn}
               disabled={!newColumnName.trim()}
-              className="p-2 rounded-lg bg-[#6364FF] text-white hover:bg-[#5354EE] transition-colors disabled:opacity-30 disabled:cursor-not-allowed shrink-0"
+              className="p-2 rounded-lg bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-30 disabled:cursor-not-allowed shrink-0"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />

@@ -62,7 +62,7 @@ export function LimitReachedModal({ isOpen, onClose }: LimitReachedModalProps) {
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 animate-fade-in" onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}>
-      <div className="bg-[#111111] rounded-xl shadow-xl max-w-md w-full overflow-hidden animate-scale-in border border-[#2a2a2a]">
+      <div data-theme="pro" className="bg-[#111111] rounded-xl shadow-xl max-w-md w-full overflow-hidden animate-scale-in border border-[#2a2a2a]">
         {/* Header */}
         <div className="bg-gradient-to-r from-amber-900/20 to-orange-900/20 px-6 py-5 border-b border-[#2a2a2a]">
           <div className="flex items-start gap-4">
@@ -93,10 +93,10 @@ export function LimitReachedModal({ isOpen, onClose }: LimitReachedModalProps) {
         {/* Body */}
         <div className="px-6 py-5">
           {/* Subscribe Option */}
-          <div className="bg-gradient-to-r from-[#1a1a1a] to-[#0f172a] rounded-lg p-4 border border-[#3b82f6]/30">
+          <div className="bg-gradient-to-r from-[#1a1a1a] to-[#0f172a] rounded-lg p-4 border border-[var(--accent-border)]">
             <div className="flex items-start gap-3 mb-4">
-              <div className="w-8 h-8 bg-[#3b82f6]/20 rounded-full flex items-center justify-center flex-shrink-0">
-                <svg className="w-4 h-4 text-[#3b82f6]" fill="currentColor" viewBox="0 0 20 20">
+              <div className="w-8 h-8 bg-[var(--accent-badge-bg)] rounded-full flex items-center justify-center flex-shrink-0">
+                <svg className="w-4 h-4 text-[var(--accent-text)]" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M5 2a2 2 0 00-2 2v14l3.5-2 3.5 2 3.5-2 3.5 2V4a2 2 0 00-2-2H5zm2.5 3a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm6.207.293a1 1 0 00-1.414 0l-6 6a1 1 0 101.414 1.414l6-6a1 1 0 000-1.414zM12.5 10a1.5 1.5 0 100 3 1.5 1.5 0 000-3z" clipRule="evenodd" />
                 </svg>
               </div>
@@ -112,7 +112,7 @@ export function LimitReachedModal({ isOpen, onClose }: LimitReachedModalProps) {
                 onClick={() => setPaymentType('upfront')}
                 className={`flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-all ${
                   paymentType === 'upfront'
-                    ? 'bg-[#3b82f6] text-white'
+                    ? 'bg-[var(--accent)] text-white'
                     : 'bg-[#2a2a2a] text-white hover:bg-[#333333]'
                 }`}
               >
@@ -122,7 +122,7 @@ export function LimitReachedModal({ isOpen, onClose }: LimitReachedModalProps) {
                 onClick={() => setPaymentType('monthly')}
                 className={`flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-all ${
                   paymentType === 'monthly'
-                    ? 'bg-[#3b82f6] text-white'
+                    ? 'bg-[var(--accent)] text-white'
                     : 'bg-[#2a2a2a] text-white hover:bg-[#333333]'
                 }`}
               >
@@ -144,7 +144,7 @@ export function LimitReachedModal({ isOpen, onClose }: LimitReachedModalProps) {
                     max={SUBSCRIPTION_PRICING.MAX_UPFRONT_MONTHS}
                     value={selectedMonths}
                     onChange={(e) => setSelectedMonths(parseInt(e.target.value))}
-                    className="w-full h-2 bg-[#2a2a2a] rounded-lg appearance-none cursor-pointer accent-[#3b82f6]"
+                    className="w-full h-2 bg-[#2a2a2a] rounded-lg appearance-none cursor-pointer accent-[var(--accent)]"
                   />
                   <div className="flex justify-between text-xs text-white mt-1">
                     <span>{SUBSCRIPTION_PRICING.MIN_UPFRONT_MONTHS} mo</span>
@@ -160,7 +160,7 @@ export function LimitReachedModal({ isOpen, onClose }: LimitReachedModalProps) {
                     </span>
                     <span className="text-xl font-bold text-white">${upfrontTotal}</span>
                   </div>
-                  <div className="text-xs text-green-400 mt-1">
+                  <div className="text-xs text-[var(--accent-text)] mt-1">
                     Save ${monthlySavings} vs monthly
                   </div>
                 </div>
@@ -168,7 +168,7 @@ export function LimitReachedModal({ isOpen, onClose }: LimitReachedModalProps) {
                 <button
                   onClick={handleUpfrontSubscribe}
                   disabled={isUpfrontLoading}
-                  className="w-full py-2.5 bg-[#3b82f6] text-white font-medium rounded-lg hover:bg-[#2563eb] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                  className="w-full py-2.5 bg-[var(--accent)] text-white font-medium rounded-lg hover:bg-[var(--accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
                 >
                   {isUpfrontLoading ? (
                     <>
@@ -204,7 +204,7 @@ export function LimitReachedModal({ isOpen, onClose }: LimitReachedModalProps) {
                 <button
                   onClick={handleMonthlySubscribe}
                   disabled={isCheckoutLoading}
-                  className="w-full py-2.5 bg-[#3b82f6] text-white font-medium rounded-lg hover:bg-[#2563eb] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                  className="w-full py-2.5 bg-[var(--accent)] text-white font-medium rounded-lg hover:bg-[var(--accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
                 >
                   {isCheckoutLoading ? (
                     <>

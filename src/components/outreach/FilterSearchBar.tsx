@@ -143,7 +143,7 @@ export function FilterSearchBar({ activeFilters, onAddFilter, onRemoveFilter }: 
           activeFilters.map((filter, i) => (
             <span
               key={`${filter.field}-${filter.value}-${i}`}
-              className="flex items-center gap-1 bg-[#6364FF]/20 border border-[#6364FF]/30 text-white text-[12px] rounded-md px-2 py-0.5"
+              className="flex items-center gap-1 bg-[var(--accent-badge-bg)] border border-[var(--accent-border)] text-white text-[12px] rounded-md px-2 py-0.5"
             >
               <span className="text-[#888]">{filter.field}:</span>
               <span>{filter.value}</span>

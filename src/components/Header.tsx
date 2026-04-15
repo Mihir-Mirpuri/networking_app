@@ -140,7 +140,7 @@ export function Header() {
                     className={`absolute -top-1.5 -right-1.5 min-w-[20px] h-[20px] flex items-center justify-center text-xs font-bold rounded-full shadow-sm ${
                       isActive
                         ? 'bg-surface-900 text-primary-600'
-                        : 'bg-accent-500 text-surface-900'
+                        : 'bg-accent text-surface-900'
                     }`}
                   >
                     {tab.badge! > 99 ? '99+' : tab.badge}

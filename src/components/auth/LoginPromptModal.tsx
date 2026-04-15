@@ -40,8 +40,8 @@ export function LoginPromptModal({ isOpen, onClose, title, message }: LoginPromp
         <div className="px-8 py-10 text-center">
           {/* Icon */}
           <div className="flex justify-center mb-6">
-            <div className="w-16 h-16 rounded-full bg-[#6364FF]/10 flex items-center justify-center">
-              <svg className="w-8 h-8 text-[#6364FF]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <div className="w-16 h-16 rounded-full bg-[var(--accent)]/10 flex items-center justify-center">
+              <svg className="w-8 h-8 text-[var(--accent-text)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
               </svg>
             </div>
@@ -56,7 +56,7 @@ export function LoginPromptModal({ isOpen, onClose, title, message }: LoginPromp
           {/* Sign in button */}
           <button
             onClick={handleSignIn}
-            className="w-full flex items-center justify-center gap-3 py-3 px-6 rounded-xl bg-[#6364FF] hover:bg-[#7879ff] text-white font-semibold transition-all hover:shadow-lg hover:shadow-[#6364FF]/25"
+            className="w-full flex items-center justify-center gap-3 py-3 px-6 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-semibold transition-all hover:shadow-lg hover:shadow-[var(--accent)]/25"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />

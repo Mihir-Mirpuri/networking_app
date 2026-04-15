@@ -54,10 +54,10 @@ function SendSuccessAnimation() {
   return (
     <div className="flex flex-col items-center justify-center py-6 animate-fade-in">
       <svg className="w-16 h-16" viewBox="0 0 52 52">
-        <circle className="draw-check-circle" cx="26" cy="26" r="25" fill="none" stroke="#10b981" strokeWidth="2" />
-        <path className="draw-check-mark" fill="none" stroke="#10b981" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" d="M14.1 27.2l7.1 7.2 16.7-16.8" />
+        <circle className="draw-check-circle" cx="26" cy="26" r="25" fill="none" stroke="var(--accent)" strokeWidth="2" />
+        <path className="draw-check-mark" fill="none" stroke="var(--accent)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" d="M14.1 27.2l7.1 7.2 16.7-16.8" />
       </svg>
-      <p className="mt-3 text-sm font-medium text-emerald-400">Email sent!</p>
+      <p className="mt-3 text-sm font-medium text-[var(--accent-text)]">Email sent!</p>
     </div>
   );
 }
@@ -154,7 +154,7 @@ function InsightsChatMessage({ insights, personName, isSubscribed, selectedInsig
       <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#252525] flex items-center justify-center mt-1">
         <SignalLogoSmall className="w-3 h-3 text-white" />
       </div>
-      <div className={`min-w-0 rounded-2xl px-3 py-2 rounded-bl-md space-y-2.5 text-sm text-white ${isSubscribed === false ? 'bg-[#22C55E]' : 'bg-[#3b66f5]'}`}>
+      <div className={`min-w-0 rounded-2xl px-3 py-2 rounded-bl-md space-y-2.5 text-sm text-white bg-[var(--accent)]`}>
         <p className="text-sm text-white leading-relaxed">Here&apos;s what I found on {firstName}:</p>
 
         {linkedinInsights.length > 0 && (
@@ -339,7 +339,7 @@ function ChatSidebar() {
             <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#252525] flex items-center justify-center mt-1">
               <SignalLogoSmall className="w-3 h-3 text-white" />
             </div>
-            <div className={`rounded-2xl px-3 py-2 rounded-bl-md ${isSubscribed === null ? 'bg-[#2a2a2a]' : isSubscribed ? 'bg-[#3b66f5]' : 'bg-[#22C55E]'}`}>
+            <div className={`rounded-2xl px-3 py-2 rounded-bl-md ${isSubscribed === null ? 'bg-[#2a2a2a]' : 'bg-[var(--accent)]'}`}>
               <TypingIndicator />
             </div>
           </div>
@@ -367,7 +367,7 @@ function ChatSidebar() {
                 <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#252525] flex items-center justify-center mt-1">
                   <SignalLogoSmall className="w-3 h-3 text-white" />
                 </div>
-                <div className={`rounded-2xl px-3 py-2 text-sm text-white rounded-bl-md ${isSubscribed === false ? 'bg-[#22C55E]' : 'bg-[#3b66f5]'}`}>
+                <div className={`rounded-2xl px-3 py-2 text-sm text-white rounded-bl-md bg-[var(--accent)]`}>
                   <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
                 </div>
               </div>
@@ -382,7 +382,7 @@ function ChatSidebar() {
               <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#252525] flex items-center justify-center mt-1">
                 <SignalLogoSmall className="w-3 h-3 text-white" />
               </div>
-              <div className={`rounded-2xl px-3 py-2 rounded-bl-md ${isSubscribed === false ? 'bg-[#22C55E]' : 'bg-[#3b66f5]'}`}>
+              <div className={`rounded-2xl px-3 py-2 rounded-bl-md bg-[var(--accent)]`}>
                 <TypingIndicator />
               </div>
             </div>
@@ -400,7 +400,7 @@ function ChatSidebar() {
             {selectedInsights.map(insight => (
               <div
                 key={insight.id}
-                className="flex items-start gap-1 px-2 py-1 bg-[#3b66f5] rounded-lg text-xs text-white"
+                className="flex items-start gap-1 px-2 py-1 bg-[var(--accent)] rounded-lg text-xs text-white"
               >
                 <span>{insight.label}</span>
                 <button
@@ -973,8 +973,8 @@ export function ExpandedReview({
   if (!currentPerson) return null;
 
   const canSend = !status && !showSuccess && !limitReached;
-  const accentColor = isSubscribed === false ? 'bg-[#22C55E]' : 'bg-[#2563EB]';
-  const accentHover = isSubscribed === false ? 'hover:bg-[#16a34a]' : 'hover:bg-[#1d4ed8]';
+  const accentColor = 'bg-[var(--accent)]';
+  const accentHover = 'hover:bg-[var(--accent-hover)]';
 
   return (
     <div className="fixed inset-0 z-50 flex bg-[#181818] animate-fade-in">
@@ -1101,7 +1101,7 @@ export function ExpandedReview({
                   .replace(/\n/g, '<br>');
                 document.execCommand('insertHTML', false, html);
               }}
-              className={`w-full min-h-[300px] text-sm text-white bg-transparent outline-none leading-[1.7] focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none [&_a]:text-[#6364FF] [&_a]:underline [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1 [&_li]:pl-1 ${isRegenerating || isGeneratingDraft ? 'opacity-50' : ''}`}
+              className={`w-full min-h-[300px] text-sm text-white bg-transparent outline-none leading-[1.7] focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none [&_a]:text-[var(--accent-text)] [&_a]:underline [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1 [&_li]:pl-1 ${isRegenerating || isGeneratingDraft ? 'opacity-50' : ''}`}
               style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
             />
           </div>
@@ -1207,7 +1207,7 @@ export function ExpandedReview({
                     <button
                       onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
                       disabled={isUploadingResume}
-                      className="w-full text-left px-3 py-2 text-xs text-[#6364FF] hover:bg-[#252525] flex items-center gap-2 disabled:opacity-50"
+                      className="w-full text-left px-3 py-2 text-xs text-[var(--accent-text)] hover:bg-[#252525] flex items-center gap-2 disabled:opacity-50"
                     >
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -1273,7 +1273,7 @@ export function ExpandedReview({
                         value={linkText}
                         onChange={(e) => setLinkText(e.target.value)}
                         placeholder="Text to display"
-                        className="w-full px-2.5 py-1.5 text-xs bg-[#141414] border border-[#333] rounded text-white outline-none focus:border-[#6364FF] placeholder-[#555]"
+                        className="w-full px-2.5 py-1.5 text-xs bg-[#141414] border border-[#333] rounded text-white outline-none focus:border-[var(--accent)] placeholder-[#555]"
                       />
                     )}
                     <div className="flex gap-2">
@@ -1283,7 +1283,7 @@ export function ExpandedReview({
                         onChange={(e) => setLinkUrl(e.target.value)}
                         placeholder="Paste or type a link"
                         autoFocus
-                        className="flex-1 px-2.5 py-1.5 text-xs bg-[#141414] border border-[#333] rounded text-white outline-none focus:border-[#6364FF] placeholder-[#555]"
+                        className="flex-1 px-2.5 py-1.5 text-xs bg-[#141414] border border-[#333] rounded text-white outline-none focus:border-[var(--accent)] placeholder-[#555]"
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
                             e.preventDefault();
@@ -1301,7 +1301,7 @@ export function ExpandedReview({
                       <button
                         onClick={() => { insertLink(); setLinkPopoverPos(null); }}
                         disabled={!linkUrl}
-                        className="px-3 py-1.5 text-xs text-white bg-[#6364FF] rounded hover:bg-[#5354EE] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="px-3 py-1.5 text-xs text-white bg-[var(--accent)] rounded hover:bg-[var(--accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       >
                         Apply
                       </button>
@@ -1360,7 +1360,7 @@ export function ExpandedReview({
               <button
                 onClick={handleSchedule}
                 disabled={isScheduling || !scheduledDateTime}
-                className="px-4 py-2 text-sm text-white bg-[#6364FF] rounded-lg hover:bg-[#5354EE] disabled:opacity-50 transition-colors"
+                className="px-4 py-2 text-sm text-white bg-[var(--accent)] rounded-lg hover:bg-[var(--accent-hover)] disabled:opacity-50 transition-colors"
               >
                 {isScheduling ? 'Scheduling...' : 'Schedule'}
               </button>

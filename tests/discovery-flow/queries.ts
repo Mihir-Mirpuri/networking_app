@@ -9,16 +9,15 @@
  *
  * Categories are labeled so failures can be traced to a specific input type.
  *
- * NOTE: multi-turn conversations (context carryover) are not covered here —
- * the harness invokes each query with empty conversation history. A separate
- * fixture would be needed for multi-turn tests.
+ * Multi-turn tests set `conversationHistory` and `currentFilters` on the
+ * test case; the harness passes these through to the LLM call.
  */
 
 import type { LinkedInFilters, DBFilters } from '@/lib/types/linkedin-filters';
 
 // ─── Expected-behavior schema ────────────────────────────────────────────────
 
-export type ExpectedStatus = 'ready' | 'needs_selection' | 'off_topic' | 'person_lookup';
+export type ExpectedStatus = 'ready' | 'needs_selection' | 'off_topic' | 'person_lookup' | 'unsupported';
 
 /** A partial matcher: only listed fields are checked. Arrays use subset semantics. */
 export interface ExpectedExtraction {
@@ -46,6 +45,27 @@ export interface ExpectedExtraction {
   // Role specificity bucket
   roleSpecificity?: 'narrow' | 'standard' | 'broad';
 
+  // For status=unsupported
+  /** Subset match — each string must appear in at least one actual criterion (case-insensitive). */
+  unsupportedCriteria?: string[];
+  /** Validate the reformulated suggested_alternative.filters. */
+  suggestedAlternativeFilters?: Partial<DBFilters>;
+  /** Validate the reformulated suggested_alternative.linkedin_filters. */
+  suggestedAlternativeLinkedInFilters?: Partial<LinkedInFilters>;
+  /** Substring match on suggested_alternative.label. */
+  suggestedAlternativeLabel?: string;
+
+  // For status=ready — suggested searches
+  /** Minimum number of suggested_searches entries returned. */
+  suggestedSearchesMin?: number;
+
+  // Message quality (any status)
+  /** Substrings the message field must contain (case-insensitive). */
+  messageContains?: string[];
+
+  // Company ambiguity flag
+  companyNameAmbiguous?: boolean;
+
   // For status=off_topic — no additional fields.
 }
 
@@ -65,6 +85,10 @@ export interface DiscoveryTestCase {
   category: string;
   query: string;
   description: string;
+  /** For multi-turn tests: prior conversation messages. */
+  conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
+  /** For multi-turn tests: filters carried over from a previous search. */
+  currentFilters?: Partial<DBFilters>;
   expected: {
     extraction: ExpectedExtraction;
     search?: ExpectedSearch;
@@ -109,7 +133,7 @@ export const QUERIES: DiscoveryTestCase[] = [
     expected: {
       extraction: {
         status: 'ready',
-        filters: { company: 'Google', role: 'Product Manager', location: 'Austin, Texas' },
+        filters: { company: 'Google', role: 'Product Manager', location: 'Austin' },
         linkedInFilters: { currentJobTitles: ['Product Manager'], locations: ['Austin'] },
       },
       search: { simplePath: true, shouldRun: true },
@@ -127,7 +151,7 @@ export const QUERIES: DiscoveryTestCase[] = [
           company: 'IBM',
           role: 'Software Engineer',
           university: 'University of Texas at Austin',
-          location: 'New York, New York',
+          location: 'New York',
         },
         linkedInFilters: {
           currentJobTitles: ['Software Engineer'],
@@ -146,7 +170,7 @@ export const QUERIES: DiscoveryTestCase[] = [
     expected: {
       extraction: {
         status: 'ready',
-        filters: { company: 'Spotify', role: 'Product Manager', location: 'Stockholm, Sweden' },
+        filters: { company: 'Spotify', role: 'Product Manager', location: 'Stockholm' },
         linkedInFilters: { currentJobTitles: ['Product Manager'], locations: ['Stockholm'] },
       },
       search: { simplePath: true, shouldRun: true },
@@ -203,7 +227,7 @@ export const QUERIES: DiscoveryTestCase[] = [
     expected: {
       extraction: {
         status: 'ready',
-        filters: { company: 'Microsoft' },
+        filters: { company: 'Microsoft', role: 'Software Engineer' },
       },
       search: { simplePath: true, shouldRun: true },
     },
@@ -231,7 +255,9 @@ export const QUERIES: DiscoveryTestCase[] = [
     expected: {
       extraction: {
         status: 'ready',
-        filters: { company: 'Anthropic' },
+        filters: { company: 'Anthropic', role: 'Machine Learning Engineer' },
+        linkedInFilters: { currentJobTitles: ['Machine Learning Engineer'] },
+        roleSpecificity: 'narrow',
       },
       search: { simplePath: true, shouldRun: true },
     },
@@ -244,7 +270,8 @@ export const QUERIES: DiscoveryTestCase[] = [
     expected: {
       extraction: {
         status: 'ready',
-        filters: { company: 'JP Morgan' },
+        filters: { company: 'JPMorgan Chase', role: 'Banker' },
+        linkedInFilters: { functionIds: ['10'] },
       },
       search: { simplePath: true, shouldRun: true },
     },
@@ -259,7 +286,7 @@ export const QUERIES: DiscoveryTestCase[] = [
     expected: {
       extraction: {
         status: 'ready',
-        filters: { company: 'OpenAI', location: 'San Francisco, California' },
+        filters: { company: 'OpenAI', location: 'San Francisco' },
         linkedInFilters: { locations: ['San Francisco'] },
       },
       search: { advancedPath: true, shouldRun: true }, // "engineers" (generic) → function_ids
@@ -273,7 +300,7 @@ export const QUERIES: DiscoveryTestCase[] = [
     expected: {
       extraction: {
         status: 'ready',
-        filters: { company: 'Goldman Sachs', location: 'New York, New York' },
+        filters: { company: 'Goldman Sachs', location: 'New York' },
         linkedInFilters: { locations: ['New York'] },
       },
       search: { simplePath: true, shouldRun: true },
@@ -287,7 +314,7 @@ export const QUERIES: DiscoveryTestCase[] = [
     expected: {
       extraction: {
         status: 'ready',
-        filters: { company: 'Snap', location: 'Los Angeles, California' },
+        filters: { company: 'Snap', location: 'Los Angeles' },
       },
       search: { advancedPath: true, shouldRun: true }, // "designers" generic
     },
@@ -300,7 +327,7 @@ export const QUERIES: DiscoveryTestCase[] = [
     expected: {
       extraction: {
         status: 'ready',
-        filters: { company: 'DeepMind', location: 'London, United Kingdom' },
+        filters: { company: 'DeepMind', location: 'London' },
       },
       search: { advancedPath: true, shouldRun: true },
     },
@@ -342,7 +369,8 @@ export const QUERIES: DiscoveryTestCase[] = [
     expected: {
       extraction: {
         status: 'ready',
-        filters: { company: 'Microsoft' },
+        filters: { company: 'Microsoft', university: 'Massachusetts Institute of Technology' },
+        linkedInFilters: { schools: ['Massachusetts Institute of Technology'] },
       },
       search: { simplePath: true, shouldRun: true },
     },
@@ -355,7 +383,8 @@ export const QUERIES: DiscoveryTestCase[] = [
     expected: {
       extraction: {
         status: 'ready',
-        filters: { company: 'Tesla' },
+        filters: { company: 'Tesla', university: 'Carnegie Mellon University' },
+        linkedInFilters: { schools: ['Carnegie Mellon University'] },
       },
       search: { simplePath: true, shouldRun: true },
     },
@@ -368,7 +397,8 @@ export const QUERIES: DiscoveryTestCase[] = [
     expected: {
       extraction: {
         status: 'ready',
-        filters: { company: 'Bridgewater' },
+        filters: { company: 'Bridgewater', university: 'University of Pennsylvania' },
+        linkedInFilters: { schools: ['University of Pennsylvania'] },
       },
       search: { simplePath: true, shouldRun: true },
     },
@@ -381,7 +411,8 @@ export const QUERIES: DiscoveryTestCase[] = [
     expected: {
       extraction: {
         status: 'ready',
-        filters: { company: 'Meta' },
+        filters: { company: 'Meta', university: 'University of California, Berkeley' },
+        linkedInFilters: { schools: ['University of California, Berkeley'] },
       },
       search: { simplePath: true, shouldRun: true },
     },
@@ -418,13 +449,13 @@ export const QUERIES: DiscoveryTestCase[] = [
     id: 'typo-gs-abbrev',
     category: 'company-typo',
     query: 'analysts at GS',
-    description: '"GS" → abbreviation for "Goldman Sachs".',
+    description: '"GS" → abbreviation ambiguous, LLM asks for clarification.',
     expected: {
       extraction: {
-        status: 'ready',
-        filters: { company: 'Goldman Sachs' },
+        status: 'needs_selection',
+        mustContainSelectables: ['Goldman Sachs'],
       },
-      search: { simplePath: true, shouldRun: true },
+      search: { shouldRun: false },
     },
   },
   {
@@ -446,26 +477,26 @@ export const QUERIES: DiscoveryTestCase[] = [
     id: 'ambiguous-chase',
     category: 'company-ambiguity',
     query: 'analysts at Chase',
-    description: '"Chase" should be flagged as ambiguous (common word + person name).',
+    description: '"Chase" ambiguous → needs_selection between Chase variants.',
     expected: {
       extraction: {
-        status: 'ready',
-        filters: { company: 'Chase' },
+        status: 'needs_selection',
+        mustContainSelectables: ['Chase'],
       },
-      search: { simplePath: true, shouldRun: true },
+      search: { shouldRun: false },
     },
   },
   {
     id: 'ambiguous-block',
     category: 'company-ambiguity',
     query: 'engineers at Block',
-    description: '"Block" (Square parent) — ambiguous flag should be true.',
+    description: '"Block" ambiguous → needs_selection between Block variants.',
     expected: {
       extraction: {
-        status: 'ready',
-        filters: { company: 'Block' },
+        status: 'needs_selection',
+        mustContainSelectables: ['Block'],
       },
-      search: { advancedPath: true, shouldRun: true },
+      search: { shouldRun: false },
     },
   },
   {
@@ -477,6 +508,7 @@ export const QUERIES: DiscoveryTestCase[] = [
       extraction: {
         status: 'ready',
         filters: { company: 'Square', role: 'Product Manager' },
+        companyNameAmbiguous: true,
       },
       search: { simplePath: true, shouldRun: true },
     },
@@ -487,12 +519,12 @@ export const QUERIES: DiscoveryTestCase[] = [
     id: 'seniority-senior-engineers',
     category: 'linkedin-seniority',
     query: 'senior engineers at Citadel',
-    description: '"senior" + "engineers" (generic) → seniorityLevelIds=["120"] + functionIds=["8"].',
+    description: '"senior" + "engineers" (generic) → excludeSeniorityLevelIds=["110"] + functionIds=["8"].',
     expected: {
       extraction: {
         status: 'ready',
         filters: { company: 'Citadel' },
-        linkedInFilters: { seniorityLevelIds: ['120'], functionIds: ['8'] },
+        linkedInFilters: { excludeSeniorityLevelIds: ['110'] },
       },
       search: { advancedPath: true, shouldRun: true },
     },
@@ -506,7 +538,7 @@ export const QUERIES: DiscoveryTestCase[] = [
       extraction: {
         status: 'ready',
         filters: { company: 'Microsoft' },
-        linkedInFilters: { seniorityLevelIds: ['110'], functionIds: ['8'] },
+        linkedInFilters: { seniorityLevelIds: ['110'] },
       },
       search: { advancedPath: true, shouldRun: true },
     },
@@ -557,14 +589,13 @@ export const QUERIES: DiscoveryTestCase[] = [
   },
   {
     id: 'seniority-cxo',
-    category: 'linkedin-seniority',
+    category: 'anti-category',
     query: 'CTOs at Series A startups in SF',
-    description: '"CTO" is a specific CXO title.',
+    description: '"Series A startups" is unsupported (no specific company) → unsupported.',
     expected: {
       extraction: {
-        status: 'needs_selection',
-        minSelectables: 2,
-        shouldEscalateToPerplexity: true,
+        status: 'unsupported',
+        unsupportedCriteria: ['Series A'],
       },
       search: { shouldRun: false },
     },
@@ -648,7 +679,7 @@ export const QUERIES: DiscoveryTestCase[] = [
     expected: {
       extraction: {
         status: 'ready',
-        filters: { company: 'Meta', location: 'New York, New York' },
+        filters: { company: 'Meta', location: 'New York' },
         linkedInFilters: { functionIds: ['8'], locations: ['New York'] },
         roleSpecificity: 'broad',
       },
@@ -661,12 +692,11 @@ export const QUERIES: DiscoveryTestCase[] = [
     id: 'headcount-startup',
     category: 'linkedin-headcount',
     query: 'PMs at early stage startups',
-    description: '"early stage startups" → needs_selection with low confidence.',
+    description: '"early stage startups" — no specific company → unsupported.',
     expected: {
       extraction: {
-        status: 'needs_selection',
-        minSelectables: 2,
-        shouldEscalateToPerplexity: true,
+        status: 'unsupported',
+        unsupportedCriteria: ['early-stage'],
       },
       search: { shouldRun: false },
     },
@@ -675,13 +705,14 @@ export const QUERIES: DiscoveryTestCase[] = [
     id: 'headcount-enterprise',
     category: 'linkedin-headcount',
     query: 'engineers at large enterprise companies',
-    description: '"large enterprise" category → needs_selection.',
+    description: '"large enterprise" → LLM uses companyHeadcount filter directly.',
     expected: {
       extraction: {
-        status: 'needs_selection',
-        minSelectables: 2,
+        status: 'ready',
+        linkedInFilters: { companyHeadcount: ['H', 'I'] },
+        roleSpecificity: 'broad',
       },
-      search: { shouldRun: false },
+      search: { advancedPath: true, shouldRun: true },
     },
   },
 
@@ -707,7 +738,7 @@ export const QUERIES: DiscoveryTestCase[] = [
     expected: {
       extraction: {
         status: 'ready',
-        filters: { company: 'Figma', location: 'San Francisco, California' },
+        filters: { company: 'Figma', location: 'San Francisco' },
         linkedInFilters: {
           yearsOfExperienceIds: ['3'],
           functionIds: ['3'],
@@ -743,7 +774,7 @@ export const QUERIES: DiscoveryTestCase[] = [
       extraction: {
         status: 'ready',
         filters: { company: 'Anthropic' },
-        linkedInFilters: { pastCompanies: ['Google'], functionIds: ['8'] },
+        linkedInFilters: { pastCompanies: ['Google'] },
       },
       search: { advancedPath: true, shouldRun: true },
     },
@@ -766,13 +797,13 @@ export const QUERIES: DiscoveryTestCase[] = [
     id: 'negation-not-california',
     category: 'linkedin-negation',
     query: 'senior engineers at Google but not in California',
-    description: 'excludeLocations=["California"] + seniorityLevelIds=["120"].',
+    description: 'excludeLocations=["California"] + excludeSeniorityLevelIds=["110"].',
     expected: {
       extraction: {
         status: 'ready',
         filters: { company: 'Google' },
         linkedInFilters: {
-          seniorityLevelIds: ['120'],
+          excludeSeniorityLevelIds: ['110'],
           excludeLocations: ['California'],
         },
       },
@@ -788,7 +819,7 @@ export const QUERIES: DiscoveryTestCase[] = [
       extraction: {
         status: 'ready',
         filters: { company: 'Anthropic' },
-        linkedInFilters: { recentlyChangedJobs: true, functionIds: ['8'] },
+        linkedInFilters: { recentlyChangedJobs: true },
       },
       search: { advancedPath: true, shouldRun: true },
     },
@@ -871,26 +902,24 @@ export const QUERIES: DiscoveryTestCase[] = [
     id: 'category-yc',
     category: 'anti-category',
     query: 'find me YC companies hiring ML engineers',
-    description: 'YC companies → needs_selection, low confidence → Perplexity escalation.',
+    description: '"YC companies" — no specific company → unsupported.',
     expected: {
       extraction: {
-        status: 'needs_selection',
-        minSelectables: 4,
-        shouldEscalateToPerplexity: true,
+        status: 'unsupported',
+        unsupportedCriteria: ['YC'],
       },
       search: { shouldRun: false },
     },
   },
   {
     id: 'category-fintech-startups',
-    category: 'anti-category',
+    category: 'unsupported-industry',
     query: 'PMs at fintech startups',
-    description: '"fintech startups" stage descriptor → needs_selection + Perplexity escalation.',
+    description: '"fintech" is unsupported industry term → unsupported with suggested alternative.',
     expected: {
       extraction: {
-        status: 'needs_selection',
-        minSelectables: 4,
-        shouldEscalateToPerplexity: true,
+        status: 'unsupported',
+        unsupportedCriteria: ['fintech'],
       },
       search: { shouldRun: false },
     },
@@ -913,12 +942,11 @@ export const QUERIES: DiscoveryTestCase[] = [
     id: 'category-unicorns',
     category: 'anti-category',
     query: 'engineers at unicorn startups',
-    description: '"unicorn" stage descriptor → needs_selection + escalation.',
+    description: '"unicorn startups" — no specific company → unsupported.',
     expected: {
       extraction: {
-        status: 'needs_selection',
-        minSelectables: 4,
-        shouldEscalateToPerplexity: true,
+        status: 'unsupported',
+        unsupportedCriteria: ['unicorn'],
       },
       search: { shouldRun: false },
     },
@@ -927,12 +955,11 @@ export const QUERIES: DiscoveryTestCase[] = [
     id: 'category-seed-stage-ai',
     category: 'anti-category',
     query: 'founders of seed-stage AI startups in SF',
-    description: 'Seed-stage AI startups → low confidence → Perplexity escalation.',
+    description: '"seed-stage AI startups" — no specific company → unsupported.',
     expected: {
       extraction: {
-        status: 'needs_selection',
-        minSelectables: 4,
-        shouldEscalateToPerplexity: true,
+        status: 'unsupported',
+        unsupportedCriteria: ['seed-stage'],
       },
       search: { shouldRun: false },
     },
@@ -1040,9 +1067,9 @@ export const QUERIES: DiscoveryTestCase[] = [
     id: 'edge-single-word',
     category: 'malformed-edge',
     query: 'engineer',
-    description: 'Single word, no company → off_topic or needs_selection.',
+    description: 'Single word, no company → needs_selection (LLM asks which company).',
     expected: {
-      extraction: { status: 'off_topic' },
+      extraction: { status: 'needs_selection' },
       search: { shouldRun: false },
     },
   },
@@ -1070,8 +1097,8 @@ export const QUERIES: DiscoveryTestCase[] = [
     id: 'edge-very-long',
     category: 'malformed-edge',
     query:
-      'I want to find software engineers who specifically worked on payments infrastructure at Stripe in San Francisco with at least 5 years of experience who also went to Stanford or MIT and are currently senior or staff level and recently joined the company in the last 6 months',
-    description: 'Very long multi-intent query — should still parse into filters.',
+      'I want to find software engineers at Stripe in San Francisco with at least 5 years of experience who also went to Stanford and are currently senior level and recently joined the company in the last 6 months',
+    description: 'Very long multi-filter query — should still parse into structured filters.',
     expected: {
       extraction: {
         status: 'ready',
@@ -1141,8 +1168,10 @@ export const QUERIES: DiscoveryTestCase[] = [
       extraction: {
         status: 'ready',
         filters: { company: 'Notion', role: 'Designer' },
+        linkedInFilters: { functionIds: ['3'] },
+        roleSpecificity: 'broad',
       },
-      search: { simplePath: true, shouldRun: true },
+      search: { advancedPath: true, shouldRun: true },
     },
   },
   {
@@ -1184,10 +1213,10 @@ export const QUERIES: DiscoveryTestCase[] = [
         filters: {
           company: 'Goldman Sachs',
           university: 'Massachusetts Institute of Technology',
-          location: 'New York, New York',
+          location: 'New York',
         },
         linkedInFilters: {
-          seniorityLevelIds: ['120'],
+          excludeSeniorityLevelIds: ['110'],
           schools: ['Massachusetts Institute of Technology'],
           locations: ['New York'],
         },
@@ -1219,14 +1248,498 @@ export const QUERIES: DiscoveryTestCase[] = [
     id: 'integrity-no-industry-ids',
     category: 'id-allowlist',
     query: 'fintech engineers at Ramp',
-    description: 'Must NOT leak industryIds (forcibly stripped by sanitizer).',
+    description: '"fintech" is unsupported industry → unsupported. Alternative keeps Ramp.',
+    expected: {
+      extraction: {
+        status: 'unsupported',
+        unsupportedCriteria: ['fintech'],
+        suggestedAlternativeFilters: { company: 'Ramp' },
+      },
+      search: { shouldRun: false },
+    },
+  },
+
+  // ═══ 20. Unsupported — degree type ═════════════════════════════════════════
+  {
+    id: 'unsupported-phd',
+    category: 'unsupported-degree',
+    query: 'PhD data scientists at Google',
+    description: '"PhD" is unsupported degree type → unsupported. Alternative keeps Data Scientist at Google.',
+    expected: {
+      extraction: {
+        status: 'unsupported',
+        unsupportedCriteria: ['PhD'],
+        suggestedAlternativeFilters: { company: 'Google', role: 'Data Scientist' },
+        suggestedAlternativeLinkedInFilters: { currentJobTitles: ['Data Scientist'] },
+        messageContains: ["can't filter", 'degree'],
+      },
+      search: { shouldRun: false },
+    },
+  },
+  {
+    id: 'unsupported-mba',
+    category: 'unsupported-degree',
+    query: 'MBA grads at McKinsey',
+    description: '"MBA" unsupported → alternative keeps McKinsey.',
+    expected: {
+      extraction: {
+        status: 'unsupported',
+        unsupportedCriteria: ['MBA'],
+        suggestedAlternativeFilters: { company: 'McKinsey' },
+        messageContains: ["can't filter", 'degree'],
+      },
+      search: { shouldRun: false },
+    },
+  },
+  {
+    id: 'unsupported-masters',
+    category: 'unsupported-degree',
+    query: 'Masters students at Meta',
+    description: '"Masters" unsupported degree → alternative keeps Meta.',
+    expected: {
+      extraction: {
+        status: 'unsupported',
+        unsupportedCriteria: ['Masters'],
+        suggestedAlternativeFilters: { company: 'Meta' },
+        messageContains: ["can't filter", 'degree'],
+      },
+      search: { shouldRun: false },
+    },
+  },
+
+  // ═══ 21. Unsupported — skills/technologies ═════════════════════════════════
+  {
+    id: 'unsupported-python',
+    category: 'unsupported-skills',
+    query: 'Python engineers at Stripe',
+    description: '"Python" is unsupported skill → alternative keeps engineers at Stripe.',
+    expected: {
+      extraction: {
+        status: 'unsupported',
+        unsupportedCriteria: ['Python'],
+        suggestedAlternativeFilters: { company: 'Stripe' },
+        messageContains: ["can't filter", 'skill'],
+      },
+      search: { shouldRun: false },
+    },
+  },
+  {
+    id: 'unsupported-react',
+    category: 'unsupported-skills',
+    query: 'React developers at Meta',
+    description: '"React" unsupported skill → alternative keeps Meta.',
+    expected: {
+      extraction: {
+        status: 'unsupported',
+        unsupportedCriteria: ['React'],
+        suggestedAlternativeFilters: { company: 'Meta' },
+        messageContains: ["can't filter"],
+      },
+      search: { shouldRun: false },
+    },
+  },
+  {
+    id: 'unsupported-kubernetes',
+    category: 'unsupported-skills',
+    query: 'people who know Kubernetes at Google',
+    description: '"Kubernetes" unsupported skill → alternative keeps Google.',
+    expected: {
+      extraction: {
+        status: 'unsupported',
+        unsupportedCriteria: ['Kubernetes'],
+        suggestedAlternativeFilters: { company: 'Google' },
+        messageContains: ["can't filter"],
+      },
+      search: { shouldRun: false },
+    },
+  },
+
+  // ═══ 22. Unsupported — compensation ════════════════════════════════════════
+  {
+    id: 'unsupported-salary',
+    category: 'unsupported-compensation',
+    query: 'engineers making $200k+ at Google',
+    description: '"$200k+" unsupported salary → alternative keeps engineers at Google.',
+    expected: {
+      extraction: {
+        status: 'unsupported',
+        unsupportedCriteria: ['$200k'],
+        suggestedAlternativeFilters: { company: 'Google' },
+        messageContains: ["can't filter", 'salary'],
+      },
+      search: { shouldRun: false },
+    },
+  },
+  {
+    id: 'unsupported-high-paying',
+    category: 'unsupported-compensation',
+    query: 'high paying PM jobs in SF',
+    description: '"high paying" unsupported compensation → alternative keeps PM + SF.',
+    expected: {
+      extraction: {
+        status: 'unsupported',
+        unsupportedCriteria: ['paying'],
+        suggestedAlternativeFilters: { role: 'Product Manager', location: 'San Francisco' },
+        messageContains: ["can't filter"],
+      },
+      search: { shouldRun: false },
+    },
+  },
+
+  // ═══ 23. Unsupported — work mode ═══════════════════════════════════════════
+  {
+    id: 'unsupported-remote',
+    category: 'unsupported-work-mode',
+    query: 'remote engineers at Stripe',
+    description: '"remote" unsupported work mode → alternative keeps engineers at Stripe.',
+    expected: {
+      extraction: {
+        status: 'unsupported',
+        unsupportedCriteria: ['remote'],
+        suggestedAlternativeFilters: { company: 'Stripe' },
+        messageContains: ["can't filter", 'remote'],
+      },
+      search: { shouldRun: false },
+    },
+  },
+  {
+    id: 'unsupported-hybrid',
+    category: 'unsupported-work-mode',
+    query: 'hybrid PMs at Google in NYC',
+    description: '"hybrid" unsupported → alternative keeps PM + Google + NYC.',
+    expected: {
+      extraction: {
+        status: 'unsupported',
+        unsupportedCriteria: ['hybrid'],
+        suggestedAlternativeFilters: { company: 'Google', role: 'Product Manager', location: 'New York' },
+        messageContains: ["can't filter"],
+      },
+      search: { shouldRun: false },
+    },
+  },
+
+  // ═══ 24. Unsupported — other (visa, hiring, certifications) ════════════════
+  {
+    id: 'unsupported-h1b',
+    category: 'unsupported-other',
+    query: 'H1B engineers at Meta',
+    description: '"H1B" unsupported visa → alternative keeps engineers at Meta.',
+    expected: {
+      extraction: {
+        status: 'unsupported',
+        unsupportedCriteria: ['H1B'],
+        suggestedAlternativeFilters: { company: 'Meta' },
+        messageContains: ["can't filter"],
+      },
+      search: { shouldRun: false },
+    },
+  },
+  {
+    id: 'unsupported-hiring',
+    category: 'unsupported-other',
+    query: 'engineers at Google who are hiring',
+    description: '"hiring" unsupported → alternative keeps engineers at Google.',
+    expected: {
+      extraction: {
+        status: 'unsupported',
+        unsupportedCriteria: ['hiring'],
+        suggestedAlternativeFilters: { company: 'Google' },
+        messageContains: ["can't filter"],
+      },
+      search: { shouldRun: false },
+    },
+  },
+  {
+    id: 'unsupported-cfa',
+    category: 'unsupported-other',
+    query: 'CFA holders at Goldman Sachs',
+    description: '"CFA" unsupported cert → alternative approximates with functionIds=["10"] (Finance).',
+    expected: {
+      extraction: {
+        status: 'unsupported',
+        unsupportedCriteria: ['CFA'],
+        suggestedAlternativeFilters: { company: 'Goldman Sachs' },
+        suggestedAlternativeLinkedInFilters: { functionIds: ['10'] },
+        messageContains: ["can't filter", 'certification'],
+      },
+      search: { shouldRun: false },
+    },
+  },
+
+  // ═══ 25. Unsupported — reformulation quality ══════════════════════════════
+  {
+    id: 'unsupported-series-b',
+    category: 'unsupported-reformulation',
+    query: 'Series B engineers in Austin',
+    description: '"Series B" unsupported funding → alternative approximates with companyHeadcount + keeps Austin.',
+    expected: {
+      extraction: {
+        status: 'unsupported',
+        unsupportedCriteria: ['Series B'],
+        suggestedAlternativeLinkedInFilters: { companyHeadcount: ['D', 'E'] },
+        suggestedAlternativeLabel: 'Austin',
+        messageContains: ["can't filter", 'funding'],
+      },
+      search: { shouldRun: false },
+    },
+  },
+  {
+    id: 'unsupported-cpa',
+    category: 'unsupported-reformulation',
+    query: 'CPA accountants at Deloitte',
+    description: '"CPA" unsupported cert → alternative approximates with functionIds=["1"] (Accounting).',
+    expected: {
+      extraction: {
+        status: 'unsupported',
+        unsupportedCriteria: ['CPA'],
+        suggestedAlternativeFilters: { company: 'Deloitte' },
+        suggestedAlternativeLinkedInFilters: { functionIds: ['1'] },
+        suggestedAlternativeLabel: 'Deloitte',
+        messageContains: ["can't filter", 'certification'],
+      },
+      search: { shouldRun: false },
+    },
+  },
+  {
+    id: 'unsupported-pmp',
+    category: 'unsupported-reformulation',
+    query: 'PMP project managers at IBM',
+    description: '"PMP" unsupported cert → alternative approximates with functionIds=["20"] (Program Mgmt).',
+    expected: {
+      extraction: {
+        status: 'unsupported',
+        unsupportedCriteria: ['PMP'],
+        suggestedAlternativeFilters: { company: 'IBM' },
+        suggestedAlternativeLinkedInFilters: { functionIds: ['20'] },
+        suggestedAlternativeLabel: 'IBM',
+        messageContains: ["can't filter", 'certification'],
+      },
+      search: { shouldRun: false },
+    },
+  },
+  {
+    id: 'unsupported-fintech-pms',
+    category: 'unsupported-reformulation',
+    query: 'fintech PMs in NYC',
+    description: '"fintech" unsupported industry → alternative keeps PM + NYC.',
+    expected: {
+      extraction: {
+        status: 'unsupported',
+        unsupportedCriteria: ['fintech'],
+        suggestedAlternativeFilters: { role: 'Product Manager', location: 'New York' },
+        messageContains: ["can't filter", 'industry'],
+      },
+      search: { shouldRun: false },
+    },
+  },
+
+  // ═══ 26. Multi-turn — filter swap ══════════════════════════════════════════
+  {
+    id: 'multiturn-swap-role',
+    category: 'multi-turn-swap',
+    query: 'try engineers instead',
+    description: 'Follow-up swapping role from PM → engineer. Company (Google) should persist.',
+    conversationHistory: [
+      { role: 'user', content: 'PMs at Google' },
+      { role: 'assistant', content: 'Searching for Product Managers at Google' },
+    ],
+    currentFilters: { company: 'Google', role: 'Product Manager' },
     expected: {
       extraction: {
         status: 'ready',
-        filters: { company: 'Ramp' },
-        forbiddenLinkedInFilterKeys: ['industryIds'],
+        filters: { company: 'Google' },
+      },
+      search: { shouldRun: true },
+    },
+  },
+  {
+    id: 'multiturn-swap-company',
+    category: 'multi-turn-swap',
+    query: 'try Meta instead',
+    description: 'Follow-up swapping company from Stripe → Meta.',
+    conversationHistory: [
+      { role: 'user', content: 'engineers at Stripe' },
+      { role: 'assistant', content: 'Searching for engineers at Stripe' },
+    ],
+    currentFilters: { company: 'Stripe' },
+    expected: {
+      extraction: {
+        status: 'ready',
+        filters: { company: 'Meta' },
+      },
+      search: { shouldRun: true },
+    },
+  },
+  {
+    id: 'multiturn-swap-location',
+    category: 'multi-turn-swap',
+    query: 'try NYC instead',
+    description: 'Follow-up swapping location from SF → NYC. Company and role persist.',
+    conversationHistory: [
+      { role: 'user', content: 'PMs at Google in SF' },
+      { role: 'assistant', content: 'Searching for Product Managers at Google in San Francisco' },
+    ],
+    currentFilters: { company: 'Google', role: 'Product Manager', location: 'San Francisco, California' },
+    expected: {
+      extraction: {
+        status: 'ready',
+        filters: { company: 'Google', role: 'Product Manager' },
+      },
+      search: { simplePath: true, shouldRun: true },
+    },
+  },
+
+  // ═══ 27. Multi-turn — filter persistence ═══════════════════════════════════
+  {
+    id: 'multiturn-persist-location',
+    category: 'multi-turn-persist',
+    query: 'try Apple',
+    description: 'Follow-up swapping company. Location (SF) should persist from previous filters.',
+    conversationHistory: [
+      { role: 'user', content: 'engineers at Google in SF' },
+      { role: 'assistant', content: 'Searching for engineers at Google in San Francisco' },
+    ],
+    currentFilters: { company: 'Google', location: 'San Francisco, California' },
+    expected: {
+      extraction: {
+        status: 'ready',
+        filters: { company: 'Apple' },
+      },
+      search: { shouldRun: true },
+    },
+  },
+  {
+    id: 'multiturn-persist-company',
+    category: 'multi-turn-persist',
+    query: 'try MIT instead',
+    description: 'Follow-up swapping university. Company (Stripe) should persist.',
+    conversationHistory: [
+      { role: 'user', content: 'Stanford alumni at Stripe' },
+      { role: 'assistant', content: 'Searching for Stanford alumni at Stripe' },
+    ],
+    currentFilters: { company: 'Stripe', university: 'Stanford University' },
+    expected: {
+      extraction: {
+        status: 'ready',
+        filters: { company: 'Stripe', university: 'Massachusetts Institute of Technology' },
+      },
+      search: { simplePath: true, shouldRun: true },
+    },
+  },
+
+  // ═══ 28. Suggested searches validation ═════════════════════════════════════
+  {
+    id: 'suggested-pms-google',
+    category: 'suggested-searches',
+    query: 'PMs at Google',
+    description: 'Ready result should include 2+ suggested alternative searches.',
+    expected: {
+      extraction: {
+        status: 'ready',
+        filters: { company: 'Google', role: 'Product Manager' },
+        suggestedSearchesMin: 2,
+      },
+      search: { simplePath: true, shouldRun: true },
+    },
+  },
+  {
+    id: 'suggested-designers-figma',
+    category: 'suggested-searches',
+    query: 'designers at Figma',
+    description: 'Broad role ready result should include 2+ suggestions.',
+    expected: {
+      extraction: {
+        status: 'ready',
+        filters: { company: 'Figma' },
+        linkedInFilters: { functionIds: ['3'] },
+        suggestedSearchesMin: 2,
       },
       search: { advancedPath: true, shouldRun: true },
+    },
+  },
+  {
+    id: 'suggested-analysts-gs',
+    category: 'suggested-searches',
+    query: 'analysts at Goldman Sachs',
+    description: 'Finance role should include 2+ suggestions.',
+    expected: {
+      extraction: {
+        status: 'ready',
+        filters: { company: 'Goldman Sachs' },
+        suggestedSearchesMin: 2,
+      },
+      search: { simplePath: true, shouldRun: true },
+    },
+  },
+  {
+    id: 'suggested-people-stripe',
+    category: 'suggested-searches',
+    query: 'people at Stripe',
+    description: 'No-role query should still produce at least 1 suggestion.',
+    expected: {
+      extraction: {
+        status: 'ready',
+        filters: { company: 'Stripe' },
+        suggestedSearchesMin: 1,
+      },
+      search: { simplePath: true, shouldRun: true },
+    },
+  },
+
+  // ═══ 29. Message quality ═══════════════════════════════════════════════════
+  {
+    id: 'message-offtopic-weather',
+    category: 'message-quality',
+    query: 'how is the weather?',
+    description: 'Off-topic message should redirect user with helpful suggestion.',
+    expected: {
+      extraction: {
+        status: 'off_topic',
+        messageContains: ['professional contacts'],
+      },
+      search: { shouldRun: false },
+    },
+  },
+  {
+    id: 'message-offtopic-hello',
+    category: 'message-quality',
+    query: 'hello!',
+    description: 'Greeting should redirect with helpful suggestion.',
+    expected: {
+      extraction: {
+        status: 'off_topic',
+        messageContains: ['help', 'find'],
+      },
+      search: { shouldRun: false },
+    },
+  },
+  {
+    id: 'message-unsupported-phd',
+    category: 'message-quality',
+    query: 'PhD engineers at Google',
+    description: 'Unsupported message should name the specific criteria.',
+    expected: {
+      extraction: {
+        status: 'unsupported',
+        unsupportedCriteria: ['PhD'],
+        messageContains: ["can't filter", 'degree'],
+      },
+      search: { shouldRun: false },
+    },
+  },
+  {
+    id: 'message-needs-selection-mbb',
+    category: 'message-quality',
+    query: 'consultants at MBB',
+    description: 'Needs-selection message should prompt user to pick.',
+    expected: {
+      extraction: {
+        status: 'needs_selection',
+        minSelectables: 3,
+        mustContainSelectables: ['McKinsey', 'BCG', 'Bain'],
+        messageContains: ['Which'],
+      },
+      search: { shouldRun: false },
     },
   },
 ];

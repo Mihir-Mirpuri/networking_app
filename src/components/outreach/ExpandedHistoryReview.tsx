@@ -115,7 +115,7 @@ function InsightsChatMessage({ insights, personName, isSubscribed, selectedInsig
       <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#252525] flex items-center justify-center mt-1">
         <SignalLogoSmall className="w-3 h-3 text-white" />
       </div>
-      <div className={`min-w-0 rounded-2xl px-3 py-2 rounded-bl-md space-y-2.5 text-sm text-white ${isSubscribed === null ? 'bg-[#2a2a2a]' : isSubscribed ? 'bg-[#3b66f5]' : 'bg-[#22C55E]'}`}>
+      <div className={`min-w-0 rounded-2xl px-3 py-2 rounded-bl-md space-y-2.5 text-sm text-white ${isSubscribed === null ? 'bg-[#2a2a2a]' : 'bg-[var(--accent)]'}`}>
         <p className="text-sm text-white leading-relaxed">Here&apos;s what I found on {firstName}:</p>
 
         {linkedinInsights.length > 0 && (
@@ -299,7 +299,7 @@ function ChatSidebar() {
             <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#252525] flex items-center justify-center mt-1">
               <SignalLogoSmall className="w-3 h-3 text-white" />
             </div>
-            <div className={`rounded-2xl px-3 py-2 rounded-bl-md ${isSubscribed === null ? 'bg-[#2a2a2a]' : isSubscribed ? 'bg-[#3b66f5]' : 'bg-[#22C55E]'}`}>
+            <div className={`rounded-2xl px-3 py-2 rounded-bl-md ${isSubscribed === null ? 'bg-[#2a2a2a]' : 'bg-[var(--accent)]'}`}>
               <TypingIndicator />
             </div>
           </div>
@@ -327,7 +327,7 @@ function ChatSidebar() {
                 <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#252525] flex items-center justify-center mt-1">
                   <SignalLogoSmall className="w-3 h-3 text-white" />
                 </div>
-                <div className={`rounded-2xl px-3 py-2 text-sm text-white rounded-bl-md ${isSubscribed === null ? 'bg-[#2a2a2a]' : isSubscribed ? 'bg-[#3b66f5]' : 'bg-[#22C55E]'}`}>
+                <div className={`rounded-2xl px-3 py-2 text-sm text-white rounded-bl-md ${isSubscribed === null ? 'bg-[#2a2a2a]' : 'bg-[var(--accent)]'}`}>
                   <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
                 </div>
               </div>
@@ -342,7 +342,7 @@ function ChatSidebar() {
               <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#252525] flex items-center justify-center mt-1">
                 <SignalLogoSmall className="w-3 h-3 text-white" />
               </div>
-              <div className={`rounded-2xl px-3 py-2 rounded-bl-md ${isSubscribed === null ? 'bg-[#2a2a2a]' : isSubscribed ? 'bg-[#3b66f5]' : 'bg-[#22C55E]'}`}>
+              <div className={`rounded-2xl px-3 py-2 rounded-bl-md ${isSubscribed === null ? 'bg-[#2a2a2a]' : 'bg-[var(--accent)]'}`}>
                 <TypingIndicator />
               </div>
             </div>
@@ -360,7 +360,7 @@ function ChatSidebar() {
             {selectedInsights.map(insight => (
               <div
                 key={insight.id}
-                className="flex items-start gap-1 px-2 py-1 bg-[#3b66f5] rounded-lg text-xs text-white"
+                className="flex items-start gap-1 px-2 py-1 bg-[var(--accent)] rounded-lg text-xs text-white"
               >
                 <span>{insight.label}</span>
                 <button
@@ -466,7 +466,7 @@ function ThreadMessageItem({ message, isExpanded, onToggle, contactName, contact
           <img src={userImage} alt="" className="w-8 h-8 rounded-full flex-shrink-0 object-cover" />
         ) : (
           <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-medium ${
-            isYou ? 'bg-[#2563EB] text-white' : 'bg-[#505050] text-white'
+            isYou ? 'bg-[var(--accent)] text-white' : 'bg-[#505050] text-white'
           }`}>
             {initials}
           </div>
@@ -897,8 +897,8 @@ export function ExpandedHistoryReview({
     setFollowUpBody(editor.innerText);
   };
 
-  const accentColor = isSubscribed === null ? 'bg-[#2a2a2a]' : isSubscribed ? 'bg-[#2563EB]' : 'bg-[#22C55E]';
-  const accentHover = isSubscribed === null ? 'hover:bg-[#333]' : isSubscribed ? 'hover:bg-[#1d4ed8]' : 'hover:bg-[#16a34a]';
+  const accentColor = isSubscribed === null ? 'bg-[#2a2a2a]' : 'bg-[var(--accent)]';
+  const accentHover = isSubscribed === null ? 'hover:bg-[#333]' : 'hover:bg-[var(--accent-hover)]';
 
   return (
     <div className="fixed inset-0 z-50 flex bg-[#181818] animate-fade-in">
@@ -917,10 +917,10 @@ export function ExpandedHistoryReview({
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#141414]/90 rounded-xl">
               <div className="flex flex-col items-center justify-center py-6 animate-fade-in">
                 <svg className="w-16 h-16" viewBox="0 0 52 52">
-                  <circle className="draw-check-circle" cx="26" cy="26" r="25" fill="none" stroke="#10b981" strokeWidth="2" />
-                  <path className="draw-check-mark" fill="none" stroke="#10b981" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" d="M14.1 27.2l7.1 7.2 16.7-16.8" />
+                  <circle className="draw-check-circle" cx="26" cy="26" r="25" fill="none" stroke="var(--accent)" strokeWidth="2" />
+                  <path className="draw-check-mark" fill="none" stroke="var(--accent)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" d="M14.1 27.2l7.1 7.2 16.7-16.8" />
                 </svg>
-                <p className="mt-3 text-sm font-medium text-emerald-400">Follow-up sent!</p>
+                <p className="mt-3 text-sm font-medium text-[var(--accent-text)]">Follow-up sent!</p>
               </div>
             </div>
           )}
@@ -1055,7 +1055,7 @@ export function ExpandedHistoryReview({
                   const text = e.clipboardData.getData('text/plain');
                   document.execCommand('insertText', false, text);
                 }}
-                className={`w-full min-h-[150px] text-sm text-white bg-transparent leading-[1.7] [&_a]:text-[#6364FF] [&_a]:underline [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1 [&_li]:pl-1 ${isGenerating ? 'opacity-50' : ''}`}
+                className={`w-full min-h-[150px] text-sm text-white bg-transparent leading-[1.7] [&_a]:text-[var(--accent)] [&_a]:underline [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1 [&_li]:pl-1 ${isGenerating ? 'opacity-50' : ''}`}
                 style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', outline: 'none', border: 'none', boxShadow: 'none' }}
               />
             </div>
@@ -1072,7 +1072,7 @@ export function ExpandedHistoryReview({
           {selectedResumeId && isComposeMode && (
             <div className="px-5 py-2 flex-shrink-0 border-t border-[#2a2a2a]">
               <div className="flex items-center gap-1">
-                <span className="text-[13px] text-[#6364FF]">
+                <span className="text-[13px] text-[var(--accent)]">
                   {resumes.find(r => r.id === selectedResumeId)?.filename || 'Resume attached'}
                 </span>
                 <div className="flex-1" />
@@ -1114,7 +1114,7 @@ export function ExpandedHistoryReview({
                       }`}
                     >
                       {resume.filename}
-                      {resume.isActive && <span className="text-[#6364FF] ml-1">(Active)</span>}
+                      {resume.isActive && <span className="text-[var(--accent)] ml-1">(Active)</span>}
                     </button>
                   ))}
                 </div>
@@ -1179,7 +1179,7 @@ export function ExpandedHistoryReview({
                   value={linkText}
                   onChange={(e) => setLinkText(e.target.value)}
                   placeholder="Link text"
-                  className="w-full px-3 py-2 text-sm bg-[#141414] border border-[#333] rounded-lg text-white outline-none focus:ring-0 focus:border-[#6364FF] placeholder-[#555]"
+                  className="w-full px-3 py-2 text-sm bg-[#141414] border border-[#333] rounded-lg text-white outline-none focus:ring-0 focus:border-[var(--accent)] placeholder-[#555]"
                 />
               </div>
               <div>
@@ -1190,7 +1190,7 @@ export function ExpandedHistoryReview({
                   onChange={(e) => setLinkUrl(e.target.value)}
                   placeholder="https://"
                   autoFocus
-                  className="w-full px-3 py-2 text-sm bg-[#141414] border border-[#333] rounded-lg text-white outline-none focus:ring-0 focus:border-[#6364FF] placeholder-[#555]"
+                  className="w-full px-3 py-2 text-sm bg-[#141414] border border-[#333] rounded-lg text-white outline-none focus:ring-0 focus:border-[var(--accent)] placeholder-[#555]"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault();
@@ -1210,7 +1210,7 @@ export function ExpandedHistoryReview({
               <button
                 onClick={insertLink}
                 disabled={!linkUrl}
-                className="px-4 py-2 text-sm text-white bg-[#6364FF] rounded-lg hover:bg-[#5354EE] disabled:opacity-50 transition-colors"
+                className="px-4 py-2 text-sm text-white bg-[var(--accent)] rounded-lg hover:bg-[var(--accent-hover)] disabled:opacity-50 transition-colors"
               >
                 Insert
               </button>

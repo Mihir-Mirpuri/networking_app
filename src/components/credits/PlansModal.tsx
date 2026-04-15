@@ -66,7 +66,7 @@ export function PlansModal({ isOpen, onClose, isSubscribed }: PlansModalProps) {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-[#111111] rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden animate-scale-in border border-[#2a2a2a]">
+      <div data-theme="pro" className="bg-[#111111] rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden animate-scale-in border border-[#2a2a2a]">
         {/* Header */}
         <div className="px-6 py-5 border-b border-[#2a2a2a]">
           <h2 className="text-xl font-semibold text-white">Choose Your Plan</h2>
@@ -141,8 +141,8 @@ export function PlansModal({ isOpen, onClose, isSubscribed }: PlansModalProps) {
 
           {/* Pro Plan */}
           {!isSubscribed && (
-            <div className="relative rounded-xl border p-5 transition-all border-[#3b82f6]/30 bg-gradient-to-br from-[#1a1a1a] to-[#0f172a]">
-              <span className="absolute -top-2.5 right-4 px-2 py-0.5 bg-[#3b82f6] text-white text-xs font-medium rounded">
+            <div className="relative rounded-xl border p-5 transition-all border-[var(--accent-border)] bg-gradient-to-br from-[#1a1a1a] to-[#0f172a]">
+              <span className="absolute -top-2.5 right-4 px-2 py-0.5 bg-[var(--accent)] text-white text-xs font-medium rounded">
                 Best Value
               </span>
               <div className="flex items-start justify-between mb-4">
@@ -160,7 +160,7 @@ export function PlansModal({ isOpen, onClose, isSubscribed }: PlansModalProps) {
                   onClick={() => setPaymentType('upfront')}
                   className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${
                     paymentType === 'upfront'
-                      ? 'bg-[#3b82f6] text-white'
+                      ? 'bg-[var(--accent)] text-white'
                       : 'bg-[#2a2a2a] text-white hover:bg-[#333333]'
                   }`}
                 >
@@ -170,7 +170,7 @@ export function PlansModal({ isOpen, onClose, isSubscribed }: PlansModalProps) {
                   onClick={() => setPaymentType('monthly')}
                   className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${
                     paymentType === 'monthly'
-                      ? 'bg-[#3b82f6] text-white'
+                      ? 'bg-[var(--accent)] text-white'
                       : 'bg-[#2a2a2a] text-white hover:bg-[#333333]'
                   }`}
                 >
@@ -192,7 +192,7 @@ export function PlansModal({ isOpen, onClose, isSubscribed }: PlansModalProps) {
                       max={SUBSCRIPTION_PRICING.MAX_UPFRONT_MONTHS}
                       value={selectedMonths}
                       onChange={(e) => setSelectedMonths(parseInt(e.target.value))}
-                      className="w-full h-2 bg-[#2a2a2a] rounded-lg appearance-none cursor-pointer accent-[#3b82f6]"
+                      className="w-full h-2 bg-[#2a2a2a] rounded-lg appearance-none cursor-pointer accent-[var(--accent)]"
                     />
                     <div className="flex justify-between text-xs text-white mt-1">
                       <span>{SUBSCRIPTION_PRICING.MIN_UPFRONT_MONTHS} mo</span>
@@ -208,7 +208,7 @@ export function PlansModal({ isOpen, onClose, isSubscribed }: PlansModalProps) {
                       </span>
                       <span className="text-2xl font-bold text-white">${upfrontTotal}</span>
                     </div>
-                    <div className="text-sm text-green-400 mt-1">
+                    <div className="text-sm text-[var(--accent-text)] mt-1">
                       You save ${monthlySavings} compared to monthly
                     </div>
                   </div>
@@ -216,7 +216,7 @@ export function PlansModal({ isOpen, onClose, isSubscribed }: PlansModalProps) {
                   <button
                     onClick={handleUpfrontUpgrade}
                     disabled={isUpfrontLoading}
-                    className="w-full py-2.5 bg-[#3b82f6] text-white font-medium rounded-lg hover:bg-[#2563eb] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                    className="w-full py-2.5 bg-[var(--accent)] text-white font-medium rounded-lg hover:bg-[var(--accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
                   >
                     {isUpfrontLoading ? (
                       <>
@@ -280,7 +280,7 @@ export function PlansModal({ isOpen, onClose, isSubscribed }: PlansModalProps) {
                   <button
                     onClick={handleMonthlyUpgrade}
                     disabled={isCheckoutLoading}
-                    className="w-full py-2.5 bg-[#3b82f6] text-white font-medium rounded-lg hover:bg-[#2563eb] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                    className="w-full py-2.5 bg-[var(--accent)] text-white font-medium rounded-lg hover:bg-[var(--accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
                   >
                     {isCheckoutLoading ? (
                       <>
@@ -330,7 +330,7 @@ export function PlansModal({ isOpen, onClose, isSubscribed }: PlansModalProps) {
               <ul className="mt-4 space-y-2">
                 <li className="flex items-center gap-2 text-sm text-white">
                   <svg
-                    className="w-4 h-4 text-[#3b82f6]"
+                    className="w-4 h-4 text-[var(--accent-text)]"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -346,7 +346,7 @@ export function PlansModal({ isOpen, onClose, isSubscribed }: PlansModalProps) {
                 </li>
                 <li className="flex items-center gap-2 text-sm text-white">
                   <svg
-                    className="w-4 h-4 text-[#3b82f6]"
+                    className="w-4 h-4 text-[var(--accent-text)]"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -362,7 +362,7 @@ export function PlansModal({ isOpen, onClose, isSubscribed }: PlansModalProps) {
                 </li>
                 <li className="flex items-center gap-2 text-sm text-white">
                   <svg
-                    className="w-4 h-4 text-[#3b82f6]"
+                    className="w-4 h-4 text-[var(--accent-text)]"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -378,7 +378,7 @@ export function PlansModal({ isOpen, onClose, isSubscribed }: PlansModalProps) {
                 </li>
                 <li className="flex items-center gap-2 text-sm text-white">
                   <svg
-                    className="w-4 h-4 text-[#3b82f6]"
+                    className="w-4 h-4 text-[var(--accent-text)]"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -399,7 +399,7 @@ export function PlansModal({ isOpen, onClose, isSubscribed }: PlansModalProps) {
           {/* Subscribed User - Manage Subscription */}
           {isSubscribed && (
             <div className="relative rounded-xl border p-5 transition-all border-[#404040] bg-[#1a1a1a]">
-              <span className="absolute -top-2.5 left-4 px-2 py-0.5 bg-[#1a1a1a] text-[#3b82f6] text-xs font-medium rounded border border-[#3b82f6]/30">
+              <span className="absolute -top-2.5 left-4 px-2 py-0.5 bg-[#1a1a1a] text-[var(--accent-text)] text-xs font-medium rounded border border-[var(--accent-border)]">
                 Current Plan
               </span>
               <div className="flex items-start justify-between">
@@ -413,7 +413,7 @@ export function PlansModal({ isOpen, onClose, isSubscribed }: PlansModalProps) {
               <ul className="mt-4 space-y-2">
                 <li className="flex items-center gap-2 text-sm text-white">
                   <svg
-                    className="w-4 h-4 text-[#3b82f6]"
+                    className="w-4 h-4 text-[var(--accent-text)]"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -429,7 +429,7 @@ export function PlansModal({ isOpen, onClose, isSubscribed }: PlansModalProps) {
                 </li>
                 <li className="flex items-center gap-2 text-sm text-white">
                   <svg
-                    className="w-4 h-4 text-[#3b82f6]"
+                    className="w-4 h-4 text-[var(--accent-text)]"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"

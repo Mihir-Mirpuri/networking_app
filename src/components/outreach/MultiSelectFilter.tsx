@@ -67,13 +67,13 @@ export function MultiSelectFilter({
         onClick={() => setIsOpen(!isOpen)}
         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-['Inter'] transition-colors ${
           hasSelection
-            ? 'bg-[#6364FF]/20 border-[#6364FF] text-white'
+            ? 'bg-[var(--accent-badge-bg)] border-[var(--accent)] text-white'
             : 'bg-[#1a1a1a] border-[#3a3a3a] text-white hover:border-[#505050]'
         }`}
       >
         <span>{label}</span>
         {hasSelection && (
-          <span className="w-4 h-4 rounded bg-[#6364FF] text-white text-[10px] font-medium flex items-center justify-center">
+          <span className="w-4 h-4 rounded bg-[var(--accent)] text-white text-[10px] font-medium flex items-center justify-center">
             {selected.length}
           </span>
         )}
@@ -123,7 +123,7 @@ export function MultiSelectFilter({
                     {/* Checkbox */}
                     <div
                       className={`w-4 h-4 rounded flex items-center justify-center shrink-0 ${
-                        isSelected ? 'bg-[#6364FF]' : 'border border-[#505050]'
+                        isSelected ? 'bg-[var(--accent)]' : 'border border-[#505050]'
                       }`}
                     >
                       {isSelected && (

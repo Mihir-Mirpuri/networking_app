@@ -602,7 +602,7 @@ function PillInput({ value, onChange, placeholder }: PillInputProps) {
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         className="text-[13px] text-white outline-none border-none ring-0 focus:outline-none focus:border-none focus:ring-0 whitespace-nowrap overflow-x-auto"
-        style={{ minHeight: '1.5em', caretColor: '#6364FF', boxShadow: 'none' }}
+        style={{ minHeight: '1.5em', caretColor: 'var(--accent)', boxShadow: 'none' }}
       />
     </div>
   );
@@ -763,7 +763,7 @@ function PillEditor({ value, onChange, placeholder }: PillEditorProps) {
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         className="w-full h-full min-h-[300px] text-sm text-white leading-[1.7] outline-none border-none ring-0 focus:outline-none focus:border-none focus:ring-0"
-        style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', caretColor: '#6364FF', boxShadow: 'none' }}
+        style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', caretColor: 'var(--accent)', boxShadow: 'none' }}
       />
     </div>
   );
@@ -823,8 +823,8 @@ function PlaceholderMenu() {
         onClick={() => setOpen((o) => !o)}
         className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${
           open
-            ? 'bg-[#6364FF]/15 text-white'
-            : 'text-[#9c9dff] hover:text-white hover:bg-[#6364FF]/10'
+            ? 'bg-[var(--accent)]/15 text-white'
+            : 'text-[var(--accent-text)] hover:text-white hover:bg-[var(--accent-tint)]'
         }`}
       >
         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.2}>
@@ -845,7 +845,7 @@ function PlaceholderMenu() {
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search variables"
               autoFocus
-              className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-md px-2.5 py-1.5 text-[12px] text-white placeholder:text-[#505050] outline-none focus:border-[#6364FF] transition-colors"
+              className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-md px-2.5 py-1.5 text-[12px] text-white placeholder:text-[#505050] outline-none focus:border-[var(--accent)] transition-colors"
             />
           </div>
           <div className="max-h-[280px] overflow-y-auto p-1.5">
@@ -859,7 +859,7 @@ function PlaceholderMenu() {
                     key={p.key}
                     type="button"
                     onClick={() => insert(p.key)}
-                    className="w-full px-2 py-1.5 rounded-md text-left text-[12px] text-[#c8c9d6] hover:bg-[#6364FF]/12 hover:text-white transition-colors font-mono"
+                    className="w-full px-2 py-1.5 rounded-md text-left text-[12px] text-[#c8c9d6] hover:bg-[var(--accent)]/12 hover:text-white transition-colors font-mono"
                   >
                     {p.label}
                   </button>
@@ -1148,7 +1148,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
           )}
         </div>
         {currentTab === 'resumes' && (
-          <label className="bg-[#6364FF] text-white text-[13px] font-semibold px-5 py-2.5 rounded-full hover:bg-[#5354EE] transition-colors cursor-pointer flex items-center gap-2">
+          <label className="bg-[var(--accent)] text-white text-[13px] font-semibold px-5 py-2.5 rounded-full hover:bg-[var(--accent-hover)] transition-colors cursor-pointer flex items-center gap-2">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
             </svg>
@@ -1159,7 +1159,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
         {currentTab === 'templates' && (
           <button
             onClick={() => setShowEmailPrefs(true)}
-            className="bg-[#6364FF] text-white text-[13px] font-semibold px-5 py-2.5 rounded-full hover:bg-[#5354EE] transition-colors flex items-center gap-2"
+            className="bg-[var(--accent)] text-white text-[13px] font-semibold px-5 py-2.5 rounded-full hover:bg-[var(--accent-hover)] transition-colors flex items-center gap-2"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
@@ -1201,12 +1201,12 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
               {/* Subtle hover wash */}
               <div
                 aria-hidden="true"
-                className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#6364FF]/[0.05] via-transparent to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+                className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[var(--accent)]/[0.05] via-transparent to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100"
               />
               {/* Top gradient hairline */}
               <div
                 aria-hidden="true"
-                className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#6364FF]/40 to-transparent"
+                className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[var(--accent)]/40 to-transparent"
               />
 
               {/* Header */}
@@ -1229,20 +1229,20 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                     {/* Ambient glow, top-right (subtle, echoes neighbors) */}
                     <div
                       aria-hidden="true"
-                      className="pointer-events-none absolute -top-16 -right-16 h-44 w-44 rounded-full bg-[#6364FF]/[0.06] blur-3xl"
+                      className="pointer-events-none absolute -top-16 -right-16 h-44 w-44 rounded-full bg-[var(--accent)]/[0.06] blur-3xl"
                     />
                     {/* Concentric ring backdrop behind avatar */}
                     <div
                       aria-hidden="true"
-                      className="pointer-events-none absolute -left-6 -top-6 h-36 w-36 rounded-full border border-[#6364FF]/10"
+                      className="pointer-events-none absolute -left-6 -top-6 h-36 w-36 rounded-full border border-[var(--accent)]/10"
                     />
                     <div
                       aria-hidden="true"
-                      className="pointer-events-none absolute -left-2 -top-2 h-28 w-28 rounded-full border border-[#6364FF]/[0.08]"
+                      className="pointer-events-none absolute -left-2 -top-2 h-28 w-28 rounded-full border border-[var(--accent)]/[0.08]"
                     />
 
                     <div className="relative">
-                      <div className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-[#6364FF]">
+                      <div className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--accent)]">
                         Identity
                       </div>
                       <p className="mt-2 text-xs text-[#909090]">How you appear in outreach.</p>
@@ -1253,17 +1253,17 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                       <div className="relative shrink-0">
                         <span
                           aria-hidden="true"
-                          className="absolute inset-0 rounded-full bg-[#6364FF]/30 blur-md"
+                          className="absolute inset-0 rounded-full bg-[var(--accent)]/30 blur-md"
                         />
                         {userImage ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={userImage}
                             alt={userName}
-                            className="relative w-14 h-14 rounded-full ring-2 ring-[#6364FF]/40"
+                            className="relative w-14 h-14 rounded-full ring-2 ring-[var(--accent)]/40"
                           />
                         ) : (
-                          <div className="relative w-14 h-14 rounded-full bg-gradient-to-br from-[#7B7CFF] to-[#4E4FDB] flex items-center justify-center text-base font-bold text-white ring-2 ring-[#6364FF]/40">
+                          <div className="relative w-14 h-14 rounded-full bg-gradient-to-br from-[#7B7CFF] to-[#4E4FDB] flex items-center justify-center text-base font-bold text-white ring-2 ring-[var(--accent)]/40">
                             {(profile.name || userName || '?').split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()}
                           </div>
                         )}
@@ -1284,7 +1284,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                         <p className="text-[15px] font-semibold text-white truncate">{profile.name || userName}</p>
                         <p className="text-xs text-[#909090] truncate">{userEmail}</p>
                         <div className="mt-1.5 inline-flex items-center gap-1.5 text-[10px] text-[#707070]">
-                          <span className="h-1 w-1 rounded-full bg-[#22C55E]" />
+                          <span className="h-1 w-1 rounded-full bg-[var(--accent)]" />
                           Signed in with Google
                         </div>
                       </div>
@@ -1296,12 +1296,12 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                     {/* Ambient glow echoing the Pro card */}
                     <div
                       aria-hidden="true"
-                      className="pointer-events-none absolute -bottom-20 -left-20 h-52 w-52 rounded-full bg-[#6364FF]/[0.07] blur-3xl"
+                      className="pointer-events-none absolute -bottom-20 -left-20 h-52 w-52 rounded-full bg-[var(--accent)]/[0.07] blur-3xl"
                     />
                     {/* Decorative chat-bubble cluster */}
                     <svg
                       aria-hidden="true"
-                      className="pointer-events-none absolute top-5 right-5 w-16 h-16 text-[#6364FF]/25"
+                      className="pointer-events-none absolute top-5 right-5 w-16 h-16 text-[var(--accent)]/25"
                       viewBox="0 0 64 64"
                       fill="none"
                       stroke="currentColor"
@@ -1314,7 +1314,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                     </svg>
 
                     <div className="relative">
-                      <div className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-[#6364FF]">
+                      <div className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--accent)]">
                         Support
                       </div>
                       <h3 className="mt-3 text-[17px] font-semibold text-white tracking-tight">
@@ -1330,8 +1330,8 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                     {/* Response-time line */}
                     <div className="relative mt-5 flex items-center gap-2 text-[11px] text-[#808080]">
                       <span className="relative flex h-1.5 w-1.5">
-                        <span className="absolute inline-flex h-full w-full rounded-full bg-[#22C55E] opacity-60 animate-ping" />
-                        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#22C55E]" />
+                        <span className="absolute inline-flex h-full w-full rounded-full bg-[var(--accent)] opacity-60 animate-ping" />
+                        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
                       </span>
                       Typically replies within a day
                     </div>
@@ -1339,7 +1339,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                     <button
                       type="button"
                       onClick={() => { setShowContactModal(true); setContactCopied(false); }}
-                      className="group/mail relative mt-6 w-full rounded-full border border-[#3a3a3a] bg-white/5 px-5 py-2.5 text-[12.5px] font-medium text-[#d0d0d0] hover:text-[#6364FF] hover:border-[#6364FF]/50 transition-colors text-center flex items-center justify-center gap-2"
+                      className="group/mail relative mt-6 w-full rounded-full border border-[#3a3a3a] bg-white/5 px-5 py-2.5 text-[12.5px] font-medium text-[#d0d0d0] hover:text-[var(--accent)] hover:border-[var(--accent)]/50 transition-colors text-center flex items-center justify-center gap-2"
                     >
                       Email the team
                       <svg className="w-3.5 h-3.5 transition-transform duration-300 group-hover/mail:translate-x-0.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
@@ -1350,20 +1350,20 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                 </div>
 
                 {/* RIGHT COLUMN — Pro showcase */}
-                <div className="relative rounded-2xl border border-[#6364FF]/30 bg-[#1e1e1e]/70 p-7 backdrop-blur flex flex-col overflow-hidden">
+                <div className="relative rounded-2xl border border-[var(--accent)]/30 bg-[#1e1e1e]/70 p-7 backdrop-blur flex flex-col overflow-hidden">
                   {/* Ambient indigo glow, top-right */}
                   <div
                     aria-hidden="true"
-                    className="pointer-events-none absolute -top-24 -right-24 h-64 w-64 rounded-full bg-[#6364FF]/20 blur-3xl"
+                    className="pointer-events-none absolute -top-24 -right-24 h-64 w-64 rounded-full bg-[var(--accent)]/20 blur-3xl"
                   />
                   <div
                     aria-hidden="true"
-                    className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#6364FF]/70 to-transparent"
+                    className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[var(--accent)]/70 to-transparent"
                   />
                   {/* Decorative sparkle */}
                   <svg
                     aria-hidden="true"
-                    className="pointer-events-none absolute top-6 right-6 w-5 h-5 text-[#6364FF]/40"
+                    className="pointer-events-none absolute top-6 right-6 w-5 h-5 text-[var(--accent)]/40"
                     viewBox="0 0 24 24"
                     fill="currentColor"
                   >
@@ -1372,10 +1372,10 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
 
                   {/* Header */}
                   <div className="relative">
-                    <div className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-[#6364FF]">
+                    <div className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--accent)]">
                       Signl Pro
                       {subscription.isSubscribed && (
-                        <span className="ml-1.5 rounded-full bg-[#6364FF]/20 px-2 py-0.5 text-[9px] tracking-[0.15em] text-[#6364FF]">
+                        <span className="ml-1.5 rounded-full bg-[var(--accent)]/20 px-2 py-0.5 text-[9px] tracking-[0.15em] text-[var(--accent)]">
                           Current
                         </span>
                       )}
@@ -1416,7 +1416,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                         'Blue AI chat bubbles',
                       ].map((label) => (
                         <li key={label} className="flex items-center gap-3">
-                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[#6364FF]/50 bg-[#6364FF]/15 text-[#6364FF] shadow-[0_0_12px_-2px_rgba(99,100,255,0.4)]">
+                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[var(--accent)]/50 bg-[var(--accent)]/15 text-[var(--accent)] shadow-[0_0_12px_-2px_rgba(99,100,255,0.4)]">
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                             </svg>
@@ -1443,7 +1443,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                         type="button"
                         onClick={async () => { setIsCheckoutLoading(true); try { await createCheckoutSession(); } catch { setIsCheckoutLoading(false); } }}
                         disabled={isCheckoutLoading}
-                        className="group/cta w-full rounded-full bg-[#6364FF] px-6 py-3.5 text-[14px] font-semibold text-white shadow-[0_20px_60px_-20px_rgba(99,100,255,0.8)] hover:-translate-y-0.5 hover:bg-[#5354EE] transition-all duration-300 disabled:opacity-50 flex items-center justify-center gap-2"
+                        className="group/cta w-full rounded-full bg-[var(--accent)] px-6 py-3.5 text-[14px] font-semibold text-white shadow-[0_20px_60px_-20px_rgba(99,100,255,0.8)] hover:-translate-y-0.5 hover:bg-[var(--accent-hover)] transition-all duration-300 disabled:opacity-50 flex items-center justify-center gap-2"
                       >
                         {isCheckoutLoading ? 'Loading…' : (
                           <>
@@ -1472,8 +1472,8 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                 className="relative w-full max-w-md mx-4 rounded-3xl border border-[#3a3a3a] bg-[#1a1a1a] p-8 overflow-hidden shadow-[0_40px_100px_-20px_rgba(0,0,0,0.8)]"
               >
                 {/* Ambient glow */}
-                <div aria-hidden="true" className="pointer-events-none absolute -top-20 -right-20 h-56 w-56 rounded-full bg-[#6364FF]/15 blur-3xl" />
-                <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#6364FF]/60 to-transparent" />
+                <div aria-hidden="true" className="pointer-events-none absolute -top-20 -right-20 h-56 w-56 rounded-full bg-[var(--accent)]/15 blur-3xl" />
+                <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[var(--accent)]/60 to-transparent" />
 
                 {/* Close button */}
                 <button
@@ -1488,7 +1488,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
 
                 <div className="relative">
                   {/* Envelope icon medallion */}
-                  <div className="mx-auto mb-5 w-14 h-14 rounded-2xl bg-[#6364FF]/15 border border-[#6364FF]/30 flex items-center justify-center text-[#6364FF] shadow-[0_0_40px_-10px_rgba(99,100,255,0.6)]">
+                  <div className="mx-auto mb-5 w-14 h-14 rounded-2xl bg-[var(--accent)]/15 border border-[var(--accent)]/30 flex items-center justify-center text-[var(--accent)] shadow-[0_0_40px_-10px_rgba(99,100,255,0.6)]">
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l9 6 9-6M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                     </svg>
@@ -1513,15 +1513,15 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                         setContactCopied(false);
                       }
                     }}
-                    className="group/copy mt-6 w-full flex items-center justify-between gap-3 rounded-2xl border border-[#3a3a3a] bg-black/30 hover:border-[#6364FF]/50 hover:bg-[#6364FF]/[0.04] pl-5 pr-3 py-3.5 transition-colors"
+                    className="group/copy mt-6 w-full flex items-center justify-between gap-3 rounded-2xl border border-[#3a3a3a] bg-black/30 hover:border-[var(--accent)]/50 hover:bg-[var(--accent)]/[0.04] pl-5 pr-3 py-3.5 transition-colors"
                   >
                     <span className="font-mono text-[14px] font-medium text-white tracking-tight truncate">
                       feedback@signl.to
                     </span>
                     <span className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${
                       contactCopied
-                        ? 'bg-[#22C55E]/15 text-[#22C55E]'
-                        : 'bg-white/5 text-[#b0b0b0] group-hover/copy:bg-[#6364FF]/15 group-hover/copy:text-[#6364FF]'
+                        ? 'bg-[var(--accent-badge-bg)] text-[var(--accent-text)]'
+                        : 'bg-white/5 text-[#b0b0b0] group-hover/copy:bg-[var(--accent)]/15 group-hover/copy:text-[var(--accent)]'
                     }`}>
                       {contactCopied ? (
                         <>
@@ -1544,7 +1544,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                   {/* Open in mail client */}
                   <a
                     href="mailto:feedback@signl.to"
-                    className="mt-3 w-full flex items-center justify-center gap-2 rounded-full bg-[#6364FF] px-5 py-3 text-[13px] font-semibold text-white shadow-[0_20px_60px_-20px_rgba(99,100,255,0.8)] hover:bg-[#5354EE] transition-colors"
+                    className="mt-3 w-full flex items-center justify-center gap-2 rounded-full bg-[var(--accent)] px-5 py-3 text-[13px] font-semibold text-white shadow-[0_20px_60px_-20px_rgba(99,100,255,0.8)] hover:bg-[var(--accent-hover)] transition-colors"
                   >
                     Open in mail app
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
@@ -1666,7 +1666,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                   <div
                     className={`relative w-full aspect-[3/4] rounded-md bg-[#F5F5F5] overflow-hidden cursor-pointer transition-all hover:shadow-lg ${
                       resume.isActive
-                        ? 'ring-2 ring-[#6364FF] shadow-[0_2px_12px_rgba(99,100,255,0.15)]'
+                        ? 'ring-2 ring-[var(--accent)] shadow-[0_2px_12px_rgba(99,100,255,0.15)]'
                         : 'hover:ring-1 hover:ring-[#505050]'
                     }`}
                     onClick={() => setExpandedResume(resume)}
@@ -1676,7 +1676,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                       <>
                         {!loadedPdfs.has(resume.id) && (
                           <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#F5F5F5] z-[1]">
-                            <div className="w-5 h-5 border-2 border-[#6364FF]/30 border-t-[#6364FF] rounded-full animate-spin" />
+                            <div className="w-5 h-5 border-2 border-[var(--accent)]/30 border-t-[var(--accent)] rounded-full animate-spin" />
                           </div>
                         )}
                         <object
@@ -1691,7 +1691,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                       </>
                     ) : (
                       <div className="w-full h-full flex flex-col items-center justify-center bg-[#F5F5F5] p-3">
-                        <svg className="w-10 h-10 text-[#6364FF] mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                        <svg className="w-10 h-10 text-[var(--accent)] mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
                         </svg>
                         <span className="text-[10px] text-[#1a1a1a] font-medium text-center truncate max-w-full px-2">{resume.filename}</span>
@@ -1718,7 +1718,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
 
                   {/* Active badge */}
                   {resume.isActive && (
-                    <span className="text-[9px] font-semibold text-[#6364FF] bg-[#6364FF]/15 px-2.5 py-0.5 rounded-full">Active</span>
+                    <span className="text-[9px] font-semibold text-[var(--accent)] bg-[var(--accent)]/15 px-2.5 py-0.5 rounded-full">Active</span>
                   )}
                 </div>
               ))}
@@ -1779,7 +1779,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                     }}
                     className="group flex items-center w-full px-5 py-4 gap-3 border-b border-[#3a3a3a] last:border-b-0 hover:bg-[#1a1a1a] transition-colors text-left"
                   >
-                    <div className="p-2 rounded-lg shrink-0 bg-[#6364FF]">
+                    <div className="p-2 rounded-lg shrink-0 bg-[var(--accent)]">
                       <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
                       </svg>
@@ -1796,7 +1796,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                   onClick={() => setEditingTemplate({ id: '__new__', name: '', subject: '', body: '', isDefault: false, attachResume: false, resumeId: null, createdAt: new Date() })}
                   className="group flex items-center w-full px-5 py-4 gap-3 hover:bg-[#1a1a1a] transition-colors text-left"
                 >
-                  <div className="p-2 rounded-lg shrink-0 bg-[#6364FF]">
+                  <div className="p-2 rounded-lg shrink-0 bg-[var(--accent)]">
                     <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                     </svg>
@@ -1900,8 +1900,8 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                     value={editingTemplate.name}
                     onChange={(e) => setEditingTemplate({ ...editingTemplate, name: e.target.value })}
                     placeholder="e.g. Coffee chat request"
-                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg px-3 py-2.5 text-[13px] text-white placeholder:text-[#454545] focus:outline-none focus:border-[#6364FF] transition-colors"
-                    style={{ caretColor: '#6364FF' }}
+                    className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg px-3 py-2.5 text-[13px] text-white placeholder:text-[#454545] focus:outline-none focus:border-[var(--accent)] transition-colors"
+                    style={{ caretColor: 'var(--accent)' }}
                     autoFocus={isNew}
                   />
                 </div>
@@ -1909,7 +1909,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                 {/* Subject */}
                 <div>
                   <label className="block text-[11px] font-medium text-[#808080] mb-1.5">Subject</label>
-                  <div className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg px-3 py-2.5 focus-within:border-[#6364FF] transition-colors">
+                  <div className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg px-3 py-2.5 focus-within:border-[var(--accent)] transition-colors">
                     <PillInput
                       value={editingTemplate.subject}
                       onChange={(newSubject) => setEditingTemplate({ ...editingTemplate, subject: newSubject })}
@@ -1924,7 +1924,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                     <label className="block text-[11px] font-medium text-[#808080]">Message</label>
                     <PlaceholderMenu />
                   </div>
-                  <div className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg px-3.5 py-3 focus-within:border-[#6364FF] transition-colors">
+                  <div className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg px-3.5 py-3 focus-within:border-[var(--accent)] transition-colors">
                     <PillEditor
                       value={editingTemplate.body}
                       onChange={(newBody) => setEditingTemplate({ ...editingTemplate, body: newBody })}
@@ -1951,7 +1951,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                 <button
                   onClick={handleSave}
                   disabled={isSavingTemplate}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-[12px] font-semibold text-white bg-[#6364FF] hover:bg-[#7879ff] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-[12px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSavingTemplate ? (
                     <>
@@ -1984,8 +1984,8 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
           >
             {/* Header */}
             <div className="flex items-center gap-4 px-6 py-4 border-b border-[#252525]">
-              <div className="p-2.5 rounded-xl bg-[#6364FF]/10">
-                <svg className="w-5 h-5 text-[#6364FF]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+              <div className="p-2.5 rounded-xl bg-[var(--accent)]/10">
+                <svg className="w-5 h-5 text-[var(--accent)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                 </svg>
@@ -2011,7 +2011,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                   value={profile.emailInstructions || ''}
                   onChange={(e) => setProfile({ ...profile, emailInstructions: e.target.value || null })}
                   rows={4}
-                  className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg text-[13px] text-white p-4 focus:outline-none focus:border-[#6364FF] transition-colors resize-none leading-relaxed placeholder:text-[#404040]"
+                  className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg text-[13px] text-white p-4 focus:outline-none focus:border-[var(--accent)] transition-colors resize-none leading-relaxed placeholder:text-[#404040]"
                   placeholder="e.g. Keep emails under 3 sentences. Always mention I'm looking for a summer internship."
                 />
               </div>
@@ -2019,8 +2019,8 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
               {/* Auto-Personalize Toggle */}
               <div className="flex items-center justify-between p-4 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg">
                 <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg transition-colors ${profile.autoPersonalize ? 'bg-[#6364FF]/10' : 'bg-[#252525]'}`}>
-                    <svg className={`w-4 h-4 transition-colors ${profile.autoPersonalize ? 'text-[#6364FF]' : 'text-[#505050]'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                  <div className={`p-2 rounded-lg transition-colors ${profile.autoPersonalize ? 'bg-[var(--accent)]/10' : 'bg-[#252525]'}`}>
+                    <svg className={`w-4 h-4 transition-colors ${profile.autoPersonalize ? 'text-[var(--accent)]' : 'text-[#505050]'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z" />
                     </svg>
                   </div>
@@ -2035,7 +2035,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                   aria-checked={profile.autoPersonalize}
                   onClick={() => setProfile({ ...profile, autoPersonalize: !profile.autoPersonalize })}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ${
-                    profile.autoPersonalize ? 'bg-[#6364FF]' : 'bg-[#303030]'
+                    profile.autoPersonalize ? 'bg-[var(--accent)]' : 'bg-[#303030]'
                   }`}
                 >
                   <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${profile.autoPersonalize ? 'translate-x-[22px]' : 'translate-x-[2px]'}`} />
@@ -2053,7 +2053,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
               </button>
               <button
                 onClick={() => setShowEmailPrefs(false)}
-                className="bg-[#6364FF] text-white text-[12px] font-semibold px-5 py-2 rounded-lg hover:bg-[#5354EE] transition-colors"
+                className="bg-[var(--accent)] text-white text-[12px] font-semibold px-5 py-2 rounded-lg hover:bg-[var(--accent-hover)] transition-colors"
               >
                 Done
               </button>
@@ -2075,7 +2075,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-[#252525]">
               <div className="flex items-center gap-3">
-                <svg className="w-5 h-5 text-[#6364FF]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                <svg className="w-5 h-5 text-[var(--accent)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
                 </svg>
                 <div>
@@ -2116,7 +2116,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                 />
               ) : (
                 <div className="w-full h-full min-h-[70vh] flex flex-col items-center justify-center text-white">
-                  <svg className="w-16 h-16 text-[#6364FF] mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                  <svg className="w-16 h-16 text-[var(--accent)] mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
                   </svg>
                   <p className="text-lg font-medium mb-2">{expandedResume.filename}</p>
@@ -2125,7 +2125,7 @@ export function ProfileClient({ userEmail, userName, userImage, activeTab }: Pro
                     href={`/api/resume/view?id=${expandedResume.id}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-4 py-2 bg-[#6364FF] text-white rounded-lg hover:bg-[#5354EE] transition-colors text-sm font-medium"
+                    className="px-4 py-2 bg-[var(--accent)] text-white rounded-lg hover:bg-[var(--accent-hover)] transition-colors text-sm font-medium"
                   >
                     Download File
                   </a>

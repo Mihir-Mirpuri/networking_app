@@ -193,7 +193,7 @@ export function SearchSidebar({
                       <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#252525] flex items-center justify-center mt-1">
                         <SignalLogo className="w-3 h-3 text-white" />
                       </div>
-                      <div className={`rounded-2xl px-3 py-2 text-sm text-white rounded-bl-md w-fit ${isSubscribed ? 'bg-[#2563EB]' : 'bg-[#22C55E]'}`}>
+                      <div className={`rounded-2xl px-3 py-2 text-sm text-white rounded-bl-md w-fit bg-[var(--accent)]`}>
                         <p>Hi{session?.user?.name ? ` ${session.user.name.split(' ')[0]}` : ''}! I&apos;m Signl. Who would you like to find today? Try:</p>
                         <div className="mt-2 space-y-1">
                           <button
@@ -246,7 +246,7 @@ export function SearchSidebar({
                             <div className="flex-shrink-0 w-5 h-5 rounded-full bg-[#252525] flex items-center justify-center mt-1">
                               <SignalLogo className="w-3 h-3 text-white" />
                             </div>
-                            <div className={`rounded-2xl px-3 py-2 text-sm text-white rounded-bl-md w-fit ${isSubscribed ? 'bg-[#2563EB]' : 'bg-[#22C55E]'}`}>
+                            <div className={`rounded-2xl px-3 py-2 text-sm text-white rounded-bl-md w-fit bg-[var(--accent)]`}>
                               {msg.isLoading ? (
                                 <div className="flex items-center gap-1.5 py-1">
                                   <div className="w-1.5 h-1.5 rounded-full bg-[#505050] animate-bounce" style={{ animationDelay: '0ms' }} />

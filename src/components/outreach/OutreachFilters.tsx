@@ -176,7 +176,7 @@ export function OutreachFilters({
 
         <button
           onClick={onSearch}
-          className="bg-[#6364FF] rounded-lg px-5 py-3 shrink-0 hover:bg-[#5354EE] transition-colors"
+          className="bg-[var(--accent)] rounded-lg px-5 py-3 shrink-0 hover:bg-[var(--accent-hover)] transition-colors"
         >
           <span className="text-sm text-white font-medium font-['Inter']">Search</span>
         </button>
@@ -191,7 +191,7 @@ export function OutreachFilters({
           onClick={() => onStarredFilterChange(starredActive ? undefined : true)}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-['Inter'] transition-colors ${
             starredActive
-              ? 'bg-[#6364FF]/20 border-[#6364FF] text-white'
+              ? 'bg-[var(--accent-badge-bg)] border-[var(--accent)] text-white'
               : 'bg-[#1a1a1a] border-[#3a3a3a] text-white hover:border-[#505050]'
           }`}
         >
@@ -206,11 +206,11 @@ export function OutreachFilters({
           onClick={() => onScheduledFilterChange(scheduledActive ? undefined : true)}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-['Inter'] transition-colors ${
             scheduledActive
-              ? 'bg-[#6364FF]/20 border-[#6364FF] text-white'
+              ? 'bg-[var(--accent-badge-bg)] border-[var(--accent)] text-white'
               : 'bg-[#1a1a1a] border-[#3a3a3a] text-white hover:border-[#505050]'
           }`}
         >
-          <svg className="w-3 h-3 text-[#6364FF]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-3 h-3 text-[var(--accent)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <span>Scheduled</span>
@@ -221,7 +221,7 @@ export function OutreachFilters({
           onClick={() => onDraftsFilterChange(draftsActive ? undefined : true)}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-['Inter'] transition-colors ${
             draftsActive
-              ? 'bg-[#6364FF]/20 border-[#6364FF] text-[#E0E0E0]'
+              ? 'bg-[var(--accent-badge-bg)] border-[var(--accent)] text-[#E0E0E0]'
               : 'bg-[#1a1a1a] border-[#3a3a3a] text-[#E0E0E0] hover:border-[#505050]'
           }`}
         >
@@ -231,7 +231,7 @@ export function OutreachFilters({
           <span>Drafts</span>
           {draftsCount > 0 && (
             <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
-              draftsActive ? 'bg-[#6364FF]/30 text-[#a5a6ff]' : 'bg-[#3a3a3a] text-[#909090]'
+              draftsActive ? 'bg-[var(--accent)]/30 text-[#a5a6ff]' : 'bg-[#3a3a3a] text-[#909090]'
             }`}>
               {draftsCount}
             </span>
@@ -334,7 +334,7 @@ export function OutreachFilters({
                           onToggleColumn(col);
                         }}
                         className={`w-4 h-4 rounded flex items-center justify-center shrink-0 ${
-                          isActive ? 'bg-[#6364FF]' : 'border border-[#505050]'
+                          isActive ? 'bg-[var(--accent)]' : 'border border-[#505050]'
                         }`}
                       >
                         {isActive && (

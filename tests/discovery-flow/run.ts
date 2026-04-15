@@ -99,7 +99,7 @@ function parseArgs(): CliOptions {
 // ─── LLM response schema (mirror of ai-search.ts LLMResponse) ────────────────
 
 interface LLMResponse {
-  status: 'ready' | 'needs_selection' | 'off_topic' | 'person_lookup';
+  status: 'ready' | 'needs_selection' | 'off_topic' | 'person_lookup' | 'unsupported';
   confidence?: 'high' | 'low';
   role_specificity?: 'narrow' | 'standard' | 'broad';
   filters: {
@@ -136,6 +136,17 @@ interface LLMResponse {
   selectables?: Array<{ label: string; filter_key: 'company' | 'role'; filter_value: string }>;
   suggested_searches?: Array<{ label: string; company: string; role: string | null }>;
   message: string;
+  unsupported_criteria?: string[];
+  suggested_alternative?: {
+    label: string;
+    filters: {
+      company: string | null;
+      role: string | null;
+      university: string | null;
+      location: string | null;
+    };
+    linkedin_filters: LLMResponse['linkedin_filters'];
+  };
 }
 
 // ─── Replicated extraction logic (minus auth) ────────────────────────────────
@@ -183,7 +194,7 @@ function shouldEscalateToPerplexity(
 }
 
 interface ExtractionOutcome {
-  status: 'ready' | 'needs_selection' | 'off_topic' | 'person_lookup';
+  status: 'ready' | 'needs_selection' | 'off_topic' | 'person_lookup' | 'unsupported';
   dbFilters: DBFilters;
   linkedInFilters: LinkedInFilters;
   selectables: Array<{ label: string; filterKey: 'company' | 'role'; filterValue: string }>;
@@ -193,18 +204,53 @@ interface ExtractionOutcome {
   roleSpecificity?: 'narrow' | 'standard' | 'broad';
   rawResponse: LLMResponse;
   escalatedToPerplexity: boolean;
+  // New fields for unsupported/message/suggested
+  unsupportedCriteria: string[];
+  suggestedAlternative: {
+    label: string;
+    filters: DBFilters;
+    linkedInFilters: LinkedInFilters;
+  } | null;
+  suggestedSearches: Array<{ label: string; company: string; role: string | null }>;
+  message: string;
 }
 
-async function runExtraction(query: string): Promise<ExtractionOutcome> {
+interface ExtractionInput {
+  query: string;
+  conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
+  currentFilters?: Partial<DBFilters>;
+}
+
+function buildTestUserPrompt(input: ExtractionInput): string {
+  const parts: string[] = [];
+  const history = input.conversationHistory || [];
+  if (history.length > 0) {
+    parts.push('Conversation history:');
+    for (const msg of history) {
+      parts.push(`${msg.role}: ${msg.content}`);
+    }
+    parts.push('');
+  }
+  const activeFilters = Object.entries(input.currentFilters || {}).filter(([, v]) => v);
+  if (activeFilters.length > 0) {
+    parts.push(`Current active filters: ${JSON.stringify(input.currentFilters)}`);
+    parts.push('');
+  }
+  parts.push(`New user message: ${input.query}`);
+  return parts.join('\n');
+}
+
+async function runExtraction(input: ExtractionInput): Promise<ExtractionOutcome> {
+  const { query } = input;
   log.info('ai-search', 'Received query', {
     message: query,
-    currentFilters: {},
-    historyLength: 0,
+    currentFilters: input.currentFilters || {},
+    historyLength: (input.conversationHistory || []).length,
   });
 
   const response = await completeJsonAnthropic<LLMResponse>({
     systemPrompt: SEARCH_EXTRACTION_SYSTEM_PROMPT,
-    userPrompt: `New user message: ${query}`,
+    userPrompt: buildTestUserPrompt(input),
     model: 'claude-haiku-4-5-20251001',
     temperature: 0.1,
     maxTokens: 512,
@@ -237,6 +283,47 @@ async function runExtraction(query: string): Promise<ExtractionOutcome> {
       selectables: [],
       rawResponse: parsed,
       escalatedToPerplexity: false,
+      unsupportedCriteria: [],
+      suggestedAlternative: null,
+      suggestedSearches: [],
+      message,
+    };
+  }
+
+  if (status === 'unsupported') {
+    const unsupportedCriteria = parsed.unsupported_criteria || [];
+    log.decision('ai-search', 'unsupported branch', {
+      unsupportedCriteria,
+      hasSuggestedAlternative: !!parsed.suggested_alternative,
+    });
+
+    let suggestedAlternative: ExtractionOutcome['suggestedAlternative'] = null;
+    if (parsed.suggested_alternative) {
+      const altFilters: DBFilters = {};
+      if (parsed.suggested_alternative.filters.company) altFilters.company = parsed.suggested_alternative.filters.company;
+      if (parsed.suggested_alternative.filters.role) altFilters.role = parsed.suggested_alternative.filters.role;
+      if (parsed.suggested_alternative.filters.university) altFilters.university = parsed.suggested_alternative.filters.university;
+      if (parsed.suggested_alternative.filters.location) altFilters.location = parsed.suggested_alternative.filters.location;
+      const altLinkedIn = convertLinkedInFilters(parsed.suggested_alternative.linkedin_filters);
+      suggestedAlternative = {
+        label: parsed.suggested_alternative.label,
+        filters: altFilters,
+        linkedInFilters: altLinkedIn,
+      };
+    }
+
+    return {
+      status,
+      dbFilters,
+      linkedInFilters: {},
+      selectables: [],
+      rawResponse: parsed,
+      escalatedToPerplexity: false,
+      unsupportedCriteria,
+      suggestedAlternative,
+      suggestedSearches: [],
+      message,
+      companyNameAmbiguous: parsed.company_name_ambiguous,
     };
   }
 
@@ -255,6 +342,10 @@ async function runExtraction(query: string): Promise<ExtractionOutcome> {
       personCompany: parsed.person_company?.trim() || undefined,
       rawResponse: parsed,
       escalatedToPerplexity: false,
+      unsupportedCriteria: [],
+      suggestedAlternative: null,
+      suggestedSearches: [],
+      message,
     };
   }
 
@@ -311,6 +402,10 @@ async function runExtraction(query: string): Promise<ExtractionOutcome> {
       companyNameAmbiguous: parsed.company_name_ambiguous,
       rawResponse: parsed,
       escalatedToPerplexity: escalated,
+      unsupportedCriteria: [],
+      suggestedAlternative: null,
+      suggestedSearches: [],
+      message,
     };
   }
 
@@ -356,6 +451,10 @@ async function runExtraction(query: string): Promise<ExtractionOutcome> {
     roleSpecificity: parsed.role_specificity || 'standard',
     rawResponse: parsed,
     escalatedToPerplexity: false,
+    unsupportedCriteria: [],
+    suggestedAlternative: null,
+    suggestedSearches: parsed.suggested_searches || [],
+    message,
   };
 }
 
@@ -719,6 +818,92 @@ function validateExtraction(
     }
   }
 
+  // 9. Unsupported criteria subset match
+  if (expected.unsupportedCriteria && expected.unsupportedCriteria.length > 0) {
+    for (const criterion of expected.unsupportedCriteria) {
+      const found = outcome.unsupportedCriteria.some(
+        actual => actual.toLowerCase().includes(criterion.toLowerCase())
+      );
+      if (!found) {
+        failures.push(
+          `unsupportedCriteria missing "${criterion}". Got: [${outcome.unsupportedCriteria.join(', ')}]`
+        );
+      }
+    }
+  }
+
+  // 10. Suggested alternative filters
+  if (expected.suggestedAlternativeFilters && outcome.suggestedAlternative) {
+    for (const [k, v] of Object.entries(expected.suggestedAlternativeFilters)) {
+      const actual = (outcome.suggestedAlternative.filters as Record<string, unknown>)[k];
+      if (actual !== v) {
+        failures.push(
+          `suggestedAlternative.filters.${k} mismatch: expected="${v}", actual="${actual ?? '(unset)'}"`
+        );
+      }
+    }
+  } else if (expected.suggestedAlternativeFilters && !outcome.suggestedAlternative) {
+    failures.push('expected suggestedAlternative but it was null');
+  }
+
+  // 11. Suggested alternative LinkedIn filters
+  if (expected.suggestedAlternativeLinkedInFilters && outcome.suggestedAlternative) {
+    for (const [k, v] of Object.entries(expected.suggestedAlternativeLinkedInFilters)) {
+      const actual = (outcome.suggestedAlternative.linkedInFilters as Record<string, unknown>)[k];
+      if (Array.isArray(v)) {
+        if (!matchArraySubset(actual as unknown[], v)) {
+          failures.push(
+            `suggestedAlternative.linkedInFilters.${k} missing values: expected subset=${JSON.stringify(v)}, actual=${JSON.stringify(actual ?? null)}`
+          );
+        }
+      } else if (typeof v === 'boolean') {
+        if (actual !== v) {
+          failures.push(
+            `suggestedAlternative.linkedInFilters.${k} mismatch: expected=${v}, actual=${actual ?? '(unset)'}`
+          );
+        }
+      }
+    }
+  }
+
+  // 12. Suggested alternative label
+  if (expected.suggestedAlternativeLabel && outcome.suggestedAlternative) {
+    if (!outcome.suggestedAlternative.label.toLowerCase().includes(expected.suggestedAlternativeLabel.toLowerCase())) {
+      failures.push(
+        `suggestedAlternative.label missing "${expected.suggestedAlternativeLabel}". Got: "${outcome.suggestedAlternative.label}"`
+      );
+    }
+  }
+
+  // 13. Suggested searches count
+  if (expected.suggestedSearchesMin != null) {
+    if (outcome.suggestedSearches.length < expected.suggestedSearchesMin) {
+      failures.push(
+        `suggestedSearches count too low: expected>=${expected.suggestedSearchesMin}, actual=${outcome.suggestedSearches.length}`
+      );
+    }
+  }
+
+  // 14. Message contains
+  if (expected.messageContains) {
+    for (const substring of expected.messageContains) {
+      if (!outcome.message.toLowerCase().includes(substring.toLowerCase())) {
+        failures.push(
+          `message missing "${substring}". Got: "${outcome.message}"`
+        );
+      }
+    }
+  }
+
+  // 15. Company name ambiguous flag
+  if (expected.companyNameAmbiguous != null) {
+    if (outcome.companyNameAmbiguous !== expected.companyNameAmbiguous) {
+      failures.push(
+        `companyNameAmbiguous mismatch: expected=${expected.companyNameAmbiguous}, actual=${outcome.companyNameAmbiguous ?? '(unset)'}`
+      );
+    }
+  }
+
   return { passed: failures.length === 0, failures, observations };
 }
 
@@ -830,7 +1015,11 @@ async function runOneTest(
   result.extraction.logFilePath = extractLogger.filePath;
 
   try {
-    const outcome = await withLogger(extractLogger, () => runExtraction(testCase.query));
+    const outcome = await withLogger(extractLogger, () => runExtraction({
+      query: testCase.query,
+      conversationHistory: testCase.conversationHistory,
+      currentFilters: testCase.currentFilters,
+    }));
     result.extraction.outcome = outcome;
     const entries = extractLogger.getEntries();
     result.extraction.validation = validateExtraction(

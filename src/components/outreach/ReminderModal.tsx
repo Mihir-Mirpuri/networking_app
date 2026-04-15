@@ -118,7 +118,7 @@ export function ReminderModal({
             <button
               onClick={handleSave}
               disabled={isSaving || !date}
-              className="px-4 py-2 text-sm bg-[#505050] text-white rounded-md hover:bg-[#606060] focus:outline-none focus:ring-2 focus:ring-[#606060] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 text-sm bg-[var(--accent)] text-white rounded-md hover:bg-[var(--accent-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSaving ? 'Saving...' : 'Save'}
             </button>
