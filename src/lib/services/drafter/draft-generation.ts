@@ -3,7 +3,6 @@
  */
 
 import { completeJson } from '@/lib/services/anthropic';
-import { GroqAction } from '@prisma/client';
 import {
   DraftGenerationInput,
   DraftGenerationResult,
@@ -53,7 +52,7 @@ export async function generateDraft(
     },
     metadata: {
       userId,
-      action: GroqAction.DRAFTER_GENERATION,
+      action: 'DRAFTER_GENERATION',
     },
   });
 
@@ -88,7 +87,7 @@ export async function refineDraft(
     },
     metadata: {
       userId,
-      action: GroqAction.DRAFTER_REFINEMENT,
+      action: 'DRAFTER_REFINEMENT',
     },
   });
 

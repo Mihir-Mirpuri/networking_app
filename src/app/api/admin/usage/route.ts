@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { isAdmin } from '@/lib/admin';
 import prisma from '@/lib/prisma';
 
 
@@ -31,8 +32,8 @@ interface SearchRecord {
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    if (!session?.user?.id || !isAdmin(session.user.email)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const now = new Date();
@@ -105,41 +106,50 @@ export async function GET() {
       where: { email: { not: null } },
     });
 
-    // ── Groq usage stats ──
-    const groqLogs = await prisma.groqUsageLog.findMany({
+    // ── LLM usage stats (migrated from groqUsageLog → apiCostLog) ──
+    const llmLogs = await prisma.apiCostLog.findMany({
+      where: { service: { in: ['groq', 'anthropic'] } },
       select: {
         action: true,
-        promptTokens: true,
-        completionTokens: true,
-        totalTokens: true,
-        error: true,
+        costUsd: true,
+        metadata: true,
         createdAt: true,
       },
     });
 
-    const calculateGroqStats = (logs: typeof groqLogs) => {
+    interface LlmLogEntry {
+      action: string;
+      costUsd: number;
+      metadata: unknown;
+      createdAt: Date;
+    }
+
+    const calculateGroqStats = (logs: LlmLogEntry[]) => {
       const totalCalls = logs.length;
-      const errorCalls = logs.filter(l => l.error).length;
-      const totalTokens = logs.reduce((sum, l) => sum + l.totalTokens, 0);
-      const promptTokens = logs.reduce((sum, l) => sum + l.promptTokens, 0);
-      const completionTokens = logs.reduce((sum, l) => sum + l.completionTokens, 0);
+      const meta = logs.map(l => l.metadata as Record<string, unknown> | null);
+      const errorCalls = meta.filter(m => m?.error === true).length;
+      const totalTokens = meta.reduce((sum: number, m) => sum + ((m?.totalTokens as number) || 0), 0);
+      const promptTokens = meta.reduce((sum: number, m) => sum + ((m?.promptTokens as number) || 0), 0);
+      const completionTokens = meta.reduce((sum: number, m) => sum + ((m?.completionTokens as number) || 0), 0);
 
       const byAction: Record<string, { calls: number; tokens: number; errors: number }> = {};
-      for (const log of logs) {
-        if (!byAction[log.action]) {
-          byAction[log.action] = { calls: 0, tokens: 0, errors: 0 };
+      for (let i = 0; i < logs.length; i++) {
+        const l = logs[i];
+        const m = meta[i];
+        if (!byAction[l.action]) {
+          byAction[l.action] = { calls: 0, tokens: 0, errors: 0 };
         }
-        byAction[log.action].calls++;
-        byAction[log.action].tokens += log.totalTokens;
-        if (log.error) byAction[log.action].errors++;
+        byAction[l.action].calls++;
+        byAction[l.action].tokens += (m?.totalTokens as number) || 0;
+        if (m?.error === true) byAction[l.action].errors++;
       }
 
       return { totalCalls, errorCalls, totalTokens, promptTokens, completionTokens, byAction };
     };
 
-    const groqToday = groqLogs.filter(l => l.createdAt >= startOfToday);
-    const groqWeek = groqLogs.filter(l => l.createdAt >= startOfWeek);
-    const groqMonth = groqLogs.filter(l => l.createdAt >= startOfMonth);
+    const groqToday = llmLogs.filter(l => l.createdAt >= startOfToday);
+    const groqWeek = llmLogs.filter(l => l.createdAt >= startOfWeek);
+    const groqMonth = llmLogs.filter(l => l.createdAt >= startOfMonth);
 
     return NextResponse.json({
       status: 'ok',
@@ -154,7 +164,7 @@ export async function GET() {
         today: calculateGroqStats(groqToday),
         thisWeek: calculateGroqStats(groqWeek),
         thisMonth: calculateGroqStats(groqMonth),
-        allTime: calculateGroqStats(groqLogs),
+        allTime: calculateGroqStats(llmLogs),
       },
       recentSearches,
       database: {

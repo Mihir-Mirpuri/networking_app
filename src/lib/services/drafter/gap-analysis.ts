@@ -3,7 +3,6 @@
  */
 
 import { completeJson } from '@/lib/services/anthropic';
-import { GroqAction } from '@prisma/client';
 import {
   RecipientContext,
   IdentifiedGap,
@@ -49,7 +48,7 @@ export async function analyzeTemplateGaps(
     },
     metadata: {
       userId,
-      action: GroqAction.DRAFTER_GAP_ANALYSIS,
+      action: 'DRAFTER_GAP_ANALYSIS',
     },
   });
 
@@ -103,7 +102,7 @@ export async function processGapResponse(
     },
     metadata: {
       userId,
-      action: GroqAction.DRAFTER_GAP_ANALYSIS,
+      action: 'DRAFTER_GAP_ANALYSIS',
     },
   });
 

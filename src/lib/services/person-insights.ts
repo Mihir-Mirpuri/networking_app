@@ -1,6 +1,5 @@
 import prisma from '@/lib/prisma';
 import { completeJsonAnthropic } from '@/lib/services/anthropic';
-import { GroqAction } from '@prisma/client';
 import { searchSerper } from '@/lib/services/serper';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -190,7 +189,7 @@ ${serperSnippets || '(none)'}`;
       maxTokens: 4096,
       metadata: {
         userId,
-        action: GroqAction.PERSON_INSIGHT_EXTRACTION,
+        action: 'PERSON_INSIGHT_EXTRACTION',
       },
     });
 

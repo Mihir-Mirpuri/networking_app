@@ -1,14 +1,14 @@
 /**
  * Anthropic (Claude) API client for text and JSON completions.
- * Logs usage to the shared GroqUsageLog table (distinguished by the `model` field).
+ * Logs usage to the ApiCostLog table via logApiCost().
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import { logGroqUsage, GroqUsageMetadata } from '@/lib/services/groq/logging';
-import { log, anthropicHaikuCost } from '@/lib/services/discovery-logger';
+import { logApiCost, anthropicHaikuCost, CostLogMetadata } from '@/lib/services/cost-logger';
+import { log } from '@/lib/services/discovery-logger';
 
-// Re-export metadata type so consumers don't need to import from groq/logging
-export type { GroqUsageMetadata } from '@/lib/services/groq/logging';
+// Re-export metadata type so consumers don't need to import from cost-logger
+export type { CostLogMetadata } from '@/lib/services/cost-logger';
 
 // Singleton client
 let client: Anthropic | null = null;
@@ -35,7 +35,7 @@ export interface AnthropicRequest {
     maxTokens?: number;
     jsonMode?: boolean;
   };
-  metadata?: GroqUsageMetadata;
+  metadata?: CostLogMetadata;
 }
 
 export interface AnthropicResponse<T = string> {
@@ -51,7 +51,7 @@ interface AnthropicJsonRequest {
   model?: string;
   temperature?: number;
   maxTokens?: number;
-  metadata?: GroqUsageMetadata;
+  metadata?: CostLogMetadata;
 }
 
 interface AnthropicJsonResponse<T> {
@@ -121,7 +121,23 @@ export async function completeJsonAnthropic<T>(
         .cache_read_input_tokens ?? 0;
 
     if (metadata) {
-      logGroqUsage(metadata, usage, response.model, durationMs);
+      logApiCost({
+        service: 'anthropic',
+        action: metadata.action,
+        costUsd: response.model.includes('haiku')
+          ? anthropicHaikuCost(usage.promptTokens, usage.completionTokens, cacheReadTokens, cacheCreationTokens)
+          : 0,
+        durationMs,
+        userId: metadata.userId,
+        metadata: {
+          model: response.model,
+          promptTokens: usage.promptTokens,
+          completionTokens: usage.completionTokens,
+          totalTokens: usage.totalTokens,
+          cacheCreationTokens,
+          cacheReadTokens,
+        },
+      });
     }
 
     const cleanedText = text.replace(/^```json\s*/, '').replace(/\s*```$/, '');
@@ -155,13 +171,14 @@ export async function completeJsonAnthropic<T>(
   } catch (error) {
     const durationMs = Date.now() - startTime;
     if (metadata) {
-      logGroqUsage(
-        metadata,
-        { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
-        model,
+      logApiCost({
+        service: 'anthropic',
+        action: metadata.action,
+        costUsd: 0,
         durationMs,
-        true
-      );
+        userId: metadata.userId,
+        metadata: { model, error: true },
+      });
     }
     log.llm('anthropic', {
       provider: 'anthropic',
@@ -241,7 +258,23 @@ async function callAnthropic(
         .cache_read_input_tokens ?? 0;
 
     if (metadata) {
-      logGroqUsage(metadata, usage, response.model, durationMs);
+      logApiCost({
+        service: 'anthropic',
+        action: metadata.action,
+        costUsd: response.model.includes('haiku')
+          ? anthropicHaikuCost(usage.promptTokens, usage.completionTokens, cacheReadTokens, cacheCreationTokens)
+          : 0,
+        durationMs,
+        userId: metadata.userId,
+        metadata: {
+          model: response.model,
+          promptTokens: usage.promptTokens,
+          completionTokens: usage.completionTokens,
+          totalTokens: usage.totalTokens,
+          cacheCreationTokens,
+          cacheReadTokens,
+        },
+      });
     }
 
     log.llm('anthropic', {
@@ -270,13 +303,14 @@ async function callAnthropic(
   } catch (error) {
     const durationMs = Date.now() - startTime;
     if (metadata) {
-      logGroqUsage(
-        metadata,
-        { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
-        model,
+      logApiCost({
+        service: 'anthropic',
+        action: metadata.action,
+        costUsd: 0,
         durationMs,
-        true
-      );
+        userId: metadata.userId,
+        metadata: { model, error: true },
+      });
     }
     log.llm('anthropic', {
       provider: 'anthropic',

@@ -1,6 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
 import { completeJson } from '@/lib/services/anthropic';
-import { GroqAction } from '@prisma/client';
 
 export interface ResumeSummary {
   organizations: string[];
@@ -103,7 +102,7 @@ Be concise. Only include notable items, not generic ones. Return ONLY valid JSON
         temperature: 0.3,
         maxTokens: 512,
       },
-      metadata: { userId, action: 'RESUME_PARSE' as GroqAction },
+      metadata: { userId, action: 'RESUME_PARSE' },
     });
 
     return response.content;

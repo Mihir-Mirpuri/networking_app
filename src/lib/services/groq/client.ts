@@ -15,7 +15,7 @@ import {
   GroqJsonParseError,
   GroqApiError,
 } from './errors';
-import { logGroqUsage } from './logging';
+import { logApiCost, groqCost } from '@/lib/services/cost-logger';
 
 // Default configuration
 const DEFAULT_MODEL: GroqModel = 'llama-3.1-8b-instant';
@@ -169,13 +169,14 @@ export async function complete(
     const durationMs = Date.now() - startTime;
     if (metadata) {
       // Fire-and-forget error log
-      logGroqUsage(
-        metadata,
-        { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
-        model,
+      logApiCost({
+        service: 'groq',
+        action: metadata.action,
+        costUsd: 0,
         durationMs,
-        true
-      );
+        userId: metadata.userId,
+        metadata: { model, error: true, promptTokens: 0, completionTokens: 0 },
+      });
     }
     throw error;
   }
@@ -192,7 +193,19 @@ export async function complete(
 
   if (metadata) {
     // Fire-and-forget success log
-    logGroqUsage(metadata, usageData, completion.model, durationMs);
+    logApiCost({
+      service: 'groq',
+      action: metadata.action,
+      costUsd: groqCost(usageData.promptTokens, usageData.completionTokens),
+      durationMs,
+      userId: metadata.userId,
+      metadata: {
+        model: completion.model,
+        promptTokens: usageData.promptTokens,
+        completionTokens: usageData.completionTokens,
+        totalTokens: usageData.totalTokens,
+      },
+    });
   }
 
   return {

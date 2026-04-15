@@ -2,8 +2,7 @@
  * Types for Groq LLM service
  */
 
-import { GroqAction } from '@prisma/client';
-export { GroqAction } from '@prisma/client';
+import { CostLogMetadata } from '@/lib/services/cost-logger';
 
 export type GroqModel =
   | 'llama-3.1-8b-instant'    // Fast, cheap - good for extraction
@@ -20,7 +19,7 @@ export interface GroqCompletionRequest {
   systemPrompt?: string;
   userPrompt: string;
   options?: GroqRequestOptions;
-  metadata?: { userId?: string; action: GroqAction };
+  metadata?: CostLogMetadata;
 }
 
 export interface GroqCompletionResponse<T = string> {
