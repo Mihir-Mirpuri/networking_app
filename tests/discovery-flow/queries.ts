@@ -1538,4 +1538,98 @@ export const QUERIES: DiscoveryTestCase[] = [
       search: { shouldRun: false },
     },
   },
+
+  // ═══ 26. Multi-turn — filter swap ══════════════════════════════════════════
+  {
+    id: 'multiturn-swap-role',
+    category: 'multi-turn-swap',
+    query: 'try engineers instead',
+    description: 'Follow-up swapping role from PM → engineer. Company (Google) should persist.',
+    conversationHistory: [
+      { role: 'user', content: 'PMs at Google' },
+      { role: 'assistant', content: 'Searching for Product Managers at Google' },
+    ],
+    currentFilters: { company: 'Google', role: 'Product Manager' },
+    expected: {
+      extraction: {
+        status: 'ready',
+        filters: { company: 'Google' },
+      },
+      search: { shouldRun: true },
+    },
+  },
+  {
+    id: 'multiturn-swap-company',
+    category: 'multi-turn-swap',
+    query: 'what about Meta?',
+    description: 'Follow-up swapping company from Stripe → Meta.',
+    conversationHistory: [
+      { role: 'user', content: 'engineers at Stripe' },
+      { role: 'assistant', content: 'Searching for engineers at Stripe' },
+    ],
+    currentFilters: { company: 'Stripe' },
+    expected: {
+      extraction: {
+        status: 'ready',
+        filters: { company: 'Meta' },
+      },
+      search: { shouldRun: true },
+    },
+  },
+  {
+    id: 'multiturn-swap-location',
+    category: 'multi-turn-swap',
+    query: 'try NYC instead',
+    description: 'Follow-up swapping location from SF → NYC. Company and role persist.',
+    conversationHistory: [
+      { role: 'user', content: 'PMs at Google in SF' },
+      { role: 'assistant', content: 'Searching for Product Managers at Google in San Francisco' },
+    ],
+    currentFilters: { company: 'Google', role: 'Product Manager', location: 'San Francisco, California' },
+    expected: {
+      extraction: {
+        status: 'ready',
+        filters: { company: 'Google', role: 'Product Manager', location: 'New York, New York' },
+      },
+      search: { simplePath: true, shouldRun: true },
+    },
+  },
+
+  // ═══ 27. Multi-turn — filter persistence ═══════════════════════════════════
+  {
+    id: 'multiturn-persist-location',
+    category: 'multi-turn-persist',
+    query: 'try Apple',
+    description: 'Follow-up swapping company. Location (SF) should persist from previous filters.',
+    conversationHistory: [
+      { role: 'user', content: 'engineers at Google in SF' },
+      { role: 'assistant', content: 'Searching for engineers at Google in San Francisco' },
+    ],
+    currentFilters: { company: 'Google', location: 'San Francisco, California' },
+    expected: {
+      extraction: {
+        status: 'ready',
+        filters: { company: 'Apple', location: 'San Francisco, California' },
+      },
+      search: { shouldRun: true },
+    },
+  },
+  {
+    id: 'multiturn-persist-company',
+    category: 'multi-turn-persist',
+    query: 'try MIT instead',
+    description: 'Follow-up swapping university. Company (Stripe) should persist.',
+    conversationHistory: [
+      { role: 'user', content: 'Stanford alumni at Stripe' },
+      { role: 'assistant', content: 'Searching for Stanford alumni at Stripe' },
+    ],
+    currentFilters: { company: 'Stripe', university: 'Stanford University' },
+    expected: {
+      extraction: {
+        status: 'ready',
+        filters: { company: 'Stripe', university: 'Massachusetts Institute of Technology' },
+      },
+      search: { simplePath: true, shouldRun: true },
+    },
+  },
 ];
