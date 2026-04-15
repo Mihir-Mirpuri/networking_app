@@ -243,8 +243,8 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onToggleStar, onToggl
               onClick={(e) => { e.stopPropagation(); onToggleResponse(tracker.id); }}
               className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
                 tracker.responseReceivedAt
-                  ? 'bg-[#22c55e] border-[#22c55e]'
-                  : 'border-[#505050] hover:border-[#22c55e]'
+                  ? 'bg-[var(--accent)] border-[var(--accent)]'
+                  : 'border-[#505050] hover:border-[var(--accent)]'
               }`}
             >
               {tracker.responseReceivedAt && (
