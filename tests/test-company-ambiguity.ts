@@ -9,7 +9,6 @@
 
 import 'dotenv/config';
 import { completeJson } from '../src/lib/services/groq';
-import { GroqAction } from '@prisma/client';
 
 // Subset of the SYSTEM_PROMPT from ai-search.ts that covers the ambiguity rules
 const SYSTEM_PROMPT = `You are a search filter extraction assistant for a professional networking tool. Your job is to help users find people by extracting structured search filters from natural language.
@@ -96,7 +95,7 @@ async function testCompany(company: string, expected: boolean): Promise<{ pass: 
     },
     metadata: {
       userId: 'test-user',
-      action: 'SEARCH_FILTER_EXTRACTION' as GroqAction,
+      action: 'SEARCH_FILTER_EXTRACTION',
     },
   });
 

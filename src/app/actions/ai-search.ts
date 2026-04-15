@@ -3,7 +3,6 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { completeJsonAnthropic } from '@/lib/services/anthropic';
-import { GroqAction } from '@prisma/client';
 import { fetchCompaniesForCategory, PerplexityCompany } from '@/lib/services/perplexity';
 import prisma from '@/lib/prisma';
 import { LinkedInFilters } from '@/lib/types/linkedin-filters';
@@ -280,7 +279,7 @@ export async function extractSearchFiltersAction(
       maxTokens: 512,
       metadata: {
         userId: session.user.id,
-        action: 'SEARCH_FILTER_EXTRACTION' as GroqAction,
+        action: 'SEARCH_FILTER_EXTRACTION',
       },
     });
 
