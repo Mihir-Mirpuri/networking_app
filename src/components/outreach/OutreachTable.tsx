@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useRef, useEffect } from 'react';
 import { OutreachTrackerEntry } from '@/app/actions/outreach';
 import { OutreachRow } from './OutreachRow';
 import { ColumnKey } from './OutreachFilters';
@@ -68,48 +68,82 @@ export function OutreachTable({
     onAutoFitColumn(column, contentWidths);
   }, [onAutoFitColumn, tableRef]);
 
+  // Refs for synchronized scrolling
+  const headerScrollRef = useRef<HTMLDivElement>(null);
+  const bodyScrollRef = useRef<HTMLDivElement>(null);
+
+  // Sync horizontal scroll between header and body
+  useEffect(() => {
+    const headerEl = headerScrollRef.current;
+    const bodyEl = bodyScrollRef.current;
+    if (!headerEl || !bodyEl) return;
+
+    const syncHeaderToBody = () => {
+      if (bodyEl) bodyEl.scrollLeft = headerEl.scrollLeft;
+    };
+    const syncBodyToHeader = () => {
+      if (headerEl) headerEl.scrollLeft = bodyEl.scrollLeft;
+    };
+
+    headerEl.addEventListener('scroll', syncHeaderToBody);
+    bodyEl.addEventListener('scroll', syncBodyToHeader);
+
+    return () => {
+      headerEl.removeEventListener('scroll', syncHeaderToBody);
+      bodyEl.removeEventListener('scroll', syncBodyToHeader);
+    };
+  }, []);
+
   return (
     <div ref={tableRef} className="flex-1 flex flex-col min-h-0 overflow-hidden">
-      {/* Header Row - Fixed */}
-      <div className="flex-shrink-0 flex items-center px-4 py-2.5 bg-[#2a2a2a] border-b border-[#3a3a3a]">
-        {/* Star column header */}
-        <div className="w-10 min-w-[40px] shrink-0" />
-        {visibleColumns.map((col, index) => (
-            <div
-              key={col}
-              className="relative flex items-center shrink-0"
-              style={{ width: columnWidths[col] || 100 }}
-              data-column={col}
-            >
+      {/* Header Row - Horizontal scroll synced with body */}
+      <div
+        ref={headerScrollRef}
+        className="flex-shrink-0 overflow-x-auto overflow-y-hidden scrollbar-hide"
+      >
+        <div className="flex items-center px-4 py-2.5 bg-[#2a2a2a] border-b border-[#3a3a3a] min-w-max">
+          {/* Star column header */}
+          <div className="w-10 min-w-[40px] shrink-0" />
+          {visibleColumns.map((col, index) => (
               <div
-                className="flex-1 px-2 overflow-hidden cursor-pointer"
-                onDoubleClick={() => handleDoubleClick(col)}
+                key={col}
+                className="relative flex items-center shrink-0"
+                style={{ width: columnWidths[col] || 100 }}
+                data-column={col}
               >
-                <span className="text-[13px] font-semibold text-white font-['Inter'] truncate">
-                  {getColumnLabel(col)}
-                </span>
-              </div>
-
-              {/* Resize handle - always visible divider with wide grab zone */}
-              {index < visibleColumns.length - 1 && (
                 <div
-                  className="absolute -right-[3px] -top-2.5 -bottom-2.5 w-[7px] cursor-col-resize z-10 group flex items-center justify-center"
-                  onMouseDown={(e) => handleResizeStart(col, e)}
+                  className="flex-1 px-2 overflow-hidden cursor-pointer"
                   onDoubleClick={() => handleDoubleClick(col)}
                 >
-                  <div className="w-[2px] h-full bg-[#404040] group-hover:bg-[var(--accent)] group-hover:w-[3px] transition-all" />
+                  <span className="text-[13px] font-semibold text-white font-['Inter'] truncate">
+                    {getColumnLabel(col)}
+                  </span>
                 </div>
-              )}
-            </div>
-        ))}
-        {/* Delete column header (empty) */}
-        <div className="w-10 min-w-[40px] shrink-0" />
+
+                {/* Resize handle - always visible divider with wide grab zone */}
+                {index < visibleColumns.length - 1 && (
+                  <div
+                    className="absolute -right-[3px] -top-2.5 -bottom-2.5 w-[7px] cursor-col-resize z-10 group flex items-center justify-center"
+                    onMouseDown={(e) => handleResizeStart(col, e)}
+                    onDoubleClick={() => handleDoubleClick(col)}
+                  >
+                    <div className="w-[2px] h-full bg-[#404040] group-hover:bg-[var(--accent)] group-hover:w-[3px] transition-all" />
+                  </div>
+                )}
+              </div>
+          ))}
+          {/* Delete column header (empty) */}
+          <div className="w-10 min-w-[40px] shrink-0" />
+        </div>
       </div>
 
-      {/* Data Rows - Scrollable */}
-      <div className="flex-1 overflow-y-auto">
+      {/* Data Rows - Scrollable both vertically and horizontally (synced with header) */}
+      <div
+        ref={bodyScrollRef}
+        className="flex-1 overflow-y-auto overflow-x-auto scrollbar-thin"
+      >
         {trackers.length === 0 ? (
-          <div className="flex items-center justify-center py-16 text-[#666] text-sm">
+          <div className="flex items-center justify-center py-16 text-[#666] text-sm min-w-max">
             No results found
           </div>
         ) : (
@@ -133,7 +167,7 @@ export function OutreachTable({
 
         {/* Load More Button */}
         {hasMore && (
-          <div className="flex justify-center py-4">
+          <div className="flex justify-center py-4 min-w-max">
             <button
               onClick={onLoadMore}
               disabled={isLoadingMore}

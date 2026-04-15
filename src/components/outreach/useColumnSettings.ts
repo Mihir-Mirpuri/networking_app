@@ -232,13 +232,37 @@ export function useColumnSettings(): UseColumnSettingsReturn {
     const reservedWidth = 40 + 40 + 32;
     const availableWidth = tableWidth - reservedWidth;
 
-    // Distribute available width evenly, clamped to min/max
-    const perColumn = Math.floor(availableWidth / currentVisible.length);
-    const clampedWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, perColumn));
+    // Define preferred widths based on column content type
+    const preferredWidths: Record<string, number> = {
+      name: 180,
+      firm: 120,
+      role: 140,
+      location: 100,
+      group: 80,
+      connection: 100,
+      firstEmailDate: 110,
+      lastEmailDate: 110,
+      followUps: 70,
+      response: 80,
+      subject: 180,
+      notes: 60,
+    };
+
+    // Calculate total preferred width
+    let totalPreferred = 0;
+    for (const col of currentVisible) {
+      totalPreferred += preferredWidths[col] || 100; // default 100 for custom columns
+    }
+
+    // Calculate scale factor to fit available width
+    const scaleFactor = availableWidth / totalPreferred;
 
     const newWidths = { ...settings.widths };
     for (const col of currentVisible) {
-      newWidths[col] = clampedWidth;
+      const preferred = preferredWidths[col] || 100;
+      const scaled = Math.floor(preferred * scaleFactor);
+      // Clamp between MIN_WIDTH and MAX_WIDTH
+      newWidths[col] = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, scaled));
     }
 
     setSettings((prev) => ({ ...prev, widths: newWidths }));

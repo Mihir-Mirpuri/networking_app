@@ -24,7 +24,6 @@ function nameToGradient(name: string): string {
 interface PersonCardProps {
   person: SearchResultWithDraft;
   onExpand: () => void;
-  onHide?: () => void;
   onToggleSaveForLater?: () => void;
 
   sendStatus?: 'success' | 'failed' | 'pending';
@@ -36,7 +35,6 @@ interface PersonCardProps {
 export function PersonCard({
   person,
   onExpand,
-  onHide,
   onToggleSaveForLater,
   sendStatus,
   scheduledFor,
@@ -116,30 +114,6 @@ export function PersonCard({
         </div>
       )}
 
-      {/* Top right - Hide button */}
-      {onHide && person.userCandidateId && (
-        <div className="absolute top-3 right-3">
-          <button
-            onClick={(e) => { e.stopPropagation(); onHide(); }}
-            className="p-1.5 text-white hover:text-white hover:bg-[#404040] rounded-lg transition-all"
-            title="Don't show again"
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-        </div>
-      )}
 
       {/* Avatar */}
       <div className="mb-4">

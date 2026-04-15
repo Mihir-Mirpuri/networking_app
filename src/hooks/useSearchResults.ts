@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { SearchResultWithDraft, regenerateDraftAction, loadMoreV2Action } from '@/app/actions/search';
 import { sendSingleEmailAction, sendEmailsAction, PersonToSend } from '@/app/actions/send';
 import { getTemplatesAction, getAutoPersonalizeAction, TemplateData } from '@/app/actions/profile';
-import { hidePersonAction, toggleSavedForLaterAction } from '@/app/actions/search';
+import { toggleSavedForLaterAction } from '@/app/actions/search';
 import { EMAIL_TEMPLATES } from '@/lib/constants';
 import { dispatchCreditsChanged } from '@/components/credits';
 import { useSession } from 'next-auth/react';
@@ -56,7 +56,6 @@ export function useSearchResults({ initialRemainingDaily }: UseSearchResultsOpti
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
-  const [hiddenCount, setHiddenCount] = useState(0);
   const retryTimerRef = useRef<NodeJS.Timeout | null>(null);
   const retryCountRef = useRef(0);
 
@@ -140,7 +139,6 @@ export function useSearchResults({ initialRemainingDaily }: UseSearchResultsOpti
     setGeneratingStatuses(new Map());
     setTotalLoaded(0);
     setHasMore(true);
-    setHiddenCount(0);
     // Reset V2 unified pagination state
     setAllBatchResults([]);
     setVisibleCount(0);
@@ -158,14 +156,13 @@ export function useSearchResults({ initialRemainingDaily }: UseSearchResultsOpti
   const applySearchResults = useCallback((
     newResults: SearchResultWithDraft[],
     meta: SearchResultsMeta,
-    newHiddenCount: number,
+    _newHiddenCount: number,
     params: SearchParams,
     v2Meta?: {
       linkedInFilters: LinkedInFilters;
       dbFilters: DBFilters;
     }
   ) => {
-    setHiddenCount(newHiddenCount);
     setSearchParams(params);
 
     if (v2Meta) {
@@ -288,18 +285,6 @@ export function useSearchResults({ initialRemainingDaily }: UseSearchResultsOpti
     }
 
     setIsSending(false);
-  };
-
-  const handleHidePerson = async (userCandidateId: string) => {
-    const result = await hidePersonAction(userCandidateId);
-
-    if (result.success) {
-      setResults((prev) => prev.filter((r) => r.userCandidateId !== userCandidateId));
-      setHiddenCount((prev) => prev + 1);
-    } else if (result.error !== 'Not authenticated') {
-      // Don't show error for unauthenticated users
-      setToast({ message: result.error || 'Failed to hide person', type: 'error' });
-    }
   };
 
   const handleToggleSaveForLater = async (userCandidateId: string) => {
@@ -458,8 +443,6 @@ export function useSearchResults({ initialRemainingDaily }: UseSearchResultsOpti
     setHasMore,
     isLoadingMore,
     isRetrying,
-    hiddenCount,
-    setHiddenCount,
 
     // Actions
     cancelRetries,
@@ -467,7 +450,6 @@ export function useSearchResults({ initialRemainingDaily }: UseSearchResultsOpti
     applySearchResults,
     handleSendFromReview,
     handleBulkSend,
-    handleHidePerson,
     handleToggleSaveForLater,
     handleTemplateChange,
     handleApplyTemplateToAll,

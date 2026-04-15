@@ -18,7 +18,6 @@ import { LoadingSpinner } from '@/components/search/LoadingSpinner';
 import { SearchLoadingState } from '@/components/search/SearchLoadingState';
 import { Toast } from '@/components/ui/Toast';
 import { LimitReachedModal, dispatchCreditsChanged } from '@/components/credits';
-import { HiddenPeopleBar } from '@/components/search/HiddenPeopleBar';
 import { searchPeopleV2Action, lookupPersonAction, SearchResultWithDraft } from '@/app/actions/search';
 import { extractSearchFiltersAction, ParsedFilters, ChatMessage, Selectable, SuggestedAlternative, SuggestedSearch } from '@/app/actions/ai-search';
 import { useSearchResults } from '@/hooks/useSearchResults';
@@ -74,7 +73,6 @@ interface MainSearchState {
   generatingStatuses: Array<[string, boolean]>;
   totalLoaded?: number;
   hasMore?: boolean;
-  hiddenCount?: number;
   searchParams?: { company?: string; role?: string; university?: string; location?: string; limit: number };
   savedAt: number;
 }
@@ -155,7 +153,6 @@ export function MainSearchView({
           if (state.searchParams) hook.setSearchParams(state.searchParams);
           if (state.totalLoaded !== undefined) hook.setTotalLoaded(state.totalLoaded);
           if (state.hasMore !== undefined) hook.setHasMore(state.hasMore);
-          if (state.hiddenCount !== undefined) hook.setHiddenCount(state.hiddenCount);
         } else {
           sessionStorage.removeItem(STORAGE_KEY);
         }
@@ -189,7 +186,6 @@ export function MainSearchView({
             generatingStatuses: Array.from(hook.generatingStatuses.entries()),
             totalLoaded: hook.totalLoaded,
             hasMore: hook.hasMore,
-            hiddenCount: hook.hiddenCount,
             searchParams: hook.searchParams ?? undefined,
             savedAt: Date.now(),
           };
@@ -198,7 +194,7 @@ export function MainSearchView({
       }, 300);
     }
     return () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); };
-  }, [messages, currentFilters, hook.results, hook.expandedIndex, hook.sendStatuses, hook.showBulkReview, hook.generatingStatuses, hook.totalLoaded, hook.hasMore, hook.hiddenCount, hook.searchParams]);
+  }, [messages, currentFilters, hook.results, hook.expandedIndex, hook.sendStatuses, hook.showBulkReview, hook.generatingStatuses, hook.totalLoaded, hook.hasMore, hook.searchParams]);
 
   const cancelSearch = useCallback(() => {
     const cancelledId = searchIdRef.current;
@@ -518,15 +514,9 @@ export function MainSearchView({
         {/* Results */}
         {hasResults && hook.expandedIndex === null && !hook.showBulkReview && (
           <>
-            <HiddenPeopleBar
-              hiddenCount={hook.hiddenCount}
-              onCountChange={(delta) => hook.setHiddenCount((prev) => prev + delta)}
-              onUnhide={(person) => hook.setResults((prev) => [...prev, person])}
-            />
             <ResultsList
               results={hook.results}
               onExpand={hook.setExpandedIndex}
-              onHide={hook.handleHidePerson}
               onToggleSaveForLater={hook.handleToggleSaveForLater}
               sendStatuses={hook.sendStatuses}
               limitReached={hook.limitReached}

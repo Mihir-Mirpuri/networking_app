@@ -432,7 +432,7 @@ function ColumnsTab({ f }: { f: HistorySidebarFilterProps }) {
         ) : (
           <button
             onClick={() => setShowNewInput(true)}
-            className="flex items-center justify-center gap-2 flex-1 px-3 py-2 rounded-lg bg-[#0b57d0] hover:bg-[#0842a0] text-[13px] text-white transition-colors"
+            className="flex items-center justify-center gap-2 flex-1 px-3 py-2 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[13px] text-white transition-colors"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -463,7 +463,7 @@ export function HistorySidebar({ stats, filterProps }: HistorySidebarProps) {
         <button
           onClick={() => setShowColumns(!showColumns)}
           className={`p-1.5 rounded-md transition-colors ${
-            showColumns ? 'bg-[#0b57d0] text-white' : 'text-[#666] hover:text-white hover:bg-[#252525]'
+            showColumns ? 'bg-[var(--accent)] text-white' : 'text-[#666] hover:text-white hover:bg-[#252525]'
           }`}
           title={showColumns ? 'Back to filters' : 'Edit columns'}
         >

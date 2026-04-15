@@ -302,7 +302,7 @@ export function SearchSidebar({
                                             key={i}
                                             onClick={() => onSuggestedSearchClick(s)}
                                             disabled={isExtracting || isSearching}
-                                            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-white bg-[#1a2a1a] border border-[#2a4a2a] rounded-full hover:bg-[#1e341e] hover:border-[#3a5e3a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-white bg-[var(--accent-badge-bg)] border border-[var(--accent-border)] rounded-full opacity-60 hover:opacity-100 hover:border-[var(--accent)] transition-all duration-200 disabled:cursor-not-allowed"
                                           >
                                             <svg className="w-3 h-3 flex-shrink-0 text-white/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                               <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />

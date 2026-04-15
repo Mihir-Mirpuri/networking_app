@@ -6,7 +6,6 @@ import { PersonCard } from './PersonCard';
 interface ResultsListProps {
   results: SearchResultWithDraft[];
   onExpand: (index: number) => void;
-  onHide?: (userCandidateId: string) => void;
   onToggleSaveForLater?: (userCandidateId: string) => void;
   sendStatuses: Map<string, 'success' | 'failed' | 'pending'>;
   limitReached?: boolean;
@@ -16,7 +15,6 @@ interface ResultsListProps {
 export function ResultsList({
   results,
   onExpand,
-  onHide,
   onToggleSaveForLater,
   sendStatuses,
   limitReached,
@@ -36,7 +34,6 @@ export function ResultsList({
             <PersonCard
               person={person}
               onExpand={() => onExpand(index)}
-              onHide={person.userCandidateId && onHide ? () => onHide(person.userCandidateId!) : undefined}
               onToggleSaveForLater={person.userCandidateId && onToggleSaveForLater ? () => onToggleSaveForLater(person.userCandidateId!) : undefined}
               sendStatus={sendStatuses.get(person.id)}
               limitReached={limitReached}

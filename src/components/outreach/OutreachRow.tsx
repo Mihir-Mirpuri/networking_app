@@ -296,7 +296,7 @@ export function OutreachRow({ tracker, onUpdate, onDelete, onToggleStar, onToggl
   return (
     <>
       <div
-        className="flex items-center px-4 py-2.5 bg-[#1a1a1a] border-b border-[#2a2a2a] hover:bg-[#252525] cursor-pointer transition-colors group"
+        className="flex items-center px-4 py-2.5 bg-[#1a1a1a] border-b border-[#2a2a2a] hover:bg-[#252525] cursor-pointer transition-colors group min-w-max"
         onClick={handleRowClick}
       >
         {/* Star button - always visible */}

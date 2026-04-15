@@ -195,6 +195,31 @@
     display: none;
   }
 
+  /* Thin horizontal scrollbar for tables */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #404040 transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    display: block;
+    height: 6px;
+    width: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: #404040;
+    border-radius: 3px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: #505050;
+  }
+
   /* Animated checkmark for send success */
   .draw-check-circle {
     stroke-dasharray: 166;
