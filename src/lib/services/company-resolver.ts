@@ -60,15 +60,25 @@ async function findCompanyLinkedInUrlViaApollo(
       }),
     });
 
-    const elapsed = Date.now() - start;
-
     if (!res.ok) {
+      await res.text().catch(() => {}); // drain body to release connection
+      const elapsed = Date.now() - start;
       console.warn(`[CompanyResolver] Apollo HTTP ${res.status} for "${companyName}" (${elapsed}ms)`);
       log.error('company-resolver', `Apollo HTTP ${res.status}`, { companyName, durationMs: elapsed });
       return { url: null, billed: false };
     }
 
-    const data = await res.json();
+    let data: any;
+    try {
+      data = await res.json();
+    } catch {
+      const elapsed = Date.now() - start;
+      console.warn(`[CompanyResolver] Apollo returned malformed JSON for "${companyName}" (${elapsed}ms)`);
+      log.error('company-resolver', 'Apollo malformed JSON', { companyName, durationMs: elapsed });
+      return { url: null, billed: true }; // Apollo billed us (HTTP 200)
+    }
+
+    const elapsed = Date.now() - start;
     const first = (data.organizations || [])[0];
     const raw: string | undefined = first?.linkedin_url;
 
@@ -194,24 +204,24 @@ export async function resolveCompanyLinkedInUrls(
     `[CompanyResolver] Batch resolving ${companyNames.length} companies: ${companyNames.join(', ')}`
   );
   const urls = new Map<string, string | null>();
-  let totalLlmCalls = 0;
+  let totalApiCalls = 0;
 
   for (const name of companyNames) {
     const result = await resolveCompanyUrl(name);
     urls.set(name, result.url);
-    totalLlmCalls += result.cost.llmCalls;
+    totalApiCalls += result.cost.llmCalls;
   }
 
   const resolved = Array.from(urls.entries()).filter(([, v]) => v !== null).length;
   console.log(
-    `[CompanyResolver] Batch complete — ${resolved}/${companyNames.length} resolved, ${totalLlmCalls} Apollo calls`
+    `[CompanyResolver] Batch complete — ${resolved}/${companyNames.length} resolved, ${totalApiCalls} Apollo calls`
   );
 
   return {
     urls,
     cost: {
-      llmCalls: totalLlmCalls,
-      costCents: totalLlmCalls * COST_PER_APOLLO_CALL_CENTS,
+      llmCalls: totalApiCalls,
+      costCents: totalApiCalls * COST_PER_APOLLO_CALL_CENTS,
     },
   };
 }

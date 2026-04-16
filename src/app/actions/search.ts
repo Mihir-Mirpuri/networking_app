@@ -486,6 +486,8 @@ export async function searchPeopleV2Action(
     // Resolve LinkedIn company URL if not already provided. Required for
     // accurate Apify filtering — without it, the scraper falls back to
     // text-matching the company name in profile bios.
+    // Company-less industry/function queries skip this block and rely on
+    // linkedInFilters.industryIds / functionIds alone (advanced path).
     if (dbFilters.company && (!linkedInFilters.currentCompanies || linkedInFilters.currentCompanies.length === 0)) {
       try {
         const resolved = await resolveCompanyUrl(dbFilters.company, dbFilters.role || undefined);
@@ -514,6 +516,7 @@ export async function searchPeopleV2Action(
       linkedInFilters.seniorityLevelIds?.length ||
       linkedInFilters.companyHeadcount?.length ||
       linkedInFilters.functionIds?.length ||
+      linkedInFilters.industryIds?.length ||
       linkedInFilters.yearsOfExperienceIds?.length ||
       linkedInFilters.pastCompanies?.length ||
       linkedInFilters.pastJobTitles?.length ||
@@ -569,6 +572,7 @@ export async function searchPeopleV2Action(
                 'seniorityLevelIds',
                 'companyHeadcount',
                 'functionIds',
+                'industryIds',
                 'yearsOfExperienceIds',
                 'pastCompanies',
                 'pastJobTitles',
