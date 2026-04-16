@@ -141,6 +141,17 @@ export const SCHOOL_ALIASES: Record<string, string> = {
   // Georgia Tech
   'scheller college of business': 'Georgia Tech',
   'georgia institute of technology': 'Georgia Tech',
+
+  // Texas A&M
+  'mays business school': 'Texas A&M University',
+  'texas a&m mays': 'Texas A&M University',
+  'texas a&m university': 'Texas A&M University',
+
+  // Rice University
+  'jones graduate school of business': 'Rice University',
+  'jones school of business': 'Rice University',
+  'rice business': 'Rice University',
+  'rice university': 'Rice University',
 };
 
 /**

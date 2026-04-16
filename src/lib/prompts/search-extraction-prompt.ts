@@ -121,6 +121,8 @@ RULE 3 -- COMPANY:
 RULE 4 -- SCHOOL:
 - MUST use full official names. Abbreviations return ZERO results.
   "MIT" -> "Massachusetts Institute of Technology", "Stanford" -> "Stanford University", "Harvard" -> "Harvard University", "UT Austin" -> "University of Texas at Austin", "Wharton" -> "The Wharton School", "HBS" -> "Harvard Business School", "CMU" -> "Carnegie Mellon University", "Cal"/"Berkeley" -> "University of California, Berkeley", "Georgia Tech" -> "Georgia Institute of Technology", "UCLA" -> "University of California, Los Angeles", "NYU" -> "New York University", "UPenn" -> "University of Pennsylvania", "USC" -> "University of Southern California", "UIUC" -> "University of Illinois Urbana-Champaign", "Caltech" -> "California Institute of Technology"
+  BUSINESS SCHOOL MAPPINGS (Haiku: use these EXACT mappings, do NOT guess):
+  "Mays Business School"/"Mays" -> "Mays Business School" (Texas A&M), "Jones School of Business"/"Jones School"/"Rice Business" -> "Jones Graduate School of Business" (Rice University), "McCombs" -> "McCombs School of Business" (UT Austin), "Booth" -> "Booth School of Business" (University of Chicago), "Kelley School" -> "Kelley School of Business" (Indiana University), "Kenan-Flagler" -> "Kenan-Flagler Business School" (UNC Chapel Hill), "Tepper" -> "Tepper School of Business" (Carnegie Mellon), "Fuqua" -> "Fuqua School of Business" (Duke), "Tuck" -> "Tuck School of Business" (Dartmouth), "Darden" -> "Darden School of Business" (UVA), "McDonough" -> "McDonough School of Business" (Georgetown), "Scheller" -> "Scheller College of Business" (Georgia Tech), "Marshall" -> "Marshall School of Business" (USC), "Anderson" -> "Anderson School of Management" (UCLA), "Haas" -> "Haas School of Business" (UC Berkeley), "Ross" -> "Ross School of Business" (University of Michigan), "Kellogg" -> "Kellogg School of Management" (Northwestern), "Sloan" -> "Sloan School of Management" (MIT), "Stern" -> "Stern School of Business" (NYU)
 - "from [X]" = university.
 
 RULE 5 -- SENIORITY (seniority_level_ids):
@@ -217,6 +219,7 @@ RULE 12 -- FILTER PERSISTENCE:
 
 - company_name_ambiguous: true for names easily confused with common words (Chase, Block, Bolt, Square, Plaid, Hinge, Toast, Ramp). false for distinctive names (McKinsey, Google, Stripe). Default true when unsure.
 - UNKNOWN COMPANIES: If user says a name you don't recognize ("MoLo Solutions", "Vanta", "Sardine"), return "ready" with the name as-is. Do NOT guess alternatives. Multi-word names are never ambiguous.
+- GOVERNMENT ENTITIES: Government departments, agencies, and offices are SPECIFIC named entities — treat them as companies. Examples: "Department of Government Efficiency" (DOGE), "FBI", "CIA", "NASA", "Department of Defense", "SEC", "USAID", "Department of State", "EPA". Return "ready" with the official name. Do NOT treat these as categories or industry terms.
 - Auto-correct obvious typos: "stripe" -> "Stripe", "GS" -> "Goldman Sachs", "Jane Stree" -> "Jane Street". Return "ready", not "needs_selection".
 - NEVER return exactly 1 selectable. Either 0 (auto-correct and "ready") or 2-5.
 
@@ -267,6 +270,12 @@ User: "Find John Smith at Google"
 
 User: "Brandon Rudy, director of broadcasting at Texas A&M"
 {"status":"person_lookup","confidence":"high","filters":{"company":null,"role":null,"university":null,"location":null},"linkedin_filters":{},"company_name_ambiguous":false,"person_name":"Brandon Rudy","person_company":"Texas A&M","unsupported_criteria":null,"suggested_alternative":null,"selectables":[],"suggested_searches":[],"message":"Looking up Brandon Rudy at Texas A&M"}
+
+User: "people who work in department of government efficiency"
+{"status":"ready","confidence":"high","role_specificity":"standard","filters":{"company":"Department of Government Efficiency","role":null,"university":null,"location":null},"linkedin_filters":{},"company_name_ambiguous":false,"person_name":null,"person_company":null,"unsupported_criteria":null,"suggested_alternative":null,"selectables":[],"suggested_searches":[{"label":"People at NASA","company":"NASA","role":null},{"label":"People at SEC","company":"SEC","role":null}],"message":"Searching for people at Department of Government Efficiency"}
+
+User: "analysts at the FBI"
+{"status":"ready","confidence":"high","role_specificity":"standard","filters":{"company":"FBI","role":"Analyst","university":null,"location":null},"linkedin_filters":{"current_job_titles":["Analyst"]},"company_name_ambiguous":false,"person_name":null,"person_company":null,"unsupported_criteria":null,"suggested_alternative":null,"selectables":[],"suggested_searches":[{"label":"Analysts at CIA","company":"CIA","role":"Analyst"}],"message":"Searching for analysts at the FBI"}
 
 User: "designers at Figma"
 {"status":"ready","confidence":"high","role_specificity":"broad","filters":{"company":"Figma","role":"Designer","university":null,"location":null},"linkedin_filters":{"function_ids":["3"]},"company_name_ambiguous":false,"person_name":null,"person_company":null,"unsupported_criteria":null,"suggested_alternative":null,"selectables":[],"suggested_searches":[{"label":"Designers at Notion","company":"Notion","role":"Designer"}],"message":"Searching for designers at Figma"}
