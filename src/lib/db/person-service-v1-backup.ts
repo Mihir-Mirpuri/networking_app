@@ -73,8 +73,6 @@ export async function findPeopleByFilters(filters: PersonFilters): Promise<Perso
       emailStatus: true,
       emailConfidence: true,
       emailDeliverable: true,
-      emailVerifiedAt: true,
-      emailVerificationReason: true,
       city: true,
       state: true,
       country: true,
@@ -190,8 +188,6 @@ async function findPeopleByFiltersVector(
     emailStatus: string | null;
     emailConfidence: number | null;
     emailDeliverable: boolean | null;
-    emailVerifiedAt: Date | null;
-    emailVerificationReason: string | null;
     city: string | null;
     state: string | null;
     country: string | null;
@@ -214,8 +210,6 @@ async function findPeopleByFiltersVector(
       p."emailStatus"::text,
       p."emailConfidence",
       p."emailDeliverable",
-      p."emailVerifiedAt",
-      p."emailVerificationReason",
       p.city,
       p.state,
       p.country,

@@ -67,8 +67,6 @@ export interface SearchResultWithDraft {
   emailStatus: 'VERIFIED' | 'UNVERIFIED' | 'MISSING';
   emailConfidence: number | null;
   emailDeliverable: boolean | null;
-  emailVerifiedAt: Date | null;
-  emailVerificationReason: string | null;
   city: string | null;
   state: string | null;
   country: string | null;
@@ -114,8 +112,6 @@ interface PersonWithSource {
   emailStatus: string | null;
   emailConfidence: number | null;
   emailDeliverable: boolean | null;
-  emailVerifiedAt: Date | null;
-  emailVerificationReason: string | null;
   city: string | null;
   state: string | null;
   country: string | null;
@@ -335,8 +331,6 @@ async function buildResultsWithDrafts(
         emailStatus: (person.emailStatus as 'VERIFIED' | 'UNVERIFIED' | 'MISSING') || 'MISSING',
         emailConfidence: person.emailConfidence,
         emailDeliverable: person.emailDeliverable,
-        emailVerifiedAt: person.emailVerifiedAt,
-        emailVerificationReason: person.emailVerificationReason,
         city: person.city,
         state: person.state,
         country: person.country,
@@ -625,7 +619,7 @@ export async function searchPeopleV2Action(
             }
 
             const orderedPeople = cachedPeople.map(person => ({
-              candidate: { ...person, emailDeliverable: person.emailDeliverable ?? null, emailVerifiedAt: person.emailVerifiedAt ?? null, emailVerificationReason: person.emailVerificationReason ?? null } as PersonWithSource,
+              candidate: { ...person, emailDeliverable: person.emailDeliverable ?? null } as PersonWithSource,
               score: 0,
               breakdown: {} as ScoreBreakdown,
             }));
@@ -728,7 +722,7 @@ export async function searchPeopleV2Action(
         if (!person) continue;
         if (allExcludedIds.includes(person.id)) continue;
         orderedPeople.push({
-          candidate: { ...person, emailDeliverable: null, emailVerifiedAt: null, emailVerificationReason: null } as PersonWithSource,
+          candidate: { ...person, emailDeliverable: null } as PersonWithSource,
           score: 0,
           breakdown: {} as ScoreBreakdown,
         });
@@ -861,7 +855,7 @@ export async function searchPeopleV2Action(
           if (!person) continue;
           if (allExcludedIds.includes(person.id)) continue;
           orderedPeople.push({
-            candidate: { ...person, emailDeliverable: null, emailVerifiedAt: null, emailVerificationReason: null } as PersonWithSource,
+            candidate: { ...person, emailDeliverable: null } as PersonWithSource,
             score: 0,
             breakdown: {} as ScoreBreakdown,
           });
@@ -1354,7 +1348,7 @@ export async function loadMoreV2Action(
         if (!person) { loadMoreNotInDb++; continue; }
         if (excludeSet.has(person.id)) { loadMoreExcluded++; continue; }
         orderedPeople.push({
-          candidate: { ...person, emailDeliverable: null, emailVerifiedAt: null, emailVerificationReason: null } as PersonWithSource,
+          candidate: { ...person, emailDeliverable: null } as PersonWithSource,
           score: 0,
           breakdown: {} as ScoreBreakdown,
         });
@@ -1622,8 +1616,6 @@ export async function unhidePersonAction(
             emailStatus: true,
             emailConfidence: true,
             emailDeliverable: true,
-            emailVerifiedAt: true,
-            emailVerificationReason: true,
             city: true,
             state: true,
             country: true,
@@ -1666,8 +1658,6 @@ export async function unhidePersonAction(
       emailStatus: (p.emailStatus as 'VERIFIED' | 'UNVERIFIED' | 'MISSING') || 'MISSING',
       emailConfidence: p.emailConfidence,
       emailDeliverable: p.emailDeliverable,
-      emailVerifiedAt: p.emailVerifiedAt,
-      emailVerificationReason: p.emailVerificationReason,
       city: p.city,
       state: p.state,
       country: p.country,
@@ -1825,8 +1815,6 @@ export async function lookupPersonAction(
             csePeople.push({
               ...existing,
               emailDeliverable: null,
-              emailVerifiedAt: null,
-              emailVerificationReason: null,
             });
             dbLinkedInUrls.add(cseResult.linkedinUrl);
           } else {
@@ -1892,8 +1880,6 @@ export async function lookupPersonAction(
                 emailStatus: true,
                 emailConfidence: true,
                 emailDeliverable: true,
-                emailVerifiedAt: true,
-                emailVerificationReason: true,
                 city: true,
                 state: true,
                 country: true,

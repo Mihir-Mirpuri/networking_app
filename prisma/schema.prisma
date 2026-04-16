@@ -109,9 +109,7 @@ model Person {
   emailStatus             EmailStatus?
   emailConfidence         Float?
   emailLastUpdated        DateTime?
-  emailDeliverable        Boolean? // Emailable verification result (null = unchecked)
-  emailVerifiedAt         DateTime? // When Emailable last verified this email
-  emailVerificationReason String? // Emailable reason (e.g., "accepted_email", "invalid_domain")
+  emailDeliverable        Boolean? // Apollo verification result (null = unverified)
   apolloEnrichedAt        DateTime? // Track when Apollo data was last fetched (legacy)
   apolloStatus            ApolloStatus? // Track the result of the last Apollo call (legacy)
   scrapedAt               DateTime? // Track when LinkedIn data was last scraped
@@ -525,8 +523,6 @@ model CompanyEmailPattern {
   pattern           String // pattern type: "first.last", "firstlast", "flast", "f.last", "first_last", "first"
   confidence        Float // 0-1 based on consistency
   sampleSize        Int      @default(0) // number of emails used to determine pattern
-  acceptAll         Boolean? // true = catch-all domain (can't verify individual emails), false = can verify, null = unchecked
-  unverifiable      Boolean  @default(false) // true = SMTP blocks verification (unavailable_smtp), trust pattern
   useApolloFallback Boolean  @default(false) // true = inconsistent patterns, call Apollo per-person
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt

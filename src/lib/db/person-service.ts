@@ -887,8 +887,6 @@ export type PersonResult = {
   emailStatus: string | null;
   emailConfidence: number | null;
   emailDeliverable: boolean | null;
-  emailVerifiedAt: Date | null;
-  emailVerificationReason: string | null;
   city: string | null;
   state: string | null;
   country: string | null;
@@ -968,8 +966,6 @@ export async function findPeopleByName(params: {
       emailStatus: true,
       emailConfidence: true,
       emailDeliverable: true,
-      emailVerifiedAt: true,
-      emailVerificationReason: true,
       city: true,
       state: true,
       country: true,
@@ -2300,8 +2296,6 @@ export async function findPeopleByFiltersV2(
     emailStatus: string | null;
     emailConfidence: number | null;
     emailDeliverable: boolean | null;
-    emailVerifiedAt: Date | null;
-    emailVerificationReason: string | null;
     city: string | null;
     state: string | null;
     country: string | null;
@@ -2325,8 +2319,6 @@ export async function findPeopleByFiltersV2(
       p."emailStatus"::text,
       p."emailConfidence",
       p."emailDeliverable",
-      p."emailVerifiedAt",
-      p."emailVerificationReason",
       p.city,
       p.state,
       p.country,
@@ -2596,8 +2588,6 @@ export async function findPeopleByFiltersV3(
     emailStatus: string | null;
     emailConfidence: number | null;
     emailDeliverable: boolean | null;
-    emailVerifiedAt: Date | null;
-    emailVerificationReason: string | null;
     city: string | null;
     state: string | null;
     country: string | null;
@@ -2624,8 +2614,6 @@ export async function findPeopleByFiltersV3(
       p."emailStatus"::text,
       p."emailConfidence",
       p."emailDeliverable",
-      p."emailVerifiedAt",
-      p."emailVerificationReason",
       p.city,
       p.state,
       p.country,
@@ -2891,8 +2879,6 @@ export async function findPeopleByFiltersV3(
       emailStatus: row.emailStatus,
       emailConfidence: row.emailConfidence,
       emailDeliverable: row.emailDeliverable,
-      emailVerifiedAt: row.emailVerifiedAt,
-      emailVerificationReason: row.emailVerificationReason,
       city: row.city,
       state: row.state,
       country: row.country,
@@ -2995,8 +2981,6 @@ export async function getTaggedPeopleForSearch(
       emailStatus: p.emailStatus,
       emailConfidence: p.emailConfidence,
       emailDeliverable: p.emailDeliverable,
-      emailVerifiedAt: p.emailVerifiedAt,
-      emailVerificationReason: p.emailVerificationReason,
       city: p.city,
       state: p.state,
       country: p.country,

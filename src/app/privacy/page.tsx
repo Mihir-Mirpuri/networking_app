@@ -204,7 +204,6 @@ export default function PrivacyPage() {
             <ul className="list-disc pl-6 text-gray-700 mb-4">
               <li><strong>Apollo:</strong> Receives names and company information from public LinkedIn profiles (not from your Google account) for email discovery</li>
               <li><strong>Apify:</strong> Receives public LinkedIn URLs (not Google user data) for profile data collection</li>
-              <li><strong>Emailable:</strong> Receives professional email addresses discovered from public sources (not your Google email) for verification</li>
               <li><strong>Google Custom Search:</strong> Receives search queries (not Google user data) for discovering professional profiles</li>
             </ul>
 
@@ -224,7 +223,6 @@ export default function PrivacyPage() {
               <li><strong>Stripe:</strong> For payment processing and subscription management</li>
               <li><strong>Apify:</strong> For collecting publicly available LinkedIn profile data</li>
               <li><strong>Apollo:</strong> For professional email address discovery and contact enrichment</li>
-              <li><strong>Emailable:</strong> For email address verification and deliverability checks</li>
               <li><strong>Google Custom Search:</strong> For discovering professional profiles on the web</li>
               <li><strong>Groq:</strong> For AI-powered email generation and resume analysis</li>
               <li><strong>Supabase:</strong> For database hosting and secure file storage (resumes)</li>
