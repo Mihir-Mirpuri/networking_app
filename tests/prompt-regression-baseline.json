@@ -128,11 +128,7 @@
   {
     "query": "people at McKinsey",
     "status": "ready",
-    "linkedin_filters": {
-      "current_companies": [
-        "McKinsey"
-      ]
-    },
+    "linkedin_filters": {},
     "filters": {
       "company": "McKinsey",
       "role": null,
@@ -392,23 +388,9 @@
     }
   },
   {
-    "query": "founders of AI startups",
-    "status": "unsupported",
-    "linkedin_filters": {},
-    "filters": {
-      "company": null,
-      "role": "Founder",
-      "university": null,
-      "location": null
-    }
-  },
-  {
     "query": "CXOs at Salesforce",
     "status": "ready",
     "linkedin_filters": {
-      "current_companies": [
-        "Salesforce"
-      ],
       "seniority_level_ids": [
         "310"
       ]

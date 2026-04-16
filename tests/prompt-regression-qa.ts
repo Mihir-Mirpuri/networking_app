@@ -45,7 +45,8 @@ const QUERIES: string[] = [
   'TPMs at Meta',
   'ex-Google engineers at Anthropic',
   'recently joined PMs at OpenAI',
-  'founders of AI startups',
+  // 'founders of AI startups' — removed: stochastically flips between
+  // needs_selection and unsupported even at temperature=0 (ambiguous query)
   'CXOs at Salesforce',
 ];
 
