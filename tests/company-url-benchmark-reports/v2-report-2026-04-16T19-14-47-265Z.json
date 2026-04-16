@@ -1,0 +1,2425 @@
+[
+  {
+    "company": {
+      "name": "毕马威中国",
+      "tier": "foreign",
+      "expected": "https://cn.linkedin.com/company/kpmg-china",
+      "note": "Simplified Chinese; canonical URL is on cn.linkedin.com subdomain"
+    },
+    "results": {
+      "sonnet": {
+        "url": "https://www.linkedin.com/company/kpmg-china",
+        "latencyMs": 2459,
+        "costUsd": 0.001332
+      },
+      "haiku": {
+        "url": "https://www.linkedin.com/company/kpmg-china",
+        "latencyMs": 1247,
+        "costUsd": 0.000169
+      },
+      "perplexity": {
+        "url": "https://www.linkedin.com/company/kpmg-china",
+        "latencyMs": 1625,
+        "costUsd": 0.001
+      },
+      "serper": {
+        "url": "https://cn.linkedin.com/company/kpmg-china",
+        "latencyMs": 935,
+        "costUsd": 0.001
+      },
+      "db": {
+        "url": null,
+        "latencyMs": 1150,
+        "costUsd": 0,
+        "metadata": {
+          "matches": 0
+        }
+      },
+      "apify": {
+        "url": "https://www.linkedin.com/company/kpmg-china/",
+        "latencyMs": 9340,
+        "costUsd": 0.008,
+        "metadata": {
+          "profileCount": 1,
+          "companyName": "毕马威中国",
+          "companyUniversalName": "kpmg-china"
+        }
+      },
+      "apollo": {
+        "url": null,
+        "latencyMs": 590,
+        "costUsd": 0,
+        "metadata": {
+          "orgCount": 0
+        }
+      },
+      "wikidata": {
+        "url": null,
+        "latencyMs": 296,
+        "costUsd": 0,
+        "metadata": {
+          "entityCount": 0
+        }
+      },
+      "claude-web": {
+        "url": "https://www.linkedin.com/company/kpmg-china",
+        "latencyMs": 7677,
+        "costUsd": 0.047914000000000005,
+        "metadata": {
+          "searches": 1
+        }
+      },
+      "website": {
+        "url": "http://linkedin.com/company/kpmg-china&#34;}}",
+        "latencyMs": 1129,
+        "costUsd": 0.001,
+        "metadata": {
+          "source": "https://kpmg.com/cn/zh.html"
+        }
+      }
+    },
+    "correctness": {
+      "sonnet": true,
+      "haiku": true,
+      "perplexity": true,
+      "serper": true,
+      "db": false,
+      "apify": true,
+      "apollo": false,
+      "wikidata": false,
+      "claude-web": true,
+      "website": false
+    }
+  },
+  {
+    "company": {
+      "name": "삼정KPMG",
+      "tier": "foreign",
+      "expected": "https://www.linkedin.com/company/samjong-kpmg",
+      "note": "Korean Hangul; slug is transliteration"
+    },
+    "results": {
+      "sonnet": {
+        "url": null,
+        "latencyMs": 2596,
+        "costUsd": 0.00138
+      },
+      "haiku": {
+        "url": "https://www.linkedin.com/company/samjung-kpmg",
+        "latencyMs": 1029,
+        "costUsd": 0.00018
+      },
+      "perplexity": {
+        "url": "https://www.linkedin.com/company/samjung-kpmg/",
+        "latencyMs": 4134,
+        "costUsd": 0.001
+      },
+      "serper": {
+        "url": "https://kr.linkedin.com/company/samjong-kpmg",
+        "latencyMs": 1258,
+        "costUsd": 0.001
+      },
+      "db": {
+        "url": null,
+        "latencyMs": 402,
+        "costUsd": 0,
+        "metadata": {
+          "matches": 0
+        }
+      },
+      "apify": {
+        "url": "https://www.linkedin.com/company/samjong-kpmg/",
+        "latencyMs": 7704,
+        "costUsd": 0.008,
+        "metadata": {
+          "profileCount": 1,
+          "companyName": "삼정KPMG (KPMG Korea)",
+          "companyUniversalName": "samjong-kpmg"
+        }
+      },
+      "apollo": {
+        "url": "http://www.linkedin.com/company/kpmg",
+        "latencyMs": 381,
+        "costUsd": 0,
+        "metadata": {
+          "orgCount": 3,
+          "matchedName": "KPMG"
+        }
+      },
+      "wikidata": {
+        "url": null,
+        "latencyMs": 152,
+        "costUsd": 0,
+        "metadata": {
+          "entityCount": 0
+        }
+      },
+      "claude-web": {
+        "url": "https://www.linkedin.com/company/samjong-kpmg",
+        "latencyMs": 3735,
+        "costUsd": 0.069124,
+        "metadata": {
+          "searches": 1
+        }
+      },
+      "website": {
+        "url": "https://www.linkedin.com/company/samjong-kpmg/posts/?feedView=all&#34;}}",
+        "latencyMs": 847,
+        "costUsd": 0.001,
+        "metadata": {
+          "source": "https://kpmg.com/kr/ko.html"
+        }
+      }
+    },
+    "correctness": {
+      "sonnet": false,
+      "haiku": false,
+      "perplexity": false,
+      "serper": true,
+      "db": false,
+      "apify": true,
+      "apollo": false,
+      "wikidata": false,
+      "claude-web": true,
+      "website": false
+    }
+  },
+  {
+    "company": {
+      "name": "Federal Bureau of Investigation",
+      "tier": "government",
+      "expected": "https://www.linkedin.com/company/fbi",
+      "note": "Full name vs acronym — slug uses acronym"
+    },
+    "results": {
+      "sonnet": {
+        "url": "https://www.linkedin.com/company/fbi",
+        "latencyMs": 20767,
+        "costUsd": 0.000456
+      },
+      "haiku": {
+        "url": "https://www.linkedin.com/company/federal-bureau-of-investigation",
+        "latencyMs": 910,
+        "costUsd": 0.000202
+      },
+      "perplexity": {
+        "url": "https://www.linkedin.com/company/fbi",
+        "latencyMs": 1294,
+        "costUsd": 0.001
+      },
+      "serper": {
+        "url": "https://www.linkedin.com/company/fbi",
+        "latencyMs": 992,
+        "costUsd": 0.001
+      },
+      "db": {
+        "url": null,
+        "latencyMs": 401,
+        "costUsd": 0,
+        "metadata": {
+          "matches": 0
+        }
+      },
+      "apify": {
+        "url": "https://www.linkedin.com/search/results/all/?keywords=Lonely+Gargoyle+LLC",
+        "latencyMs": 10890,
+        "costUsd": 0.008,
+        "metadata": {
+          "profileCount": 1,
+          "companyName": "Lonely Gargoyle LLC"
+        }
+      },
+      "apollo": {
+        "url": "http://www.linkedin.com/company/fbi",
+        "latencyMs": 394,
+        "costUsd": 0,
+        "metadata": {
+          "orgCount": 2,
+          "matchedName": "Federal Bureau of Investigation (FBI)"
+        }
+      },
+      "wikidata": {
+        "url": null,
+        "latencyMs": 524,
+        "costUsd": 0,
+        "metadata": {
+          "entityCount": 3,
+          "bindings": 0,
+          "qids": [
+            "Q8333",
+            "Q846087",
+            "Q1057168"
+          ]
+        }
+      },
+      "claude-web": {
+        "url": "https://www.linkedin.com/company/fbi",
+        "latencyMs": 31809,
+        "costUsd": 0.04696,
+        "metadata": {
+          "searches": 1
+        }
+      },
+      "website": {
+        "url": "https://www.linkedin.com/company/fbi",
+        "latencyMs": 2037,
+        "costUsd": 0.001,
+        "metadata": {
+          "source": "https://www.fbi.gov/services"
+        }
+      }
+    },
+    "correctness": {
+      "sonnet": true,
+      "haiku": false,
+      "perplexity": true,
+      "serper": true,
+      "db": false,
+      "apify": false,
+      "apollo": true,
+      "wikidata": false,
+      "claude-web": true,
+      "website": true
+    }
+  },
+  {
+    "company": {
+      "name": "White House",
+      "tier": "government",
+      "expected": "https://www.linkedin.com/company/the-white-house",
+      "note": "Slug prepends \"the-\""
+    },
+    "results": {
+      "sonnet": {
+        "url": "https://www.linkedin.com/company/the-white-house",
+        "latencyMs": 12611,
+        "costUsd": 0.000495
+      },
+      "haiku": {
+        "url": "https://www.linkedin.com/company/the-white-house",
+        "latencyMs": 923,
+        "costUsd": 0.00019
+      },
+      "perplexity": {
+        "url": null,
+        "latencyMs": 1481,
+        "costUsd": 0.001
+      },
+      "serper": {
+        "url": "https://www.linkedin.com/company/white-house-fellows-foundation",
+        "latencyMs": 1152,
+        "costUsd": 0.001
+      },
+      "db": {
+        "url": null,
+        "latencyMs": 391,
+        "costUsd": 0,
+        "metadata": {
+          "matches": 0
+        }
+      },
+      "apify": {
+        "url": "https://www.linkedin.com/company/desalesmedia/",
+        "latencyMs": 13046,
+        "costUsd": 0.008,
+        "metadata": {
+          "profileCount": 1,
+          "companyName": "DeSales Media Group",
+          "companyUniversalName": "desalesmedia"
+        }
+      },
+      "apollo": {
+        "url": "http://www.linkedin.com/company/the-white-house",
+        "latencyMs": 308,
+        "costUsd": 0,
+        "metadata": {
+          "orgCount": 3,
+          "matchedName": "The White House"
+        }
+      },
+      "wikidata": {
+        "url": null,
+        "latencyMs": 288,
+        "costUsd": 0,
+        "metadata": {
+          "entityCount": 3,
+          "bindings": 0,
+          "qids": [
+            "Q7903",
+            "Q35525",
+            "Q1355327"
+          ]
+        }
+      },
+      "claude-web": {
+        "url": "https://www.linkedin.com/company/the-white-house",
+        "latencyMs": 18176,
+        "costUsd": 0.041716,
+        "metadata": {
+          "searches": 1
+        }
+      },
+      "website": {
+        "url": null,
+        "latencyMs": 1575,
+        "costUsd": 0.001,
+        "metadata": {
+          "candidates": 3
+        }
+      }
+    },
+    "correctness": {
+      "sonnet": true,
+      "haiku": true,
+      "perplexity": false,
+      "serper": false,
+      "db": false,
+      "apify": false,
+      "apollo": true,
+      "wikidata": false,
+      "claude-web": true,
+      "website": false
+    }
+  },
+  {
+    "company": {
+      "name": "Kirkland & Ellis",
+      "tier": "law",
+      "expected": "https://www.linkedin.com/company/kirkland-&-ellis-llp",
+      "note": "Ampersand preserved in slug; LLP suffix added"
+    },
+    "results": {
+      "sonnet": {
+        "url": "https://www.linkedin.com/company/kirkland-ellis",
+        "latencyMs": 15976,
+        "costUsd": 0.000489
+      },
+      "haiku": {
+        "url": "https://www.linkedin.com/company/kirkland-&-ellis",
+        "latencyMs": 909,
+        "costUsd": 0.000198
+      },
+      "perplexity": {
+        "url": "https://www.linkedin.com/company/kirkland-&-ellis",
+        "latencyMs": 2467,
+        "costUsd": 0.001
+      },
+      "serper": {
+        "url": "https://www.linkedin.com/company/kirkland-&-ellis-llp",
+        "latencyMs": 899,
+        "costUsd": 0.001
+      },
+      "db": {
+        "url": null,
+        "latencyMs": 774,
+        "costUsd": 0,
+        "metadata": {
+          "matches": 0
+        }
+      },
+      "apify": {
+        "url": "https://www.linkedin.com/company/kirkland-&-ellis-llp/",
+        "latencyMs": 9529,
+        "costUsd": 0.008,
+        "metadata": {
+          "profileCount": 1,
+          "companyName": "Kirkland & Ellis",
+          "companyUniversalName": "kirkland-&-ellis-llp"
+        }
+      },
+      "apollo": {
+        "url": "http://www.linkedin.com/company/kirkland-&-ellis-llp",
+        "latencyMs": 4417,
+        "costUsd": 0,
+        "metadata": {
+          "orgCount": 3,
+          "matchedName": "Kirkland & Ellis"
+        }
+      },
+      "wikidata": {
+        "url": null,
+        "latencyMs": 715,
+        "costUsd": 0,
+        "metadata": {
+          "entityCount": 2,
+          "bindings": 0,
+          "qids": [
+            "Q1743511",
+            "Q125295638"
+          ]
+        }
+      },
+      "claude-web": {
+        "url": "https://www.linkedin.com/company/kirkland-&-ellis-llp",
+        "latencyMs": 21125,
+        "costUsd": 0.055756,
+        "metadata": {
+          "searches": 1
+        }
+      },
+      "website": {
+        "url": "https://www.linkedin.com/company/kirkland-&amp;-ellis-llp",
+        "latencyMs": 2165,
+        "costUsd": 0.001,
+        "metadata": {
+          "source": "https://www.kirkland.com/"
+        }
+      }
+    },
+    "correctness": {
+      "sonnet": false,
+      "haiku": false,
+      "perplexity": false,
+      "serper": true,
+      "db": false,
+      "apify": true,
+      "apollo": true,
+      "wikidata": false,
+      "claude-web": true,
+      "website": false
+    }
+  },
+  {
+    "company": {
+      "name": "Skadden, Arps, Slate, Meagher & Flom LLP and Affiliates",
+      "tier": "law",
+      "expected": "https://www.linkedin.com/company/skadden-arps-slate-meagher-flom-llp-affiliates",
+      "note": "Long name, commas and ampersand stripped, \"and\" preserved"
+    },
+    "results": {
+      "sonnet": {
+        "url": "https://www.linkedin.com/company/skadden-arps-slate-meagher-&-flom-llp-and-affiliates",
+        "latencyMs": 24583,
+        "costUsd": 0.000867
+      },
+      "haiku": {
+        "url": "https://www.linkedin.com/company/skadden-arps-slate-meagher-flom-llp-and-affiliates",
+        "latencyMs": 920,
+        "costUsd": 0.000279
+      },
+      "perplexity": {
+        "url": null,
+        "latencyMs": 1429,
+        "costUsd": 0.001
+      },
+      "serper": {
+        "url": "https://www.linkedin.com/company/skadden-arps-slate-meagher-flom-llp-affiliates",
+        "latencyMs": 920,
+        "costUsd": 0.001
+      },
+      "db": {
+        "url": null,
+        "latencyMs": 388,
+        "costUsd": 0,
+        "metadata": {
+          "matches": 0
+        }
+      },
+      "apify": {
+        "url": "https://www.linkedin.com/company/skadden-arps-slate-meagher-flom-llp-affiliates/",
+        "latencyMs": 8379,
+        "costUsd": 0.008,
+        "metadata": {
+          "profileCount": 1,
+          "companyName": "Skadden, Arps, Slate, Meagher & Flom LLP and Affiliates",
+          "companyUniversalName": "skadden-arps-slate-meagher-flom-llp-affiliates"
+        }
+      },
+      "apollo": {
+        "url": "http://www.linkedin.com/company/skadden-arps-slate-meagher-flom-llp-affiliates",
+        "latencyMs": 256,
+        "costUsd": 0,
+        "metadata": {
+          "orgCount": 1,
+          "matchedName": "Skadden, Arps, Slate, Meagher & Flom LLP and Affiliates"
+        }
+      },
+      "wikidata": {
+        "url": null,
+        "latencyMs": 149,
+        "costUsd": 0,
+        "metadata": {
+          "entityCount": 0
+        }
+      },
+      "claude-web": {
+        "url": "https://www.linkedin.com/company/skadden-arps-slate-meagher-flom-llp-affiliates",
+        "latencyMs": 29718,
+        "costUsd": 0.048187,
+        "metadata": {
+          "searches": 1
+        }
+      },
+      "website": {
+        "url": "https://www.linkedin.com/company/skadden-arps-slate-meagher-flom-llp-affiliates",
+        "latencyMs": 1078,
+        "costUsd": 0.001,
+        "metadata": {
+          "source": "https://www.skadden.com/"
+        }
+      }
+    },
+    "correctness": {
+      "sonnet": false,
+      "haiku": false,
+      "perplexity": false,
+      "serper": true,
+      "db": false,
+      "apify": true,
+      "apollo": true,
+      "wikidata": false,
+      "claude-web": true,
+      "website": true
+    }
+  },
+  {
+    "company": {
+      "name": "Baker McKenzie",
+      "tier": "law",
+      "expected": "https://www.linkedin.com/company/baker-&-mckenzie",
+      "note": "No ampersand in input name, but slug has one"
+    },
+    "results": {
+      "sonnet": {
+        "url": "https://www.linkedin.com/company/baker-mckenzie",
+        "latencyMs": 19552,
+        "costUsd": 0.000498
+      },
+      "haiku": {
+        "url": "https://www.linkedin.com/company/baker-mckenzie",
+        "latencyMs": 1095,
+        "costUsd": 0.000191
+      },
+      "perplexity": {
+        "url": "https://www.linkedin.com/company/baker-mckenzie",
+        "latencyMs": 1469,
+        "costUsd": 0.001
+      },
+      "serper": {
+        "url": "https://www.linkedin.com/company/baker-&-mckenzie",
+        "latencyMs": 1288,
+        "costUsd": 0.001
+      },
+      "db": {
+        "url": null,
+        "latencyMs": 386,
+        "costUsd": 0,
+        "metadata": {
+          "matches": 0
+        }
+      },
+      "apify": {
+        "url": "https://www.linkedin.com/company/baker-&-mckenzie/",
+        "latencyMs": 10876,
+        "costUsd": 0.008,
+        "metadata": {
+          "profileCount": 1,
+          "companyName": "Baker McKenzie",
+          "companyUniversalName": "baker-&-mckenzie"
+        }
+      },
+      "apollo": {
+        "url": "http://www.linkedin.com/company/baker-&-mckenzie",
+        "latencyMs": 345,
+        "costUsd": 0,
+        "metadata": {
+          "orgCount": 3,
+          "matchedName": "Baker McKenzie"
+        }
+      },
+      "wikidata": {
+        "url": null,
+        "latencyMs": 387,
+        "costUsd": 0,
+        "metadata": {
+          "entityCount": 3,
+          "bindings": 0,
+          "qids": [
+            "Q804340",
+            "Q131895889",
+            "Q13433895"
+          ]
+        }
+      },
+      "claude-web": {
+        "url": "https://www.linkedin.com/company/baker-&-mckenzie",
+        "latencyMs": 23644,
+        "costUsd": 0.054391,
+        "metadata": {
+          "searches": 1
+        }
+      },
+      "website": {
+        "url": "http://www.linkedin.com/company/baker-&amp;-mckenzie?trk=cp_followed_name_baker-%26-mckenzie",
+        "latencyMs": 1613,
+        "costUsd": 0.001,
+        "metadata": {
+          "source": "https://www.bakermckenzie.com/en/"
+        }
+      }
+    },
+    "correctness": {
+      "sonnet": false,
+      "haiku": false,
+      "perplexity": false,
+      "serper": true,
+      "db": false,
+      "apify": true,
+      "apollo": true,
+      "wikidata": false,
+      "claude-web": true,
+      "website": false
+    }
+  },
+  {
+    "company": {
+      "name": "Harvard Business School",
+      "tier": "school",
+      "expected": "https://www.linkedin.com/school/harvard-business-school/",
+      "note": "Uses /school/ path, not /company/"
+    },
+    "results": {
+      "sonnet": {
+        "url": "https://www.linkedin.com/school/harvard-business-school/",
+        "latencyMs": 23273,
+        "costUsd": 0.000513
+      },
+      "haiku": {
+        "url": "https://www.linkedin.com/school/harvard-business-school",
+        "latencyMs": 731,
+        "costUsd": 0.000191
+      },
+      "perplexity": {
+        "url": "https://www.linkedin.com/school/harvard-business-school/",
+        "latencyMs": 1320,
+        "costUsd": 0.001
+      },
+      "serper": {
+        "url": "https://www.linkedin.com/school/harvard-business-school/",
+        "latencyMs": 905,
+        "costUsd": 0.001
+      },
+      "db": {
+        "url": null,
+        "latencyMs": 399,
+        "costUsd": 0,
+        "metadata": {
+          "matches": 0
+        }
+      },
+      "apify": {
+        "url": "https://www.linkedin.com/company/australia-china-business-council/",
+        "latencyMs": 10240,
+        "costUsd": 0.008,
+        "metadata": {
+          "profileCount": 1,
+          "companyName": "Australia China Business Council",
+          "companyUniversalName": "australia-china-business-council"
+        }
+      },
+      "apollo": {
+        "url": "http://www.linkedin.com/school/harvard-business-school",
+        "latencyMs": 345,
+        "costUsd": 0,
+        "metadata": {
+          "orgCount": 3,
+          "matchedName": "Harvard Business School"
+        }
+      },
+      "wikidata": {
+        "url": null,
+        "latencyMs": 383,
+        "costUsd": 0,
+        "metadata": {
+          "entityCount": 3,
+          "bindings": 0,
+          "qids": [
+            "Q49126",
+            "Q3783574",
+            "Q5676306"
+          ]
+        }
+      },
+      "claude-web": {
+        "url": "https://www.linkedin.com/school/harvard-business-school/",
+        "latencyMs": 27240,
+        "costUsd": 0.039619,
+        "metadata": {
+          "searches": 1
+        }
+      },
+      "website": {
+        "url": "https://www.linkedin.com/school/harvard-business-school/",
+        "latencyMs": 857,
+        "costUsd": 0.001,
+        "metadata": {
+          "source": "https://www.hbs.edu/"
+        }
+      }
+    },
+    "correctness": {
+      "sonnet": true,
+      "haiku": true,
+      "perplexity": true,
+      "serper": true,
+      "db": false,
+      "apify": false,
+      "apollo": true,
+      "wikidata": false,
+      "claude-web": true,
+      "website": true
+    }
+  },
+  {
+    "company": {
+      "name": "The Wharton School",
+      "tier": "school",
+      "expected": "https://www.linkedin.com/school/the-wharton-school/",
+      "note": "Uses /school/ path"
+    },
+    "results": {
+      "sonnet": {
+        "url": "https://www.linkedin.com/school/the-wharton-school",
+        "latencyMs": 16971,
+        "costUsd": 0.000537
+      },
+      "haiku": {
+        "url": "https://www.linkedin.com/school/the-wharton-school",
+        "latencyMs": 904,
+        "costUsd": 0.000204
+      },
+      "perplexity": {
+        "url": null,
+        "latencyMs": 1627,
+        "costUsd": 0.001
+      },
+      "serper": {
+        "url": "https://www.linkedin.com/school/the-wharton-school/",
+        "latencyMs": 934,
+        "costUsd": 0.001
+      },
+      "db": {
+        "url": null,
+        "latencyMs": 423,
+        "costUsd": 0,
+        "metadata": {
+          "matches": 0
+        }
+      },
+      "apify": {
+        "url": "https://www.linkedin.com/school/the-wharton-school/",
+        "latencyMs": 10068,
+        "costUsd": 0.008,
+        "metadata": {
+          "profileCount": 1,
+          "companyName": "The Wharton School",
+          "companyUniversalName": "the-wharton-school"
+        }
+      },
+      "apollo": {
+        "url": "http://www.linkedin.com/school/the-wharton-school",
+        "latencyMs": 256,
+        "costUsd": 0,
+        "metadata": {
+          "orgCount": 3,
+          "matchedName": "The Wharton School"
+        }
+      },
+      "wikidata": {
+        "url": null,
+        "latencyMs": 350,
+        "costUsd": 0,
+        "metadata": {
+          "entityCount": 2,
+          "bindings": 0,
+          "qids": [
+            "Q1329269",
+            "Q134609106"
+          ]
+        }
+      },
+      "claude-web": {
+        "url": "https://www.linkedin.com/school/the-wharton-school/",
+        "latencyMs": 21318,
+        "costUsd": 0.037288,
+        "metadata": {
+          "searches": 1
+        }
+      },
+      "website": {
+        "url": "https://www.linkedin.com/school/5290?pathWildcard=5290",
+        "latencyMs": 1033,
+        "costUsd": 0.001,
+        "metadata": {
+          "source": "https://www.wharton.upenn.edu/"
+        }
+      }
+    },
+    "correctness": {
+      "sonnet": true,
+      "haiku": true,
+      "perplexity": false,
+      "serper": true,
+      "db": false,
+      "apify": true,
+      "apollo": true,
+      "wikidata": false,
+      "claude-web": true,
+      "website": false
+    }
+  },
+  {
+    "company": {
+      "name": "Columbia Law School",
+      "tier": "school",
+      "expected": "https://www.linkedin.com/school/columbia-law-school/",
+      "note": "Uses /school/ path"
+    },
+    "results": {
+      "sonnet": {
+        "url": "https://www.linkedin.com/school/columbia-law-school/",
+        "latencyMs": 13474,
+        "costUsd": 0.000513
+      },
+      "haiku": {
+        "url": "https://www.linkedin.com/school/columbia-law-school",
+        "latencyMs": 1079,
+        "costUsd": 0.000191
+      },
+      "perplexity": {
+        "url": null,
+        "latencyMs": 1280,
+        "costUsd": 0.001
+      },
+      "serper": {
+        "url": "https://www.linkedin.com/school/columbia-law-school/",
+        "latencyMs": 917,
+        "costUsd": 0.001
+      },
+      "db": {
+        "url": null,
+        "latencyMs": 423,
+        "costUsd": 0,
+        "metadata": {
+          "matches": 0
+        }
+      },
+      "apify": {
+        "url": "https://www.linkedin.com/company/76656096/",
+        "latencyMs": 9564,
+        "costUsd": 0.008,
+        "metadata": {
+          "profileCount": 1,
+          "companyName": "TEDxReno"
+        }
+      },
+      "apollo": {
+        "url": "http://www.linkedin.com/school/columbia-law-school",
+        "latencyMs": 363,
+        "costUsd": 0,
+        "metadata": {
+          "orgCount": 3,
+          "matchedName": "Columbia Law School"
+        }
+      },
+      "wikidata": {
+        "url": null,
+        "latencyMs": 350,
+        "costUsd": 0,
+        "metadata": {
+          "entityCount": 2,
+          "bindings": 0,
+          "qids": [
+            "Q1149089",
+            "Q5149755"
+          ]
+        }
+      },
+      "claude-web": {
+        "url": "https://www.linkedin.com/school/columbia-law-school/",
+        "latencyMs": 16330,
+        "costUsd": 0.051946,
+        "metadata": {
+          "searches": 1
+        }
+      },
+      "website": {
+        "url": "https://www.linkedin.com/school/columbia-law-school/",
+        "latencyMs": 1063,
+        "costUsd": 0.001,
+        "metadata": {
+          "source": "https://www.law.columbia.edu/"
+        }
+      }
+    },
+    "correctness": {
+      "sonnet": true,
+      "haiku": true,
+      "perplexity": false,
+      "serper": true,
+      "db": false,
+      "apify": false,
+      "apollo": true,
+      "wikidata": false,
+      "claude-web": true,
+      "website": true
+    }
+  },
+  {
+    "company": {
+      "name": "BCG X",
+      "tier": "sub-brand",
+      "expected": "https://www.linkedin.com/company/bcg-x",
+      "note": "BCG sub-brand with its own page (not boston-consulting-group)"
+    },
+    "results": {
+      "sonnet": {
+        "url": "https://www.linkedin.com/company/bcg-x",
+        "latencyMs": 22544,
+        "costUsd": 0.000483
+      },
+      "haiku": {
+        "url": "https://www.linkedin.com/company/bcg-x",
+        "latencyMs": 827,
+        "costUsd": 0.000186
+      },
+      "perplexity": {
+        "url": null,
+        "latencyMs": 2711,
+        "costUsd": 0.001
+      },
+      "serper": {
+        "url": "https://www.linkedin.com/company/bcg-x",
+        "latencyMs": 949,
+        "costUsd": 0.001
+      },
+      "db": {
+        "url": null,
+        "latencyMs": 388,
+        "costUsd": 0,
+        "metadata": {
+          "matches": 0
+        }
+      },
+      "apify": {
+        "url": "https://www.linkedin.com/company/boston-consulting-group/",
+        "latencyMs": 12171,
+        "costUsd": 0.008,
+        "metadata": {
+          "profileCount": 1,
+          "companyName": "Boston Consulting Group (BCG)",
+          "companyUniversalName": "boston-consulting-group"
+        }
+      },
+      "apollo": {
+        "url": "http://www.linkedin.com/company/bcg-x",
+        "latencyMs": 334,
+        "costUsd": 0,
+        "metadata": {
+          "orgCount": 1,
+          "matchedName": "BCG X"
+        }
+      },
+      "wikidata": {
+        "url": null,
+        "latencyMs": 144,
+        "costUsd": 0,
+        "metadata": {
+          "entityCount": 0
+        }
+      },
+      "claude-web": {
+        "url": "https://www.linkedin.com/company/bcg-x",
+        "latencyMs": 28132,
+        "costUsd": 0.054106,
+        "metadata": {
+          "searches": 1
+        }
+      },
+      "website": {
+        "url": "https://www.linkedin.com/company/bcg-x",
+        "latencyMs": 1157,
+        "costUsd": 0.001,
+        "metadata": {
+          "source": "https://www.bcg.com/x/"
+        }
+      }
+    },
+    "correctness": {
+      "sonnet": true,
+      "haiku": true,
+      "perplexity": false,
+      "serper": true,
+      "db": false,
+      "apify": false,
+      "apollo": true,
+      "wikidata": false,
+      "claude-web": true,
+      "website": true
+    }
+  },
+  {
+    "company": {
+      "name": "Microsoft AI",
+      "tier": "sub-brand",
+      "expected": "https://www.linkedin.com/company/microsoft-ai",
+      "note": "Microsoft sub-brand with its own page"
+    },
+    "results": {
+      "sonnet": {
+        "url": "https://www.linkedin.com/company/microsoft-ai",
+        "latencyMs": 23978,
+        "costUsd": 0.000465
+      },
+      "haiku": {
+        "url": "https://www.linkedin.com/company/microsoft-ai",
+        "latencyMs": 1151,
+        "costUsd": 0.00018
+      },
+      "perplexity": {
+        "url": null,
+        "latencyMs": 1863,
+        "costUsd": 0.001
+      },
+      "serper": {
+        "url": "https://www.linkedin.com/company/microsoft-ai",
+        "latencyMs": 868,
+        "costUsd": 0.001
+      },
+      "db": {
+        "url": null,
+        "latencyMs": 595,
+        "costUsd": 0,
+        "metadata": {
+          "matches": 0
+        }
+      },
+      "apify": {
+        "url": "https://www.linkedin.com/company/microsoft/",
+        "latencyMs": 16217,
+        "costUsd": 0.008,
+        "metadata": {
+          "profileCount": 1,
+          "companyName": "Microsoft",
+          "companyUniversalName": "microsoft"
+        }
+      },
+      "apollo": {
+        "url": "http://www.linkedin.com/company/microsoft-ai",
+        "latencyMs": 468,
+        "costUsd": 0,
+        "metadata": {
+          "orgCount": 3,
+          "matchedName": "Microsoft AI"
+        }
+      },
+      "wikidata": {
+        "url": null,
+        "latencyMs": 656,
+        "costUsd": 0,
+        "metadata": {
+          "entityCount": 3,
+          "bindings": 0,
+          "qids": [
+            "Q125891217",
+            "Q100301837",
+            "Q119999093"
+          ]
+        }
+      },
+      "claude-web": {
+        "url": "https://www.linkedin.com/company/microsoft-ai",
+        "latencyMs": 37556,
+        "costUsd": 0.037333,
+        "metadata": {
+          "searches": 1
+        }
+      },
+      "website": {
+        "url": "https://www.linkedin.com/company/microsoft-ai/",
+        "latencyMs": 2263,
+        "costUsd": 0.001,
+        "metadata": {
+          "source": "https://microsoft.ai/"
+        }
+      }
+    },
+    "correctness": {
+      "sonnet": true,
+      "haiku": true,
+      "perplexity": false,
+      "serper": true,
+      "db": false,
+      "apify": false,
+      "apollo": true,
+      "wikidata": false,
+      "claude-web": true,
+      "website": true
+    }
+  },
+  {
+    "company": {
+      "name": "Google DeepMind",
+      "tier": "sub-brand",
+      "expected": "https://www.linkedin.com/company/googledeepmind",
+      "note": "Slug is concatenated (no hyphen)"
+    },
+    "results": {
+      "sonnet": {
+        "url": "https://www.linkedin.com/company/googledeepmind",
+        "latencyMs": 12480,
+        "costUsd": 0.000504
+      },
+      "haiku": {
+        "url": "https://www.linkedin.com/company/deepmind",
+        "latencyMs": 5491,
+        "costUsd": 0.000183
+      },
+      "perplexity": {
+        "url": "https://www.linkedin.com/company/google-deepmind",
+        "latencyMs": 2858,
+        "costUsd": 0.001
+      },
+      "serper": {
+        "url": "https://www.linkedin.com/company/googledeepmind",
+        "latencyMs": 5314,
+        "costUsd": 0.001
+      },
+      "db": {
+        "url": null,
+        "latencyMs": 1861,
+        "costUsd": 0,
+        "metadata": {
+          "matches": 0
+        }
+      },
+      "apify": {
+        "url": "https://www.linkedin.com/company/googledeepmind/",
+        "latencyMs": 14104,
+        "costUsd": 0.008,
+        "metadata": {
+          "profileCount": 1,
+          "companyName": "Google DeepMind",
+          "companyUniversalName": "googledeepmind"
+        }
+      },
+      "apollo": {
+        "url": "http://www.linkedin.com/company/googledeepmind",
+        "latencyMs": 1627,
+        "costUsd": 0,
+        "metadata": {
+          "orgCount": 1,
+          "matchedName": "Google DeepMind"
+        }
+      },
+      "wikidata": {
+        "url": null,
+        "latencyMs": 4678,
+        "costUsd": 0,
+        "metadata": {
+          "entityCount": 3,
+          "bindings": 0,
+          "qids": [
+            "Q15733006",
+            "Q22329209",
+            "Q23016184"
+          ]
+        }
+      },
+      "claude-web": {
+        "url": "https://www.linkedin.com/company/googledeepmind",
+        "latencyMs": 8663,
+        "costUsd": 0.048652,
+        "metadata": {
+          "searches": 1
+        }
+      },
+      "website": {
+        "url": "https://www.linkedin.com/company/googledeepmind/",
+        "latencyMs": 5758,
+        "costUsd": 0.001,
+        "metadata": {
+          "source": "https://deepmind.google/"
+        }
+      }
+    },
+    "correctness": {
+      "sonnet": true,
+      "haiku": false,
+      "perplexity": false,
+      "serper": true,
+      "db": false,
+      "apify": true,
+      "apollo": true,
+      "wikidata": false,
+      "claude-web": true,
+      "website": true
+    }
+  },
+  {
+    "company": {
+      "name": "JPMorganChase",
+      "tier": "variation",
+      "expected": "https://www.linkedin.com/company/jpmorganchase",
+      "acceptable": [
+        "https://www.linkedin.com/company/jpmorgan"
+      ],
+      "note": "Concatenated input; slug may be jpmorgan OR jpmorganchase"
+    },
+    "results": {
+      "sonnet": {
+        "url": "https://www.linkedin.com/company/jpmorganchase",
+        "latencyMs": 14252,
+        "costUsd": 0.000504
+      },
+      "haiku": {
+        "url": "https://www.linkedin.com/company/jpmorgan-chase-co",
+        "latencyMs": 980,
+        "costUsd": 0.000203
+      },
+      "perplexity": {
+        "url": null,
+        "latencyMs": 1730,
+        "costUsd": 0.001
+      },
+      "serper": {
+        "url": "https://www.linkedin.com/company/jpmorganchase",
+        "latencyMs": 858,
+        "costUsd": 0.001
+      },
+      "db": {
+        "url": null,
+        "latencyMs": 342,
+        "costUsd": 0,
+        "metadata": {
+          "matches": 0
+        }
+      },
+      "apify": {
+        "url": "https://www.linkedin.com/company/kiara-assets/",
+        "latencyMs": 11247,
+        "costUsd": 0.008,
+        "metadata": {
+          "profileCount": 1,
+          "companyName": "Kiara Assets",
+          "companyUniversalName": "kiara-assets"
+        }
+      },
+      "apollo": {
+        "url": "http://www.linkedin.com/company/jpmorganchase",
+        "latencyMs": 249,
+        "costUsd": 0,
+        "metadata": {
+          "orgCount": 3,
+          "matchedName": "JPMorganChase"
+        }
+      },
+      "wikidata": {
+        "url": null,
+        "latencyMs": 287,
+        "costUsd": 0,
+        "metadata": {
+          "entityCount": 3,
+          "bindings": 0,
+          "qids": [
+            "Q192314",
+            "Q7381595",
+            "Q935919"
+          ]
+        }
+      },
+      "claude-web": {
+        "url": "https://www.linkedin.com/company/jpmorganchase",
+        "latencyMs": 21113,
+        "costUsd": 0.040918,
+        "metadata": {
+          "searches": 1
+        }
+      },
+      "website": {
+        "url": "https://www.linkedin.com/company/jpmorgan",
+        "latencyMs": 1379,
+        "costUsd": 0.001,
+        "metadata": {
+          "source": "https://www.jpmorgan.com/"
+        }
+      }
+    },
+    "correctness": {
+      "sonnet": true,
+      "haiku": false,
+      "perplexity": false,
+      "serper": true,
+      "db": false,
+      "apify": false,
+      "apollo": true,
+      "wikidata": false,
+      "claude-web": true,
+      "website": true
+    }
+  },
+  {
+    "company": {
+      "name": "C.H. Robinson Worldwide",
+      "tier": "variation",
+      "expected": "https://www.linkedin.com/company/c-h-robinson",
+      "note": "Canonical strips \"Worldwide\" and dots"
+    },
+    "results": {
+      "sonnet": {
+        "url": "https://www.linkedin.com/company/c-h-robinson",
+        "latencyMs": 15206,
+        "costUsd": 0.00051
+      },
+      "haiku": {
+        "url": "https://www.linkedin.com/company/c.h.-robinson-worldwide",
+        "latencyMs": 2139,
+        "costUsd": 0.000205
+      },
+      "perplexity": {
+        "url": "https://www.linkedin.com/company/c.h.-robinson-worldwide",
+        "latencyMs": 2702,
+        "costUsd": 0.001
+      },
+      "serper": {
+        "url": "https://www.linkedin.com/company/c-h-robinson-company",
+        "latencyMs": 1081,
+        "costUsd": 0.001
+      },
+      "db": {
+        "url": null,
+        "latencyMs": 1870,
+        "costUsd": 0,
+        "metadata": {
+          "matches": 0
+        }
+      },
+      "apify": {
+        "url": "https://www.linkedin.com/company/c-h-robinson/",
+        "latencyMs": 9659,
+        "costUsd": 0.008,
+        "metadata": {
+          "profileCount": 1,
+          "companyName": "C.H. Robinson Worldwide, Inc.",
+          "companyUniversalName": "c-h-robinson"
+        }
+      },
+      "apollo": {
+        "url": "http://www.linkedin.com/company/c.h.-robinson-worldwide-argentina-s.a.",
+        "latencyMs": 755,
+        "costUsd": 0,
+        "metadata": {
+          "orgCount": 3,
+          "matchedName": "C.H. Robinson Worldwide Argentina, S.A."
+        }
+      },
+      "wikidata": {
+        "url": null,
+        "latencyMs": 868,
+        "costUsd": 0,
+        "metadata": {
+          "entityCount": 1,
+          "bindings": 0,
+          "qids": [
+            "Q931200"
+          ]
+        }
+      },
+      "claude-web": {
+        "url": "https://www.linkedin.com/company/c-h-robinson",
+        "latencyMs": 19347,
+        "costUsd": 0.057544000000000005,
+        "metadata": {
+          "searches": 1
+        }
+      },
+      "website": {
+        "url": "http://www.linkedin.com/company/c-h-robinson",
+        "latencyMs": 1686,
+        "costUsd": 0.001,
+        "metadata": {
+          "source": "https://www.chrobinson.com/en-us/"
+        }
+      }
+    },
+    "correctness": {
+      "sonnet": true,
+      "haiku": false,
+      "perplexity": false,
+      "serper": false,
+      "db": false,
+      "apify": true,
+      "apollo": false,
+      "wikidata": false,
+      "claude-web": true,
+      "website": true
+    }
+  },
+  {
+    "company": {
+      "name": "Facebook",
+      "tier": "popular",
+      "expected": "https://www.linkedin.com/company/meta",
+      "acceptable": [
+        "https://www.linkedin.com/company/facebook"
+      ],
+      "note": "Rebranded to Meta; both slugs exist"
+    },
+    "results": {
+      "sonnet": {
+        "url": "https://www.linkedin.com/company/facebook",
+        "latencyMs": 26772,
+        "costUsd": 0.000432
+      },
+      "haiku": {
+        "url": "https://www.linkedin.com/company/facebook",
+        "latencyMs": 1240,
+        "costUsd": 0.000169
+      },
+      "perplexity": {
+        "url": "https://www.linkedin.com/company/facebook",
+        "latencyMs": 1836,
+        "costUsd": 0.001
+      },
+      "serper": {
+        "url": "https://in.linkedin.com/company/facebook-soi",
+        "latencyMs": 1635,
+        "costUsd": 0.001
+      },
+      "db": {
+        "url": null,
+        "latencyMs": 1262,
+        "costUsd": 0,
+        "metadata": {
+          "matches": 0
+        }
+      },
+      "apify": {
+        "url": "https://www.linkedin.com/company/animoca-brands/",
+        "latencyMs": 10257,
+        "costUsd": 0.008,
+        "metadata": {
+          "profileCount": 1,
+          "companyName": "Animoca Brands",
+          "companyUniversalName": "animoca-brands"
+        }
+      },
+      "apollo": {
+        "url": "http://www.linkedin.com/company/facebook",
+        "latencyMs": 819,
+        "costUsd": 0,
+        "metadata": {
+          "orgCount": 3,
+          "matchedName": "Facebook"
+        }
+      },
+      "wikidata": {
+        "url": null,
+        "latencyMs": 1191,
+        "costUsd": 0,
+        "metadata": {
+          "entityCount": 3,
+          "bindings": 0,
+          "qids": [
+            "Q355",
+            "Q380",
+            "Q754454"
+          ]
+        }
+      },
+      "claude-web": {
+        "url": "https://www.linkedin.com/company/facebook",
+        "latencyMs": 31679,
+        "costUsd": 0.045067,
+        "metadata": {
+          "searches": 1
+        }
+      },
+      "website": {
+        "url": null,
+        "latencyMs": 4167,
+        "costUsd": 0.001,
+        "metadata": {
+          "candidates": 3
+        }
+      }
+    },
+    "correctness": {
+      "sonnet": true,
+      "haiku": true,
+      "perplexity": true,
+      "serper": false,
+      "db": false,
+      "apify": false,
+      "apollo": true,
+      "wikidata": false,
+      "claude-web": true,
+      "website": false
+    }
+  },
+  {
+    "company": {
+      "name": "Shopify",
+      "tier": "popular",
+      "expected": "https://www.linkedin.com/company/shopify"
+    },
+    "results": {
+      "sonnet": {
+        "url": "https://www.linkedin.com/company/shopify",
+        "latencyMs": 15752,
+        "costUsd": 0.000453
+      },
+      "haiku": {
+        "url": "https://www.linkedin.com/company/shopify",
+        "latencyMs": 1228,
+        "costUsd": 0.000176
+      },
+      "perplexity": {
+        "url": null,
+        "latencyMs": 2381,
+        "costUsd": 0.001
+      },
+      "serper": {
+        "url": "https://ca.linkedin.com/company/shopify",
+        "latencyMs": 2288,
+        "costUsd": 0.001
+      },
+      "db": {
+        "url": null,
+        "latencyMs": 701,
+        "costUsd": 0,
+        "metadata": {
+          "matches": 0
+        }
+      },
+      "apify": {
+        "url": "https://www.linkedin.com/company/itsolutionsww/",
+        "latencyMs": 10986,
+        "costUsd": 0.008,
+        "metadata": {
+          "profileCount": 1,
+          "companyName": "IT Solutions Worldwide BV",
+          "companyUniversalName": "itsolutionsww"
+        }
+      },
+      "apollo": {
+        "url": "http://www.linkedin.com/company/shopify",
+        "latencyMs": 661,
+        "costUsd": 0,
+        "metadata": {
+          "orgCount": 3,
+          "matchedName": "Shopify"
+        }
+      },
+      "wikidata": {
+        "url": null,
+        "latencyMs": 674,
+        "costUsd": 0,
+        "metadata": {
+          "entityCount": 3,
+          "bindings": 0,
+          "qids": [
+            "Q7501150",
+            "Q105620580",
+            "Q107384438"
+          ]
+        }
+      },
+      "claude-web": {
+        "url": "https://www.linkedin.com/company/shopify",
+        "latencyMs": 21036,
+        "costUsd": 0.0715,
+        "metadata": {
+          "searches": 1
+        }
+      },
+      "website": {
+        "url": "https://www.linkedin.com/company/shopify/",
+        "latencyMs": 1481,
+        "costUsd": 0.001,
+        "metadata": {
+          "source": "https://www.shopify.com/"
+        }
+      }
+    },
+    "correctness": {
+      "sonnet": true,
+      "haiku": true,
+      "perplexity": false,
+      "serper": true,
+      "db": false,
+      "apify": false,
+      "apollo": true,
+      "wikidata": false,
+      "claude-web": true,
+      "website": true
+    }
+  },
+  {
+    "company": {
+      "name": "SpaceX",
+      "tier": "popular",
+      "expected": "https://www.linkedin.com/company/spacex"
+    },
+    "results": {
+      "sonnet": {
+        "url": "https://www.linkedin.com/company/spacex",
+        "latencyMs": 37795,
+        "costUsd": 0.000453
+      },
+      "haiku": {
+        "url": "https://www.linkedin.com/company/spacex",
+        "latencyMs": 1484,
+        "costUsd": 0.000176
+      },
+      "perplexity": {
+        "url": "https://www.linkedin.com/company/spacex",
+        "latencyMs": 1937,
+        "costUsd": 0.001
+      },
+      "serper": {
+        "url": "https://www.linkedin.com/company/ad-astra-school",
+        "latencyMs": 1997,
+        "costUsd": 0.001
+      },
+      "db": {
+        "url": null,
+        "latencyMs": 858,
+        "costUsd": 0,
+        "metadata": {
+          "matches": 0
+        }
+      },
+      "apify": {
+        "url": "https://www.linkedin.com/company/spacex/",
+        "latencyMs": 10135,
+        "costUsd": 0.008,
+        "metadata": {
+          "profileCount": 1,
+          "companyName": "SpaceX",
+          "companyUniversalName": "spacex"
+        }
+      },
+      "apollo": {
+        "url": "http://www.linkedin.com/company/spacex",
+        "latencyMs": 552,
+        "costUsd": 0,
+        "metadata": {
+          "orgCount": 3,
+          "matchedName": "SpaceX"
+        }
+      },
+      "wikidata": {
+        "url": null,
+        "latencyMs": 1480,
+        "costUsd": 0,
+        "metadata": {
+          "entityCount": 3,
+          "bindings": 0,
+          "qids": [
+            "Q193701",
+            "Q7572748",
+            "Q236448"
+          ]
+        }
+      },
+      "claude-web": {
+        "url": "https://www.linkedin.com/company/spacex",
+        "latencyMs": 42462,
+        "costUsd": 0.041785,
+        "metadata": {
+          "searches": 1
+        }
+      },
+      "website": {
+        "url": null,
+        "latencyMs": 2975,
+        "costUsd": 0.001,
+        "metadata": {
+          "candidates": 2
+        }
+      }
+    },
+    "correctness": {
+      "sonnet": true,
+      "haiku": true,
+      "perplexity": true,
+      "serper": false,
+      "db": false,
+      "apify": true,
+      "apollo": true,
+      "wikidata": false,
+      "claude-web": true,
+      "website": false
+    }
+  },
+  {
+    "company": {
+      "name": "Deloitte Consulting",
+      "tier": "consulting",
+      "expected": null,
+      "acceptable": [
+        "https://www.linkedin.com/showcase/deloitteconsulting/",
+        "https://www.linkedin.com/company/deloitte"
+      ],
+      "note": "Ambiguous — /showcase/ page vs parent /company/deloitte"
+    },
+    "results": {
+      "sonnet": {
+        "url": "https://www.linkedin.com/company/deloitte",
+        "latencyMs": 13240,
+        "costUsd": 0.000477
+      },
+      "haiku": {
+        "url": "https://www.linkedin.com/company/deloitte-consulting",
+        "latencyMs": 842,
+        "costUsd": 0.000194
+      },
+      "perplexity": {
+        "url": "https://www.linkedin.com/company/deloitte",
+        "latencyMs": 1430,
+        "costUsd": 0.001
+      },
+      "serper": {
+        "url": null,
+        "latencyMs": 1225,
+        "costUsd": 0.001
+      },
+      "db": {
+        "url": null,
+        "latencyMs": 1141,
+        "costUsd": 0,
+        "metadata": {
+          "matches": 0
+        }
+      },
+      "apify": {
+        "url": "https://www.linkedin.com/company/deloitte/",
+        "latencyMs": 8586,
+        "costUsd": 0.008,
+        "metadata": {
+          "profileCount": 1,
+          "companyName": "Deloitte Consulting",
+          "companyUniversalName": "deloitte"
+        }
+      },
+      "apollo": {
+        "url": "http://www.linkedin.com/company/next-consulting-srl",
+        "latencyMs": 306,
+        "costUsd": 0,
+        "metadata": {
+          "orgCount": 3,
+          "matchedName": "Deloitte Consulting"
+        }
+      },
+      "wikidata": {
+        "url": null,
+        "latencyMs": 271,
+        "costUsd": 0,
+        "metadata": {
+          "entityCount": 0
+        }
+      },
+      "claude-web": {
+        "url": "https://www.linkedin.com/showcase/deloitteconsulting/`",
+        "latencyMs": 19209,
+        "costUsd": 0.049591,
+        "metadata": {
+          "searches": 1
+        }
+      },
+      "website": {
+        "url": "https://www.linkedin.com/company/deloitte/",
+        "latencyMs": 4352,
+        "costUsd": 0.001,
+        "metadata": {
+          "source": "https://www.deloitte.com/us/en.html"
+        }
+      }
+    },
+    "correctness": {
+      "sonnet": true,
+      "haiku": false,
+      "perplexity": true,
+      "serper": false,
+      "db": false,
+      "apify": true,
+      "apollo": false,
+      "wikidata": false,
+      "claude-web": false,
+      "website": true
+    }
+  },
+  {
+    "company": {
+      "name": "EY-Parthenon",
+      "tier": "consulting",
+      "expected": "https://www.linkedin.com/company/ey-parthenon"
+    },
+    "results": {
+      "sonnet": {
+        "url": "https://www.linkedin.com/company/ey-parthenon",
+        "latencyMs": 19532,
+        "costUsd": 0.000525
+      },
+      "haiku": {
+        "url": "https://www.linkedin.com/company/ey-parthenon",
+        "latencyMs": 987,
+        "costUsd": 0.0002
+      },
+      "perplexity": {
+        "url": null,
+        "latencyMs": 1296,
+        "costUsd": 0.001
+      },
+      "serper": {
+        "url": "https://www.linkedin.com/company/ey-parthenon",
+        "latencyMs": 757,
+        "costUsd": 0.001
+      },
+      "db": {
+        "url": null,
+        "latencyMs": 441,
+        "costUsd": 0,
+        "metadata": {
+          "matches": 0
+        }
+      },
+      "apify": {
+        "url": "https://www.linkedin.com/company/ey-parthenon/",
+        "latencyMs": 11662,
+        "costUsd": 0.008,
+        "metadata": {
+          "profileCount": 1,
+          "companyName": "EY-Parthenon",
+          "companyUniversalName": "ey-parthenon"
+        }
+      },
+      "apollo": {
+        "url": "http://www.linkedin.com/company/ey-parthenon",
+        "latencyMs": 299,
+        "costUsd": 0,
+        "metadata": {
+          "orgCount": 3,
+          "matchedName": "EY-Parthenon"
+        }
+      },
+      "wikidata": {
+        "url": null,
+        "latencyMs": 357,
+        "costUsd": 0,
+        "metadata": {
+          "entityCount": 1,
+          "bindings": 0,
+          "qids": [
+            "Q65228261"
+          ]
+        }
+      },
+      "claude-web": {
+        "url": "https://www.linkedin.com/company/ey-parthenon",
+        "latencyMs": 25417,
+        "costUsd": 0.054184,
+        "metadata": {
+          "searches": 1
+        }
+      },
+      "website": {
+        "url": "https://www.linkedin.com/company/ey-parthenon/posts/?feedView=all",
+        "latencyMs": 1008,
+        "costUsd": 0.001,
+        "metadata": {
+          "source": "https://www.ey.com/en_us/services/strategy/parthenon"
+        }
+      }
+    },
+    "correctness": {
+      "sonnet": true,
+      "haiku": true,
+      "perplexity": false,
+      "serper": true,
+      "db": false,
+      "apify": true,
+      "apollo": true,
+      "wikidata": false,
+      "claude-web": true,
+      "website": false
+    }
+  },
+  {
+    "company": {
+      "name": "QuantumBlack, AI by McKinsey",
+      "tier": "consulting",
+      "expected": "https://www.linkedin.com/company/quantumblack",
+      "note": "Long branded name; slug is just quantumblack"
+    },
+    "results": {
+      "sonnet": {
+        "url": "https://www.linkedin.com/company/quantumblack",
+        "latencyMs": 22770,
+        "costUsd": 0.000507
+      },
+      "haiku": {
+        "url": "https://www.linkedin.com/company/quantumblack",
+        "latencyMs": 1063,
+        "costUsd": 0.000194
+      },
+      "perplexity": {
+        "url": null,
+        "latencyMs": 1611,
+        "costUsd": 0.001
+      },
+      "serper": {
+        "url": "https://uk.linkedin.com/company/quantumblack",
+        "latencyMs": 732,
+        "costUsd": 0.001
+      },
+      "db": {
+        "url": null,
+        "latencyMs": 406,
+        "costUsd": 0,
+        "metadata": {
+          "matches": 0
+        }
+      },
+      "apify": {
+        "url": "https://www.linkedin.com/company/mckinsey/",
+        "latencyMs": 9244,
+        "costUsd": 0.008,
+        "metadata": {
+          "profileCount": 1,
+          "companyName": "McKinsey & Company",
+          "companyUniversalName": "mckinsey"
+        }
+      },
+      "apollo": {
+        "url": "http://www.linkedin.com/company/quantumblack",
+        "latencyMs": 233,
+        "costUsd": 0,
+        "metadata": {
+          "orgCount": 1,
+          "matchedName": "QuantumBlack, AI by McKinsey"
+        }
+      },
+      "wikidata": {
+        "url": null,
+        "latencyMs": 159,
+        "costUsd": 0,
+        "metadata": {
+          "entityCount": 0
+        }
+      },
+      "claude-web": {
+        "url": "https://www.linkedin.com/company/quantumblack",
+        "latencyMs": 32235,
+        "costUsd": 0.047830000000000004,
+        "metadata": {
+          "searches": 1
+        }
+      },
+      "website": {
+        "url": null,
+        "latencyMs": 24829,
+        "costUsd": 0.001,
+        "metadata": {
+          "candidates": 3
+        }
+      }
+    },
+    "correctness": {
+      "sonnet": true,
+      "haiku": true,
+      "perplexity": false,
+      "serper": true,
+      "db": false,
+      "apify": false,
+      "apollo": true,
+      "wikidata": false,
+      "claude-web": true,
+      "website": false
+    }
+  },
+  {
+    "company": {
+      "name": "Metafora",
+      "tier": "obscure",
+      "expected": "https://www.linkedin.com/company/grow-with-metafora",
+      "note": "Unexpected slug — \"grow-with-metafora\" not \"metafora\""
+    },
+    "results": {
+      "sonnet": {
+        "url": null,
+        "latencyMs": 15292,
+        "costUsd": 0.000951
+      },
+      "haiku": {
+        "url": null,
+        "latencyMs": 2167,
+        "costUsd": 0.000442
+      },
+      "perplexity": {
+        "url": null,
+        "latencyMs": 1147,
+        "costUsd": 0.001
+      },
+      "serper": {
+        "url": "https://www.linkedin.com/school/metafora-studio-arts-y-arteterapia/",
+        "latencyMs": 753,
+        "costUsd": 0.001
+      },
+      "db": {
+        "url": null,
+        "latencyMs": 397,
+        "costUsd": 0,
+        "metadata": {
+          "matches": 0
+        }
+      },
+      "apify": {
+        "url": "https://www.linkedin.com/company/metafora-search/",
+        "latencyMs": 8761,
+        "costUsd": 0.008,
+        "metadata": {
+          "profileCount": 1,
+          "companyName": "Metafora Search",
+          "companyUniversalName": "metafora-search"
+        }
+      },
+      "apollo": {
+        "url": "http://www.linkedin.com/company/grow-with-metafora",
+        "latencyMs": 260,
+        "costUsd": 0,
+        "metadata": {
+          "orgCount": 3,
+          "matchedName": "Metafora"
+        }
+      },
+      "wikidata": {
+        "url": null,
+        "latencyMs": 287,
+        "costUsd": 0,
+        "metadata": {
+          "entityCount": 3,
+          "bindings": 0,
+          "qids": [
+            "Q111986145",
+            "Q102205630",
+            "Q29581149"
+          ]
+        }
+      },
+      "claude-web": {
+        "url": "https://www.linkedin.com/company/grow-with-metafora`",
+        "latencyMs": 20773,
+        "costUsd": 0.049102,
+        "metadata": {
+          "searches": 1
+        }
+      },
+      "website": {
+        "url": null,
+        "latencyMs": 2337,
+        "costUsd": 0.001,
+        "metadata": {
+          "candidates": 3
+        }
+      }
+    },
+    "correctness": {
+      "sonnet": false,
+      "haiku": false,
+      "perplexity": false,
+      "serper": false,
+      "db": false,
+      "apify": false,
+      "apollo": true,
+      "wikidata": false,
+      "claude-web": false,
+      "website": false
+    }
+  },
+  {
+    "company": {
+      "name": "Vooma",
+      "tier": "obscure",
+      "expected": "https://www.linkedin.com/company/vooma-inc",
+      "note": "Slug includes \"-inc\""
+    },
+    "results": {
+      "sonnet": {
+        "url": "https://www.linkedin.com/company/vooma",
+        "latencyMs": 19482,
+        "costUsd": 0.000453
+      },
+      "haiku": {
+        "url": null,
+        "latencyMs": 1026,
+        "costUsd": 0.000121
+      },
+      "perplexity": {
+        "url": null,
+        "latencyMs": 2064,
+        "costUsd": 0.001
+      },
+      "serper": {
+        "url": "https://www.linkedin.com/company/vooma-inc",
+        "latencyMs": 1872,
+        "costUsd": 0.001
+      },
+      "db": {
+        "url": null,
+        "latencyMs": 405,
+        "costUsd": 0,
+        "metadata": {
+          "matches": 0
+        }
+      },
+      "apify": {
+        "url": "https://www.linkedin.com/company/vooma-inc/",
+        "latencyMs": 9152,
+        "costUsd": 0.008,
+        "metadata": {
+          "profileCount": 1,
+          "companyName": "Vooma",
+          "companyUniversalName": "vooma-inc"
+        }
+      },
+      "apollo": {
+        "url": "http://www.linkedin.com/company/vooma-inc",
+        "latencyMs": 311,
+        "costUsd": 0,
+        "metadata": {
+          "orgCount": 3,
+          "matchedName": "Vooma"
+        }
+      },
+      "wikidata": {
+        "url": null,
+        "latencyMs": 146,
+        "costUsd": 0,
+        "metadata": {
+          "entityCount": 0
+        }
+      },
+      "claude-web": {
+        "url": "https://www.linkedin.com/company/vooma-inc",
+        "latencyMs": 24501,
+        "costUsd": 0.046672000000000005,
+        "metadata": {
+          "searches": 1
+        }
+      },
+      "website": {
+        "url": null,
+        "latencyMs": 1214,
+        "costUsd": 0.001,
+        "metadata": {
+          "candidates": 3
+        }
+      }
+    },
+    "correctness": {
+      "sonnet": false,
+      "haiku": false,
+      "perplexity": false,
+      "serper": true,
+      "db": false,
+      "apify": true,
+      "apollo": true,
+      "wikidata": false,
+      "claude-web": true,
+      "website": false
+    }
+  },
+  {
+    "company": {
+      "name": "Nominal",
+      "tier": "obscure",
+      "expected": "https://www.linkedin.com/company/nominal-inc",
+      "note": "Slug includes \"-inc\"; many companies named Nominal"
+    },
+    "results": {
+      "sonnet": {
+        "url": "https://www.linkedin.com/company/nominal",
+        "latencyMs": 18573,
+        "costUsd": 0.000435
+      },
+      "haiku": {
+        "url": null,
+        "latencyMs": 1810,
+        "costUsd": 0.000455
+      },
+      "perplexity": {
+        "url": "https://www.linkedin.com/company/nominal/",
+        "latencyMs": 1883,
+        "costUsd": 0.001
+      },
+      "serper": {
+        "url": "https://www.linkedin.com/company/nominal-inc",
+        "latencyMs": 863,
+        "costUsd": 0.001
+      },
+      "db": {
+        "url": null,
+        "latencyMs": 405,
+        "costUsd": 0,
+        "metadata": {
+          "matches": 0
+        }
+      },
+      "apify": {
+        "url": "https://www.linkedin.com/company/odin-dynamics/",
+        "latencyMs": 12127,
+        "costUsd": 0.008,
+        "metadata": {
+          "profileCount": 1,
+          "companyName": "Odin Dynamics, Inc",
+          "companyUniversalName": "odin-dynamics"
+        }
+      },
+      "apollo": {
+        "url": "http://www.linkedin.com/company/nominal-inc",
+        "latencyMs": 238,
+        "costUsd": 0,
+        "metadata": {
+          "orgCount": 3,
+          "matchedName": "Nominal"
+        }
+      },
+      "wikidata": {
+        "url": null,
+        "latencyMs": 286,
+        "costUsd": 0,
+        "metadata": {
+          "entityCount": 3,
+          "bindings": 0,
+          "qids": [
+            "Q114946227",
+            "Q74674960",
+            "Q503992"
+          ]
+        }
+      },
+      "claude-web": {
+        "url": "https://www.linkedin.com/company/nominal-inc",
+        "latencyMs": 25200,
+        "costUsd": 0.032269,
+        "metadata": {
+          "searches": 1
+        }
+      },
+      "website": {
+        "url": "https://www.linkedin.com/company/nominalinc/",
+        "latencyMs": 2024,
+        "costUsd": 0.001,
+        "metadata": {
+          "source": "https://www.nominal.so/"
+        }
+      }
+    },
+    "correctness": {
+      "sonnet": false,
+      "haiku": false,
+      "perplexity": false,
+      "serper": true,
+      "db": false,
+      "apify": false,
+      "apollo": true,
+      "wikidata": false,
+      "claude-web": true,
+      "website": false
+    }
+  },
+  {
+    "company": {
+      "name": "Saronic Technologies",
+      "tier": "obscure",
+      "expected": "https://www.linkedin.com/company/saronic-technologies"
+    },
+    "results": {
+      "sonnet": {
+        "url": "https://www.linkedin.com/company/saronic-technologies",
+        "latencyMs": 6218,
+        "costUsd": 0.000486
+      },
+      "haiku": {
+        "url": null,
+        "latencyMs": 814,
+        "costUsd": 0.000122
+      },
+      "perplexity": {
+        "url": "https://www.linkedin.com/company/saronic-technologies",
+        "latencyMs": 1171,
+        "costUsd": 0.001
+      },
+      "serper": {
+        "url": "https://www.linkedin.com/company/saronic-technologies",
+        "latencyMs": 805,
+        "costUsd": 0.001
+      },
+      "db": {
+        "url": null,
+        "latencyMs": 384,
+        "costUsd": 0,
+        "metadata": {
+          "matches": 0
+        }
+      },
+      "apify": {
+        "url": "https://www.linkedin.com/company/saronic-technologies/",
+        "latencyMs": 8625,
+        "costUsd": 0.008,
+        "metadata": {
+          "profileCount": 1,
+          "companyName": "Saronic Technologies",
+          "companyUniversalName": "saronic-technologies"
+        }
+      },
+      "apollo": {
+        "url": "http://www.linkedin.com/company/saronic-technologies",
+        "latencyMs": 279,
+        "costUsd": 0,
+        "metadata": {
+          "orgCount": 1,
+          "matchedName": "Saronic Technologies"
+        }
+      },
+      "wikidata": {
+        "url": null,
+        "latencyMs": 170,
+        "costUsd": 0,
+        "metadata": {
+          "entityCount": 0
+        }
+      },
+      "claude-web": {
+        "url": "https://www.linkedin.com/company/saronic-technologies",
+        "latencyMs": 12888,
+        "costUsd": 0.060292000000000005,
+        "metadata": {
+          "searches": 1
+        }
+      },
+      "website": {
+        "url": "https://www.linkedin.com/company/saronic-technologies",
+        "latencyMs": 1135,
+        "costUsd": 0.001,
+        "metadata": {
+          "source": "https://www.saronic.com/"
+        }
+      }
+    },
+    "correctness": {
+      "sonnet": true,
+      "haiku": false,
+      "perplexity": true,
+      "serper": true,
+      "db": false,
+      "apify": true,
+      "apollo": true,
+      "wikidata": false,
+      "claude-web": true,
+      "website": true
+    }
+  }
+]

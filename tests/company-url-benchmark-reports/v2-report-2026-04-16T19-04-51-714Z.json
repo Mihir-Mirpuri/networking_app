@@ -1,0 +1,187 @@
+[
+  {
+    "company": {
+      "name": "毕马威中国",
+      "tier": "foreign",
+      "expected": "https://cn.linkedin.com/company/kpmg-china",
+      "note": "Simplified Chinese; canonical URL is on cn.linkedin.com subdomain"
+    },
+    "results": {
+      "sonnet": {
+        "url": "https://www.linkedin.com/company/kpmg-china",
+        "latencyMs": 2776,
+        "costUsd": 0.001332
+      },
+      "haiku": {
+        "url": "https://www.linkedin.com/company/kpmg-china",
+        "latencyMs": 1211,
+        "costUsd": 0.000169
+      },
+      "perplexity": {
+        "url": "https://www.linkedin.com/company/kpmg-china",
+        "latencyMs": 1738,
+        "costUsd": 0.001
+      },
+      "serper": {
+        "url": "https://tw.linkedin.com/company/kpmg-china",
+        "latencyMs": 1113,
+        "costUsd": 0.001
+      },
+      "db": {
+        "url": null,
+        "latencyMs": 2612,
+        "costUsd": 0,
+        "metadata": {
+          "matches": 0
+        }
+      },
+      "apify": {
+        "url": "https://www.linkedin.com/company/kpmg-china/",
+        "latencyMs": 9264,
+        "costUsd": 0.008,
+        "metadata": {
+          "profileCount": 1,
+          "companyName": "毕马威中国",
+          "companyUniversalName": "kpmg-china"
+        }
+      },
+      "apollo": {
+        "url": null,
+        "latencyMs": 898,
+        "costUsd": 0,
+        "metadata": {
+          "orgCount": 0
+        }
+      },
+      "wikidata": {
+        "url": null,
+        "latencyMs": 292,
+        "costUsd": 0,
+        "metadata": {
+          "entityCount": 0
+        }
+      },
+      "claude-web": {
+        "url": "https://www.linkedin.com/company/kpmg-china",
+        "latencyMs": 3866,
+        "costUsd": 0.047914000000000005,
+        "metadata": {
+          "searches": 1
+        }
+      },
+      "website": {
+        "url": "http://linkedin.com/company/kpmg-china&#34;}}",
+        "latencyMs": 1738,
+        "costUsd": 0.001,
+        "metadata": {
+          "source": "https://kpmg.com/cn/zh.html"
+        }
+      }
+    },
+    "correctness": {
+      "sonnet": true,
+      "haiku": true,
+      "perplexity": true,
+      "serper": true,
+      "db": false,
+      "apify": true,
+      "apollo": false,
+      "wikidata": false,
+      "claude-web": true,
+      "website": false
+    }
+  },
+  {
+    "company": {
+      "name": "삼정KPMG",
+      "tier": "foreign",
+      "expected": "https://www.linkedin.com/company/samjong-kpmg",
+      "note": "Korean Hangul; slug is transliteration"
+    },
+    "results": {
+      "sonnet": {
+        "url": null,
+        "latencyMs": 2677,
+        "costUsd": 0.00138
+      },
+      "haiku": {
+        "url": "https://www.linkedin.com/company/samjung-kpmg",
+        "latencyMs": 1891,
+        "costUsd": 0.00018
+      },
+      "perplexity": {
+        "url": "https://www.linkedin.com/company/samjeong-kpmg/",
+        "latencyMs": 1724,
+        "costUsd": 0.001
+      },
+      "serper": {
+        "url": null,
+        "latencyMs": 1637,
+        "costUsd": 0.001
+      },
+      "db": {
+        "url": null,
+        "latencyMs": 341,
+        "costUsd": 0,
+        "metadata": {
+          "matches": 0
+        }
+      },
+      "apify": {
+        "url": "https://www.linkedin.com/company/samjong-kpmg/",
+        "latencyMs": 8699,
+        "costUsd": 0.008,
+        "metadata": {
+          "profileCount": 1,
+          "companyName": "삼정KPMG (KPMG Korea)",
+          "companyUniversalName": "samjong-kpmg"
+        }
+      },
+      "apollo": {
+        "url": "http://www.linkedin.com/company/kpmg",
+        "latencyMs": 331,
+        "costUsd": 0,
+        "metadata": {
+          "orgCount": 3,
+          "matchedName": "KPMG"
+        }
+      },
+      "wikidata": {
+        "url": null,
+        "latencyMs": 132,
+        "costUsd": 0,
+        "metadata": {
+          "entityCount": 0
+        }
+      },
+      "claude-web": {
+        "url": "https://www.linkedin.com/company/samjong-kpmg",
+        "latencyMs": 4448,
+        "costUsd": 0.068854,
+        "metadata": {
+          "searches": 1
+        }
+      },
+      "website": {
+        "url": "https://www.linkedin.com/company/samjong-kpmg/posts/?feedView=all&#34;}}",
+        "latencyMs": 833,
+        "costUsd": 0.001,
+        "metadata": {
+          "source": "https://kpmg.com/kr/ko.html"
+        }
+      }
+    },
+    "correctness": {
+      "sonnet": false,
+      "haiku": false,
+      "perplexity": false,
+      "serper": false,
+      "db": false,
+      "apify": true,
+      "apollo": false,
+      "wikidata": false,
+      "claude-web": true,
+      "website": false
+    }
+  }
+]
