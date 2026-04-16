@@ -42,6 +42,7 @@ export interface LinkedInSearchParams {
   yearsAtCurrentCompanyIds?: string[];
   seniorityLevelIds?: string[];
   functionIds?: string[];
+  industryIds?: string[];            // Curated subset — validated in sanitizer
   profileLanguages?: string[];
   companyHeadcount?: string[];
   companyHeadquarterLocations?: string[];
@@ -303,6 +304,7 @@ export async function searchLinkedInShort(
     ['yearsAtCurrentCompanyIds', 'yearsAtCurrentCompanyIds'],
     ['seniorityLevelIds', 'seniorityLevelIds'],
     ['functionIds', 'functionIds'],
+    ['industryIds', 'industryIds'],
     ['profileLanguages', 'profileLanguages'],
     ['companyHeadcount', 'companyHeadcount'],
     ['companyHeadquarterLocations', 'companyHeadquarterLocations'],
