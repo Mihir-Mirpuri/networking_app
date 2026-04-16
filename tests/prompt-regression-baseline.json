@@ -1,0 +1,423 @@
+[
+  {
+    "query": "software engineers at Google",
+    "status": "ready",
+    "linkedin_filters": {
+      "current_job_titles": [
+        "Software Engineer"
+      ]
+    },
+    "filters": {
+      "company": "Google",
+      "role": "Software Engineer",
+      "university": null,
+      "location": null
+    }
+  },
+  {
+    "query": "PMs at Stripe",
+    "status": "ready",
+    "linkedin_filters": {
+      "current_job_titles": [
+        "Product Manager"
+      ]
+    },
+    "filters": {
+      "company": "Stripe",
+      "role": "Product Manager",
+      "university": null,
+      "location": null
+    }
+  },
+  {
+    "query": "senior engineers at Uber",
+    "status": "ready",
+    "linkedin_filters": {
+      "current_job_titles": [
+        "Software Engineer"
+      ],
+      "exclude_seniority_level_ids": [
+        "110"
+      ]
+    },
+    "filters": {
+      "company": "Uber",
+      "role": "Software Engineer",
+      "university": null,
+      "location": null
+    }
+  },
+  {
+    "query": "staff engineers at Stripe",
+    "status": "ready",
+    "linkedin_filters": {
+      "current_job_titles": [
+        "Staff Software Engineer"
+      ],
+      "exclude_seniority_level_ids": [
+        "110"
+      ]
+    },
+    "filters": {
+      "company": "Stripe",
+      "role": "Staff Software Engineer",
+      "university": null,
+      "location": null
+    }
+  },
+  {
+    "query": "directors at Google",
+    "status": "ready",
+    "linkedin_filters": {
+      "seniority_level_ids": [
+        "220"
+      ]
+    },
+    "filters": {
+      "company": "Google",
+      "role": "Director",
+      "university": null,
+      "location": null
+    }
+  },
+  {
+    "query": "designers at Figma",
+    "status": "ready",
+    "linkedin_filters": {
+      "function_ids": [
+        "3"
+      ]
+    },
+    "filters": {
+      "company": "Figma",
+      "role": "Designer",
+      "university": null,
+      "location": null
+    }
+  },
+  {
+    "query": "lawyers at Cravath",
+    "status": "ready",
+    "linkedin_filters": {
+      "function_ids": [
+        "14"
+      ]
+    },
+    "filters": {
+      "company": "Cravath",
+      "role": "Lawyer",
+      "university": null,
+      "location": null
+    }
+  },
+  {
+    "query": "analysts at the FBI",
+    "status": "ready",
+    "linkedin_filters": {
+      "current_job_titles": [
+        "Analyst"
+      ]
+    },
+    "filters": {
+      "company": "FBI",
+      "role": "Analyst",
+      "university": null,
+      "location": null
+    }
+  },
+  {
+    "query": "people at McKinsey",
+    "status": "ready",
+    "linkedin_filters": {
+      "current_companies": [
+        "McKinsey"
+      ]
+    },
+    "filters": {
+      "company": "McKinsey",
+      "role": null,
+      "university": null,
+      "location": null
+    }
+  },
+  {
+    "query": "MIT grads at Stripe",
+    "status": "ready",
+    "linkedin_filters": {
+      "schools": [
+        "Massachusetts Institute of Technology"
+      ],
+      "current_companies": [
+        "Stripe"
+      ]
+    },
+    "filters": {
+      "company": "Stripe",
+      "role": null,
+      "university": "Massachusetts Institute of Technology",
+      "location": null
+    }
+  },
+  {
+    "query": "Brandon Rudy, director of broadcasting at Texas A&M",
+    "status": "person_lookup",
+    "linkedin_filters": {},
+    "filters": {
+      "company": null,
+      "role": null,
+      "university": null,
+      "location": null
+    }
+  },
+  {
+    "query": "consultants at MBB",
+    "status": "needs_selection",
+    "linkedin_filters": {},
+    "filters": {
+      "company": null,
+      "role": "Consultant",
+      "university": null,
+      "location": null
+    }
+  },
+  {
+    "query": "PhD data scientists at Google",
+    "status": "unsupported",
+    "linkedin_filters": {},
+    "filters": {
+      "company": "Google",
+      "role": "Data Scientist",
+      "university": null,
+      "location": null
+    }
+  },
+  {
+    "query": "remote engineers at Stripe",
+    "status": "unsupported",
+    "linkedin_filters": {},
+    "filters": {
+      "company": "Stripe",
+      "role": "Software Engineer",
+      "university": null,
+      "location": null
+    }
+  },
+  {
+    "query": "ML engineers making $200k+ in San Francisco",
+    "status": "unsupported",
+    "linkedin_filters": {},
+    "filters": {
+      "company": null,
+      "role": "Machine Learning Engineer",
+      "university": null,
+      "location": "San Francisco"
+    }
+  },
+  {
+    "query": "CFA holders at Goldman Sachs",
+    "status": "unsupported",
+    "linkedin_filters": {},
+    "filters": {
+      "company": "Goldman Sachs",
+      "role": null,
+      "university": null,
+      "location": null
+    }
+  },
+  {
+    "query": "CPA accountants at Deloitte",
+    "status": "unsupported",
+    "linkedin_filters": {},
+    "filters": {
+      "company": "Deloitte",
+      "role": "Accountant",
+      "university": null,
+      "location": null
+    }
+  },
+  {
+    "query": "engineers at Series B startups in Austin",
+    "status": "unsupported",
+    "linkedin_filters": {},
+    "filters": {
+      "company": null,
+      "role": "Software Engineer",
+      "university": null,
+      "location": "Austin"
+    }
+  },
+  {
+    "query": "people who know Python at Stripe",
+    "status": "unsupported",
+    "linkedin_filters": {},
+    "filters": {
+      "company": "Stripe",
+      "role": null,
+      "university": null,
+      "location": null
+    }
+  },
+  {
+    "query": "I am looking for internships as a finance analyst in chicago",
+    "status": "ready",
+    "linkedin_filters": {
+      "current_job_titles": [
+        "Financial Analyst"
+      ],
+      "locations": [
+        "Chicago"
+      ]
+    },
+    "filters": {
+      "company": null,
+      "role": "Financial Analyst",
+      "university": null,
+      "location": "Chicago"
+    }
+  },
+  {
+    "query": "trying to break into product management at Stripe",
+    "status": "ready",
+    "linkedin_filters": {
+      "current_job_titles": [
+        "Product Manager"
+      ]
+    },
+    "filters": {
+      "company": "Stripe",
+      "role": "Product Manager",
+      "university": null,
+      "location": null
+    }
+  },
+  {
+    "query": "how is the weather?",
+    "status": "off_topic",
+    "linkedin_filters": {},
+    "filters": {
+      "company": null,
+      "role": null,
+      "university": null,
+      "location": null
+    }
+  },
+  {
+    "query": "John",
+    "status": "off_topic",
+    "linkedin_filters": {},
+    "filters": {
+      "company": null,
+      "role": null,
+      "university": null,
+      "location": null
+    }
+  },
+  {
+    "query": "growth PMs at Airbnb",
+    "status": "ready",
+    "linkedin_filters": {
+      "current_job_titles": [
+        "Product Manager"
+      ]
+    },
+    "filters": {
+      "company": "Airbnb",
+      "role": "Product Manager",
+      "university": null,
+      "location": null
+    }
+  },
+  {
+    "query": "quants at Jane Street",
+    "status": "ready",
+    "linkedin_filters": {
+      "current_job_titles": [
+        "Quantitative Researcher"
+      ]
+    },
+    "filters": {
+      "company": "Jane Street",
+      "role": "Quantitative Researcher",
+      "university": null,
+      "location": null
+    }
+  },
+  {
+    "query": "TPMs at Meta",
+    "status": "ready",
+    "linkedin_filters": {
+      "current_job_titles": [
+        "Technical Program Manager"
+      ]
+    },
+    "filters": {
+      "company": "Meta",
+      "role": "Technical Program Manager",
+      "university": null,
+      "location": null
+    }
+  },
+  {
+    "query": "ex-Google engineers at Anthropic",
+    "status": "ready",
+    "linkedin_filters": {
+      "current_job_titles": [
+        "Software Engineer"
+      ],
+      "past_companies": [
+        "Google"
+      ]
+    },
+    "filters": {
+      "company": "Anthropic",
+      "role": "Software Engineer",
+      "university": null,
+      "location": null
+    }
+  },
+  {
+    "query": "recently joined PMs at OpenAI",
+    "status": "ready",
+    "linkedin_filters": {
+      "current_job_titles": [
+        "Product Manager"
+      ],
+      "recently_changed_jobs": true
+    },
+    "filters": {
+      "company": "OpenAI",
+      "role": "Product Manager",
+      "university": null,
+      "location": null
+    }
+  },
+  {
+    "query": "founders of AI startups",
+    "status": "unsupported",
+    "linkedin_filters": {},
+    "filters": {
+      "company": null,
+      "role": "Founder",
+      "university": null,
+      "location": null
+    }
+  },
+  {
+    "query": "CXOs at Salesforce",
+    "status": "ready",
+    "linkedin_filters": {
+      "current_companies": [
+        "Salesforce"
+      ],
+      "seniority_level_ids": [
+        "310"
+      ]
+    },
+    "filters": {
+      "company": "Salesforce",
+      "role": "CXO",
+      "university": null,
+      "location": null
+    }
+  }
+]
