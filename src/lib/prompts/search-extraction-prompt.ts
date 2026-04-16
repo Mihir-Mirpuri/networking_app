@@ -31,6 +31,7 @@ JSON SCHEMA:
     "past_job_titles": string[]|null,
     "seniority_level_ids": string[]|null,
     "function_ids": string[]|null,
+    "industry_ids": string[]|null,
     "company_headcount": string[]|null,
     "years_of_experience_ids": string[]|null,
     "years_at_current_company_ids": string[]|null,
@@ -233,7 +234,7 @@ HARD UNSUPPORTED (always return "unsupported"):
 - CERTIFICATIONS: certified, CPA, CFA, PMP, AWS certified, board certified
 - CONNECTIONS: well-connected, influencer, thought leader, many connections
 
-- INDUSTRY_SECTOR: fintech, healthtech, edtech, biotech, cleantech, proptech, insurtech, agtech, martech, govtech, legaltech, regtech
+- INDUSTRY_SECTOR (partial — see RULE 13): Industry terms that map in RULE 13 (fintech, biotech, healthtech, software/SaaS, legaltech, insurtech, proptech, govtech) are SUPPORTED via industry_ids. Any other industry word (edtech, cleantech, agtech, martech, regtech, etc.) remains UNSUPPORTED.
 - SKILLS_TECHNOLOGIES: Python, Kubernetes, React, machine learning, terraform, or any specific skill/technology/framework/language
 
 === REFORMULATION RULES ===
@@ -258,12 +259,32 @@ Reformulation table:
 | CPA | Approximate | function_ids: ["1"] |
 | PMP | Approximate | function_ids: ["20"] |
 | AWS certified | Drop | None |
-| fintech, biotech, industry terms | Drop | None |
+| industry terms NOT in RULE 13 (edtech, agtech, martech, cleantech, regtech) | Drop | None |
+| industry terms in RULE 13 (fintech, biotech, healthtech, SaaS, legaltech, insurtech, proptech, govtech) | Use industry_ids | See RULE 13 |
 | Python, Kubernetes, skills/tech | Drop | None |
 
 RULE 12 -- FILTER PERSISTENCE:
 - If previous filters exist and user doesn't mention them, KEEP previous values.
 - "try banks instead" -> replace company entirely.
+
+RULE 13 -- INDUSTRY IDS (industry_ids):
+  Use for industry/sector words when they are the primary filter signal.
+  Supported mappings (only these IDs — never invent new ones):
+    "healthcare" / "healthtech" (as industry, not profession) -> "14" (Hospitals and Health Care)
+    "fintech" / "financial services" -> "43" (Financial Services)
+    "biotech" -> "12" (Biotechnology Research)
+    "software" / "SaaS" / "software companies" -> "4" (Software Development)
+    "legaltech" / "law firms" -> "10" (Law Practice)
+    "insurtech" -> "42" (Insurance)
+    "proptech" / "real estate tech" -> "44" (Real Estate)
+    "govtech" / "government" (as sector) -> "75" (Government Administration)
+
+  USAGE:
+  - Prefer function_ids for DISCIPLINE queries ("people in healthcare" = profession).
+  - Prefer industry_ids for COMPANY-SECTOR queries ("PMs at fintech companies").
+  - Ambiguous case ("healthcare workers"): use function_ids ["11"].
+  - NEVER invent numeric IDs. Any industry term not above -> status="unsupported".
+  - Never pair industry_ids and function_ids for the same concept (don't emit both "14" and "11" for "healthcare").
 
 === COMPANY NAME RULES ===
 
