@@ -70,6 +70,7 @@ interface LLMResponse {
     past_job_titles?: string[];
     seniority_level_ids?: string[];
     function_ids?: string[];
+    industry_ids?: string[];
     company_headcount?: string[];
     years_of_experience_ids?: string[];
     years_at_current_company_ids?: string[];
@@ -124,6 +125,7 @@ function convertLinkedInFilters(raw: LLMResponse['linkedin_filters'] | undefined
   if (raw.past_job_titles?.length) result.pastJobTitles = raw.past_job_titles;
   if (raw.seniority_level_ids?.length) result.seniorityLevelIds = raw.seniority_level_ids;
   if (raw.function_ids?.length) result.functionIds = raw.function_ids;
+  if (raw.industry_ids?.length) result.industryIds = raw.industry_ids;
   if (raw.company_headcount?.length) result.companyHeadcount = raw.company_headcount;
   if (raw.years_of_experience_ids?.length) result.yearsOfExperienceIds = raw.years_of_experience_ids;
   if (raw.years_at_current_company_ids?.length) result.yearsAtCurrentCompanyIds = raw.years_at_current_company_ids;
