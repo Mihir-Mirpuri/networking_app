@@ -43,6 +43,7 @@ import {
   withLogger,
   APIFY_SHORT_COST_PER_PAGE,
 } from '@/lib/services/discovery-logger';
+import { shouldSkipApi, DB_FIRST_THRESHOLD } from '@/lib/services/search-threshold';
 
 
 export interface RecentSearch {
@@ -401,7 +402,7 @@ export type SearchActionV2Result = {
   error: string;
 };
 
-const DB_FIRST_THRESHOLD = 6; // If DB returns this many or more, skip API
+// DB_FIRST_THRESHOLD imported from @/lib/services/search-threshold
 
 /**
  * V2 Search Action — Natural language search with pre-parsed filters.
@@ -773,9 +774,15 @@ export async function searchPeopleV2Action(
       const dbStart = Date.now();
       let people = await findPeopleByFiltersV3(filters);
       dbResultCount = people.length;
-      console.log(`[SearchV2] DB returned ${dbResultCount} results in ${Date.now() - dbStart}ms`);
+      const skipApi = shouldSkipApi(people);
+      const strongMatchCount = people.filter(
+        p => p.matchTier === 'exact' || p.matchTier === 'near_exact'
+      ).length;
+      console.log(`[SearchV2] DB returned ${dbResultCount} results (${strongMatchCount} exact/near_exact) in ${Date.now() - dbStart}ms`);
       log.info('search-v2', 'DB query complete', {
         resultCount: dbResultCount,
+        strongMatchCount,
+        skipApi,
         durationMs: Date.now() - dbStart,
         aliasesUsed: companyAliases.length,
       });
@@ -788,11 +795,12 @@ export async function searchPeopleV2Action(
         template = { id: defaultTemplate.id, subject: defaultTemplate.subject, body: defaultTemplate.body, attachResume: false, resumeId: null };
       }
 
-      if (dbResultCount < DB_FIRST_THRESHOLD) {
+      if (!skipApi) {
         // ── LinkedIn fallback: show LinkedIn results directly (like advanced path) ──
-        console.log(`[SearchV2] DB has ${dbResultCount} results (< ${DB_FIRST_THRESHOLD}) — calling Short mode API`);
+        console.log(`[SearchV2] DB has ${strongMatchCount} strong matches (< ${DB_FIRST_THRESHOLD}, ${dbResultCount} total) — calling Short mode API`);
         log.decision('search-v2', 'DB insufficient — calling LinkedIn Short', {
           dbResultCount,
+          strongMatchCount,
           threshold: DB_FIRST_THRESHOLD,
         });
         const apiStart = Date.now();
@@ -880,11 +888,11 @@ export async function searchPeopleV2Action(
         results = await buildResultsWithDrafts(orderedPeople.slice(0, input.limit), userId, template, user);
         console.log(`[SearchV2] Built ${results.length} results with drafts in ${Date.now() - draftsStart2}ms`);
       } else {
-        // ── DB has enough results: use them directly, skip LinkedIn API ──
-        console.log(`[SearchV2] DB has ${dbResultCount} results (>= ${DB_FIRST_THRESHOLD}) — skipping API ($0 cost)`);
+        // ── DB has enough strong matches: use them directly, skip LinkedIn API ──
+        console.log(`[SearchV2] DB has ${strongMatchCount} strong matches (>= ${DB_FIRST_THRESHOLD}, ${dbResultCount} total) — skipping API ($0 cost)`);
         log.decision('search-v2', 'DB sufficient — skipping API', {
           dbResultCount,
-          threshold: DB_FIRST_THRESHOLD,
+          strongMatchCount,
           vectorActive: isVectorRoleMatchingEnabled() && !!dbFilters.role,
         });
 
