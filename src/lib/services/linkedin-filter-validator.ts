@@ -6,8 +6,9 @@
  * Company Headcount, Years of Experience). These IDs are accepted by the
  * Apify actor `harvestapi/linkedin-profile-search` in Short mode.
  *
- * Industry IDs are NOT validated here because industry-based filtering has
- * been removed from the discovery flow.
+ * Industry IDs are validated against VALID_INDUSTRY_IDS — a curated subset
+ * of LinkedIn's industry codes. The prompt's RULE 13 is the contract for
+ * which IDs may be emitted.
  *
  * To update: if LinkedIn/Apify adds new IDs, update
  * docs/APIFY_LINKEDIN_PROFILE_SEARCH.md first (source of truth), then mirror
@@ -84,6 +85,22 @@ export const VALID_YOE_IDS = new Set<string>(['1', '2', '3', '4', '5']);
 // Years at Current Company — same 1-5 scale as YoE
 export const VALID_YEARS_AT_COMPANY_IDS = new Set<string>(['1', '2', '3', '4', '5']);
 
+// Industry IDs — curated subset from
+// https://github.com/HarvestAPI/linkedin-industry-codes-v2/blob/main/linkedin_industry_code_v2_all_eng_with_header.csv
+// Only includes industries that RULE 13 in search-extraction-prompt.ts emits.
+// Each ID is verified against the authoritative CSV. To add more, verify the
+// ID in the CSV, then update BOTH this Set AND RULE 13 in the prompt.
+export const VALID_INDUSTRY_IDS = new Set<string>([
+  '4',    // Software Development
+  '10',   // Law Practice
+  '12',   // Biotechnology Research
+  '14',   // Hospitals and Health Care
+  '42',   // Insurance
+  '43',   // Financial Services
+  '44',   // Real Estate
+  '75',   // Government Administration
+]);
+
 /**
  * Filter a string array through an allowlist Set, logging any rejected values.
  * Rejected IDs are dropped — the rest pass through.
@@ -123,7 +140,7 @@ function filterValid(
  * - Unknown IDs are silently dropped (not thrown) and logged via `filterValid`
  * - If a field becomes empty after filtering, it is deleted from the output
  *   (so we never send `seniorityLevelIds: []` to Apify)
- * - `industryIds` is forcibly stripped — industry-based filtering is disabled
+ * - `industryIds` is validated against VALID_INDUSTRY_IDS (curated subset)
  * - Non-ID fields (searchQuery, locations, schools, etc.) pass through untouched
  */
 export function sanitizeLinkedInFilters(
@@ -211,8 +228,16 @@ export function sanitizeLinkedInFilters(
     }
   }
 
-  // ─── Industry (forcibly stripped — no longer supported) ────
-  if ('industryIds' in (result as Record<string, unknown>)) {
+  // ─── Industry ──────────────────────────────────────────────
+  if (raw.industryIds?.length) {
+    const valid = filterValid(raw.industryIds, VALID_INDUSTRY_IDS, 'industryIds');
+    if (valid.length) {
+      result.industryIds = valid;
+    } else {
+      delete result.industryIds;
+    }
+  } else if ('industryIds' in (result as Record<string, unknown>)) {
+    // Empty array or undefined — drop the key so we never send [] to Apify
     delete (result as Record<string, unknown>).industryIds;
   }
 
