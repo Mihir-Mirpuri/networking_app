@@ -281,8 +281,10 @@ export async function searchLinkedInShort(
   const startPage = params.startPage || 1;
 
   // Build actor input — only include defined params
+  // Default maxItems to 25 (one full page) since the Apify actor defaults to 10
   const actorInput: Record<string, unknown> = {
     profileScraperMode: 'Short',
+    maxItems: params.maxItems ?? 25 * takePages,
   };
 
   // Map our params to actor input (only set non-undefined values)
