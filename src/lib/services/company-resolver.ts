@@ -33,16 +33,13 @@ function normalizeCompanyName(name: string): string {
 
 /**
  * Ask Apollo for the LinkedIn company page URL.
- * Returns {url, billed}. `billed` is true iff Apollo returned HTTP 200
- * (so a credit was consumed, regardless of whether the search matched).
+ * Returns {url, billed}. billed=true iff HTTP 200 (credit consumed).
  */
 async function findCompanyLinkedInUrlViaApollo(
   companyName: string
 ): Promise<{ url: string | null; billed: boolean }> {
   const apiKey = process.env.APOLLO_API_KEY;
-  if (!apiKey) {
-    throw new Error('APOLLO_API_KEY not configured');
-  }
+  if (!apiKey) throw new Error('APOLLO_API_KEY not configured');
 
   const start = Date.now();
   try {
@@ -53,68 +50,28 @@ async function findCompanyLinkedInUrlViaApollo(
         'Content-Type': 'application/json',
         'X-Api-Key': apiKey,
       },
-      body: JSON.stringify({
-        q_organization_name: companyName,
-        page: 1,
-        per_page: 1,
-      }),
+      body: JSON.stringify({ q_organization_name: companyName, page: 1, per_page: 1 }),
     });
 
     if (!res.ok) {
-      await res.text().catch(() => {}); // drain body to release connection
-      const elapsed = Date.now() - start;
-      console.warn(`[CompanyResolver] Apollo HTTP ${res.status} for "${companyName}" (${elapsed}ms)`);
-      log.error('company-resolver', `Apollo HTTP ${res.status}`, { companyName, durationMs: elapsed });
+      console.warn(`[CompanyResolver] Apollo HTTP ${res.status} for "${companyName}"`);
       return { url: null, billed: false };
     }
 
-    let data: any;
-    try {
-      data = await res.json();
-    } catch {
-      const elapsed = Date.now() - start;
-      console.warn(`[CompanyResolver] Apollo returned malformed JSON for "${companyName}" (${elapsed}ms)`);
-      log.error('company-resolver', 'Apollo malformed JSON', { companyName, durationMs: elapsed });
-      return { url: null, billed: true }; // Apollo billed us (HTTP 200)
-    }
-
+    const data = await res.json();
     const elapsed = Date.now() - start;
-    const first = (data.organizations || [])[0];
-    const raw: string | undefined = first?.linkedin_url;
+    const raw: string | undefined = (data.organizations || [])[0]?.linkedin_url;
+    const url = raw ? raw.replace(/^http:\/\//, 'https://') : null;
 
-    if (!raw) {
-      console.log(`[CompanyResolver] Apollo no match for "${companyName}" (${elapsed}ms)`);
-      log.api('company-resolver', {
-        service: 'apollo',
-        endpoint: 'mixed_companies/search',
-        request: { companyName },
-        response: { url: null },
-        durationMs: elapsed,
-        costUsd: APOLLO_COST_PER_LOOKUP,
-      });
-      return { url: null, billed: true };
-    }
-
-    // Apollo returns http://www.linkedin.com/... — normalize to https://
-    const url = raw.replace(/^http:\/\//, 'https://');
-    console.log(`[CompanyResolver] Apollo resolved "${companyName}" → ${url} (${elapsed}ms)`);
+    console.log(`[CompanyResolver] Apollo: "${companyName}" → ${url || 'null'} (${elapsed}ms)`);
     log.api('company-resolver', {
-      service: 'apollo',
-      endpoint: 'mixed_companies/search',
-      request: { companyName },
-      response: { url, matchedName: first?.name },
-      durationMs: elapsed,
-      costUsd: APOLLO_COST_PER_LOOKUP,
+      service: 'apollo', endpoint: 'mixed_companies/search',
+      request: { companyName }, response: { url },
+      durationMs: elapsed, costUsd: APOLLO_COST_PER_LOOKUP,
     });
     return { url, billed: true };
   } catch (err) {
-    const elapsed = Date.now() - start;
-    const msg = err instanceof Error ? err.message : String(err);
-    console.warn(`[CompanyResolver] Apollo failed for "${companyName}" (${elapsed}ms): ${msg}`);
-    log.error('company-resolver', `Apollo failed for "${companyName}"`, {
-      durationMs: elapsed,
-      error: msg,
-    });
+    console.warn(`[CompanyResolver] Apollo failed for "${companyName}":`, err instanceof Error ? err.message : err);
     return { url: null, billed: false };
   }
 }
