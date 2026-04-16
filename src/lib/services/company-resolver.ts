@@ -1,27 +1,21 @@
 /**
  * Company Name → LinkedIn Company URL Resolver
  *
- * Uses Sonnet 4.6 to resolve company names to LinkedIn company page URLs.
- * Results are cached in the CompanyUrl DB table to avoid repeat lookups.
+ * Uses Apollo's /v1/mixed_companies/search endpoint to resolve company-name →
+ * LinkedIn-company-URL on cache miss. Results are cached in the CompanyUrl DB
+ * table to avoid repeat lookups.
  *
- * Flow: DB cache (free, instant) → Sonnet 4.6 (~$0.0002, ~1s) → cache result.
- * If Sonnet can't find it, the caller falls back to using the company name string.
+ * Flow: DB cache (free, instant) → Apollo (~$0.024, ~200ms) → cache result.
+ * If Apollo can't find it, the caller falls back to using the company name string.
+ *
+ * Swapped from Sonnet 4.6 on 2026-04-16 (see
+ * docs/superpowers/specs/2026-04-16-apollo-company-resolver-design.md).
+ * Apollo scored 84% in benchmark vs Sonnet's 72% with 3–5× lower latency.
  */
 
-import Anthropic from '@anthropic-ai/sdk';
 import prisma from '@/lib/prisma';
 import { log } from '@/lib/services/discovery-logger';
-
-let anthropicClient: Anthropic | null = null;
-
-function getAnthropicClient(): Anthropic {
-  if (!anthropicClient) {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
-    anthropicClient = new Anthropic({ apiKey });
-  }
-  return anthropicClient;
-}
+import { APOLLO_COST_PER_LOOKUP } from '@/lib/services/cost-logger';
 
 export interface CompanyResolveResult {
   url: string | null;
@@ -31,62 +25,98 @@ export interface CompanyResolveResult {
   };
 }
 
-const COST_PER_SONNET_CALL_CENTS = 0.02; // ~$0.0002
+const COST_PER_APOLLO_CALL_CENTS = APOLLO_COST_PER_LOOKUP * 100; // 2.4¢
 
 function normalizeCompanyName(name: string): string {
   return name.toLowerCase().trim();
 }
 
 /**
- * Ask Sonnet 4.6 for the LinkedIn company page URL.
- * Returns the URL or null if not found. ~1s latency, ~$0.0002/call.
+ * Ask Apollo for the LinkedIn company page URL.
+ * Returns {url, billed}. `billed` is true iff Apollo returned HTTP 200
+ * (so a credit was consumed, regardless of whether the search matched).
  */
-async function findCompanyLinkedInUrlViaSonnet(companyName: string): Promise<string | null> {
-  const client = getAnthropicClient();
+async function findCompanyLinkedInUrlViaApollo(
+  companyName: string
+): Promise<{ url: string | null; billed: boolean }> {
+  const apiKey = process.env.APOLLO_API_KEY;
+  if (!apiKey) {
+    throw new Error('APOLLO_API_KEY not configured');
+  }
+
   const start = Date.now();
-
   try {
-    const res = await client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 80,
-      temperature: 0,
-      messages: [{
-        role: 'user',
-        content: `LinkedIn company page URL for "${companyName}". Return ONLY: {"url":"https://www.linkedin.com/company/SLUG"} or {"url":null}`,
-      }],
+    const res = await fetch('https://api.apollo.io/v1/mixed_companies/search', {
+      method: 'POST',
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Content-Type': 'application/json',
+        'X-Api-Key': apiKey,
+      },
+      body: JSON.stringify({
+        q_organization_name: companyName,
+        page: 1,
+        per_page: 1,
+      }),
     });
-
-    const text = res.content[0].type === 'text' ? res.content[0].text : '';
-    const match = text.match(/https?:\/\/(www\.)?linkedin\.com\/company\/[a-zA-Z0-9_-]+/);
-    const url = match?.[0] || null;
 
     const elapsed = Date.now() - start;
-    console.log(`[CompanyResolver] Sonnet resolved "${companyName}" → ${url || 'null'} (${elapsed}ms)`);
+
+    if (!res.ok) {
+      console.warn(`[CompanyResolver] Apollo HTTP ${res.status} for "${companyName}" (${elapsed}ms)`);
+      log.error('company-resolver', `Apollo HTTP ${res.status}`, { companyName, durationMs: elapsed });
+      return { url: null, billed: false };
+    }
+
+    const data = await res.json();
+    const first = (data.organizations || [])[0];
+    const raw: string | undefined = first?.linkedin_url;
+
+    if (!raw) {
+      console.log(`[CompanyResolver] Apollo no match for "${companyName}" (${elapsed}ms)`);
+      log.api('company-resolver', {
+        service: 'apollo',
+        endpoint: 'mixed_companies/search',
+        request: { companyName },
+        response: { url: null },
+        durationMs: elapsed,
+        costUsd: APOLLO_COST_PER_LOOKUP,
+      });
+      return { url: null, billed: true };
+    }
+
+    // Apollo returns http://www.linkedin.com/... — normalize to https://
+    const url = raw.replace(/^http:\/\//, 'https://');
+    console.log(`[CompanyResolver] Apollo resolved "${companyName}" → ${url} (${elapsed}ms)`);
     log.api('company-resolver', {
-      service: 'anthropic-sonnet',
-      endpoint: 'resolveCompanyUrl',
+      service: 'apollo',
+      endpoint: 'mixed_companies/search',
       request: { companyName },
-      response: { url },
+      response: { url, matchedName: first?.name },
       durationMs: elapsed,
-      costUsd: COST_PER_SONNET_CALL_CENTS / 100,
+      costUsd: APOLLO_COST_PER_LOOKUP,
     });
-    return url;
+    return { url, billed: true };
   } catch (err) {
     const elapsed = Date.now() - start;
-    console.warn(`[CompanyResolver] Sonnet failed for "${companyName}" (${elapsed}ms):`, err instanceof Error ? err.message : err);
-    log.error('company-resolver', `Sonnet failed for "${companyName}"`, {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`[CompanyResolver] Apollo failed for "${companyName}" (${elapsed}ms): ${msg}`);
+    log.error('company-resolver', `Apollo failed for "${companyName}"`, {
       durationMs: elapsed,
-      error: err instanceof Error ? err.message : String(err),
+      error: msg,
     });
-    return null;
+    return { url: null, billed: false };
   }
 }
+
+// Test-only export for shadow script. Prefix `_` signals do-not-import from app code.
+export const _findCompanyLinkedInUrlViaApollo = findCompanyLinkedInUrlViaApollo;
 
 /**
  * Resolve a company name to its LinkedIn company page URL.
  *
  * 1. Check DB cache first (free)
- * 2. If not cached, ask Sonnet 4.6 (~$0.0002)
+ * 2. If not cached, ask Apollo (~$0.024)
  * 3. Cache the result for future lookups
  */
 export async function resolveCompanyUrl(
@@ -111,11 +141,15 @@ export async function resolveCompanyUrl(
       return { url: cached.url, cost: { llmCalls: 0, costCents: 0 } };
     }
   } catch (err) {
-    console.warn(`[CompanyResolver] Cache lookup failed for "${companyName}": ${err instanceof Error ? err.message : 'unknown'}`);
+    console.warn(
+      `[CompanyResolver] Cache lookup failed for "${companyName}": ${
+        err instanceof Error ? err.message : 'unknown'
+      }`
+    );
   }
 
-  // 2. Ask Sonnet 4.6
-  const url = await findCompanyLinkedInUrlViaSonnet(companyName);
+  // 2. Ask Apollo
+  const { url, billed } = await findCompanyLinkedInUrlViaApollo(companyName);
 
   if (url) {
     // 3. Cache the result
@@ -126,7 +160,11 @@ export async function resolveCompanyUrl(
         update: { url },
       });
     } catch (err) {
-      console.warn(`[CompanyResolver] Failed to cache "${companyName}": ${err instanceof Error ? err.message : 'unknown'}`);
+      console.warn(
+        `[CompanyResolver] Failed to cache "${companyName}": ${
+          err instanceof Error ? err.message : 'unknown'
+        }`
+      );
     }
   } else {
     console.warn(`[CompanyResolver] No LinkedIn URL found for "${companyName}"`);
@@ -136,20 +174,25 @@ export async function resolveCompanyUrl(
   return {
     url,
     cost: {
-      llmCalls: 1,
-      costCents: COST_PER_SONNET_CALL_CENTS,
+      llmCalls: billed ? 1 : 0,
+      costCents: billed ? COST_PER_APOLLO_CALL_CENTS : 0,
     },
   };
 }
 
 /**
  * Batch resolve multiple company names.
- * Checks cache first, then resolves uncached names via Sonnet.
+ * Checks cache first, then resolves uncached names via Apollo.
  */
 export async function resolveCompanyLinkedInUrls(
   companyNames: string[]
-): Promise<{ urls: Map<string, string | null>; cost: { llmCalls: number; costCents: number } }> {
-  console.log(`[CompanyResolver] Batch resolving ${companyNames.length} companies: ${companyNames.join(', ')}`);
+): Promise<{
+  urls: Map<string, string | null>;
+  cost: { llmCalls: number; costCents: number };
+}> {
+  console.log(
+    `[CompanyResolver] Batch resolving ${companyNames.length} companies: ${companyNames.join(', ')}`
+  );
   const urls = new Map<string, string | null>();
   let totalLlmCalls = 0;
 
@@ -160,13 +203,15 @@ export async function resolveCompanyLinkedInUrls(
   }
 
   const resolved = Array.from(urls.entries()).filter(([, v]) => v !== null).length;
-  console.log(`[CompanyResolver] Batch complete — ${resolved}/${companyNames.length} resolved, ${totalLlmCalls} Sonnet calls`);
+  console.log(
+    `[CompanyResolver] Batch complete — ${resolved}/${companyNames.length} resolved, ${totalLlmCalls} Apollo calls`
+  );
 
   return {
     urls,
     cost: {
       llmCalls: totalLlmCalls,
-      costCents: totalLlmCalls * COST_PER_SONNET_CALL_CENTS,
+      costCents: totalLlmCalls * COST_PER_APOLLO_CALL_CENTS,
     },
   };
 }
