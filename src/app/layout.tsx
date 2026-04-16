@@ -3,6 +3,7 @@ import { GeistSans } from 'geist/font/sans';
 import { Outfit } from 'next/font/google';
 import './globals.css';
 import { Providers } from '@/components/Providers';
+import { EmbeddedBrowserWarning } from '@/components/EmbeddedBrowserWarning';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
@@ -53,6 +54,7 @@ export default async function RootLayout({
     <html lang="en">
       <body className={`${GeistSans.className} ${outfit.variable}`} data-theme={theme}>
         <Providers>
+          <EmbeddedBrowserWarning />
           {children}
         </Providers>
       </body>
