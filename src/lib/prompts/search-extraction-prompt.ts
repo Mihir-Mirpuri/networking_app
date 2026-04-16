@@ -54,6 +54,18 @@ JSON SCHEMA:
   "message": string
 }
 
+=== INTERPRETATION NOTE ===
+
+This is a NETWORKING app. Users often phrase queries from their own perspective
+("I'm looking for internships as a [role] in [city]", "I want a job as [role] at [company]",
+"trying to get into [role] at [company]", "hoping to break into [industry] in [city]").
+These are ALWAYS networking requests — the user wants to find PEOPLE in those
+roles/companies/locations so they can reach out. Strip the first-person framing
+and extract role/company/location as normal filters. Do NOT classify these as off_topic.
+
+Only classify as off_topic when the query contains NO extractable role, company,
+location, university, or function (e.g. "how is the weather?", "what's for lunch").
+
 === STATUS DECISION TREE ===
 
 1. Does the user name a SPECIFIC PERSON with first AND last name?
@@ -297,6 +309,12 @@ User: "people who know Python and Kubernetes at Stripe"
 
 User: "MIT grads at Stripe"
 {"status":"ready","confidence":"high","role_specificity":"standard","filters":{"company":"Stripe","role":null,"university":"Massachusetts Institute of Technology","location":null},"linkedin_filters":{"schools":["Massachusetts Institute of Technology"]},"company_name_ambiguous":false,"person_name":null,"person_company":null,"unsupported_criteria":null,"suggested_alternative":null,"selectables":[],"suggested_searches":[],"message":"Searching for MIT alumni at Stripe"}
+
+User: "I am looking for internships as a finance analyst in chicago"
+{"status":"ready","confidence":"high","role_specificity":"standard","filters":{"company":null,"role":"Financial Analyst","university":null,"location":"Chicago"},"linkedin_filters":{"current_job_titles":["Financial Analyst"],"locations":["Chicago"]},"company_name_ambiguous":false,"person_name":null,"person_company":null,"unsupported_criteria":null,"suggested_alternative":null,"selectables":[],"suggested_searches":[{"label":"Finance analysts at JPMorgan","company":"JPMorgan","role":"Financial Analyst"},{"label":"Finance analysts at Goldman Sachs","company":"Goldman Sachs","role":"Financial Analyst"}],"message":"Searching for financial analysts in Chicago"}
+
+User: "trying to break into product management at Stripe"
+{"status":"ready","confidence":"high","role_specificity":"standard","filters":{"company":"Stripe","role":"Product Manager","university":null,"location":null},"linkedin_filters":{"current_job_titles":["Product Manager"]},"company_name_ambiguous":false,"person_name":null,"person_company":null,"unsupported_criteria":null,"suggested_alternative":null,"selectables":[],"suggested_searches":[{"label":"PMs at Google","company":"Google","role":"Product Manager"}],"message":"Searching for Product Managers at Stripe"}
 
 User: "how is the weather?"
 {"status":"off_topic","confidence":"high","filters":{"company":null,"role":null,"university":null,"location":null},"linkedin_filters":{},"company_name_ambiguous":false,"person_name":null,"person_company":null,"unsupported_criteria":null,"suggested_alternative":null,"selectables":[],"suggested_searches":[],"message":"I help you find professional contacts! Try 'software engineers at Google' or 'PMs at Stripe'."}
