@@ -17,6 +17,7 @@ export interface LinkedInFilters {
   pastJobTitles?: string[];
   seniorityLevelIds?: string[];
   functionIds?: string[];
+  industryIds?: string[];             // Curated subset — see VALID_INDUSTRY_IDS
   companyHeadcount?: string[];
   yearsOfExperienceIds?: string[];
   yearsAtCurrentCompanyIds?: string[];
