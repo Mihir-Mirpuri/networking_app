@@ -82,7 +82,33 @@ location, university, or function (e.g. "how is the weather?", "what's for lunch
 
 2. Does the user name a SPECIFIC company (real, named entity)?
    YES -> Go to 2.5.
-   NO -> Go to 3.
+   NO  -> Go to 2A (company-less filter check).
+
+2A. COMPANY-LESS FILTER CHECK
+    Does the query contain at least one PRIMARY SIGNAL from this list?
+    A primary signal is a role/discipline/industry/school — NOT a
+    location or seniority alone.
+    PRIMARY SIGNALS (need >=1):
+    - Discipline word (engineers, designers, salespeople, healthcare
+      workers, lawyers, marketers, recruiters, finance people,
+      consultants, researchers, biz dev) -> function_ids (RULE 1)
+    - Named job title (Software Engineer, Product Manager, Doctor,
+      Nurse, Lawyer, Data Scientist, etc.) -> current_job_titles (RULE 1)
+    - Industry/sector term (fintech, biotech, healthtech, etc.)
+      -> industry_ids (RULE 13)
+    - School (alumni queries, e.g. "MIT grads", "Stanford alumni")
+      -> schools
+    MODIFIERS (may be combined with a primary signal, cannot stand alone):
+    - location, seniority, company_headcount, years_of_experience,
+      recently_changed_jobs
+
+    If ANY primary signal present:
+      -> Go to 2.5 (unsupported-criteria check) with company=null.
+         If no unsupported criteria: status="ready". Emit the extracted
+         filters. STOP.
+    If NO primary signal (e.g. "people in Austin" = location only,
+    or "find people" = nothing):
+      -> Go to 3.
 
 2.5. Does the request contain UNSUPPORTED CRITERIA? (See UNSUPPORTED CRITERIA LIST below.)
    Check each word/phrase against the list. Two outcomes:
@@ -119,6 +145,18 @@ USE function_ids ONLY (role_specificity: "broad") for DISCIPLINE WORDS -- these 
 NEVER set both current_job_titles AND function_ids for the same role.
 
 Title precision note: Distinctive titles ("Data Scientist", "Designer", "Analyst") match tightly (~100%). Common-substring titles ("Product Manager") leak ~15% to variants like "Product Marketing Manager". This is expected.
+
+Company-less discipline queries: When the query has no company, emit
+function_ids for pure discipline words or current_job_titles for named
+roles — follow the title-vs-discipline split above unchanged. Do NOT
+invent a company. filters.company stays null. NEVER emit both for the
+same role.
+  - "find people in healthcare" -> function_ids: ["11"], role: null, company: null, role_specificity: "broad"
+  - "healthcare workers" -> function_ids: ["11"], role: null, company: null, role_specificity: "broad"
+  - "doctors" -> current_job_titles: ["Doctor"], company: null, role_specificity: "standard" (named title)
+  - "nurses in NYC" -> current_job_titles: ["Nurse"], locations: ["New York"], company: null
+  - "engineers in Austin" -> function_ids: ["8"], locations: ["Austin"], company: null, role_specificity: "broad"
+  - "designers in SF" -> function_ids: ["3"], locations: ["San Francisco"], company: null, role_specificity: "broad"
 
 RULE 2 -- LOCATION:
 - Use FULL names only. Abbreviations unreliable ("CA" matches Canada).
