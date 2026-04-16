@@ -1,0 +1,496 @@
+{
+  "phaseA": [
+    {
+      "name": "epaypolicy",
+      "cachedUrl": "https://www.linkedin.com/company/epaypolicy",
+      "apolloUrl": "https://www.linkedin.com/company/epaypolicy",
+      "status": "agree",
+      "billed": true,
+      "elapsed": 232
+    },
+    {
+      "name": "fanduel",
+      "cachedUrl": "https://www.linkedin.com/company/fanduel",
+      "apolloUrl": "https://www.linkedin.com/company/fanduel",
+      "status": "agree",
+      "billed": true,
+      "elapsed": 178
+    },
+    {
+      "name": "intel",
+      "cachedUrl": "https://www.linkedin.com/company/intel-corporation",
+      "apolloUrl": "https://www.linkedin.com/company/intel-corporation",
+      "status": "agree",
+      "billed": true,
+      "elapsed": 164
+    },
+    {
+      "name": "wilson sporting goods",
+      "cachedUrl": "https://www.linkedin.com/company/wilson-sporting-goods",
+      "apolloUrl": "https://www.linkedin.com/company/wilson-sporting-goods",
+      "status": "agree",
+      "billed": true,
+      "elapsed": 182
+    },
+    {
+      "name": "fanatics",
+      "cachedUrl": "https://www.linkedin.com/company/fanatics-inc-",
+      "apolloUrl": "https://www.linkedin.com/company/fanatics-inc-",
+      "status": "agree",
+      "billed": true,
+      "elapsed": 168
+    },
+    {
+      "name": "jb hunt transport services",
+      "cachedUrl": "https://www.linkedin.com/company/jb-hunt-transport-services-inc",
+      "apolloUrl": "https://www.linkedin.com/company/jb-hunt-transport-services-inc",
+      "status": "agree",
+      "billed": true,
+      "elapsed": 184
+    },
+    {
+      "name": "end game",
+      "cachedUrl": "https://www.linkedin.com/company/endgame",
+      "apolloUrl": "https://www.linkedin.com/company/endgameinmind",
+      "status": "disagree",
+      "billed": true,
+      "elapsed": 190
+    },
+    {
+      "name": "evidence action",
+      "cachedUrl": "https://www.linkedin.com/company/evidence-action",
+      "apolloUrl": "https://www.linkedin.com/company/evidence-action",
+      "status": "agree",
+      "billed": true,
+      "elapsed": 262
+    },
+    {
+      "name": "boardroom partners inc.",
+      "cachedUrl": "https://www.linkedin.com/company/boardroom-partners",
+      "apolloUrl": "https://www.linkedin.com/company/boardroom-partners",
+      "status": "agree",
+      "billed": true,
+      "elapsed": 161
+    },
+    {
+      "name": "conceptual interiors",
+      "cachedUrl": "https://www.linkedin.com/company/conceptual-interiors",
+      "apolloUrl": "https://www.linkedin.com/company/conceptual-interiors",
+      "status": "agree",
+      "billed": true,
+      "elapsed": 183
+    },
+    {
+      "name": "weatherstone capital partners",
+      "cachedUrl": "https://www.linkedin.com/company/weatherstone-capital-partners",
+      "apolloUrl": "https://www.linkedin.com/company/weatherstone-capital-partners",
+      "status": "agree",
+      "billed": true,
+      "elapsed": 190
+    },
+    {
+      "name": "texas a&m consulting group (tacg)",
+      "cachedUrl": "https://www.linkedin.com/company/texas-a-m-consulting-group-tacg",
+      "apolloUrl": "https://www.linkedin.com/company/texas-a-m-consulting-group-tacg",
+      "status": "agree",
+      "billed": true,
+      "elapsed": 233
+    },
+    {
+      "name": "national equity fund",
+      "cachedUrl": "https://www.linkedin.com/company/national-equity-fund",
+      "apolloUrl": "https://www.linkedin.com/company/national-equity-fund",
+      "status": "agree",
+      "billed": true,
+      "elapsed": 163
+    },
+    {
+      "name": "h&r block",
+      "cachedUrl": "https://www.linkedin.com/company/h&r-block",
+      "apolloUrl": "https://www.linkedin.com/company/h&r-block",
+      "status": "agree",
+      "billed": true,
+      "elapsed": 182
+    },
+    {
+      "name": "hydro flask emea",
+      "cachedUrl": "https://www.linkedin.com/company/hydro-flask",
+      "apolloUrl": null,
+      "status": "apollo_null",
+      "billed": true,
+      "elapsed": 179
+    },
+    {
+      "name": "rula",
+      "cachedUrl": "https://www.linkedin.com/company/rulahealth",
+      "apolloUrl": "https://www.linkedin.com/company/rulahealth",
+      "status": "agree",
+      "billed": true,
+      "elapsed": 175
+    },
+    {
+      "name": "khiladipro",
+      "cachedUrl": "https://www.linkedin.com/company/khiladipro",
+      "apolloUrl": "https://www.linkedin.com/company/khiladipro",
+      "status": "agree",
+      "billed": true,
+      "elapsed": 255
+    },
+    {
+      "name": "insider loops",
+      "cachedUrl": "https://www.linkedin.com/company/insider-loops",
+      "apolloUrl": "https://www.linkedin.com/company/insider-loops",
+      "status": "agree",
+      "billed": true,
+      "elapsed": 143
+    },
+    {
+      "name": "quantum capital group",
+      "cachedUrl": "https://www.linkedin.com/company/quantum-energy-partners",
+      "apolloUrl": "https://www.linkedin.com/company/quantum-energy-partners",
+      "status": "agree",
+      "billed": true,
+      "elapsed": 140
+    },
+    {
+      "name": "salesforce recruiters",
+      "cachedUrl": "https://www.linkedin.com/company/sales-force-recruiters",
+      "apolloUrl": "https://www.linkedin.com/company/sales-force-recruiters",
+      "status": "agree",
+      "billed": true,
+      "elapsed": 147
+    },
+    {
+      "name": "briefcatch",
+      "cachedUrl": "https://www.linkedin.com/company/briefcatch",
+      "apolloUrl": "https://www.linkedin.com/company/briefcatch",
+      "status": "agree",
+      "billed": true,
+      "elapsed": 213
+    },
+    {
+      "name": "odd roots coffee",
+      "cachedUrl": "https://www.linkedin.com/company/odd-beans",
+      "apolloUrl": null,
+      "status": "apollo_null",
+      "billed": true,
+      "elapsed": 131
+    },
+    {
+      "name": "covenant review",
+      "cachedUrl": "https://www.linkedin.com/company/covenant-review",
+      "apolloUrl": "https://www.linkedin.com/company/covenant-review",
+      "status": "agree",
+      "billed": true,
+      "elapsed": 159
+    },
+    {
+      "name": "pusat pelaporan dan analisis transaksi keuangan",
+      "cachedUrl": "https://www.linkedin.com/company/pusat-pelaporan-dan-analisis-transaksi-keuangan-ppatk",
+      "apolloUrl": "https://www.linkedin.com/company/pusat-pelaporan-dan-analisis-transaksi-keuangan-ppatk",
+      "status": "agree",
+      "billed": true,
+      "elapsed": 216
+    },
+    {
+      "name": "ami",
+      "cachedUrl": "https://www.linkedin.com/company/ami",
+      "apolloUrl": "https://www.linkedin.com/company/ami-paris",
+      "status": "disagree",
+      "billed": true,
+      "elapsed": 244
+    },
+    {
+      "name": "finnimo",
+      "cachedUrl": "https://www.linkedin.com/company/finnimo",
+      "apolloUrl": "https://www.linkedin.com/company/finnimo",
+      "status": "agree",
+      "billed": true,
+      "elapsed": 138
+    },
+    {
+      "name": "ford motor company",
+      "cachedUrl": "https://www.linkedin.com/company/ford-motor-company",
+      "apolloUrl": "https://www.linkedin.com/company/ford-motor-company",
+      "status": "agree",
+      "billed": true,
+      "elapsed": 151
+    },
+    {
+      "name": "j. b. hunt transport",
+      "cachedUrl": "https://www.linkedin.com/company/jb-hunt-transport-services-inc",
+      "apolloUrl": "https://www.linkedin.com/company/j-b-hunt-transportation",
+      "status": "disagree",
+      "billed": true,
+      "elapsed": 251
+    },
+    {
+      "name": "alliance consumer growth (acg)",
+      "cachedUrl": "https://www.linkedin.com/company/alliance-consumer-growth",
+      "apolloUrl": "https://www.linkedin.com/company/alliance-consumer-growth-llc",
+      "status": "disagree",
+      "billed": true,
+      "elapsed": 165
+    },
+    {
+      "name": "lakeshore learning materials",
+      "cachedUrl": "https://www.linkedin.com/company/lakeshore-learning-materials",
+      "apolloUrl": "https://www.linkedin.com/company/lakeshore-learning-materials",
+      "status": "agree",
+      "billed": true,
+      "elapsed": 154
+    },
+    {
+      "name": "denim lounge",
+      "cachedUrl": "https://www.linkedin.com/company/denim-lounge",
+      "apolloUrl": "https://www.linkedin.com/company/denim-lounge-tekstil-ticaret-limited-%c5%9firketi",
+      "status": "disagree",
+      "billed": true,
+      "elapsed": 139
+    },
+    {
+      "name": "extraordinary women on boards",
+      "cachedUrl": "https://www.linkedin.com/company/extraordinary-women-on-boards",
+      "apolloUrl": "https://www.linkedin.com/company/extraordinary-women-on-boards",
+      "status": "agree",
+      "billed": true,
+      "elapsed": 142
+    },
+    {
+      "name": "dgp capital",
+      "cachedUrl": "https://www.linkedin.com/company/dgp-capital",
+      "apolloUrl": "https://www.linkedin.com/company/dgp-capital",
+      "status": "agree",
+      "billed": true,
+      "elapsed": 174
+    },
+    {
+      "name": "zs",
+      "cachedUrl": "https://www.linkedin.com/company/zs-associates",
+      "apolloUrl": "https://www.linkedin.com/company/zs-associates",
+      "status": "agree",
+      "billed": true,
+      "elapsed": 157
+    },
+    {
+      "name": "empwr mvmnt",
+      "cachedUrl": "https://www.linkedin.com/company/empwr-mvmnt",
+      "apolloUrl": "https://www.linkedin.com/company/empwr-mvmnt",
+      "status": "agree",
+      "billed": true,
+      "elapsed": 131
+    },
+    {
+      "name": "gm consulting",
+      "cachedUrl": "https://www.linkedin.com/company/gmconsultinggroupllc",
+      "apolloUrl": "https://www.linkedin.com/company/gm-consulting-srl",
+      "status": "disagree",
+      "billed": true,
+      "elapsed": 168
+    },
+    {
+      "name": "mvmnt pros",
+      "cachedUrl": "https://www.linkedin.com/company/mvmnt-pros",
+      "apolloUrl": null,
+      "status": "apollo_null",
+      "billed": true,
+      "elapsed": 123
+    },
+    {
+      "name": "carpion private wealth",
+      "cachedUrl": "https://www.linkedin.com/company/carpion-private-wealth",
+      "apolloUrl": "https://www.linkedin.com/company/carpion-private-wealth",
+      "status": "agree",
+      "billed": true,
+      "elapsed": 189
+    },
+    {
+      "name": "annalex capital",
+      "cachedUrl": "https://www.linkedin.com/company/annaly-capital-management",
+      "apolloUrl": null,
+      "status": "apollo_null",
+      "billed": true,
+      "elapsed": 136
+    },
+    {
+      "name": "archdiocese of galveston-houston",
+      "cachedUrl": "https://www.linkedin.com/company/archgh",
+      "apolloUrl": "https://www.linkedin.com/company/archgh",
+      "status": "agree",
+      "billed": true,
+      "elapsed": 141
+    },
+    {
+      "name": "fanduel sports network",
+      "cachedUrl": "https://www.linkedin.com/company/fanduel-sports-network",
+      "apolloUrl": "https://www.linkedin.com/company/fanduel-sports-network",
+      "status": "agree",
+      "billed": true,
+      "elapsed": 121
+    },
+    {
+      "name": "sap",
+      "cachedUrl": "https://www.linkedin.com/company/sap",
+      "apolloUrl": "https://www.linkedin.com/company/sap",
+      "status": "agree",
+      "billed": true,
+      "elapsed": 159
+    },
+    {
+      "name": "michael & susan dell foundation",
+      "cachedUrl": "https://www.linkedin.com/company/dellfoundation",
+      "apolloUrl": "https://www.linkedin.com/company/dellfoundation",
+      "status": "agree",
+      "billed": true,
+      "elapsed": 166
+    },
+    {
+      "name": "archer",
+      "cachedUrl": "https://www.linkedin.com/company/archer-integrated-risk-management",
+      "apolloUrl": "https://www.linkedin.com/company/flyarcher",
+      "status": "disagree",
+      "billed": true,
+      "elapsed": 145
+    },
+    {
+      "name": "confido",
+      "cachedUrl": "https://www.linkedin.com/company/confidotech",
+      "apolloUrl": "https://www.linkedin.com/company/confidotech",
+      "status": "agree",
+      "billed": true,
+      "elapsed": 134
+    },
+    {
+      "name": "apple",
+      "cachedUrl": "https://www.linkedin.com/company/apple",
+      "apolloUrl": null,
+      "status": "apollo_null",
+      "billed": true,
+      "elapsed": 150
+    },
+    {
+      "name": "glendon capital management lp",
+      "cachedUrl": "https://www.linkedin.com/company/glendon-capital-management",
+      "apolloUrl": "https://www.linkedin.com/company/glendon-capital-management",
+      "status": "agree",
+      "billed": true,
+      "elapsed": 132
+    },
+    {
+      "name": "kpmg us",
+      "cachedUrl": "https://www.linkedin.com/company/kpmg-us",
+      "apolloUrl": "https://www.linkedin.com/company/kpmg-us",
+      "status": "agree",
+      "billed": true,
+      "elapsed": 127
+    },
+    {
+      "name": "silicon labs",
+      "cachedUrl": "https://www.linkedin.com/company/siliconlabs",
+      "apolloUrl": "https://www.linkedin.com/company/siliconlabs",
+      "status": "agree",
+      "billed": true,
+      "elapsed": 292
+    },
+    {
+      "name": "cei transport",
+      "cachedUrl": "https://www.linkedin.com/company/cei-logistics",
+      "apolloUrl": null,
+      "status": "apollo_null",
+      "billed": true,
+      "elapsed": 215
+    }
+  ],
+  "phaseC": [
+    {
+      "name": "Mouser Electronics",
+      "apolloUrl": "https://www.linkedin.com/company/mouser-electronics",
+      "costCents": 0,
+      "elapsed": 211
+    },
+    {
+      "name": "Shopify",
+      "apolloUrl": "https://www.linkedin.com/company/shopify",
+      "costCents": 0,
+      "elapsed": 199
+    },
+    {
+      "name": "Evercore",
+      "apolloUrl": "https://www.linkedin.com/company/evercore-inc",
+      "costCents": 0,
+      "elapsed": 197
+    },
+    {
+      "name": "Renaissance Technologies",
+      "apolloUrl": "https://www.linkedin.com/company/renaissane-technologies",
+      "costCents": 0,
+      "elapsed": 198
+    },
+    {
+      "name": "Qualcomm",
+      "apolloUrl": "https://www.linkedin.com/company/qualcomm",
+      "costCents": 0,
+      "elapsed": 194
+    },
+    {
+      "name": "NACD New Jersey Chapter",
+      "apolloUrl": "https://www.linkedin.com/company/nacd-new-jersey",
+      "costCents": 0,
+      "elapsed": 193
+    },
+    {
+      "name": "Namakor Holdings",
+      "apolloUrl": "https://www.linkedin.com/company/nama-holdings",
+      "costCents": 0,
+      "elapsed": 196
+    },
+    {
+      "name": "National Equity Fund",
+      "apolloUrl": "https://www.linkedin.com/company/national-equity-fund",
+      "costCents": 0,
+      "elapsed": 203
+    },
+    {
+      "name": "National Institutes of Health",
+      "apolloUrl": "https://www.linkedin.com/company/national-institutes-of-health",
+      "costCents": 0,
+      "elapsed": 190
+    },
+    {
+      "name": "National Renewable Energy Laboratory",
+      "apolloUrl": "https://www.linkedin.com/company/national-renewable-energy-laboratory",
+      "costCents": 0,
+      "elapsed": 199
+    },
+    {
+      "name": "Chainlink Labs",
+      "apolloUrl": "https://www.linkedin.com/company/chainlink-labs",
+      "costCents": 0,
+      "elapsed": 193
+    },
+    {
+      "name": "Changi Airport Group",
+      "apolloUrl": "https://www.linkedin.com/company/changiairportgroup",
+      "costCents": 0,
+      "elapsed": 193
+    },
+    {
+      "name": "Changing The Present",
+      "apolloUrl": "https://www.linkedin.com/company/changing-the-present",
+      "costCents": 0,
+      "elapsed": 196
+    },
+    {
+      "name": "Chart Industries, Inc.",
+      "apolloUrl": "https://www.linkedin.com/company/chart-industries",
+      "costCents": 0,
+      "elapsed": 193
+    },
+    {
+      "name": "Chevron Phillips Chemical Company",
+      "apolloUrl": "https://www.linkedin.com/company/chevron-phillips-chemical-company",
+      "costCents": 0,
+      "elapsed": 192
+    }
+  ]
+}
