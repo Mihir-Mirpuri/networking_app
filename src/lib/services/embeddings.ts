@@ -26,8 +26,38 @@ function getOpenAIClient(): OpenAI | null {
 }
 
 /**
+ * Normalize a role string before embedding OR cache key derivation.
+ *
+ * LinkedIn profile headlines often pollute the role field with noise like
+ * "Senior SWE | Ex-Google | ML/AI Enthusiast | Stanford '18". Only the first
+ * segment is the actual role; the rest degrades embedding quality by shifting
+ * the vector away from clean query strings like "Senior SWE".
+ *
+ * Rule: take the substring before the first `|`, `·`, `—`, or `–` (with or
+ * without surrounding whitespace), then trim and lowercase. In-word hyphens
+ * (`Co-Founder`) are preserved — we only strip em/en dashes, not the plain
+ * ASCII hyphen.
+ */
+export function normalizeRoleForEmbedding(role: string): string {
+  if (!role) return '';
+  const firstSegment = role.split(/\s*[|·—–]\s*/)[0] ?? '';
+  return firstSegment.trim().toLowerCase();
+}
+
+/**
+ * Back-compat alias. Prefer `normalizeRoleForEmbedding` in new code.
+ * @deprecated Use normalizeRoleForEmbedding
+ */
+export function normalizeRole(role: string): string {
+  return normalizeRoleForEmbedding(role);
+}
+
+/**
  * Generate embedding for a single role string.
  * Returns null if OPENAI_API_KEY is not set.
+ *
+ * Input is normalized (headline-stripped + lowercased) before being sent to
+ * OpenAI, so noisy LinkedIn headlines produce the same embedding as clean titles.
  */
 export async function generateRoleEmbedding(role: string): Promise<number[] | null> {
   const client = getOpenAIClient();
@@ -36,11 +66,17 @@ export async function generateRoleEmbedding(role: string): Promise<number[] | nu
     return null;
   }
 
+  const normalized = normalizeRoleForEmbedding(role);
+  if (!normalized) {
+    console.warn(`[Embeddings] Skipping empty role after normalization (raw="${role}")`);
+    return null;
+  }
+
   try {
     const start = Date.now();
     const response = await client.embeddings.create({
       model: MODEL,
-      input: role.trim(),
+      input: normalized,
       dimensions: DIMENSIONS,
     });
     const totalTokens = response.usage?.total_tokens ?? 0;
@@ -49,13 +85,13 @@ export async function generateRoleEmbedding(role: string): Promise<number[] | nu
       action: 'ROLE_EMBEDDING',
       costUsd: openaiEmbeddingCost(totalTokens),
       durationMs: Date.now() - start,
-      metadata: { role: role.trim(), totalTokens },
+      metadata: { role: normalized, rawRole: role, totalTokens },
     });
-    console.log(`[Embeddings] Generated embedding for "${role}" in ${Date.now() - start}ms`);
+    console.log(`[Embeddings] Generated embedding for "${normalized}" (raw="${role}") in ${Date.now() - start}ms`);
     return response.data[0].embedding;
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    console.error(`[Embeddings] OpenAI API error for role="${role}": ${msg}`);
+    console.error(`[Embeddings] OpenAI API error for role="${role}" (normalized="${normalized}"): ${msg}`);
     return null;
   }
 }
@@ -66,11 +102,6 @@ export async function generateRoleEmbedding(role: string): Promise<number[] | nu
  * Roles come from dropdown menus (~50 distinct values), so this stays small.
  */
 const searchRoleCache = new Map<string, number[]>();
-
-/** Normalize a role string for cache lookup: lowercase + trim. */
-export function normalizeRole(role: string): string {
-  return role.trim().toLowerCase();
-}
 
 /**
  * Look up a cached role embedding — checks in-memory first, then the RoleEmbedding table.
@@ -151,7 +182,14 @@ export async function getSearchRoleEmbedding(role: string): Promise<number[] | n
 /**
  * Stamp a Person's role_embedding from the RoleEmbedding cache.
  * Never calls OpenAI — if the role isn't cached yet, it's a no-op.
- * The IS NULL guard makes this idempotent (won't overwrite existing embeddings).
+ *
+ * Uses `IS DISTINCT FROM` so the UPDATE only touches the row when the cached
+ * embedding differs from (or is missing compared to) the stored one. This:
+ *   - fills NULL embeddings (same as before),
+ *   - refreshes stale embeddings when the canonical one changes (e.g., after
+ *     the role normalization fix landed and a cleaner embedding was cached),
+ *   - is a no-op when the stored embedding already matches the cache (avoids
+ *     write churn since stampPersonRoleEmbedding is called on every profile save).
  */
 export async function stampPersonRoleEmbedding(personId: string, role: string): Promise<void> {
   const embedding = await lookupCachedEmbedding(role);
@@ -161,7 +199,7 @@ export async function stampPersonRoleEmbedding(personId: string, role: string): 
   await prisma.$executeRaw`
     UPDATE "Person"
     SET role_embedding = ${vectorString}::vector
-    WHERE id = ${personId} AND role_embedding IS NULL
+    WHERE id = ${personId} AND role_embedding IS DISTINCT FROM ${vectorString}::vector
   `;
 }
 

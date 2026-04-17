@@ -170,15 +170,15 @@ async function test5_stamp_noop_uncached() {
   console.log('  PASSED\n');
 }
 
-async function test6_stamp_no_overwrite() {
-  console.log('Test 6: stampPersonRoleEmbedding does not overwrite existing');
+async function test6_stamp_refreshes_when_cache_differs() {
+  console.log('Test 6: stampPersonRoleEmbedding refreshes when cached embedding differs');
   const { stampPersonRoleEmbedding, cacheRoleEmbedding } = await import('../src/lib/services/embeddings');
 
   const role = `${TEST_ROLE_PREFIX}designer`;
-  const originalEmbedding = fakEmbedding(60);
-  const cachedEmbedding = fakEmbedding(61);
+  const staleEmbedding = fakEmbedding(60);
+  const freshEmbedding = fakEmbedding(61);
 
-  // Create a Person and manually set a role_embedding
+  // Create a Person and manually set a "stale" role_embedding
   const person = await prisma.person.create({
     data: {
       fullName: 'Test Person 6',
@@ -186,24 +186,24 @@ async function test6_stamp_no_overwrite() {
       role: role,
     },
   });
-  const originalVector = `[${originalEmbedding.join(',')}]`;
+  const staleVector = `[${staleEmbedding.join(',')}]`;
   await prisma.$executeRaw`
-    UPDATE "Person" SET role_embedding = ${originalVector}::vector WHERE id = ${person.id}
+    UPDATE "Person" SET role_embedding = ${staleVector}::vector WHERE id = ${person.id}
   `;
 
-  // Cache a different embedding for the same role
-  await cacheRoleEmbedding(role, cachedEmbedding);
+  // Cache a DIFFERENT embedding for the same role — simulates the canonical
+  // embedding having changed (e.g., after role-normalization rolled out)
+  await cacheRoleEmbedding(role, freshEmbedding);
 
-  // Stamp — should NOT overwrite (IS NULL guard)
+  // Stamp — with IS DISTINCT FROM, this SHOULD refresh the stale embedding
   await stampPersonRoleEmbedding(person.id, role);
 
-  // Verify embedding is unchanged
   const rows = await prisma.$queryRaw<Array<{ embedding: string }>>`
     SELECT role_embedding::text as embedding FROM "Person" WHERE id = ${person.id}
   `;
   const current = JSON.parse(rows[0].embedding) as number[];
-  assert(arraysClose(current, originalEmbedding), 'Embedding should not have been overwritten');
-  assert(!arraysClose(current, cachedEmbedding), 'Should not match the cached (different) embedding');
+  assert(arraysClose(current, freshEmbedding), 'Embedding should have been refreshed to the fresh cached value');
+  assert(!arraysClose(current, staleEmbedding), 'The stale embedding should no longer be present');
 
   console.log('  PASSED\n');
 }
@@ -279,7 +279,7 @@ async function main() {
     await test3_three_tier_fallback();
     await test4_stamp_from_cache();
     await test5_stamp_noop_uncached();
-    await test6_stamp_no_overwrite();
+    await test6_stamp_refreshes_when_cache_differs();
     await test7_save_short_profile_integration();
     await test8_on_conflict_safety();
 
