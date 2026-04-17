@@ -45,3 +45,6 @@ prisma/migrations/
 .claude/
 .env*.local
 scripts/
+
+# git worktrees
+.worktrees/
